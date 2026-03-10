@@ -1,0 +1,10 @@
+{
+  // Root tsconfig — uses TypeScript project references.
+  // This allows main, preload, and renderer to have different compiler settings
+  // (e.g. different module systems) while sharing the same type-checking run.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.web.json" }
+  ]
+}

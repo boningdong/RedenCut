@@ -1,0 +1,91 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design Token System
+   All colours, spacing, and typography live here as CSS custom properties.
+   Components use var(--token) — never raw colour values in component code.
+   This makes a future dark/light toggle or plugin theme override a 1-file change.
+   ─────────────────────────────────────────────────────────────────────────────
+*/
+
+@import "tailwindcss";
+
+:root {
+  /* ── Palette (monochrome + single accent) ────────────────────────────────── */
+  --color-bg-primary:    #0f0f0f;   /* app background */
+  --color-bg-secondary:  #1a1a1a;   /* panels, sidebars */
+  --color-bg-elevated:   #242424;   /* cards, dropdowns */
+  --color-bg-hover:      #2e2e2e;   /* hover states */
+  --color-border:        #2e2e2e;   /* dividers */
+  --color-border-subtle: #222222;
+
+  --color-text-primary:  #e8e8e8;
+  --color-text-secondary:#888888;
+  --color-text-muted:    #555555;
+
+  --color-accent:        #6366f1;   /* indigo — the only chromatic value */
+  --color-accent-hover:  #818cf8;
+  --color-accent-muted:  rgba(99, 102, 241, 0.15);
+
+  --color-danger:        #ef4444;   /* muted regions */
+  --color-danger-muted:  rgba(239, 68, 68, 0.12);
+
+  --color-success:       #22c55e;
+
+  /* ── Typography ──────────────────────────────────────────────────────────── */
+  --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  --text-xs:   0.6875rem;  /* 11px — labels */
+  --text-sm:   0.8125rem;  /* 13px — transcript, secondary UI */
+  --text-base: 0.9375rem;  /* 15px — body */
+  --text-lg:   1.0625rem;  /* 17px — headings */
+
+  /* ── Spacing (4px grid) ─────────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* ── Waveform-specific ──────────────────────────────────────────────────── */
+  --waveform-color:          #4f46e5;   /* inactive waveform */
+  --waveform-progress-color: #818cf8;   /* played portion */
+  --waveform-cursor-color:   #ffffff;
+  --waveform-region-muted:   rgba(239, 68, 68, 0.20);
+}
+
+/* ── Base resets ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;   /* no body scrollbars — panels manage their own scroll */
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  -webkit-font-smoothing: antialiased;
+  /* Disable text selection on the chrome (UI chrome, not browser):
+     individual panels re-enable selection for their content. */
+  user-select: none;
+}
+
+/* Re-enable text selection inside content panels */
+.selectable { user-select: text; }
+
+/* ── Scrollbar styling (WebKit/Blink — Electron/Chromium) ────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }

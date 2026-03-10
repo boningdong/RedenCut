@@ -1,0 +1,27 @@
+{
+  // TypeScript config for the Node.js side: main process + preload scripts.
+  // Uses CommonJS modules because Electron's main process is Node.js CJS.
+  // Also covers electron.vite.config.ts itself (the build tool config).
+  "compilerOptions": {
+    "composite": true,            // required for project references
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,      // allows `import x from 'cjs-module'`
+    "skipLibCheck": true,
+    "outDir": "dist-electron",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@main/*": ["src/main/*"]
+    }
+  },
+  "include": [
+    "electron.vite.config.*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*"
+  ]
+}

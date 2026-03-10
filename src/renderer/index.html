@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Content Security Policy:
+      - script-src 'self': only load scripts from same origin
+      - style-src 'self' 'unsafe-inline': allow inline styles (needed for Tailwind CSS-in-JS)
+      Note: In dev mode this page is served by Vite dev server; CSP does not block HMR.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src 'self' blob: file:; img-src 'self' data: blob:"
+    />
+    <title>PodCut</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Vite entry point — electron-vite resolves this to src/renderer/src/main.tsx -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
