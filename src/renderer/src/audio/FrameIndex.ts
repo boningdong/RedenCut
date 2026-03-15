@@ -172,9 +172,36 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
 async function buildWavIndex(url: string): Promise<FrameIndex> {
   console.log('[FrameIndex] Building WAV index for', url)
 
-  // Read the 44-byte header
+  // Fetch the first 44 bytes using a streaming read — safe for large WAV files.
+  // IMPORTANT: do NOT call resp.arrayBuffer() here.  If the server ignores the
+  // Range header and returns the full body, arrayBuffer() would load hundreds of
+  // MB into renderer memory and crash.
   const headResp = await fetch(url, { headers: { Range: 'bytes=0-43' } })
-  const header = new DataView(await headResp.arrayBuffer())
+
+  // ── Total file size ───────────────────────────────────────────────────────
+  let totalBytes = 0
+  const cr      = headResp.headers.get('content-range') ?? ''
+  const crMatch = cr.match(/\/(\d+)$/)
+  if (crMatch) {
+    totalBytes = parseInt(crMatch[1])
+  } else {
+    totalBytes = parseInt(headResp.headers.get('content-length') ?? '0')
+  }
+
+  // ── Stream-read only the first 44 bytes ───────────────────────────────────
+  const reader  = headResp.body!.getReader()
+  const scratch = new Uint8Array(44)
+  let   bytesRead = 0
+  while (bytesRead < 44) {
+    const { done, value } = await reader.read()
+    if (done || !value) break
+    const toCopy = Math.min(value.length, 44 - bytesRead)
+    scratch.set(value.subarray(0, toCopy), bytesRead)
+    bytesRead += toCopy
+  }
+  reader.cancel().catch(() => { /* ignore */ })
+
+  const header = new DataView(scratch.buffer)
 
   // WAV header: "RIFF" at 0, "WAVE" at 8, "fmt " at 12
   const channels   = header.getUint16(22, true)
@@ -185,11 +212,7 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   const bytesPerSample = (bitDepth / 8) * channels
   const bytesPerSecond = sampleRate * bytesPerSample
 
-  // Get total file size
-  const contentRange = headResp.headers.get('content-range') ?? ''
-  const totalMatch = contentRange.match(/\/(\d+)$/)
-  const totalBytes = totalMatch ? parseInt(totalMatch[1]) : 0
-  const dataBytes = totalBytes - dataOffset
+  const dataBytes = totalBytes > 0 ? totalBytes - dataOffset : 0
 
   const frames: FrameEntry[] = []
   const stepSeconds = 1.0  // one entry per second

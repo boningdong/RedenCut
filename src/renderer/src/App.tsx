@@ -163,7 +163,12 @@ export default function App() {
    *   4. Generate waveform peaks (may take a few seconds for large files)
    *   5. Transition to 'ready' state → WaveformView mounts
    */
-  const loadAudio = useCallback(async (filePath: string, metadata: AudioMetadata) => {
+  const loadAudio = useCallback(async (
+    filePath: string,
+    metadata: AudioMetadata,
+    /** Pass false when the timeline is already loaded (e.g. opening a saved project). */
+    shouldInitTimeline = true,
+  ) => {
     setOpenedFile({ filePath, metadata })
     setLoadingState({ status: 'generating-peaks', progress: 0 })
 
@@ -176,8 +181,10 @@ export default function App() {
     }
     resetPlayback()
 
-    // ── 2. Initialise timeline (uses filePath as sourceFileId for simplicity) ─
-    useTimelineStore.getState().initFromFile(filePath, metadata.durationSeconds)
+    // ── 2. Initialise timeline (skipped when project was already loaded above) ─
+    if (shouldInitTimeline) {
+      useTimelineStore.getState().initFromFile(filePath, metadata.durationSeconds)
+    }
     const { tracks: initTracks } = useTimelineStore.getState()
     console.log(`[App] timeline init — ${initTracks.length} tracks, sourceFileId=${filePath}`)
 
@@ -300,7 +307,8 @@ export default function App() {
         console.log(`[App] opened legacy project — migrated ${project.edits.length} edits to clips`)
       }
 
-      await loadAudio(project.source.file, metadata)
+      // false = don't call initFromFile — timeline is already set above
+      await loadAudio(project.source.file, metadata, false)
       setIsDirty(false)
     } catch (err) { handleError(err) }
   }, [loadAudio, handleError, resetEditor, resetTranscript, resetTimeline,

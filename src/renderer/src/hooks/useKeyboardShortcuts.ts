@@ -36,12 +36,13 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
     const handle = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
 
-      // Don't intercept while typing in an actual input field
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) return
+      // Don't intercept while typing in a real input field.
+      // contentEditable (transcript panel) gets a carve-out for Space so the
+      // user can play/pause without clicking away from the transcript first.
+      const isTypingField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+      const isContentEditable = target.isContentEditable
+      if (isTypingField) return
+      if (isContentEditable && e.code !== 'Space') return
 
       const isMeta = e.metaKey || e.ctrlKey
       const player = getAudioPlayerInstance()

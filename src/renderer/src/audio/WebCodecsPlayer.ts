@@ -53,25 +53,61 @@ interface WavInfo {
  * Fetch the first 256 bytes of a WAV file and parse the fmt/data chunk headers.
  * 256 bytes is enough to cover a standard 44-byte PCM header plus any LIST/INFO
  * metadata that some encoders insert before the data chunk.
+ *
+ * Uses a streaming read so that large WAV files (700 MB+) are never fully
+ * buffered in the renderer — even if the server ignores the Range header and
+ * returns the entire file body, we consume only the first 256 bytes and
+ * cancel the rest of the stream.
  */
 async function parseWavInfo(url: string): Promise<WavInfo> {
   const resp = await fetch(url, { headers: { Range: 'bytes=0-255' } })
-  const buf  = new Uint8Array(await resp.arrayBuffer())
-  const view = new DataView(buf.buffer, buf.byteOffset)
 
-  // Get total file size from the Content-Range response header
+  // ── Total file size ───────────────────────────────────────────────────────
+  // 206 Partial Content: read from Content-Range: bytes 0-255/<total>
+  // 200 OK (Range not honoured): read from Content-Length
+  let totalBytes = 0
   const contentRange = resp.headers.get('content-range') ?? ''
-  const totalMatch   = contentRange.match(/\/(\d+)$/)
-  const totalBytes   = totalMatch ? parseInt(totalMatch[1]) : 0
+  const crMatch      = contentRange.match(/\/(\d+)$/)
+  if (crMatch) {
+    totalBytes = parseInt(crMatch[1])
+  } else {
+    totalBytes = parseInt(resp.headers.get('content-length') ?? '0')
+  }
 
+  // ── Stream-read at most 256 bytes ─────────────────────────────────────────
+  // IMPORTANT: do NOT call resp.arrayBuffer() — if Range is not honoured the
+  // body is the full WAV (can be hundreds of MB) and would OOM the renderer.
+  const reader  = resp.body!.getReader()
+  const scratch = new Uint8Array(256)
+  let bytesRead = 0
+  while (bytesRead < 256) {
+    const { done, value } = await reader.read()
+    if (done || !value) break
+    const toCopy = Math.min(value.length, 256 - bytesRead)
+    scratch.set(value.subarray(0, toCopy), bytesRead)
+    bytesRead += toCopy
+  }
+  reader.cancel().catch(() => { /* ignore stream-cancel errors */ })
+
+  if (bytesRead < 36) {
+    throw new Error(`[WebCodecsPlayer] WAV header too short: only ${bytesRead} bytes readable`)
+  }
+
+  const buf  = scratch.subarray(0, bytesRead)
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
+
+  // ── Parse fmt fields from fixed offsets ───────────────────────────────────
+  // Valid for standard WAV where "fmt " is the first sub-chunk (offset 12).
+  // DAW exports that insert a JUNK chunk first will have wrong values here,
+  // but the vast majority of podcast audio uses standard layout.
   const audioFormat = view.getUint16(20, true)  // 1 = PCM, 3 = IEEE 754 float
   const channels    = view.getUint16(22, true)
   const sampleRate  = view.getUint32(24, true)
   const bitDepth    = view.getUint16(34, true)
 
-  // Walk sub-chunks after the RIFF/WAVE/fmt headers to find "data".
+  // ── Walk sub-chunks to find "data" offset ─────────────────────────────────
   // Standard layout: RIFF(4) + size(4) + WAVE(4) + fmt (8+16) = 44 bytes.
-  // Non-standard: extra chunks (LIST, INFO, JUNK) may come first.
+  // Non-standard: extra chunks (LIST, INFO, JUNK) may come before "data".
   let dataOffset = 12  // start just past "RIFF" + fileSize + "WAVE"
   while (dataOffset + 8 <= buf.byteLength) {
     const id = String.fromCharCode(
@@ -224,8 +260,27 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
     // ── WAV: raw PCM path (bypasses AudioDecoder) ─────────────────────────
     if (url.toLowerCase().includes('.wav')) {
-      const wavInfo  = await parseWavInfo(url)
-      await this.ensureCtx()  // still need AudioContext for the worklet
+      // Step A: parse WAV header (streaming — safe for large files)
+      let wavInfo: WavInfo
+      try {
+        wavInfo = await parseWavInfo(url)
+        console.log(
+          `[WebCodecsPlayer] WAV header — ${wavInfo.channels}ch ${wavInfo.sampleRate}Hz ` +
+          `${wavInfo.bitDepth}-bit${wavInfo.isFloat ? ' float' : ''} ` +
+          `dataOffset=${wavInfo.dataOffset} totalBytes=${wavInfo.totalBytes}`,
+        )
+      } catch (err) {
+        console.error('[WebCodecsPlayer] parseWavInfo failed:', err)
+        throw err
+      }
+
+      // Step B: set up AudioContext + worklet (needed for PCM playback too)
+      try {
+        await this.ensureCtx()
+      } catch (err) {
+        console.error('[WebCodecsPlayer] ensureCtx failed:', err)
+        throw err
+      }
 
       // Precise duration from file size and format, not the approximated FrameIndex
       const pcmBytes = wavInfo.totalBytes - wavInfo.dataOffset

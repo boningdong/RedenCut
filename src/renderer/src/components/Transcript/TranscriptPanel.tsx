@@ -160,6 +160,17 @@ export function TranscriptPanel({
         return
       }
 
+      // Space — play/pause audio.
+      // We call stopPropagation so the document-level useKeyboardShortcuts
+      // handler doesn't fire a second time (it already carves out Space for
+      // contentEditable, but belt-and-suspenders never hurts).
+      if (e.code === 'Space') {
+        e.preventDefault()
+        e.stopPropagation()
+        getAudioPlayerInstance()?.playPause().catch(console.error)
+        return
+      }
+
       // Prevent the user from actually typing into the transcript
       if (e.key.length === 1) {
         e.preventDefault()

@@ -18,7 +18,7 @@
 // Log prefix: [WaveformView]
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.js'
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js'
@@ -177,6 +177,31 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       console.warn('[WaveformView] player not yet available at mount — cursor will not move until file opens')
     }
 
+    // ── Seed clip regions after WaveSurfer finishes its async layout pass ──
+    // WaveSurfer defers internal rendering even when initialized from peaks,
+    // so addRegion() calls made before 'ready' fires land at px-offset 0.
+    // Reading from the store here avoids a stale-closure on `tracks`.
+    ws.on('ready', () => {
+      const { tracks: initTracks, selectedClipId: initSel } = useTimelineStore.getState()
+      initTracks.forEach((track) => {
+        track.clips.forEach((clip) => {
+          if (!clip.muted) return
+          const outputEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
+          wsRegions.addRegion({
+            id:     `clip-${clip.id}`,
+            start:  clip.outputStart,
+            end:    outputEnd,
+            color:  clip.id === initSel
+              ? 'rgba(239, 68, 68, 0.45)'
+              : 'rgba(239, 68, 68, 0.22)',
+            drag:   false,
+            resize: false,
+          })
+        })
+      })
+      console.log(`[WaveformView] seeded ${initTracks.flatMap(t => t.clips).filter(c => c.muted).length} muted region(s) after ready`)
+    })
+
     wsRef.current = ws
     setWaveSurferInstance(ws)
     setRegionsPluginInstance(wsRegions)
@@ -196,8 +221,10 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   }, [peaks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync muted clip regions → WaveSurfer ──────────────────────────────────
-  // Re-runs whenever tracks or selectedClipId change.
-  // Only muted clips get a red region overlay; unmuted clips are invisible.
+  // Re-runs when tracks or selectedClipId change (user mutes/unmutes/selects).
+  // The initial seed after a file load is handled by the ws.on('ready') callback
+  // above, which fires after WaveSurfer has finished its async layout pass and
+  // can correctly position regions on screen.
   useEffect(() => {
     const wsRegions = regionsRef.current
     if (!wsRegions) return
@@ -226,6 +253,21 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     })
   }, [tracks, selectedClipId])
 
+  // ── Split markers (React-rendered, not WaveSurfer regions) ────────────────
+  // Computed as absolute-positioned divs so they're always exactly 2 px wide
+  // on screen — identical in concept to WaveSurfer's own cursor line.
+  const splitPositions = useMemo(() => {
+    if (peaks.durationSeconds <= 0) return []
+    const positions: Array<{ id: string; time: number }> = []
+    tracks.forEach((track) => {
+      const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
+      sorted.slice(1).forEach((clip) => {
+        positions.push({ id: clip.id, time: clip.outputStart })
+      })
+    })
+    return positions
+  }, [tracks, peaks.durationSeconds])
+
   // ── Sync selection removal from outside (e.g. after a keyboard shortcut) ─
   useEffect(() => {
     if (selection !== null) return
@@ -246,8 +288,27 @@ export function WaveformView({ peaks }: WaveformViewProps) {
         borderBottom: '1px solid var(--color-border)',
       }}
     >
-      {/* Main waveform canvas */}
-      <div ref={containerRef} style={{ padding: '8px 0', cursor: 'crosshair' }} />
+      {/* Main waveform canvas + split-marker overlays */}
+      <div style={{ position: 'relative' }}>
+        <div ref={containerRef} style={{ padding: '8px 0', cursor: 'crosshair' }} />
+        {/* Split markers: 2-px-wide lines, always the same visual width regardless of
+            audio duration — same concept as WaveSurfer's own cursor element. */}
+        {splitPositions.map(({ id, time }) => (
+          <div
+            key={id}
+            style={{
+              position:        'absolute',
+              top:             0,
+              bottom:          0,
+              left:            `calc(${(time / peaks.durationSeconds) * 100}% - 1px)`,
+              width:           2,
+              backgroundColor: 'rgba(99, 102, 241, 0.85)',
+              pointerEvents:   'none',
+              zIndex:          10,
+            }}
+          />
+        ))}
+      </div>
 
       {/* Timeline ruler */}
       <div
