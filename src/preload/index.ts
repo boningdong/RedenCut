@@ -23,13 +23,16 @@ const api = {
     openFile: () =>
       ipcRenderer.invoke('audio:open-file'),
 
+    probeFile: (filePath: string) =>
+      ipcRenderer.invoke('audio:probe-file', filePath),
+
     generatePeaks: (filePath: string) =>
       ipcRenderer.invoke('audio:generate-peaks', filePath),
   },
 
   project: {
-    open: (filePath: string) =>
-      ipcRenderer.invoke('project:open', filePath),
+    openDialog: () =>
+      ipcRenderer.invoke('project:open-dialog'),
 
     save: (project: unknown, filePath: string) =>
       ipcRenderer.invoke('project:save', project, filePath),
@@ -38,32 +41,29 @@ const api = {
       ipcRenderer.invoke('project:save-as', project),
   },
 
+  transcript: {
+    checkAvailability: () =>
+      ipcRenderer.invoke('transcript:check-availability'),
+
+    generate: (filePath: string, language?: string) =>
+      ipcRenderer.invoke('transcript:generate', filePath, language),
+  },
+
   // ── Push event subscriptions ───────────────────────────────────────────────
-  // Pattern: register a listener, return a cleanup function.
-  // Renderer usage:
-  //   useEffect(() => {
-  //     return window.electronAPI.on.peaksProgress((p) => setProgress(p))
-  //   }, [])
   on: {
     peaksProgress: (callback: (progress: number) => void) => {
       const handler = (_event: IpcRendererEvent, progress: number) => callback(progress)
       ipcRenderer.on('audio:peaks-progress', handler)
-      // Return cleanup fn — caller must call this to avoid listener leak
       return () => ipcRenderer.off('audio:peaks-progress', handler)
+    },
+
+    transcriptProgress: (callback: (status: string) => void) => {
+      const handler = (_event: IpcRendererEvent, status: string) => callback(status)
+      ipcRenderer.on('transcript:progress', handler)
+      return () => ipcRenderer.off('transcript:progress', handler)
     },
   },
 } satisfies IElectronAPI
 
 // Expose to the renderer as window.electronAPI
 contextBridge.exposeInMainWorld('electronAPI', api)
-
-// ── Learning note ─────────────────────────────────────────────────────────────
-// ipcRenderer.invoke(channel, ...args) → sends a message to ipcMain.handle()
-//   and returns a Promise that resolves with the handler's return value.
-//   This is the request/response pattern (renderer asks, main responds).
-//
-// ipcRenderer.on(channel, handler) → subscribes to one-way events pushed
-//   from the main process via webContents.send(). This is the event/push pattern.
-//
-// Never use ipcRenderer.send/sendSync — they are fire-and-forget with no
-// type safety. Always use invoke/handle for request-response.

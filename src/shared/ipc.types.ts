@@ -12,7 +12,7 @@
 //     no functions as arguments — Promises are fine as return values)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { AudioMetadata, PeakData, ProjectFile } from './project.types'
+import type { AudioMetadata, PeakData, ProjectFile, Transcript } from './project.types'
 
 export interface IElectronAPI {
   audio: {
@@ -24,6 +24,12 @@ export interface IElectronAPI {
     openFile(): Promise<{ filePath: string; metadata: AudioMetadata } | null>
 
     /**
+     * Probes an audio file without opening a dialog.
+     * Used when reopening an audio file from a saved project.
+     */
+    probeFile(filePath: string): Promise<AudioMetadata>
+
+    /**
      * Generates waveform peak data for the given audio file path.
      * The result is cached as <basename>.peaks.json alongside the audio file.
      * Emits progress events on the 'audio:peaks-progress' channel.
@@ -32,17 +38,37 @@ export interface IElectronAPI {
   }
 
   project: {
-    /** Parses and validates a .podcut.json file from disk. */
-    open(filePath: string): Promise<ProjectFile>
+    /**
+     * Opens a native file dialog filtered to .podcut files, parses and
+     * validates the project JSON, then returns the project + its file path.
+     * Returns null if the user cancelled.
+     */
+    openDialog(): Promise<{ projectPath: string; project: ProjectFile } | null>
 
-    /** Serialises and writes a ProjectFile to disk. */
+    /** Serialises and writes a ProjectFile to the given path. */
     save(project: ProjectFile, filePath: string): Promise<void>
 
     /**
      * Opens a Save As dialog, then writes the file.
      * Returns the chosen path so the renderer can update its state.
+     * Returns null if the user cancelled.
      */
     saveAs(project: ProjectFile): Promise<string | null>
+  }
+
+  transcript: {
+    /**
+     * Checks whether the local Whisper.cpp binary and a model are available.
+     * Returns null if ready, or an actionable error string if not.
+     */
+    checkAvailability(): Promise<string | null>
+
+    /**
+     * Transcribes the given audio file using whisper.cpp.
+     * Returns word-level timestamps. May take minutes for long files.
+     * Emits progress events on the 'transcript:progress' channel.
+     */
+    generate(filePath: string, language?: string): Promise<Transcript>
   }
 
   // ── Push-event subscriptions ─────────────────────────────────────────────
@@ -53,6 +79,12 @@ export interface IElectronAPI {
   on: {
     /** Fired periodically during peak generation. progress is 0–1. */
     peaksProgress(callback: (progress: number) => void): () => void
+
+    /**
+     * Fired during transcription with a status string, e.g. "Processing segment 4/12".
+     * The renderer can display this as a progress label.
+     */
+    transcriptProgress(callback: (status: string) => void): () => void
   }
 }
 

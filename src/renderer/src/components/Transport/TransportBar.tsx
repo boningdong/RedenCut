@@ -1,12 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // TransportBar
 //
-// Play/pause controls + time display. Lives at the bottom of the app.
-// Reads from the playback store; controls wavesurfer via getWaveSurferInstance().
+// Play/pause controls, time display, and Preview Mode toggle.
+// Lives at the bottom of the app.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useCallback } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
+import { useEditorStore } from '../../stores/editor.store'
 import { getWaveSurferInstance } from '../Waveform/WaveformView'
 import { Button } from '../ui/Button'
 
@@ -19,22 +20,36 @@ function formatTime(seconds: number): string {
 }
 
 export function TransportBar() {
-  const isPlaying = usePlaybackStore((s) => s.isPlaying)
+  const isPlaying   = usePlaybackStore((s) => s.isPlaying)
   const currentTime = usePlaybackStore((s) => s.currentTime)
-  const duration = usePlaybackStore((s) => s.duration)
+  const duration    = usePlaybackStore((s) => s.duration)
+
+  const previewMode      = useEditorStore((s) => s.previewMode)
+  const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode)
 
   const handlePlayPause = useCallback(() => {
-    getWaveSurferInstance()?.playPause()
-  }, [])
+    const ws = getWaveSurferInstance()
+    if (!ws) return
+
+    // Preview Mode: if about to play and playhead is inside a muted region,
+    // jump to the end of that region before playing.
+    if (!ws.isPlaying() && previewMode) {
+      const { edits } = useEditorStore.getState()
+      const time = ws.getCurrentTime()
+      const muted = edits.filter((e) => e.type === 'mute')
+      const inside = muted.find((e) => time >= e.start && time < e.end)
+      if (inside) ws.setTime(inside.end)
+    }
+
+    ws.playPause()
+  }, [previewMode])
 
   const handleSkipToStart = useCallback(() => {
-    const ws = getWaveSurferInstance()
-    if (ws) ws.seekTo(0)
+    getWaveSurferInstance()?.seekTo(0)
   }, [])
 
   const handleSkipToEnd = useCallback(() => {
-    const ws = getWaveSurferInstance()
-    if (ws) ws.seekTo(1)
+    getWaveSurferInstance()?.seekTo(1)
   }, [])
 
   return (
@@ -57,7 +72,7 @@ export function TransportBar() {
       </Button>
 
       {/* Play / Pause */}
-      <Button size="sm" variant="primary" onClick={handlePlayPause} title={isPlaying ? 'Pause' : 'Play'}>
+      <Button size="sm" variant="primary" onClick={handlePlayPause} title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}>
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </Button>
 
@@ -83,6 +98,42 @@ export function TransportBar() {
         <span style={{ color: 'var(--color-text-muted)' }}>/</span>
         <span>{formatTime(duration)}</span>
       </div>
+
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Preview Mode toggle */}
+      <button
+        onClick={togglePreviewMode}
+        title="Preview Mode: skip muted regions during playback"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: 'none',
+          border: `1px solid ${previewMode ? 'var(--color-accent)' : 'var(--color-border)'}`,
+          borderRadius: 4,
+          color: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
+          fontSize: 'var(--text-xs)',
+          padding: '3px 8px',
+          cursor: 'pointer',
+          letterSpacing: '0.04em',
+          transition: 'color 0.15s, border-color 0.15s',
+        }}
+      >
+        {/* Dot indicator */}
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            backgroundColor: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
+            flexShrink: 0,
+            transition: 'background-color 0.15s',
+          }}
+        />
+        Preview
+      </button>
     </div>
   )
 }

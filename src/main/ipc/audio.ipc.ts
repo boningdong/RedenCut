@@ -47,6 +47,13 @@ ipcMain.handle('audio:open-file', async (event) => {
   return { filePath, metadata }
 })
 
+// ── Channel: audio:probe-file ─────────────────────────────────────────────────
+// Probes a file without opening a dialog — used when reopening a project file
+// where the audio path is already known.
+ipcMain.handle('audio:probe-file', async (_event, filePath: string) => {
+  return probeAudio(filePath)
+})
+
 // ── Channel: audio:generate-peaks ────────────────────────────────────────────
 // Generates (or loads from cache) waveform peaks for a given audio file.
 // Pushes progress events to the renderer on 'audio:peaks-progress'.

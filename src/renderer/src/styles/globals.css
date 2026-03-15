@@ -81,6 +81,10 @@ body {
 /* Re-enable text selection inside content panels */
 .selectable { user-select: text; }
 
+
+/* Waveform region labels */
+.wavesurfer-region > div { pointer-events: none; }
+
 /* ── Scrollbar styling (WebKit/Blink — Electron/Chromium) ────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

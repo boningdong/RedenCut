@@ -38,6 +38,12 @@ export const WordSchema = z.object({
   confidence: z.number().optional(),
   /** Speaker label, e.g. "A", "B". Populated by diarization. */
   speaker: z.string().optional(),
+  /**
+   * True when the user has deleted this word (muted its audio region).
+   * The word stays in the array — muted words are never removed — so undo/redo
+   * and boundary adjustments remain possible.
+   */
+  muted: z.boolean().default(false),
 })
 export type Word = z.infer<typeof WordSchema>
 
@@ -57,7 +63,7 @@ export type Transcript = z.infer<typeof TranscriptSchema>
 // An Edit is a non-destructive instruction applied during export. The source
 // audio is never modified; edits are metadata only.
 
-export const EditTypeSchema = z.enum(['mute'])
+export const EditTypeSchema = z.enum(['mute', 'cut'])
 export type EditType = z.infer<typeof EditTypeSchema>
 
 export const EditSchema = z.object({

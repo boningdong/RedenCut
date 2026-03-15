@@ -37,6 +37,16 @@ const FFMPEG_CANDIDATES = [
   '/usr/bin/ffmpeg',
 ]
 
+// whisper.cpp installed via `brew install whisper-cpp` provides `whisper-cli`.
+// Older formula versions used `whisper` as the binary name.
+const WHISPER_CANDIDATES = [
+  '/opt/homebrew/bin/whisper-cli',   // Apple Silicon (brew install whisper-cpp)
+  '/usr/local/bin/whisper-cli',      // Intel Mac
+  '/usr/bin/whisper-cli',            // Linux
+  '/opt/homebrew/bin/whisper',       // older whisper-cpp formula name
+  '/usr/local/bin/whisper',
+]
+
 function isExecutable(filePath: string): boolean {
   try {
     const stat = statSync(filePath)
@@ -88,6 +98,7 @@ function resolveFromStaticPackage(packageName: string): string | null {
 
 let _ffprobePath: string | null = null
 let _ffmpegPath: string | null = null
+let _whisperPath: string | null = null
 
 export function getFfprobePath(): string {
   if (_ffprobePath) return _ffprobePath
@@ -133,4 +144,34 @@ export function getFfmpegPath(): string {
     'Install it with: brew install ffmpeg\n' +
     'Then restart the app.',
   )
+}
+
+/**
+ * Returns the path to the whisper-cli binary, or null if not found.
+ * Unlike ffprobe/ffmpeg, whisper is optional — callers should check
+ * availability via `getWhisperPath()` returning null before showing UI.
+ */
+export function getWhisperPath(): string | null {
+  if (_whisperPath !== null) return _whisperPath   // cached (may be empty string = not found)
+
+  const fromPath = findInPath(WHISPER_CANDIDATES, 'whisper-cli')
+  if (fromPath) {
+    _whisperPath = fromPath
+    return _whisperPath
+  }
+
+  // Also try plain `whisper` name via which
+  try {
+    const result = execFileSync('which', ['whisper'], {
+      encoding: 'utf-8',
+      timeout: 3000,
+    }).trim()
+    if (result && isExecutable(result)) {
+      _whisperPath = result
+      return _whisperPath
+    }
+  } catch { /* not found */ }
+
+  _whisperPath = ''   // cache negative result
+  return null
 }
