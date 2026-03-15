@@ -44,10 +44,11 @@ export function TranscriptPanel({
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const duration    = usePlaybackStore((s) => s.duration)
 
-  const words          = useTranscriptStore((s) => s.words)
-  const showMutedWords = useTranscriptStore((s) => s.showMutedWords)
-  const muteWords      = useTranscriptStore((s) => s.muteWords)
+  const words           = useTranscriptStore((s) => s.words)
+  const showMutedWords  = useTranscriptStore((s) => s.showMutedWords)
+  const muteWords       = useTranscriptStore((s) => s.muteWords)
   const toggleShowMuted = useTranscriptStore((s) => s.toggleShowMutedWords)
+  const shiftTimestamps = useTranscriptStore((s) => s.shiftTimestamps)
 
   const addEdit      = useEditorStore((s) => s.addEdit)
   const setSelection = useEditorStore((s) => s.setSelection)
@@ -108,6 +109,18 @@ export function TranscriptPanel({
     },
     [duration],
   )
+
+  // ── Manual timestamp calibration ─────────────────────────────────────────
+  // The user positions the playhead exactly where the first word starts, then
+  // clicks "Sync to playhead". We shift every word's timestamps by the
+  // difference so the first word aligns with the current playhead position.
+  const handleCalibrateOffset = useCallback(() => {
+    if (words.length === 0) return
+    const firstWord = words[0]
+    const offset = currentTime - firstWord.start
+    if (Math.abs(offset) < 0.01) return   // already aligned — nothing to do
+    shiftTimestamps(offset)
+  }, [words, currentTime, shiftTimestamps])
 
   // ── Delete/Backspace: mute the words that intersect the native selection ──
   const handleDeleteFromSelection = useCallback(() => {
@@ -182,13 +195,23 @@ export function TranscriptPanel({
           Transcript
         </span>
         {hasTranscript && (
-          <button
-            onClick={toggleShowMuted}
-            style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '2px 4px' }}
-            title={showMutedWords ? 'Hide deleted words' : 'Show deleted words'}
-          >
-            {showMutedWords ? 'Hide deleted' : 'Show deleted'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              onClick={handleCalibrateOffset}
+              style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '2px 4px' }}
+              title="Shift all word timestamps so the first word aligns with the current playhead position"
+            >
+              Sync to playhead
+            </button>
+            <span style={{ color: 'var(--color-border)', userSelect: 'none' }}>·</span>
+            <button
+              onClick={toggleShowMuted}
+              style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '2px 4px' }}
+              title={showMutedWords ? 'Hide deleted words' : 'Show deleted words'}
+            >
+              {showMutedWords ? 'Hide deleted' : 'Show deleted'}
+            </button>
+          </div>
         )}
       </div>
 

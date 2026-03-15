@@ -34,7 +34,7 @@ import { mkdtemp, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir, homedir } from 'os'
 import { existsSync } from 'fs'
-import { getWhisperPath } from '../audio/binaries'
+import { getWhisperPath, getFfmpegPath } from '../audio/binaries'
 import type { ITranscriber, TranscribeOptions } from '../../shared/transcriber.types'
 import type { Transcript, Word } from '../../shared/project.types'
 
@@ -227,6 +227,51 @@ function extractWords(segment: WhisperSegment): Word[] {
   }))
 }
 
+// ── Leading silence detection ─────────────────────────────────────────────────
+/**
+ * Detects how many milliseconds of silence precede the first audible speech.
+ *
+ * Runs FFmpeg's `silencedetect` filter and reads the first `silence_end` line
+ * from stderr, e.g. "silence_end: 5.023 | silence_duration: 5.023".
+ *
+ * Returns 0 if the audio starts immediately (no leading silence) or if
+ * detection fails for any reason — making this always safe to call.
+ *
+ * The result is passed to whisper as `--offset-t <ms>` so that whisper's
+ * internal timestamp coordinate system starts at the real speech onset rather
+ * than at position 0 of the file.
+ */
+async function detectLeadingSilence(audioFilePath: string): Promise<number> {
+  return new Promise((resolve) => {
+    let ffmpegPath: string
+    try { ffmpegPath = getFfmpegPath() }
+    catch { return resolve(0) }   // ffmpeg not available — not fatal here
+
+    const proc = spawn(ffmpegPath, [
+      '-i', audioFilePath,
+      '-af', 'silencedetect=n=-40dB:d=0.1',   // silence < -40 dB for >= 0.1 s
+      '-f', 'null', '-',
+    ], { stdio: ['ignore', 'ignore', 'pipe'] })
+
+    let stderr = ''
+    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+
+    proc.on('close', () => {
+      // FFmpeg prints: "[silencedetect] silence_end: 5.023 | silence_duration: 5.023"
+      // We want only the FIRST silence_end — that's the end of the leading silence.
+      const match = stderr.match(/silence_end:\s*([\d.]+)/)
+      if (match) {
+        const endSeconds = parseFloat(match[1])
+        resolve(Math.round(endSeconds * 1000))   // convert to integer ms
+      } else {
+        resolve(0)   // audio starts immediately — no offset needed
+      }
+    })
+
+    proc.on('error', () => resolve(0))   // non-fatal: proceed without offset
+  })
+}
+
 // ── WhisperTranscriber ────────────────────────────────────────────────────────
 export class WhisperTranscriber implements ITranscriber {
   readonly name = 'Whisper.cpp (local)'
@@ -280,6 +325,14 @@ export class WhisperTranscriber implements ITranscriber {
     const outputPrefix = join(tmpDir, 'out')
 
     try {
+      onProgress?.('Detecting silence…')
+
+      // Detect leading silence so whisper's timestamps are correctly anchored.
+      // whisper always starts its first timestamp at 0 (the chunk window start),
+      // so without this offset the first words appear to start at 0 s even when
+      // there is several seconds of silence before any speech.
+      const leadingSilenceMs = await detectLeadingSilence(audioFilePath)
+
       onProgress?.('Starting transcription…')
 
       const args = [
@@ -289,6 +342,13 @@ export class WhisperTranscriber implements ITranscriber {
         '-of', outputPrefix,
         '--print-progress',   // whisper-cli prints progress lines to stderr
       ]
+
+      if (leadingSilenceMs > 0) {
+        // Tell whisper to begin processing at this offset. It adds the value to
+        // every timestamp it emits, so the first word lands at the correct
+        // absolute position in the audio track.
+        args.push('--offset-t', String(leadingSilenceMs))
+      }
 
       if (options.language) {
         args.push('-l', options.language)

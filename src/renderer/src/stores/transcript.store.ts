@@ -53,6 +53,14 @@ interface TranscriptState {
   setIsGenerating: (generating: boolean) => void
   setGeneratingStatus: (status: string) => void
 
+  /**
+   * Shifts every word's start and end timestamps by `offsetSeconds`.
+   * Used for manual calibration: the user positions the playhead at the true
+   * start of the first word, then the UI calls shiftTimestamps(currentTime - firstWord.start).
+   * Timestamps are clamped to >= 0.
+   */
+  shiftTimestamps: (offsetSeconds: number) => void
+
   reset: () => void
 }
 
@@ -96,6 +104,15 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
 
   setIsGenerating: (generating) => set({ isGenerating: generating }),
   setGeneratingStatus: (status) => set({ generatingStatus: status }),
+
+  shiftTimestamps: (offsetSeconds) =>
+    set((s) => ({
+      words: s.words.map((w) => ({
+        ...w,
+        start: Math.max(0, w.start + offsetSeconds),
+        end:   Math.max(0, w.end   + offsetSeconds),
+      })),
+    })),
 
   reset: () => set(initialState),
 }))
