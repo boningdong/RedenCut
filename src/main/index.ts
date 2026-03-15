@@ -102,16 +102,20 @@ app.whenReady().then(() => {
       headers: Object.fromEntries(request.headers.entries()),
     })
 
-    // Patch Content-Type if net.fetch didn't set an audio/* type.
+    // Always rebuild headers so we can:
+    //   a) patch Content-Type for correct audio MIME
+    //   b) add Access-Control-Allow-Origin so createMediaElementSource() works
+    //      (the Web Audio API treats podcut:// as a cross-origin resource and
+    //       requires CORS headers even for local files)
     const ext = extname(filePath).toLowerCase()
     const mimeType = AUDIO_MIME[ext]
     const existing = response.headers.get('content-type') ?? ''
+    const headers = new Headers(response.headers)
+    headers.set('access-control-allow-origin', '*')
     if (mimeType && !existing.startsWith('audio/')) {
-      const headers = new Headers(response.headers)
       headers.set('content-type', mimeType)
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
     }
-    return response
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
   })
 
   createWindow()

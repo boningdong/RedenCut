@@ -24,7 +24,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorStore } from '../../stores/editor.store'
-import { getWaveSurferInstance } from '../Waveform/WaveformView'
+import { useTimelineStore } from '../../stores/timeline.store'
+import { getAudioPlayerInstance } from '@shared/player.types'
 import type { Word } from '@shared/project.types'
 
 interface TranscriptPanelProps {
@@ -50,7 +51,6 @@ export function TranscriptPanel({
   const toggleShowMuted = useTranscriptStore((s) => s.toggleShowMutedWords)
   const shiftTimestamps = useTranscriptStore((s) => s.shiftTimestamps)
 
-  const addEdit      = useEditorStore((s) => s.addEdit)
   const setSelection = useEditorStore((s) => s.setSelection)
 
   // ── Refs ──────────────────────────────────────────────────────────────────
@@ -104,8 +104,7 @@ export function TranscriptPanel({
   const handleWordClick = useCallback(
     (e: React.MouseEvent, word: Word) => {
       e.stopPropagation()
-      const ws = getWaveSurferInstance()
-      if (ws && duration > 0) ws.setTime(word.start)
+      if (duration > 0) getAudioPlayerInstance()?.seekTo(word.start)
     },
     [duration],
   )
@@ -139,11 +138,14 @@ export function TranscriptPanel({
     const end     = Math.max(...selected.map((w) => w.end))
     const wordIds = selected.map((w) => w.id)
 
-    addEdit({ type: 'mute', start, end, source: 'text' }, wordIds)
+    // Mute via timeline.store (uses the primary source file's ID)
+    const { sourceFiles, muteRange } = useTimelineStore.getState()
+    const sfId = sourceFiles[0]?.id
+    if (sfId) muteRange(sfId, start, end, wordIds)
     muteWords(wordIds)
     sel.removeAllRanges()       // clear the native selection after muting
     setSelection(null)
-  }, [words, addEdit, muteWords, setSelection])
+  }, [words, muteWords, setSelection])
 
   // ── Keyboard handler on the contentEditable container ────────────────────
   const handleKeyDown = useCallback(

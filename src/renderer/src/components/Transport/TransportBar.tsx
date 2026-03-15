@@ -3,12 +3,17 @@
 //
 // Play/pause controls, time display, and Preview Mode toggle.
 // Lives at the bottom of the app.
+//
+// All playback control goes through IAudioPlayer — never through WaveSurfer.
+// Playback state (isPlaying, currentTime, duration) comes from playback.store
+// which is updated by App.tsx subscribing to the player's callbacks.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useCallback } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useEditorStore } from '../../stores/editor.store'
-import { getWaveSurferInstance } from '../Waveform/WaveformView'
+import { getAudioPlayerInstance } from '@shared/player.types'
+import { useTimelineStore } from '../../stores/timeline.store'
 import { Button } from '../ui/Button'
 
 function formatTime(seconds: number): string {
@@ -24,32 +29,38 @@ export function TransportBar() {
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const duration    = usePlaybackStore((s) => s.duration)
 
-  const previewMode      = useEditorStore((s) => s.previewMode)
+  const previewMode       = useEditorStore((s) => s.previewMode)
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode)
 
-  const handlePlayPause = useCallback(() => {
-    const ws = getWaveSurferInstance()
-    if (!ws) return
+  const handlePlayPause = useCallback(async () => {
+    const player = getAudioPlayerInstance()
+    if (!player) return
 
-    // Preview Mode: if about to play and playhead is inside a muted region,
-    // jump to the end of that region before playing.
-    if (!ws.isPlaying() && previewMode) {
-      const { edits } = useEditorStore.getState()
-      const time = ws.getCurrentTime()
-      const muted = edits.filter((e) => e.type === 'mute')
-      const inside = muted.find((e) => time >= e.start && time < e.end)
-      if (inside) ws.setTime(inside.end)
+    if (!player.isPlaying() && previewMode) {
+      // Preview Mode: if playhead is inside a muted clip, skip to its end before playing
+      const time = player.getCurrentTime()
+      const clips = useTimelineStore.getState().tracks.flatMap((t) => t.clips)
+      const inside = clips.find((c) => {
+        if (!c.muted) return false
+        const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
+        return time >= c.outputStart && time < outputEnd
+      })
+      if (inside) {
+        const outputEnd = inside.outputStart + (inside.sourceEnd - inside.sourceStart)
+        player.seekTo(outputEnd)
+      }
     }
 
-    ws.playPause()
+    await player.playPause()
   }, [previewMode])
 
   const handleSkipToStart = useCallback(() => {
-    getWaveSurferInstance()?.seekTo(0)
+    getAudioPlayerInstance()?.seekTo(0)
   }, [])
 
   const handleSkipToEnd = useCallback(() => {
-    getWaveSurferInstance()?.seekTo(1)
+    const player = getAudioPlayerInstance()
+    if (player) player.seekTo(player.getDuration())
   }, [])
 
   return (
@@ -121,7 +132,6 @@ export function TransportBar() {
           transition: 'color 0.15s, border-color 0.15s',
         }}
       >
-        {/* Dot indicator */}
         <span
           style={{
             width: 6,

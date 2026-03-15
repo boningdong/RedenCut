@@ -10,29 +10,41 @@
 //   ├──────────────────────────────────┬───┬──────────────────────────────┤
 //   │                                  │   │                              │
 //   │  Waveform area (flex: 1)         │ ▌ │  Transcript panel            │
-//   │    Minimap                       │   │  (resizable, default 280px)  │
-//   │    Waveform + regions            │   │                              │
+//   │    Waveform + regions            │   │  (resizable, default 280px)  │
 //   │    Timeline                      │   │                              │
 //   │                                  │   │                              │
 //   ├──────────────────────────────────┴───┴──────────────────────────────┤
 //   │ TransportBar (48px): ⏮ ⏸ ⏭  time  ·  Preview                      │
 //   └──────────────────────────────────────────────────────────────────────┘
 //
-// Project state lives in editor.store.
-// Transcript state lives in transcript.store.
-// Ephemeral loading state lives in local useState.
+// Player lifecycle:
+//   1. User opens a file → loadAudio() creates a WebCodecsPlayer (or SimpleAudioPlayer fallback)
+//   2. Player loads source file, initialises timeline.store
+//   3. Player callbacks feed into playback.store (currentTime, isPlaying, duration)
+//   4. WaveformView reads playback.store for display; timeline.store for regions
+//   5. When file closes / new file opens → player.destroy(), new player created
+//
+// Player selection (runtime, inside loadAudio):
+//   WebCodecsPlayer  — AudioDecoder available + codec supported → frame-accurate skip
+//   SimpleAudioPlayer — fallback; linear playback with gain=0 for muted regions
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import type { AudioMetadata, PeakData, ProjectFile } from '@shared/project.types'
 import { APP_NAME, APP_FILE_EXT } from '@shared/constants'
+import type { IAudioPlayer } from '@shared/player.types'
+import { setAudioPlayerInstance } from '@shared/player.types'
+import { SimpleAudioPlayer } from './audio/SimpleAudioPlayer'
+import { WebCodecsPlayer } from './audio/WebCodecsPlayer'
 import { Button } from './components/ui/Button'
 import { FileInfoPanel } from './components/FileInfoPanel'
 import { WaveformView } from './components/Waveform/WaveformView'
 import { TransportBar } from './components/Transport/TransportBar'
 import { TranscriptPanel } from './components/Transcript/TranscriptPanel'
 import { useEditorStore } from './stores/editor.store'
+import { usePlaybackStore } from './stores/playback.store'
 import { useTranscriptStore } from './stores/transcript.store'
+import { useTimelineStore } from './stores/timeline.store'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
 // ── State shapes ──────────────────────────────────────────────────────────────
@@ -53,15 +65,22 @@ export default function App() {
   const [openedFile,   setOpenedFile]   = useState<OpenedFile | null>(null)
   const [loadingState, setLoadingState] = useState<LoadingState>({ status: 'idle' })
 
+  // The active IAudioPlayer instance — created/destroyed as files open/close
+  const playerRef = useRef<IAudioPlayer | null>(null)
+
   // Editor store
   const projectPath    = useEditorStore((s) => s.projectPath)
   const isDirty        = useEditorStore((s) => s.isDirty)
-  const edits          = useEditorStore((s) => s.edits)
   const setProjectPath = useEditorStore((s) => s.setProjectPath)
   const setIsDirty     = useEditorStore((s) => s.setIsDirty)
-  const setEdits       = useEditorStore((s) => s.setEdits)
   const setProject     = useEditorStore((s) => s.setProject)
   const resetEditor    = useEditorStore((s) => s.reset)
+
+  // Playback store setters (written from player callbacks, NOT from WaveSurfer)
+  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime)
+  const setPlaying     = usePlaybackStore((s) => s.setPlaying)
+  const setDuration    = usePlaybackStore((s) => s.setDuration)
+  const resetPlayback  = usePlaybackStore((s) => s.reset)
 
   // Transcript store
   const words               = useTranscriptStore((s) => s.words)
@@ -71,6 +90,17 @@ export default function App() {
   const setIsGenerating     = useTranscriptStore((s) => s.setIsGenerating)
   const setGeneratingStatus = useTranscriptStore((s) => s.setGeneratingStatus)
   const resetTranscript     = useTranscriptStore((s) => s.reset)
+
+  // Timeline store
+  const tracks       = useTimelineStore((s) => s.tracks)
+  const resetTimeline = useTimelineStore((s) => s.reset)
+
+  // ── Keep player in sync whenever the clip model changes ───────────────────
+  // When keyboard shortcuts mutate tracks (mute/unmute/split), the player
+  // needs updated gain info. setTracks() is cheap — just replaces the array ref.
+  useEffect(() => {
+    playerRef.current?.setTracks(tracks)
+  }, [tracks])
 
   // ── Resizable transcript panel ────────────────────────────────────────────
   const [transcriptWidth, setTranscriptWidth] = useState(280)
@@ -85,7 +115,7 @@ export default function App() {
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!dragRef.current) return
-      const delta = dragRef.current.startX - e.clientX  // drag left = wider
+      const delta = dragRef.current.startX - e.clientX
       const newW = Math.min(600, Math.max(160, dragRef.current.startWidth + delta))
       setTranscriptWidth(newW)
     }
@@ -116,14 +146,96 @@ export default function App() {
     })
   }, [setGeneratingStatus])
 
+  // ── Destroy player on unmount ─────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      playerRef.current?.destroy()
+      setAudioPlayerInstance(null)
+    }
+  }, [])
+
   // ── Core loading helper ───────────────────────────────────────────────────
-  /** Probes metadata, generates peaks, and sets the ready state. */
+  /**
+   * Given an already-probed file path + metadata:
+   *   1. Tear down any existing player
+   *   2. Init timeline.store (creates Track + Clip for the full duration)
+   *   3. Create SimpleAudioPlayer, load source file, wire callbacks → stores
+   *   4. Generate waveform peaks (may take a few seconds for large files)
+   *   5. Transition to 'ready' state → WaveformView mounts
+   */
   const loadAudio = useCallback(async (filePath: string, metadata: AudioMetadata) => {
     setOpenedFile({ filePath, metadata })
     setLoadingState({ status: 'generating-peaks', progress: 0 })
+
+    // ── 1. Destroy existing player ───────────────────────────────────────
+    if (playerRef.current) {
+      console.log('[App] destroying old player')
+      playerRef.current.destroy()
+      playerRef.current = null
+      setAudioPlayerInstance(null)
+    }
+    resetPlayback()
+
+    // ── 2. Initialise timeline (uses filePath as sourceFileId for simplicity) ─
+    useTimelineStore.getState().initFromFile(filePath, metadata.durationSeconds)
+    const { tracks: initTracks } = useTimelineStore.getState()
+    console.log(`[App] timeline init — ${initTracks.length} tracks, sourceFileId=${filePath}`)
+
+    // ── 3. Create player and load source file ─────────────────────────────
+    // Prefer WebCodecsPlayer (frame-accurate skip at cut boundaries).
+    // Fall back to SimpleAudioPlayer if WebCodecs AudioDecoder is unavailable
+    // or if the codec isn't supported on this platform.
+    let player: IAudioPlayer
+    if (typeof AudioDecoder !== 'undefined') {
+      const wcPlayer = new WebCodecsPlayer()
+      try {
+        await wcPlayer.loadSourceFile(filePath, filePath)
+        player = wcPlayer
+        console.log('[App] using WebCodecsPlayer (frame-accurate skip)')
+      } catch (err) {
+        console.warn('[App] WebCodecsPlayer unavailable, falling back to SimpleAudioPlayer:', err)
+        wcPlayer.destroy()
+        const sPlayer = new SimpleAudioPlayer()
+        await sPlayer.loadSourceFile(filePath, filePath)
+        player = sPlayer
+      }
+    } else {
+      console.log('[App] AudioDecoder not available — using SimpleAudioPlayer')
+      const sPlayer = new SimpleAudioPlayer()
+      await sPlayer.loadSourceFile(filePath, filePath)
+      player = sPlayer
+    }
+
+    playerRef.current = player
+
+    // Pass initial tracks so the player knows about any clips
+    player.setTracks(initTracks)
+
+    // Wire player callbacks → playback store (updates at 60fps)
+    player.onTimeUpdate((t) => usePlaybackStore.getState().setCurrentTime(t))
+    player.onPlayStateChange((p) => usePlaybackStore.getState().setPlaying(p))
+    player.onDurationChange((d) => {
+      console.log(`[App] player duration changed: ${d.toFixed(2)}s`)
+      usePlaybackStore.getState().setDuration(d)
+    })
+    player.onEnded(() => {
+      usePlaybackStore.getState().setPlaying(false)
+      usePlaybackStore.getState().setCurrentTime(0)
+    })
+
+    // Seed duration from metadata (player's onDurationChange fires async)
+    setDuration(metadata.durationSeconds)
+
+    // Expose to WaveformView, TransportBar, keyboard shortcuts
+    setAudioPlayerInstance(player)
+    console.log('[App] player ready and registered')
+
+    // ── 4. Generate waveform peaks (main-process FFmpeg call) ─────────────
     const peaks = await window.electronAPI.audio.generatePeaks(filePath)
+
+    // ── 5. Transition to ready — WaveformView mounts ──────────────────────
     setLoadingState({ status: 'ready', peaks })
-  }, [])
+  }, [resetPlayback, setDuration]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleError = useCallback((err: unknown) => {
     const message = (err as Error).message ?? String(err)
@@ -145,9 +257,10 @@ export default function App() {
       if (!result) { setLoadingState({ status: 'idle' }); return }
       resetEditor()
       resetTranscript()
+      resetTimeline()
       await loadAudio(result.filePath, result.metadata)
     } catch (err) { handleError(err) }
-  }, [loadAudio, handleError, resetEditor, resetTranscript])
+  }, [loadAudio, handleError, resetEditor, resetTranscript, resetTimeline])
 
   // ── Open project file ─────────────────────────────────────────────────────
   const handleOpenProject = useCallback(async () => {
@@ -159,20 +272,44 @@ export default function App() {
       const { projectPath: pPath, project } = result
       resetEditor()
       resetTranscript()
+      resetTimeline()
       setProjectPath(pPath)
-      setEdits(project.edits)
       setProject(project)
       if (project.transcript) setWords(project.transcript.words)
 
+      // Resolve audio metadata for the saved source file
       const metadata = await window.electronAPI.audio.probeFile(project.source.file)
+
+      // Restore timeline from saved project (new format) or migrate from edits[]
+      if (project.sourceFiles.length > 0 && project.tracks.length > 0) {
+        // Project was saved with the new multi-track model — load directly
+        useTimelineStore.getState().loadFromProject(project.sourceFiles, project.tracks)
+        console.log('[App] opened project with multi-track model')
+      } else {
+        // Legacy project: create a single-file timeline from source + edits[]
+        useTimelineStore.getState().initFromFile(project.source.file, project.source.durationSeconds)
+        for (const edit of project.edits) {
+          if (edit.type === 'mute') {
+            useTimelineStore.getState().muteRange(
+              project.source.file,
+              edit.start,
+              edit.end,
+            )
+          }
+        }
+        console.log(`[App] opened legacy project — migrated ${project.edits.length} edits to clips`)
+      }
+
       await loadAudio(project.source.file, metadata)
       setIsDirty(false)
     } catch (err) { handleError(err) }
-  }, [loadAudio, handleError, resetEditor, resetTranscript, setProjectPath, setEdits, setProject, setWords, setIsDirty])
+  }, [loadAudio, handleError, resetEditor, resetTranscript, resetTimeline,
+      setProjectPath, setProject, setWords, setIsDirty])
 
   // ── Build project snapshot ────────────────────────────────────────────────
   const buildProject = useCallback((): ProjectFile | null => {
     if (!openedFile) return null
+    const { sourceFiles, tracks: currentTracks } = useTimelineStore.getState()
     return {
       version: 1,
       createdAt: new Date().toISOString(),
@@ -182,7 +319,18 @@ export default function App() {
         channels: openedFile.metadata.channels,
         durationSeconds: openedFile.metadata.durationSeconds,
       },
-      edits,
+      // Derive legacy edits[] from muted clips for backward compatibility
+      edits: currentTracks.flatMap((t) =>
+        t.clips
+          .filter((c) => c.muted)
+          .map((c) => ({
+            id: `edit-${c.id}`,
+            type: 'mute' as const,
+            start: c.sourceStart,
+            end: c.sourceEnd,
+            source: 'manual' as const,
+          })),
+      ),
       transcript: words.length > 0
         ? { engine: 'whisper.cpp', words, speakers: {} }
         : undefined,
@@ -190,8 +338,11 @@ export default function App() {
       markers: [],
       export: { targetLUFS: -16, truePeakDbTP: -1.5, format: 'mp3', sampleRate: 48000 },
       pluginData: {},
+      // New multi-track fields
+      sourceFiles,
+      tracks: currentTracks,
     }
-  }, [openedFile, edits, words])
+  }, [openedFile, words])
 
   // ── Save / Save As ────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -237,10 +388,6 @@ export default function App() {
   useKeyboardShortcuts({ onSave: handleSave })
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const audioUrl = openedFile
-    ? `podcut://localhost/${encodeURIComponent(openedFile.filePath)}`
-    : null
-
   const isLoading =
     loadingState.status === 'opening' ||
     loadingState.status === 'generating-peaks'
@@ -315,8 +462,8 @@ export default function App() {
 
         {/* Left: waveform / loading states */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-          {loadingState.status === 'ready' && audioUrl ? (
-            <WaveformView audioUrl={audioUrl} peaks={loadingState.peaks} />
+          {loadingState.status === 'ready' ? (
+            <WaveformView peaks={loadingState.peaks} />
           ) : loadingState.status === 'generating-peaks' ? (
             <PeakGenerationProgress progress={loadingState.progress} />
           ) : (

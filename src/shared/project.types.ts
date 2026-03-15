@@ -132,6 +132,69 @@ export type ExportSettings = z.infer<typeof ExportSettingsSchema>
 // (e.g. "com.example.noise-reducer"). The host never inspects this data.
 export const PluginDataSchema = z.record(z.string(), z.unknown())
 
+// ── Multi-track model ─────────────────────────────────────────────────────────
+// These types form the new clip/track abstraction layer. The older flat edits[]
+// model is preserved for backward-compat with saved v1 projects; on load, it is
+// migrated into the track model automatically.
+
+/** A single audio effect in a clip or track's processing chain. */
+export const EffectSchema = z.object({
+  id:      z.string(),
+  type:    z.enum(['gain', 'eq', 'compressor', 'noise-reduction']),
+  enabled: z.boolean().default(true),
+  /** Arbitrary numeric parameters keyed by name, e.g. { gainDb: -6 }. */
+  params:  z.record(z.string(), z.number()).default({}),
+})
+export type Effect = z.infer<typeof EffectSchema>
+
+/**
+ * A contiguous slice of a source file placed at a position on a track's
+ * output timeline. This is the fundamental unit of non-destructive editing.
+ *
+ *   sourceStart / sourceEnd  — the window into the raw source file (seconds)
+ *   outputStart              — where this clip plays in the mixed-down output
+ *                              (seconds). For a simple single-file project,
+ *                              outputStart === sourceStart until clips are moved.
+ *   muted                    — true  → audio is silenced (region visible on waveform)
+ *                              false → plays normally
+ */
+export const ClipSchema = z.object({
+  id:           z.string(),
+  trackId:      z.string(),
+  sourceFileId: z.string(),
+  sourceStart:  z.number(),
+  sourceEnd:    z.number(),
+  outputStart:  z.number(),
+  gain:         z.number().default(1),
+  muted:        z.boolean().default(false),
+  effects:      z.array(EffectSchema).default([]),
+})
+export type Clip = z.infer<typeof ClipSchema>
+
+/**
+ * A track holds an ordered sequence of clips drawn from one or more source
+ * files, plus track-level processing.
+ */
+export const TrackSchema = z.object({
+  id:      z.string(),
+  name:    z.string(),
+  clips:   z.array(ClipSchema).default([]),
+  volume:  z.number().default(1),
+  muted:   z.boolean().default(false),
+  solo:    z.boolean().default(false),
+  color:   z.string().default('#4f46e5'),  // waveform colour for this track
+  effects: z.array(EffectSchema).default([]),
+})
+export type Track = z.infer<typeof TrackSchema>
+
+/** A source audio file registered in the project. */
+export const SourceFileSchema = z.object({
+  id:       z.string(),
+  filePath: z.string(),
+  duration: z.number(),
+})
+export type SourceFile = z.infer<typeof SourceFileSchema>
+
 // ── Project file (root) ───────────────────────────────────────────────────────
 export const ProjectFileSchema = z.object({
   version: z.literal(1),
@@ -144,6 +207,9 @@ export const ProjectFileSchema = z.object({
   export: ExportSettingsSchema.default({}),
   /** Plugin-contributed metadata. See addendum §3.3. */
   pluginData: PluginDataSchema.optional().default({}),
+  // ── Multi-track fields (added alongside v1; migration from edits[] on load) ─
+  sourceFiles: z.array(SourceFileSchema).default([]),
+  tracks:      z.array(TrackSchema).default([]),
 })
 export type ProjectFile = z.infer<typeof ProjectFileSchema>
 

@@ -1,72 +1,68 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // WaveformView
 //
-// Wraps wavesurfer.js v7 and connects it to the editor + playback stores.
+// WaveSurfer is used PURELY as a visual renderer. It owns no audio element
+// and never calls play/pause. All audio is managed by IAudioPlayer (see
+// player.types.ts / SimpleAudioPlayer.ts).
 //
-// Key decisions:
-//   1. Peaks + duration only — wavesurfer never decodes the raw audio.
-//      Critical for files > 100 MB.
-//   2. HTMLMediaElement backend — streams large files without loading into RAM.
-//   3. RegionsPlugin handles both:
-//        • Mute edit regions (persisted) — red, IDs prefixed with 'edit-'
-//        • Drag-to-select region (ephemeral) — amber, ID assigned by wavesurfer
-//   4. Preview Mode — on timeupdate, if a muted region is hit, seek to its end.
-//      If playhead starts inside a muted region on Play, skip forward immediately.
-//   5. Clicking an edit region sets selectedEditId so Delete/U can remove it.
+// Architecture:
+//   • WaveSurfer is created with peaks + duration only — no media, no url.
+//     It renders from pre-computed peaks immediately.
+//   • Cursor position is driven by player.onTimeUpdate → ws.setTime(t)
+//   • User clicks the waveform: ws.on('interaction', t) → player.seekTo(t)
+//   • Muted clip regions are rendered from timeline.store.tracks (not edits[])
+//   • Preview Mode skip: when onTimeUpdate fires inside a muted clip, seekTo
+//     the clip's output end.
+//   • Drag-to-select creates ephemeral amber regions stored in editor.store.selection
+//
+// Log prefix: [WaveformView]
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useEffect, useRef } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.js'
-import MinimapPlugin from 'wavesurfer.js/dist/plugins/minimap.js'
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js'
-import type { PeakData } from '@shared/project.types'
-import { usePlaybackStore } from '../../stores/playback.store'
+import type { PeakData, Clip } from '@shared/project.types'
+import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
+import { useTimelineStore } from '../../stores/timeline.store'
 
 interface WaveformViewProps {
-  /** podcut:// URL served by the custom protocol handler in main */
-  audioUrl: string
   /** Pre-generated peaks from the main process */
   peaks: PeakData
 }
 
-export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
+export function WaveformView({ peaks }: WaveformViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const minimapRef   = useRef<HTMLDivElement>(null)
-  const audioRef     = useRef<HTMLAudioElement>(null)
   const wsRef        = useRef<WaveSurfer | null>(null)
   const regionsRef   = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null)
 
   // Track the ID of the ephemeral drag-selection region
   const selectionRegionIdRef = useRef<string | null>(null)
 
-  const setPlaying     = usePlaybackStore((s) => s.setPlaying)
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime)
-  const setDuration    = usePlaybackStore((s) => s.setDuration)
+  // Store subscriptions
+  const selection         = useEditorStore((s) => s.selection)
+  const previewMode       = useEditorStore((s) => s.previewMode)
+  const setSelection      = useEditorStore((s) => s.setSelection)
 
-  const edits           = useEditorStore((s) => s.edits)
-  const selection       = useEditorStore((s) => s.selection)
-  const previewMode     = useEditorStore((s) => s.previewMode)
-  const selectedEditId  = useEditorStore((s) => s.selectedEditId)
-  const setSelection    = useEditorStore((s) => s.setSelection)
-  const setSelectedEditId = useEditorStore((s) => s.setSelectedEditId)
+  // Timeline store — muted clips drive the red regions on the waveform
+  const tracks            = useTimelineStore((s) => s.tracks)
+  const selectedClipId    = useTimelineStore((s) => s.selectedClipId)
+  const setSelectedClipId = useTimelineStore((s) => s.setSelectedClipId)
 
-  // ── Create / destroy wavesurfer instance ─────────────────────────────────
+  // Keep a ref so the player callback always sees the latest previewMode value
+  // without needing to re-subscribe when previewMode changes
+  const previewModeRef = useRef(previewMode)
+  useEffect(() => { previewModeRef.current = previewMode }, [previewMode])
+
+  // ── Create / destroy WaveSurfer instance ──────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current || !minimapRef.current || !audioRef.current) return
+    if (!containerRef.current) return
+
+    console.log('[WaveformView] Creating WaveSurfer instance (peaks-only, no media)')
 
     const wsRegions = RegionsPlugin.create()
     regionsRef.current = wsRegions
-
-    // Set src on the audio element before handing it to WaveSurfer.
-    // Do NOT pass `url` to WaveSurfer.create() — when WaveSurfer receives
-    // a url it triggers its own internal load/fetch path which can race
-    // with the custom protocol handler and produce "no supported sources".
-    // Setting src here and passing only `media` keeps WaveSurfer out of
-    // the loading loop: it renders from peaks immediately and plays via
-    // the element whose src is already set.
-    audioRef.current.src = audioUrl
 
     const ws = WaveSurfer.create({
       container: containerRef.current,
@@ -78,7 +74,8 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
       barGap: 1,
       barRadius: 2,
       height: 80,
-      media: audioRef.current,
+      // No 'media' and no 'url' — WaveSurfer is purely visual.
+      // All audio playback is handled by IAudioPlayer (SimpleAudioPlayer / WebCodecsPlayer).
       peaks: peaks.data,
       duration: peaks.durationSeconds,
       plugins: [
@@ -88,12 +85,6 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
           primaryLabelInterval: 60,
           style: { fontSize: '10px', color: 'var(--color-text-muted)' },
         }),
-        MinimapPlugin.create({
-          container: minimapRef.current,
-          height: 20,
-          waveColor: '#3730a3',
-          progressColor: '#6366f1',
-        }),
         wsRegions,
       ],
     })
@@ -102,9 +93,10 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
     wsRegions.enableDragSelection({ color: 'rgba(245, 158, 11, 0.15)' })
 
     // ── Region events ──────────────────────────────────────────────────────
+
     wsRegions.on('region-created', (region) => {
-      // Edit regions are added programmatically with 'edit-' IDs — ignore them here
-      if (region.id.startsWith('edit-')) return
+      // Clip mute regions are added programmatically with 'clip-' IDs — ignore
+      if (region.id.startsWith('clip-')) return
 
       // Remove any previous selection region
       if (selectionRegionIdRef.current && selectionRegionIdRef.current !== region.id) {
@@ -121,44 +113,79 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
       }
     })
 
-    // Clicking an edit region selects it for Delete/U; clicking background clears all
+    // Clicking a clip mute region selects it for Delete/U key
     wsRegions.on('region-clicked', (region, e) => {
       e.stopPropagation()
-      if (region.id.startsWith('edit-')) {
-        // Select this edit region; clear any drag-selection
+      if (region.id.startsWith('clip-')) {
+        const clipId = region.id.slice(5)  // 'clip-{clipId}'
+        // Clear any drag-selection
         if (selectionRegionIdRef.current) {
           const sel = wsRegions.getRegions().find((r) => r.id === selectionRegionIdRef.current)
           sel?.remove()
           selectionRegionIdRef.current = null
         }
-        setSelectedEditId(region.id)
+        setSelectedClipId(clipId)
         setSelection({ start: region.start, end: region.end })
+        console.log(`[WaveformView] clip region clicked id=${clipId}`)
       }
     })
 
-    // Clicking the waveform background clears drag-selection and edit selection
-    ws.on('interaction', () => {
+    // Clicking the waveform background clears selections and seeks the player
+    ws.on('interaction', (newTime: number) => {
+      console.log(`[WaveformView] interaction newTime=${newTime.toFixed(2)}s`)
       if (selectionRegionIdRef.current) {
         const r = wsRegions.getRegions().find((r) => r.id === selectionRegionIdRef.current)
         r?.remove()
         selectionRegionIdRef.current = null
         setSelection(null)
       }
-      setSelectedEditId(null)
+      setSelectedClipId(null)
+      // Move cursor immediately (snappy feel)
+      ws.setTime(newTime)
+      // Seek the player — triggers onTimeUpdate which will also call ws.setTime (idempotent)
+      getAudioPlayerInstance()?.seekTo(newTime)
     })
 
-    // ── Playback events ────────────────────────────────────────────────────
-    ws.on('ready',      () => setDuration(ws.getDuration()))
-    ws.on('play',       () => setPlaying(true))
-    ws.on('pause',      () => setPlaying(false))
-    ws.on('finish',     () => setPlaying(false))
-    ws.on('timeupdate', (time) => setCurrentTime(time))
+    // ── Player → cursor bridge ─────────────────────────────────────────────
+    // Subscribe to the player's time ticks to drive the WaveSurfer cursor.
+    // Also implements Preview Mode: if playhead enters a muted clip, skip to end.
+    const player = getAudioPlayerInstance()
+    let unsubTimeUpdate: (() => void) | null = null
+
+    if (player) {
+      console.log('[WaveformView] Subscribing to player.onTimeUpdate')
+      unsubTimeUpdate = player.onTimeUpdate((t) => {
+        ws.setTime(t)
+
+        if (previewModeRef.current) {
+          const { tracks: currentTracks } = useTimelineStore.getState()
+          const hit = currentTracks
+            .flatMap((tr) => tr.clips as Clip[])
+            .find((c) => {
+              if (!c.muted) return false
+              const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
+              return t >= c.outputStart && t < outputEnd
+            })
+          if (hit) {
+            const outputEnd = hit.outputStart + (hit.sourceEnd - hit.sourceStart)
+            console.log(`[WaveformView] preview skip t=${t.toFixed(2)}s → ${outputEnd.toFixed(2)}s`)
+            getAudioPlayerInstance()?.seekTo(outputEnd)
+          }
+        }
+      })
+    } else {
+      console.warn('[WaveformView] player not yet available at mount — cursor will not move until file opens')
+    }
 
     wsRef.current = ws
     setWaveSurferInstance(ws)
     setRegionsPluginInstance(wsRegions)
 
+    console.log(`[WaveformView] WaveSurfer ready — duration=${peaks.durationSeconds.toFixed(2)}s`)
+
     return () => {
+      console.log('[WaveformView] Destroying WaveSurfer instance')
+      unsubTimeUpdate?.()
       ws.destroy()
       wsRef.current = null
       regionsRef.current = null
@@ -166,57 +193,38 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
       setWaveSurferInstance(null)
       setRegionsPluginInstance(null)
     }
-  }, [audioUrl, peaks]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [peaks]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sync edit regions → WaveSurfer ────────────────────────────────────────
-  // Re-runs whenever edits or selectedEditId changes. Wipes and re-adds all
-  // edit regions so the selected one can render with a different colour.
+  // ── Sync muted clip regions → WaveSurfer ──────────────────────────────────
+  // Re-runs whenever tracks or selectedClipId change.
+  // Only muted clips get a red region overlay; unmuted clips are invisible.
   useEffect(() => {
     const wsRegions = regionsRef.current
     if (!wsRegions) return
 
+    // Remove all previously rendered clip regions
     wsRegions.getRegions().forEach((r) => {
-      if (r.id.startsWith('edit-')) r.remove()
+      if (r.id.startsWith('clip-')) r.remove()
     })
 
-    edits.forEach((edit) => {
-      const isSelected = edit.id === selectedEditId
-      wsRegions.addRegion({
-        id: edit.id,
-        start: edit.start,
-        end: edit.end,
-        color: isSelected
-          ? 'rgba(239, 68, 68, 0.45)'   // brighter when selected
-          : edit.type === 'mute'
-            ? 'rgba(239, 68, 68, 0.22)'
-            : 'rgba(99, 102, 241, 0.22)',
-        drag: false,
-        resize: false,
+    tracks.forEach((track) => {
+      track.clips.forEach((clip) => {
+        if (!clip.muted) return
+        const outputEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
+        const isSelected = clip.id === selectedClipId
+        wsRegions.addRegion({
+          id: `clip-${clip.id}`,
+          start: clip.outputStart,
+          end: outputEnd,
+          color: isSelected
+            ? 'rgba(239, 68, 68, 0.45)'  // brighter when selected
+            : 'rgba(239, 68, 68, 0.22)',
+          drag: false,
+          resize: false,
+        })
       })
     })
-  }, [edits, selectedEditId])
-
-  // ── Preview Mode — skip muted regions on timeupdate ───────────────────────
-  // Use refs so the listener always sees the latest values without re-registering.
-  const previewModeRef = useRef(previewMode)
-  const editsRef       = useRef(edits)
-  useEffect(() => { previewModeRef.current = previewMode }, [previewMode])
-  useEffect(() => { editsRef.current = edits }, [edits])
-
-  useEffect(() => {
-    const ws = wsRef.current
-    if (!ws) return
-
-    const skip = (time: number) => {
-      if (!previewModeRef.current) return
-      const muted = editsRef.current.filter((e) => e.type === 'mute')
-      const hit = muted.find((e) => time >= e.start && time < e.end)
-      if (hit) ws.setTime(hit.end)
-    }
-
-    ws.on('timeupdate', skip)
-    return () => { ws.un('timeupdate', skip) }
-  }, [audioUrl, peaks]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tracks, selectedClipId])
 
   // ── Sync selection removal from outside (e.g. after a keyboard shortcut) ─
   useEffect(() => {
@@ -238,15 +246,6 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
         borderBottom: '1px solid var(--color-border)',
       }}
     >
-      {/* Minimap — scrollable overview */}
-      <div
-        ref={minimapRef}
-        style={{
-          borderBottom: '1px solid var(--color-border-subtle)',
-          backgroundColor: 'var(--color-bg-primary)',
-        }}
-      />
-
       {/* Main waveform canvas */}
       <div ref={containerRef} style={{ padding: '8px 0', cursor: 'crosshair' }} />
 
@@ -255,17 +254,14 @@ export function WaveformView({ audioUrl, peaks }: WaveformViewProps) {
         id="waveform-timeline"
         style={{ borderTop: '1px solid var(--color-border-subtle)', paddingBottom: 4 }}
       />
-
-      {/* Hidden audio element — wavesurfer uses this for streaming playback */}
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} style={{ display: 'none' }} />
     </div>
   )
 }
 
 // ── Module-level imperative handles ───────────────────────────────────────────
-// Exposed so TransportBar and keyboard shortcuts can control playback/regions
-// without prop drilling.
+// Exposed so keyboard shortcuts can call ws.setTime() for nudge operations.
+// In the new design, these are less critical (use player.seekTo() instead),
+// but keeping them avoids breaking existing call sites.
 
 let _wsInstance: WaveSurfer | null = null
 let _regionsInstance: ReturnType<typeof RegionsPlugin.create> | null = null
