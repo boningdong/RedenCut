@@ -96,6 +96,15 @@ async function parseWavInfo(url: string): Promise<WavInfo> {
   const buf  = scratch.subarray(0, bytesRead)
   const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
 
+  // ── RIFF chunk-size fallback ──────────────────────────────────────────────
+  // Electron's net.fetch for file:// URLs often omits Content-Length and
+  // Content-Range headers, leaving totalBytes = 0.  The RIFF header at bytes
+  // 4-7 contains (fileSize - 8) as a uint32 LE — always reliable.
+  if (totalBytes === 0 && bytesRead >= 8) {
+    totalBytes = view.getUint32(4, true) + 8
+    console.log(`[WebCodecsPlayer] WAV totalBytes from RIFF header: ${totalBytes}`)
+  }
+
   // ── Parse fmt fields from fixed offsets ───────────────────────────────────
   // Valid for standard WAV where "fmt " is the first sub-chunk (offset 12).
   // DAW exports that insert a JUNK chunk first will have wrong values here,
@@ -219,9 +228,25 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
   // ── AudioContext / Worklet setup ──────────────────────────────────────────
 
-  private async ensureCtx(): Promise<AudioContext> {
-    if (this.ctx && this.ctx.state !== 'closed') return this.ctx
-    this.ctx = new AudioContext()
+  /**
+   * Ensure an AudioContext + worklet exist.  Pass the file's native sample rate
+   * so that the context runs at the same rate — if they mismatch, every sample
+   * is played at the wrong speed and the pitch shifts audibly.
+   */
+  private async ensureCtx(sampleRate?: number): Promise<AudioContext> {
+    if (this.ctx && this.ctx.state !== 'closed') {
+      // Recreate if the caller wants a different sample rate
+      if (sampleRate && this.ctx.sampleRate !== sampleRate) {
+        console.log(`[WebCodecsPlayer] Recreating AudioContext: ${this.ctx.sampleRate} → ${sampleRate}`)
+        this.worklet?.disconnect()
+        this.worklet = null
+        await this.ctx.close()
+        this.ctx = null
+      } else {
+        return this.ctx
+      }
+    }
+    this.ctx = new AudioContext(sampleRate ? { sampleRate } : undefined)
     console.log('[WebCodecsPlayer] AudioContext created, sampleRate:', this.ctx.sampleRate)
     await this.loadWorklet()
     return this.ctx
@@ -241,6 +266,17 @@ export class WebCodecsPlayer implements IAudioPlayer {
       outputChannelCount: [2],
     })
     this.worklet.connect(this.ctx.destination)
+
+    // When the worklet drains its first real audio block it sends 'started'.
+    // We use that moment to zero the AudioContext clock so the displayed
+    // playhead position exactly matches when audio physically begins.
+    this.worklet.port.onmessage = ({ data }) => {
+      if (data.type === 'started' && this._isPlaying && this.ctx) {
+        this._ctxTimeAtPlay = this.ctx.currentTime
+        console.log('[WebCodecsPlayer] audio started — clock zeroed')
+      }
+    }
+
     console.log('[WebCodecsPlayer] AudioWorklet ready')
   }
 
@@ -274,9 +310,9 @@ export class WebCodecsPlayer implements IAudioPlayer {
         throw err
       }
 
-      // Step B: set up AudioContext + worklet (needed for PCM playback too)
+      // Step B: set up AudioContext + worklet at the file's native sample rate
       try {
-        await this.ensureCtx()
+        await this.ensureCtx(wavInfo.sampleRate)
       } catch (err) {
         console.error('[WebCodecsPlayer] ensureCtx failed:', err)
         throw err
@@ -302,6 +338,8 @@ export class WebCodecsPlayer implements IAudioPlayer {
         `[WebCodecsPlayer] loaded WAV id=${id} — ${wavInfo.channels}ch ${wavInfo.sampleRate}Hz ` +
         `${wavInfo.bitDepth}-bit${wavInfo.isFloat ? ' float' : ''} duration=${duration.toFixed(2)}s`,
       )
+      // Start pre-buffering immediately so the queue is warm before play()
+      if (!this._decodeCtrl) this.startDecodeLoop(this._currentTime)
       return
     }
 
@@ -312,8 +350,10 @@ export class WebCodecsPlayer implements IAudioPlayer {
       ? Math.round(1 / index.frames[0].duration * 1152)  // MP3: 1152 samples/frame
       : 44100
 
-    const ctx   = await this.ensureCtx()
-    const codec = guessCodecConfig(url, ctx.sampleRate)
+    // Create the AudioContext at the file's actual sample rate so decoded PCM
+    // plays at the correct pitch (no resampling in the worklet).
+    await this.ensureCtx(sampleRate)
+    const codec = guessCodecConfig(url, sampleRate)
 
     // Validate that the codec is supported before accepting the source
     const config: AudioDecoderConfig = {
@@ -338,8 +378,9 @@ export class WebCodecsPlayer implements IAudioPlayer {
       this.durationChangeCbs.forEach((cb) => cb(duration))
     }
 
-    console.log(`[WebCodecsPlayer] loaded id=${id} codec=${codec.codec} duration=${duration.toFixed(2)}s`)
-    void sampleRate   // suppress unused-var warning — we derive sampleRate from ctx instead
+    console.log(`[WebCodecsPlayer] loaded id=${id} codec=${codec.codec} sampleRate=${sampleRate} duration=${duration.toFixed(2)}s`)
+    // Start pre-buffering immediately so the queue is warm before play()
+    if (!this._decodeCtrl) this.startDecodeLoop(this._currentTime)
   }
 
   // ── IAudioPlayer — setTracks ──────────────────────────────────────────────
@@ -361,23 +402,39 @@ export class WebCodecsPlayer implements IAudioPlayer {
     const ctx = await this.ensureCtx()
     if (ctx.state === 'suspended') await ctx.resume()
 
-    this._isPlaying      = true
-    this._ctxTimeAtPlay  = ctx.currentTime
-    this._posAtPlay      = this._currentTime
+    this._isPlaying     = true
+    // _ctxTimeAtPlay is intentionally left as-is here.  It will be set to
+    // ctx.currentTime by the worklet's 'started' callback — the moment the
+    // first real audio block drains.  Until then, the rAF loop holds the
+    // playhead at _posAtPlay (no visible jump during the pre-buffer gap).
+    this._ctxTimeAtPlay = null
+    this._posAtPlay     = this._currentTime
+
+    // Open the worklet gate: it starts draining the pre-buffered queue.
+    this.worklet?.port.postMessage({ type: 'play' })
 
     this.emitPlayState(true)
     this.startRaf()
-    this.startDecodeLoop(this._currentTime)
+    // The decode loop may already be running from pre-buffering; only start
+    // it if it was stopped (e.g. after destroy/seek).
+    if (!this._decodeCtrl) {
+      this.startDecodeLoop(this._currentTime)
+    }
     console.log(`[WebCodecsPlayer] play() t=${this._currentTime.toFixed(2)}s`)
   }
 
   pause(): void {
     if (!this._isPlaying) return
     console.log(`[WebCodecsPlayer] pause() t=${this._currentTime.toFixed(2)}s`)
-    this.stopDecodeLoop()
+    // Close the worklet gate — it will keep buffering incoming PCM but output
+    // silence, so the queue stays warm for the next play() call.
+    this.worklet?.port.postMessage({ type: 'pause' })
     this.stopRaf()
-    this._isPlaying = false
+    this._isPlaying     = false
+    this._ctxTimeAtPlay = null
     this.emitPlayState(false)
+    // Keep _decodeCtrl running: the decode loop continues to fill the pre-buffer
+    // so there is zero latency when the user hits play again.
   }
 
   async playPause(): Promise<void> {
@@ -390,12 +447,25 @@ export class WebCodecsPlayer implements IAudioPlayer {
     console.log(`[WebCodecsPlayer] seekTo ${clamped.toFixed(2)}s`)
 
     const wasPlaying = this._isPlaying
-    if (wasPlaying) this.pause()
+    if (wasPlaying) {
+      this.worklet?.port.postMessage({ type: 'pause' })
+      this.stopRaf()
+      this._isPlaying     = false
+      this._ctxTimeAtPlay = null
+      this.emitPlayState(false)
+    }
 
-    this._currentTime  = clamped
+    this._currentTime   = clamped
+    this._posAtPlay     = clamped
+    this._ctxTimeAtPlay = null
     this._bufferedAhead = 0
+    // flush stale audio and reset the 'started' arm inside the worklet
     this.worklet?.port.postMessage({ type: 'flush' })
     this.emitTimeUpdate(clamped)
+
+    // Always restart the decode loop from the new position so the worklet
+    // queue is warm before the user hits play (zero-latency pre-buffer).
+    this.startDecodeLoop(clamped)
 
     if (wasPlaying) this.play().catch(console.error)
   }
@@ -457,20 +527,27 @@ export class WebCodecsPlayer implements IAudioPlayer {
     if (this._rafId !== null) return
 
     const tick = () => {
-      if (!this._isPlaying || !this.ctx || this._ctxTimeAtPlay === null) return
+      if (!this._isPlaying || !this.ctx) return
 
-      this._currentTime = this._posAtPlay + (this.ctx.currentTime - this._ctxTimeAtPlay)
+      if (this._ctxTimeAtPlay !== null) {
+        // Clock is running — advance playhead using the AudioContext hardware clock.
+        this._currentTime = this._posAtPlay + (this.ctx.currentTime - this._ctxTimeAtPlay)
 
-      if (this._currentTime >= this._duration) {
-        this._currentTime = this._duration
-        this.emitTimeUpdate(this._currentTime)
-        this._isPlaying = false
-        this.stopDecodeLoop()
-        this.stopRaf()
-        this.emitPlayState(false)
-        this.endedCbs.forEach((cb) => cb())
-        return
+        if (this._currentTime >= this._duration) {
+          this._currentTime = this._duration
+          this.emitTimeUpdate(this._currentTime)
+          this._isPlaying = false
+          this.worklet?.port.postMessage({ type: 'pause' })
+          this.stopDecodeLoop()
+          this.stopRaf()
+          this._ctxTimeAtPlay = null
+          this.emitPlayState(false)
+          this.endedCbs.forEach((cb) => cb())
+          return
+        }
       }
+      // If _ctxTimeAtPlay is still null (worklet hasn't drained audio yet),
+      // emit the current position unchanged so the playhead stays still.
 
       this.emitTimeUpdate(this._currentTime)
       this._rafId = requestAnimationFrame(tick)
@@ -505,15 +582,15 @@ export class WebCodecsPlayer implements IAudioPlayer {
   }
 
   private restartDecodeLoop(fromTime: number): void {
-    if (!this._isPlaying) return
     this.worklet?.port.postMessage({ type: 'flush' })
     this._bufferedAhead = 0
     this.startDecodeLoop(fromTime)
   }
 
   /**
-   * The core loop. Iterates the clip list in output order, skipping muted clips,
-   * and decodes each unmuted segment via byte-range fetch + AudioDecoder.
+   * The core loop.  Iterates the clip list in output order and decodes each
+   * segment via byte-range fetch + AudioDecoder.  Muted segments get silence
+   * pushed into the worklet queue so the cursor advances at real speed.
    */
   private async runDecodeLoop(startTime: number, signal: AbortSignal): Promise<void> {
     if (!this.primarySourceId) return
@@ -523,10 +600,17 @@ export class WebCodecsPlayer implements IAudioPlayer {
     const segments = this.buildSegments(startTime)
     console.log(`[WebCodecsPlayer] decode loop: ${segments.length} segments from ${startTime.toFixed(2)}s`)
 
+    const sampleRate  = entry.wavInfo?.sampleRate  ?? entry.codec.sampleRate
+    const numChannels = entry.wavInfo?.channels     ?? entry.codec.numberOfChannels
+
     if (entry.wavInfo) {
       // ── WAV: direct PCM path — no AudioDecoder ──────────────────────────
       for (const seg of segments) {
         if (signal.aborted) break
+        if (seg.muted) {
+          await this.feedSilence(seg.durationSecs, sampleRate, numChannels, signal)
+          continue
+        }
         await this.decodePcmBytesRange(entry, seg.startByte, seg.endByte, seg.sourceStart, signal)
       }
     } else {
@@ -534,6 +618,10 @@ export class WebCodecsPlayer implements IAudioPlayer {
       const dec = await this.openDecoder(entry)
       for (const seg of segments) {
         if (signal.aborted) break
+        if (seg.muted) {
+          await this.feedSilence(seg.durationSecs, sampleRate, numChannels, signal)
+          continue
+        }
         console.log(`[WebCodecsPlayer] segment [${seg.sourceStart.toFixed(2)}s] bytes ${seg.startByte}–${seg.endByte}`)
         await this.decodeBytesRange(entry, dec, seg.startByte, seg.endByte, seg.sourceStart, signal)
       }
@@ -546,20 +634,60 @@ export class WebCodecsPlayer implements IAudioPlayer {
     }
   }
 
+  // ── Silence feeder for muted segments ──────────────────────────────────
+  //
+  // Pushes zero-filled PCM chunks into the worklet queue so the FIFO stays
+  // time-aligned with the clock.  Respects the same throttle as real decode
+  // so we don't flood the queue.
+
+  private async feedSilence(
+    durationSecs: number,
+    sampleRate:   number,
+    numChannels:  number,
+    signal:       AbortSignal,
+  ): Promise<void> {
+    const CHUNK_FRAMES = 4096
+    let remaining = durationSecs
+
+    while (remaining > 0 && !signal.aborted) {
+      // Respect the buffer-ahead throttle
+      while (this._bufferedAhead > TARGET_BUFFER_SECS && !signal.aborted) {
+        await new Promise<void>((r) => setTimeout(r, 50))
+        this._bufferedAhead = Math.max(0, this._bufferedAhead - 0.05)
+      }
+      if (signal.aborted) break
+
+      const chunkDur = Math.min(CHUNK_FRAMES / sampleRate, remaining)
+      const frames   = Math.ceil(chunkDur * sampleRate)
+      const channels = Array.from({ length: numChannels }, () => new Float32Array(frames))
+      sendPcmChunk(this.worklet!.port, { channels, timestamp: 0 })
+      this._bufferedAhead += chunkDur
+      remaining           -= chunkDur
+    }
+  }
+
   // ── Segment builder ───────────────────────────────────────────────────────
+  //
+  // Builds an ordered list of source-time segments that the decode loop must
+  // process.  Muted clips are INCLUDED (with muted=true) so the worklet queue
+  // stays time-aligned and the cursor advances through them at real speed.
+  // The decode loop sends silence for muted segments instead of fetching audio.
 
   private buildSegments(startTime: number): Array<{
-    startByte:   number
-    endByte:     number
-    sourceStart: number
-    outputStart: number
+    startByte:    number
+    endByte:      number
+    sourceStart:  number
+    outputStart:  number
+    muted:        boolean
+    durationSecs: number
   }> {
     if (!this.primarySourceId) return []
     const entry = this.sources.get(this.primarySourceId)
     if (!entry) return []
 
+    type Seg = { startByte: number; endByte: number; sourceStart: number; outputStart: number; muted: boolean; durationSecs: number }
     const anySolo = this.tracks.some((t) => t.solo)
-    const segs: Array<{ startByte: number; endByte: number; sourceStart: number; outputStart: number }> = []
+    const segs: Seg[] = []
 
     for (const track of this.tracks) {
       if (track.muted) continue
@@ -568,7 +696,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
       const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
 
       for (const clip of sorted) {
-        if (clip.muted) continue
         if (clip.sourceFileId !== this.primarySourceId) continue
 
         const clipOutputEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
@@ -580,14 +707,31 @@ export class WebCodecsPlayer implements IAudioPlayer {
           clip.sourceStart + (startTime - clip.outputStart),
         )
 
+        if (clip.muted) {
+          // Muted clip: include it so silence fills the worklet queue for this
+          // time span — keeps the cursor moving at real speed.
+          const segDuration = clip.sourceEnd - seekSourceTime
+          segs.push({
+            startByte:    0,
+            endByte:      0,
+            sourceStart:  seekSourceTime,
+            outputStart:  clip.outputStart + (seekSourceTime - clip.sourceStart),
+            muted:        true,
+            durationSecs: segDuration,
+          })
+          continue
+        }
+
         const startFrame = entry.index.seek(seekSourceTime)
         const endFrame   = entry.index.seek(clip.sourceEnd)
 
         segs.push({
-          startByte:   startFrame.byteOffset,
-          endByte:     endFrame.byteOffset + FETCH_CHUNK,  // slightly past to ensure complete last frame
-          sourceStart: startFrame.time,
-          outputStart: clip.outputStart + (startFrame.time - clip.sourceStart),
+          startByte:    startFrame.byteOffset,
+          endByte:      endFrame.byteOffset + FETCH_CHUNK,  // slightly past to ensure complete last frame
+          sourceStart:  startFrame.time,
+          outputStart:  clip.outputStart + (startFrame.time - clip.sourceStart),
+          muted:        false,
+          durationSecs: clip.sourceEnd - startFrame.time,
         })
       }
     }
@@ -596,10 +740,12 @@ export class WebCodecsPlayer implements IAudioPlayer {
     if (segs.length === 0 && this.sources.size > 0) {
       const startFrame = entry.index.seek(startTime)
       segs.push({
-        startByte:   startFrame.byteOffset,
-        endByte:     Number.MAX_SAFE_INTEGER,
-        sourceStart: startFrame.time,
-        outputStart: startFrame.time,
+        startByte:    startFrame.byteOffset,
+        endByte:      Number.MAX_SAFE_INTEGER,
+        sourceStart:  startFrame.time,
+        outputStart:  startFrame.time,
+        muted:        false,
+        durationSecs: entry.duration - startFrame.time,
       })
     }
 

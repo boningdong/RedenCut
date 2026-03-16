@@ -93,35 +93,62 @@ function parseMp3Header(b0: number, b1: number, b2: number): {
 async function buildMp3Index(url: string): Promise<FrameIndex> {
   console.log('[FrameIndex] Building MP3 index for', url)
 
-  // Fetch the first 256 KB to probe for the initial frame parameters,
-  // then build an approximate index using constant bitrate assumption.
-  // For VBR files we scan the full file (up to 20 MB).
+  // Fetch the first 256 KB to probe for the initial frame parameters.
   const headResponse = await fetch(url, { headers: { Range: 'bytes=0-262143' } })
   const headBuffer = await headResponse.arrayBuffer()
   const data = new Uint8Array(headBuffer)
 
-  // Get total file size from Content-Range header
+  // Get total file size from Content-Range or Content-Length header.
+  // Electron's net.fetch for file:// often omits Content-Range, so fall back
+  // to Content-Length.  If both are absent, use data.length as a last resort.
   const contentRange = headResponse.headers.get('content-range') ?? ''
   const totalMatch = contentRange.match(/\/(\d+)$/)
-  const totalBytes = totalMatch ? parseInt(totalMatch[1]) : data.length
+  const totalBytes = totalMatch
+    ? parseInt(totalMatch[1])
+    : parseInt(headResponse.headers.get('content-length') ?? '0') || data.length
 
   const frames: FrameEntry[] = []
-  let offset = 0
   let currentTime = 0
   let lastSampleRate = 44100
 
-  // Skip ID3v2 tag if present
-  if (data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
+  // ── ID3v2 tag skip ────────────────────────────────────────────────────────
+  // Podcast MP3s often embed cover art in their ID3 tags, making them larger
+  // than our initial 256 KB fetch window.  When the tag extends past our
+  // buffer, fetch a second 64 KB chunk immediately after the tag.
+  let fileBase = 0      // byte offset of scanData relative to the full file
+  let scanData = data
+  let offset   = 0
+
+  if (data.length >= 10 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
     const id3Size = ((data[6] & 0x7f) << 21) | ((data[7] & 0x7f) << 14) |
                    ((data[8] & 0x7f) <<  7) |  (data[9] & 0x7f)
-    offset = 10 + id3Size
-    console.log(`[FrameIndex] MP3 skipping ID3v2 tag (${id3Size} bytes)`)
+    const tagEnd = 10 + id3Size
+    console.log(`[FrameIndex] MP3 ID3v2 tag: ${id3Size} bytes, tagEnd=${tagEnd}`)
+
+    if (tagEnd >= data.length) {
+      // Tag larger than initial buffer — fetch 64 KB right after it
+      const fetchEnd = tagEnd + 65535
+      console.log(`[FrameIndex] MP3 large ID3 tag (>${data.length} bytes); fetching bytes ${tagEnd}-${fetchEnd}`)
+      try {
+        const secondResp = await fetch(url, { headers: { Range: `bytes=${tagEnd}-${fetchEnd}` } })
+        const secondBuf  = await secondResp.arrayBuffer()
+        scanData  = new Uint8Array(secondBuf)
+        fileBase  = tagEnd
+        offset    = 0
+      } catch {
+        console.warn('[FrameIndex] MP3 second-chunk fetch failed after large ID3 — uniform fallback')
+        return buildUniformIndex(url, 'mp3', MP3_SAMPLES_PER_FRAME)
+      }
+    } else {
+      offset = tagEnd
+    }
   }
 
+  // ── Frame scan ────────────────────────────────────────────────────────────
   let framesScanned = 0
 
-  while (offset + 4 < data.length) {
-    const result = parseMp3Header(data[offset], data[offset + 1], data[offset + 2])
+  while (offset + 4 < scanData.length) {
+    const result = parseMp3Header(scanData[offset], scanData[offset + 1], scanData[offset + 2])
     if (!result) {
       offset++
       continue
@@ -131,36 +158,43 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
     lastSampleRate = sampleRate
     const frameDuration = MP3_SAMPLES_PER_FRAME / sampleRate
 
-    // Only keep a sparse index (every ~0.5 s) to save memory
+    // Sparse index (every ~0.5 s) to keep memory reasonable
     if (framesScanned % Math.max(1, Math.round(0.5 * sampleRate / MP3_SAMPLES_PER_FRAME)) === 0) {
-      frames.push({ byteOffset: offset, time: currentTime, duration: frameDuration })
+      frames.push({ byteOffset: fileBase + offset, time: currentTime, duration: frameDuration })
     }
 
     currentTime += frameDuration
-    offset += frameSize
+    offset      += frameSize
     framesScanned++
   }
 
-  // Extrapolate remaining frames from the total file size
-  if (frames.length > 0 && totalBytes > data.length) {
+  // ── Fallback when scan found nothing ─────────────────────────────────────
+  if (frames.length === 0) {
+    console.warn('[FrameIndex] MP3 scan produced no frames — using uniform fallback')
+    return buildUniformIndex(url, 'mp3', MP3_SAMPLES_PER_FRAME)
+  }
+
+  // ── Extrapolate remaining frames from the total file size ─────────────────
+  const bytesScanned = fileBase + scanData.length
+  if (totalBytes > bytesScanned) {
     const lastFrame = frames[frames.length - 1]
     const avgBytesPerSec = lastFrame.byteOffset > 0
       ? lastFrame.byteOffset / Math.max(lastFrame.time, 0.1)
       : 16000  // 128 kbps fallback
 
-    let extraOffset = data.length
-    let extraTime = currentTime
+    let extraOffset = bytesScanned
+    let extraTime   = currentTime
 
     while (extraOffset < totalBytes) {
       const frameDuration = MP3_SAMPLES_PER_FRAME / lastSampleRate
       frames.push({ byteOffset: extraOffset, time: extraTime, duration: frameDuration })
       const approxFrameSize = Math.round(avgBytesPerSec * frameDuration)
       extraOffset += Math.max(1, approxFrameSize)
-      extraTime += frameDuration
+      extraTime   += frameDuration
     }
   }
 
-  console.log(`[FrameIndex] MP3 index built: ${frames.length} entries, ${currentTime.toFixed(1)}s scanned`)
+  console.log(`[FrameIndex] MP3 index built: ${frames.length} entries, ~${currentTime.toFixed(1)}s scanned`)
   return createIndex(frames)
 }
 
@@ -202,6 +236,15 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   reader.cancel().catch(() => { /* ignore */ })
 
   const header = new DataView(scratch.buffer)
+
+  // ── RIFF chunk-size fallback ──────────────────────────────────────────────
+  // Electron's net.fetch for file:// URLs often omits Content-Length and
+  // Content-Range, leaving totalBytes = 0.  Bytes 4-7 of a RIFF/WAV file
+  // always contain (fileSize - 8) as uint32 LE.
+  if (totalBytes === 0 && bytesRead >= 8) {
+    totalBytes = header.getUint32(4, true) + 8
+    console.log(`[FrameIndex] WAV totalBytes from RIFF header: ${totalBytes}`)
+  }
 
   // WAV header: "RIFF" at 0, "WAVE" at 8, "fmt " at 12
   const channels   = header.getUint16(22, true)
