@@ -188,28 +188,49 @@ export default function App() {
     const { tracks: initTracks } = useTimelineStore.getState()
     console.log(`[App] timeline init — ${initTracks.length} tracks, sourceFileId=${filePath}`)
 
-    // ── 3. Create player and load source file ─────────────────────────────
-    // Prefer WebCodecsPlayer (frame-accurate skip at cut boundaries).
-    // Fall back to SimpleAudioPlayer if WebCodecs AudioDecoder is unavailable
-    // or if the codec isn't supported on this platform.
+    // ── 3. Create player and load all source files ────────────────────────
+    // Prefer WebCodecsPlayer (frame-accurate skip + multi-source mixing).
+    // Fall back to SimpleAudioPlayer if WebCodecs AudioDecoder is unavailable.
+    //
+    // Load every source file registered in the timeline store — this handles
+    // single-file projects (one source) and multi-track projects (N sources).
+    // The primary file is always loaded first so it sets the AudioContext rate.
+    const { sourceFiles } = useTimelineStore.getState()
+    const orderedSources = [
+      { id: filePath, filePath },
+      ...sourceFiles
+        .filter((sf) => sf.filePath !== filePath)
+        .map((sf) => ({ id: sf.id, filePath: sf.filePath })),
+    ]
+
     let player: IAudioPlayer
     if (typeof AudioDecoder !== 'undefined') {
       const wcPlayer = new WebCodecsPlayer()
       try {
-        await wcPlayer.loadSourceFile(filePath, filePath)
+        for (const { id, filePath: fp } of orderedSources) {
+          await wcPlayer.loadSourceFile(id, fp)
+        }
         player = wcPlayer
-        console.log('[App] using WebCodecsPlayer (frame-accurate skip)')
+        console.log(`[App] using WebCodecsPlayer (${orderedSources.length} source(s))`)
       } catch (err) {
         console.warn('[App] WebCodecsPlayer unavailable, falling back to SimpleAudioPlayer:', err)
         wcPlayer.destroy()
         const sPlayer = new SimpleAudioPlayer()
-        await sPlayer.loadSourceFile(filePath, filePath)
+        for (const { id, filePath: fp } of orderedSources) {
+          await sPlayer.loadSourceFile(id, fp).catch((e) => {
+            console.warn(`[App] SimpleAudioPlayer: could not load secondary source id=${id}:`, e)
+          })
+        }
         player = sPlayer
       }
     } else {
       console.log('[App] AudioDecoder not available — using SimpleAudioPlayer')
       const sPlayer = new SimpleAudioPlayer()
-      await sPlayer.loadSourceFile(filePath, filePath)
+      for (const { id, filePath: fp } of orderedSources) {
+        await sPlayer.loadSourceFile(id, fp).catch((e) => {
+          console.warn(`[App] SimpleAudioPlayer: could not load secondary source id=${id}:`, e)
+        })
+      }
       player = sPlayer
     }
 

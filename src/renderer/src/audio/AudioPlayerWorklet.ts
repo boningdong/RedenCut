@@ -130,8 +130,12 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
       for (const ch of output) ch.fill(0, filled)
     }
 
-    // Keep the processor alive as long as we haven't fully drained after end.
-    return !this._ended || this._queue.length > 0
+    // Always return true to keep the processor alive for the lifetime of the
+    // AudioWorkletNode.  Returning false would permanently terminate it on the
+    // audio thread, making it unable to receive further PCM chunks after a
+    // replay or seek-back — especially dangerous for short files that get
+    // fully pre-buffered and whose decode loop sends 'end' while paused.
+    return true
   }
 }
 

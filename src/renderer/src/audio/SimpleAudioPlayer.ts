@@ -169,7 +169,14 @@ export class SimpleAudioPlayer implements IAudioPlayer {
       await ctx.resume()
     }
     console.log('[SimpleAudioPlayer] play() currentTime=', el.currentTime)
-    await el.play()
+    // Play all sources in parallel; errors on secondary sources are non-fatal
+    await Promise.all(
+      [...this.sources.entries()].map(([id, entry]) =>
+        entry.element.play().catch((err) => {
+          console.warn(`[SimpleAudioPlayer] play() failed for source id=${id}:`, err)
+        }),
+      ),
+    )
     this._isPlaying = true
     this.emitPlayState(true)
     this.startRaf()
@@ -179,7 +186,9 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     const el = this.primaryElement
     if (!el) return
     console.log('[SimpleAudioPlayer] pause() currentTime=', el.currentTime)
-    el.pause()
+    for (const entry of this.sources.values()) {
+      entry.element.pause()
+    }
     this._isPlaying = false
     this.stopRaf()
     this.emitPlayState(false)
@@ -197,10 +206,15 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   seekTo(outputTime: number): void {
     const el = this.primaryElement
     if (!el) return
-    // Phase 1: output time === source time (single file, no clip rearrangement)
     const clamped = Math.max(0, Math.min(outputTime, el.duration || 0))
     console.log(`[SimpleAudioPlayer] seekTo outputTime=${outputTime} clamped=${clamped}`)
-    el.currentTime = clamped
+    // Seek all sources to the same output time so they stay in sync.
+    // For secondary sources we use outputTime directly (output === source time
+    // for the typical background-music use case where clips start at t=0).
+    for (const entry of this.sources.values()) {
+      const d = entry.element.duration || 0
+      entry.element.currentTime = d > 0 ? Math.max(0, Math.min(outputTime, d)) : 0
+    }
     this.updateGains()
     this.emitTimeUpdate(clamped)
   }
