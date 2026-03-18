@@ -64,6 +64,12 @@ interface TimelineState {
   sourceFiles: SourceFile[]
   tracks:      Track[]
   undoStack:   HistoryEntry[]
+  /**
+   * Populated by undo(); cleared by any new mutation.
+   * Each entry holds a snapshot of tracks[] before the operation was undone,
+   * along with the word IDs that were un-muted so redo can re-mute them.
+   */
+  redoStack:   HistoryEntry[]
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -126,9 +132,10 @@ interface TimelineState {
   selectedClipId: string | null
   setSelectedClipId(id: string | null): void
 
-  // ── Undo ───────────────────────────────────────────────────────────────────
+  // ── Undo / Redo ────────────────────────────────────────────────────────────
 
   undo(): void
+  redo(): void
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -151,6 +158,7 @@ const initialState = {
   sourceFiles:    [] as SourceFile[],
   tracks:         [] as Track[],
   undoStack:      [] as HistoryEntry[],
+  redoStack:      [] as HistoryEntry[],
   selectedClipId: null as string | null,
 }
 
@@ -267,6 +275,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     set((s) => ({
       tracks:    s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),
       undoStack: [...s.undoStack, { before, wordIds, label: `mute [${startTime.toFixed(1)}–${endTime.toFixed(1)}]` }],
+      redoStack: [],   // any new mutation invalidates the redo future
     }))
 
     if (wordIds.length > 0) {
@@ -297,6 +306,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     set((s) => ({
       tracks:         s.tracks.map((t) => (t.id === track.id ? { ...t, clips: merged } : t)),
       undoStack:      [...s.undoStack, { before, wordIds: resolvedWordIds, label: `unmute clip ${clipId}` }],
+      redoStack:      [],   // new mutation invalidates the redo future
       selectedClipId: null,
     }))
 
@@ -335,6 +345,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
           : t,
       ),
       undoStack: [...s.undoStack, { before, wordIds: [], label: `split at ${time.toFixed(1)}` }],
+      redoStack: [],   // new mutation invalidates the redo future
     }))
   },
 
@@ -376,6 +387,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       return {
         tracks:    newTracks,
         undoStack: [...s.undoStack, { before, wordIds: [], label: `move clip ${clipId}` }],
+        redoStack: [],   // new mutation invalidates the redo future
       }
     })
   },
@@ -387,17 +399,53 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── undo ────────────────────────────────────────────────────────────────────
   undo() {
-    const { undoStack } = get()
+    const { undoStack, tracks } = get()
     if (undoStack.length === 0) return
     const entry = undoStack[undoStack.length - 1]
     console.log(`[Timeline] undo — "${entry.label}" wordIds=${entry.wordIds.length}`)
+
+    // Capture current state as a redo entry so we can re-apply this op.
+    // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
+    // and its `wordIds` are re-muted on redo.
+    const redoEntry: HistoryEntry = {
+      before:  cloneTracks(tracks),
+      wordIds: entry.wordIds,
+      label:   entry.label,
+    }
+
     set((s) => ({
       tracks:         entry.before,
       undoStack:      s.undoStack.slice(0, -1),
+      redoStack:      [...s.redoStack, redoEntry],
       selectedClipId: null,
     }))
     if (entry.wordIds.length > 0) {
       useTranscriptStore.getState().unmuteWords(entry.wordIds)
+    }
+  },
+
+  // ── redo ────────────────────────────────────────────────────────────────────
+  redo() {
+    const { redoStack, tracks } = get()
+    if (redoStack.length === 0) return
+    const entry = redoStack[redoStack.length - 1]
+    console.log(`[Timeline] redo — "${entry.label}" wordIds=${entry.wordIds.length}`)
+
+    // Capture current (pre-redo) state as an undo entry so the user can undo again.
+    const undoEntry: HistoryEntry = {
+      before:  cloneTracks(tracks),
+      wordIds: entry.wordIds,
+      label:   entry.label,
+    }
+
+    set((s) => ({
+      tracks:         entry.before,
+      redoStack:      s.redoStack.slice(0, -1),
+      undoStack:      [...s.undoStack, undoEntry],
+      selectedClipId: null,
+    }))
+    if (entry.wordIds.length > 0) {
+      useTranscriptStore.getState().muteWords(entry.wordIds)
     }
   },
 

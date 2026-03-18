@@ -363,6 +363,103 @@ describe('undo', () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+// redo
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('redo', () => {
+  const SF_ID = '/audio/test.mp3'
+
+  beforeEach(() => {
+    resetAll()
+    tl().initFromFile(SF_ID, 100)
+  })
+
+  it('re-applies a split that was undone', () => {
+    tl().splitAt(50)
+    tl().undo()
+    expect(primaryClips()).toHaveLength(1)
+    tl().redo()
+    expect(primaryClips()).toHaveLength(2)
+    expect(primaryClips()[0].sourceEnd).toBe(50)
+    expect(primaryClips()[1].sourceStart).toBe(50)
+  })
+
+  it('re-applies a muteRange that was undone', () => {
+    tl().muteRange(SF_ID, 20, 60)
+    tl().undo()
+    expect(primaryClips().every((c) => !c.muted)).toBe(true)
+    tl().redo()
+    const muted = primaryClips().find((c) => c.muted)
+    expect(muted).toBeDefined()
+    expect(muted!.sourceStart).toBe(20)
+    expect(muted!.sourceEnd).toBe(60)
+  })
+
+  it('re-mutes transcript words when redoing a mute operation', () => {
+    useTranscriptStore.getState().setWords([
+      makeWord('w1', 22, 30),
+      makeWord('w2', 35, 45),
+    ])
+    tl().muteRange(SF_ID, 20, 60, ['w1', 'w2'])
+    tl().undo()
+    expect(useTranscriptStore.getState().words.find((w) => w.id === 'w1')!.muted).toBe(false)
+    tl().redo()
+    expect(useTranscriptStore.getState().words.find((w) => w.id === 'w1')!.muted).toBe(true)
+    expect(useTranscriptStore.getState().words.find((w) => w.id === 'w2')!.muted).toBe(true)
+  })
+
+  it('is a no-op when the redo stack is empty', () => {
+    tl().splitAt(50)
+    expect(() => tl().redo()).not.toThrow()
+    expect(primaryClips()).toHaveLength(2)
+  })
+
+  it('clears the redo stack when a new mutation is made after undo', () => {
+    tl().splitAt(50)
+    tl().undo()
+    expect(tl().redoStack).toHaveLength(1)
+
+    tl().splitAt(30)
+    expect(tl().redoStack).toHaveLength(0)
+
+    tl().redo() // no-op now
+    expect(primaryClips()).toHaveLength(2) // only the new split at 30
+  })
+
+  it('supports undo/redo cycling multiple times', () => {
+    tl().splitAt(50)
+    for (let i = 0; i < 3; i++) {
+      tl().undo()
+      expect(primaryClips()).toHaveLength(1)
+      tl().redo()
+      expect(primaryClips()).toHaveLength(2)
+    }
+  })
+
+  it('pushes a redo entry back to undoStack (enabling undo after redo)', () => {
+    tl().splitAt(50)
+    tl().undo()
+    tl().redo()
+    expect(tl().undoStack).toHaveLength(1)
+    tl().undo()
+    expect(primaryClips()).toHaveLength(1)
+  })
+
+  it('multiple undos followed by multiple redos restores in correct order', () => {
+    tl().splitAt(30)  // op1: [0–30][30–100]
+    tl().splitAt(70)  // op2: [0–30][30–70][70–100]
+    tl().undo()       // undo op2
+    tl().undo()       // undo op1
+    expect(primaryClips()).toHaveLength(1)
+
+    tl().redo()  // redo op1
+    expect(primaryClips()).toHaveLength(2)
+    tl().redo()  // redo op2
+    expect(primaryClips()).toHaveLength(3)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 // loadFromProject
 // ══════════════════════════════════════════════════════════════════════════════
 

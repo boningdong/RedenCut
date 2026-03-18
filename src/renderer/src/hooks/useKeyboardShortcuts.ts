@@ -61,6 +61,13 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         return
       }
 
+      // ── Cmd+Shift+Z — Redo ────────────────────────────────────────────
+      if (isMeta && e.shiftKey && e.code === 'KeyZ') {
+        e.preventDefault()
+        useTimelineStore.getState().redo()
+        return
+      }
+
       if (isMeta) return
 
       switch (e.code) {
