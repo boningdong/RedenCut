@@ -418,26 +418,36 @@ export default function App() {
     const reason = await window.electronAPI.transcript.checkAvailability()
     if (reason) { handleError(new Error(reason)); return }
 
-    // Two-step lookup: track id → sourceFileId → SourceFile
     const { tracks: currentTracks, sourceFiles: currentSFs } = useTimelineStore.getState()
-    let sf: ReturnType<typeof currentSFs.find>
+
+    // Collect which source files to transcribe
+    const targets: { sf: (typeof currentSFs)[0]; trackId: string }[] = []
     if (trackId) {
       const track = currentTracks.find((t) => t.id === trackId)
-      const sfId = track?.clips[0]?.sourceFileId
-      sf = currentSFs.find((s) => s.id === sfId)
+      const sfId  = track?.clips[0]?.sourceFileId
+      const sf    = currentSFs.find((s) => s.id === sfId)
+      if (sf) targets.push({ sf, trackId })
     } else {
-      sf = currentSFs[0]
+      // No trackId → generate for every track that has a source file
+      for (const track of currentTracks) {
+        const sfId = track.clips[0]?.sourceFileId
+        const sf   = currentSFs.find((s) => s.id === sfId)
+        if (sf) targets.push({ sf, trackId: track.id })
+      }
     }
-    if (!sf) return
+    if (targets.length === 0) return
 
     setIsGenerating(true)
     setGeneratingStatus('Starting…')
     try {
-      const transcript = await window.electronAPI.transcript.generate(sf.filePath)
-      const taggedWords = transcript.words.map((w) => ({ ...w, sourceFileId: sf!.id }))
-      // Read from store — not from closed-over `words` to avoid stale closure
-      const currentWords = useTranscriptStore.getState().words
-      setWords(mergeTrackWords(currentWords, taggedWords, sf.id))
+      let currentWords = useTranscriptStore.getState().words
+      for (const { sf } of targets) {
+        setGeneratingStatus(targets.length > 1 ? `Transcribing ${sf.filePath.split('/').pop()}…` : 'Transcribing…')
+        const transcript  = await window.electronAPI.transcript.generate(sf.filePath)
+        const taggedWords = transcript.words.map((w) => ({ ...w, sourceFileId: sf.id }))
+        currentWords      = mergeTrackWords(currentWords, taggedWords, sf.id)
+      }
+      setWords(currentWords)
       setIsDirty(true)
     } catch (err) { handleError(err) }
     finally { setIsGenerating(false); setGeneratingStatus('') }

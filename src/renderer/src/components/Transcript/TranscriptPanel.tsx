@@ -270,14 +270,14 @@ export function TranscriptPanel({
           {/* Per-track pills */}
           {tracks.map((track) => {
             const trackSfId = track.clips[0]?.sourceFileId
-            const isActive  = activeTrackFilter === trackSfId
+            const isActive  = !!trackSfId && activeTrackFilter === trackSfId
             const hasWords  = trackSfId != null && words.some((w) => w.sourceFileId === trackSfId)
             const dotColor  = track.color
 
             return (
               <button
                 key={track.id}
-                onClick={() => setActiveTrackFilter(isActive ? null : (trackSfId ?? null))}
+                onClick={() => { if (trackSfId) setActiveTrackFilter(trackSfId) }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -309,29 +309,6 @@ export function TranscriptPanel({
             )
           })}
 
-          {/* "⚡ All tracks" — generates for tracks without transcripts sequentially */}
-          <button
-            onClick={async () => {
-              for (const track of tracks) {
-                const sfId = track.clips[0]?.sourceFileId
-                if (sfId && !words.some((w) => w.sourceFileId === sfId)) {
-                  await onGenerate(track.id)
-                }
-              }
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-text-muted)',
-              fontSize: 10,
-              padding: '2px 4px',
-              cursor: 'pointer',
-              marginLeft: 'auto',
-            }}
-            title="Generate transcripts for all tracks that don't have one yet"
-          >
-            ⚡ All tracks
-          </button>
         </div>
       )}
 
@@ -423,6 +400,9 @@ function EmptyTranscriptState({ onGenerate }: { onGenerate: (trackId?: string) =
       >
         Generate Transcript
       </button>
+      <p style={{ fontSize: 10, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
+        Generates transcripts for all tracks
+      </p>
     </div>
   )
 }
