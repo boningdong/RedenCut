@@ -340,6 +340,34 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                 />
               )}
 
+              {/* Gap overlays — cover waveform in regions between clips */}
+              {(() => {
+                const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
+                return sorted.slice(0, -1).flatMap((clip, i) => {
+                  const clipEnd   = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
+                  const nextStart = sorted[i + 1].outputStart
+                  if (nextStart <= clipEnd + 0.001) return []
+                  const leftPct  = duration > 0 ? (clipEnd / duration) * 100 : 0
+                  const widthPct = duration > 0 ? ((nextStart - clipEnd) / duration) * 100 : 0
+                  return [(
+                    <div
+                      key={`gap-${clip.id}`}
+                      style={{
+                        position:        'absolute',
+                        left:            `${leftPct}%`,
+                        width:           `${widthPct}%`,
+                        top:             0,
+                        bottom:          0,
+                        backgroundColor: 'var(--color-bg-secondary)',
+                        opacity:         0.85,
+                        pointerEvents:   'none',
+                        zIndex:          6,
+                      }}
+                    />
+                  )]
+                })
+              })()}
+
               {/* Split markers — lines at the start of each clip after the first */}
               {track.clips
                 .slice(1)
