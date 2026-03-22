@@ -8,12 +8,14 @@
 import { ipcMain } from 'electron'
 import { spawn } from 'child_process'
 import type { ProjectFile } from '@shared/project.types'
+import { ProjectFileSchema } from '@shared/project.types'
 import type { RenderProgress } from '@shared/ipc.types'
 import { buildRenderArgs } from '../audio/renderer'
 import { getFfmpegPath } from '../audio/binaries'
 
 ipcMain.handle('project:export', async (event, project: ProjectFile, outputPath: string) => {
-  const args = buildRenderArgs(project, outputPath)
+  const validated = ProjectFileSchema.parse(project)
+  const args = buildRenderArgs(validated, outputPath)
   const ffmpeg = spawn(getFfmpegPath(), args)
 
   console.log(`[RenderIPC] spawning ffmpeg: ${getFfmpegPath()} ${args.join(' ')}`)
