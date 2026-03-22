@@ -27,6 +27,12 @@ interface TranscriptState {
    */
   showMutedWords: boolean
 
+  /**
+   * When non-null, only words from this sourceFileId are shown.
+   * null = all tracks merged.
+   */
+  activeTrackFilter: string | null
+
   /** True while a transcription job is running. */
   isGenerating: boolean
 
@@ -68,6 +74,7 @@ const initialState = {
   words: [] as Word[],
   selectedWordIds: new Set<string>(),
   showMutedWords: true,
+  activeTrackFilter: null as string | null,
   isGenerating: false,
   generatingStatus: '',
 }
@@ -101,6 +108,8 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
 
   toggleShowMutedWords: () =>
     set((s) => ({ showMutedWords: !s.showMutedWords })),
+
+  setActiveTrackFilter: (sourceFileId: string | null) => set({ activeTrackFilter: sourceFileId }),
 
   setIsGenerating: (generating) => set({ isGenerating: generating }),
   setGeneratingStatus: (status) => set({ generatingStatus: status }),
