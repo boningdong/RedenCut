@@ -49,6 +49,11 @@ export const WordSchema = z.object({
    * undefined on legacy words — backfilled to sourceFiles[0].id on project open.
    */
   sourceFileId: z.string().optional(),
+  /**
+   * ID of the Track this word belongs to.
+   * undefined on legacy words — backfilled to tracks[0].id on project open.
+   */
+  trackId: z.string().optional(),
 })
 export type Word = z.infer<typeof WordSchema>
 

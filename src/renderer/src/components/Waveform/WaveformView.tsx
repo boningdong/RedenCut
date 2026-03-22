@@ -45,13 +45,15 @@ interface WaveformViewProps {
 type TrackPeakState = 'loading' | PeakData
 
 export function WaveformView({ peaks }: WaveformViewProps) {
-  const tracks            = useTimelineStore((s) => s.tracks)
-  const addSourceFile     = useTimelineStore((s) => s.addSourceFile)
-  const addTrack          = useTimelineStore((s) => s.addTrack)
-  const removeTrack       = useTimelineStore((s) => s.removeTrack)
-  const moveClip          = useTimelineStore((s) => s.moveClip)
-  const selectedClipId    = useTimelineStore((s) => s.selectedClipId)
-  const setSelectedClipId = useTimelineStore((s) => s.setSelectedClipId)
+  const tracks             = useTimelineStore((s) => s.tracks)
+  const addSourceFile      = useTimelineStore((s) => s.addSourceFile)
+  const addTrack           = useTimelineStore((s) => s.addTrack)
+  const removeTrack        = useTimelineStore((s) => s.removeTrack)
+  const moveClip           = useTimelineStore((s) => s.moveClip)
+  const selectedClipId     = useTimelineStore((s) => s.selectedClipId)
+  const setSelectedClipId  = useTimelineStore((s) => s.setSelectedClipId)
+  const selectedTrackId    = useTimelineStore((s) => s.selectedTrackId)
+  const setSelectedTrackId = useTimelineStore((s) => s.setSelectedTrackId)
 
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const duration    = peaks.durationSeconds  // primary peaks duration as timeline length
@@ -100,12 +102,13 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   }, [])
 
   // ── Seek on lane click ────────────────────────────────────────────────────
-  const handleLaneClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleLaneClick = useCallback((e: React.MouseEvent<HTMLDivElement>, trackId?: string) => {
+    if (trackId) setSelectedTrackId(trackId)
     const rect = e.currentTarget.getBoundingClientRect()
     const pct  = (e.clientX - rect.left) / rect.width
     const t    = pct * duration
     getAudioPlayerInstance()?.seekTo(t)
-  }, [duration])
+  }, [duration, setSelectedTrackId])
 
   // ── Add Track ────────────────────────────────────────────────────────────
   const handleAddTrack = useCallback(async () => {
@@ -252,8 +255,9 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                 height:       96,
                 cursor:       'crosshair',
                 overflow:     'hidden',
+                borderLeft:   track.id === selectedTrackId ? '2px solid var(--color-accent)' : '2px solid transparent',
               }}
-              onClick={handleLaneClick}
+              onClick={(e) => handleLaneClick(e, track.id)}
               onPointerMove={handleClipPointerMove}
               onPointerUp={handleClipPointerUp}
             >
@@ -296,6 +300,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                     onPointerDown={(e) => handleClipPointerDown(e, clip)}
                     onClick={(e) => {
                       e.stopPropagation()
+                      setSelectedTrackId(track.id)
                       setSelectedClipId(clip.id === selectedClipId ? null : clip.id)
                       setSelection({ start: clip.outputStart, end: clip.outputStart + clipDur })
                     }}

@@ -147,8 +147,12 @@ export function TranscriptPanel({
     // If viewing a specific track, route the delete to that track's source file.
     const { sourceFiles: sfList, muteRange } = useTimelineStore.getState()
     const { tracks: tList } = useTimelineStore.getState()
-    const activeTrackForDelete = activeTrackFilter ? tList.find((t) => t.id === activeTrackFilter) : null
-    const sfId = activeTrackForDelete?.clips[0]?.sourceFileId
+    const routingTrack = activeTrackFilter
+      ? tList.find((t) => t.id === activeTrackFilter)
+      : selected[0]?.trackId
+        ? tList.find((t) => t.id === selected[0].trackId)
+        : null
+    const sfId = routingTrack?.clips[0]?.sourceFileId
               ?? selected[0]?.sourceFileId
               ?? sfList[0]?.id
     if (sfId) muteRange(sfId, start, end, wordIds)
@@ -190,13 +194,8 @@ export function TranscriptPanel({
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
-  // Find the active track to get its sourceFileId for word filtering.
-  // activeTrackFilter now stores a trackId (not sourceFileId) for uniqueness.
-  const activeTrack   = activeTrackFilter ? tracks.find((t) => t.id === activeTrackFilter) : null
-  const activeSfId    = activeTrack?.clips[0]?.sourceFileId
-
-  const visibleWords  = words
-    .filter((w) => !activeTrackFilter || (activeSfId != null ? w.sourceFileId === activeSfId : false))
+  const visibleWords = words
+    .filter((w) => !activeTrackFilter || w.trackId === activeTrackFilter)
     .filter((w) => showMutedWords || !w.muted)
 
   const hasTranscript = visibleWords.length > 0
@@ -280,9 +279,8 @@ export function TranscriptPanel({
 
           {/* Per-track pills */}
           {tracks.map((track) => {
-            const trackSfId = track.clips[0]?.sourceFileId
             const isActive  = activeTrackFilter === track.id
-            const hasWords  = trackSfId != null && words.some((w) => w.sourceFileId === trackSfId)
+            const hasWords  = words.some((w) => w.trackId === track.id)
             const dotColor  = track.color
 
             return (

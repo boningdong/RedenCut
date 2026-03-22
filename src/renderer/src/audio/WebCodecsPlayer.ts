@@ -408,6 +408,18 @@ export class WebCodecsPlayer implements IAudioPlayer {
   setTracks(tracks: Track[]): void {
     this.tracks = tracks
     console.log(`[WebCodecsPlayer] setTracks — ${tracks.length} tracks`)
+
+    // Apply per-track volume to each source's gain node.
+    // Each source is controlled by the volume of its associated track.
+    if (this.ctx) {
+      for (const [sourceId, entry] of this.sources.entries()) {
+        if (!entry.gainNode) continue
+        const track = tracks.find((t) => t.clips.some((c) => c.sourceFileId === sourceId))
+        const volume = track?.volume ?? 1
+        entry.gainNode.gain.setValueAtTime(volume, this.ctx.currentTime)
+      }
+    }
+
     this.restartAllDecodeLoops(this._currentTime)
   }
 

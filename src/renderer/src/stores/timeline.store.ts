@@ -140,6 +140,10 @@ interface TimelineState {
   selectedClipId: string | null
   setSelectedClipId(id: string | null): void
 
+  /** ID of the currently selected track. Used by splitAt to target the right track. */
+  selectedTrackId: string | null
+  setSelectedTrackId(id: string | null): void
+
   // ── Undo / Redo ────────────────────────────────────────────────────────────
 
   undo(): void
@@ -165,11 +169,12 @@ interface TimelineState {
 const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
 
 const initialState = {
-  sourceFiles:    [] as SourceFile[],
-  tracks:         [] as Track[],
-  undoStack:      [] as HistoryEntry[],
-  redoStack:      [] as HistoryEntry[],
-  selectedClipId: null as string | null,
+  sourceFiles:     [] as SourceFile[],
+  tracks:          [] as Track[],
+  undoStack:       [] as HistoryEntry[],
+  redoStack:       [] as HistoryEntry[],
+  selectedClipId:  null as string | null,
+  selectedTrackId: null as string | null,
 }
 
 export const useTimelineStore = create<TimelineState>()((set, get) => ({
@@ -340,12 +345,20 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── splitAt ─────────────────────────────────────────────────────────────────
   splitAt(time) {
-    const { tracks } = get()
-    // Find the clip that contains `time` across all tracks
+    const { tracks, selectedTrackId } = get()
+
     let targetTrackId: string | null = null
     let targetClip:    Clip | null   = null
 
-    for (const track of tracks) {
+    // Prefer the selected track — check it first
+    const searchOrder = selectedTrackId
+      ? [
+          tracks.find((t) => t.id === selectedTrackId),
+          ...tracks.filter((t) => t.id !== selectedTrackId),
+        ].filter(Boolean) as Track[]
+      : tracks
+
+    for (const track of searchOrder) {
       const clip = track.clips.find((c) =>
         time > c.outputStart && time < c.outputStart + (c.sourceEnd - c.sourceStart)
       )
@@ -430,6 +443,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   // ── selectedClipId ──────────────────────────────────────────────────────────
   setSelectedClipId(id) {
     set({ selectedClipId: id })
+  },
+
+  // ── selectedTrackId ─────────────────────────────────────────────────────────
+  setSelectedTrackId(id) {
+    set({ selectedTrackId: id })
   },
 
   // ── undo ────────────────────────────────────────────────────────────────────
@@ -569,29 +587,36 @@ function splitAndMute(
 /**
  * Merge adjacent unmuted clips of the same source file into one.
  * Applied after an unmute operation to keep the clip list tidy.
+ *
+ * A pair of clips is mergeable only when they are adjacent in BOTH source
+ * space (sourceEnd ≈ sourceStart) AND output space (outputEnd ≈ outputStart).
+ * Clips that have been repositioned (outputStart ≠ sourceStart) are NOT merged
+ * even if their source ranges are contiguous.
  */
 function mergeAdjacentUnmuted(clips: Clip[]): Clip[] {
   if (clips.length === 0) return clips
-  const sorted = [...clips].sort((a, b) => a.sourceStart - b.sourceStart)
+  // Sort by output position — the order clips appear on the timeline
+  const sorted = [...clips].sort((a, b) => a.outputStart - b.outputStart)
   const merged: Clip[] = [sorted[0]]
 
   for (let i = 1; i < sorted.length; i++) {
     const prev = merged[merged.length - 1]
     const curr = sorted[i]
+    const prevOutputEnd = prev.outputStart + (prev.sourceEnd - prev.sourceStart)
     if (
       !prev.muted &&
       !curr.muted &&
       prev.sourceFileId === curr.sourceFileId &&
       prev.trackId      === curr.trackId &&
-      Math.abs(prev.sourceEnd - curr.sourceStart) < 0.001
+      Math.abs(prev.sourceEnd   - curr.sourceStart) < 0.001 &&   // source adjacent
+      Math.abs(prevOutputEnd    - curr.outputStart)  < 0.001     // output adjacent
     ) {
-      // Merge: extend prev to cover curr
+      // Merge: extend prev's source range; output position unchanged
       merged[merged.length - 1] = { ...prev, sourceEnd: curr.sourceEnd }
     } else {
       merged.push(curr)
     }
   }
-
   return merged
 }
 

@@ -311,13 +311,16 @@ export default function App() {
       setProjectPath(pPath)
       setProject(project)
       if (project.transcript?.words) {
-        const primarySfId = project.sourceFiles[0]?.id ?? project.source.file
+        const primarySfId    = project.sourceFiles[0]?.id ?? project.source.file
+        const firstTrackId   = project.tracks[0]?.id
         if (!project.sourceFiles[0]?.id) {
           console.warn('[App] handleOpenProject: sourceFiles[] empty — backfilling words with relative path', primarySfId)
         }
-        const backfilled = project.transcript.words.map((w) =>
-          w.sourceFileId ? w : { ...w, sourceFileId: primarySfId }
-        )
+        const backfilled = project.transcript.words.map((w) => ({
+          ...w,
+          sourceFileId: w.sourceFileId ?? primarySfId,
+          trackId:      w.trackId      ?? firstTrackId,
+        }))
         setWords(backfilled)
       }
 
@@ -441,11 +444,15 @@ export default function App() {
     setGeneratingStatus('Starting…')
     try {
       let currentWords = useTranscriptStore.getState().words
-      for (const { sf } of targets) {
+      for (const { sf, trackId: tId } of targets) {
         setGeneratingStatus(targets.length > 1 ? `Transcribing ${sf.filePath.split('/').pop()}…` : 'Transcribing…')
         const transcript  = await window.electronAPI.transcript.generate(sf.filePath)
-        const taggedWords = transcript.words.map((w) => ({ ...w, sourceFileId: sf.id }))
-        currentWords      = mergeTrackWords(currentWords, taggedWords, sf.id)
+        const taggedWords = transcript.words.map((w) => ({
+          ...w,
+          sourceFileId: sf.id,
+          trackId:      tId,
+        }))
+        currentWords = mergeTrackWords(currentWords, taggedWords, tId, sf.id)
       }
       setWords(currentWords)
       setIsDirty(true)
