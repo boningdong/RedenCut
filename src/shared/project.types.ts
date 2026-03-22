@@ -44,6 +44,11 @@ export const WordSchema = z.object({
    * and boundary adjustments remain possible.
    */
   muted: z.boolean().default(false),
+  /**
+   * ID of the SourceFile this word came from.
+   * undefined on legacy words — backfilled to sourceFiles[0].id on project open.
+   */
+  sourceFileId: z.string().optional(),
 })
 export type Word = z.infer<typeof WordSchema>
 
