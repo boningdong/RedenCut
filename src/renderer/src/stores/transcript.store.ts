@@ -33,6 +33,8 @@ interface TranscriptState {
    */
   activeTrackFilter: string | null
 
+  setActiveTrackFilter: (sourceFileId: string | null) => void
+
   /** True while a transcription job is running. */
   isGenerating: boolean
 
