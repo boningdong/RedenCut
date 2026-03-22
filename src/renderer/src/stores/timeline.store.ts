@@ -162,6 +162,8 @@ interface TimelineState {
 
 // ── Implementation ─────────────────────────────────────────────────────────────
 
+const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
+
 const initialState = {
   sourceFiles:    [] as SourceFile[],
   tracks:         [] as Track[],
@@ -200,7 +202,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume:  1,
       muted:   false,
       solo:    false,
-      color:   '#4f46e5',
+      color:   TRACK_COLORS[0],
       effects: [],
     }
 
@@ -237,7 +239,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume:  1,
       muted:   false,
       solo:    false,
-      color:   '#4f46e5',
+      color:   TRACK_COLORS[get().tracks.length % TRACK_COLORS.length],
       effects: [],
     }
     if (sourceFileId) {

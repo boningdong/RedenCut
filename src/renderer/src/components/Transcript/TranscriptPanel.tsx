@@ -268,13 +268,11 @@ export function TranscriptPanel({
           </button>
 
           {/* Per-track pills */}
-          {tracks.map((track, idx) => {
+          {tracks.map((track) => {
             const trackSfId = track.clips[0]?.sourceFileId
             const isActive  = activeTrackFilter === trackSfId
             const hasWords  = trackSfId != null && words.some((w) => w.sourceFileId === trackSfId)
-            // Cycle through a small palette of accent-adjacent colors
-            const dotColors = ['var(--color-accent)', '#e07b39', '#39a0e0', '#a039e0', '#39e07b']
-            const dotColor  = dotColors[idx % dotColors.length]
+            const dotColor  = track.color
 
             return (
               <button
