@@ -44,13 +44,16 @@ All tracks are the same height. No variable-height or collapsible tracks.
 
 Each track header contains:
 - Editable track name
-- Mute toggle (M)
-- Solo toggle (S)
+- Mute toggle (click-only, no keyboard shortcut — avoids conflict with S = Split)
+- Solo toggle (click-only, no keyboard shortcut — avoids conflict with S = Split)
 - Volume knob or slider
 - Color swatch (matches waveform color)
 - Remove button (×)
 
 Dispatches to `timeline.store`: `updateTrack`, `removeTrack`.
+
+**Keyboard conflict note:** The existing S shortcut means "Split at playhead" globally.
+Mute and Solo are click-only affordances in the track header — no keyboard shortcut assigned.
 
 ### Clip Lane (right area)
 
@@ -72,13 +75,19 @@ Each track gets its own WaveSurfer instance rendered inside its clip lane. Peaks
 loaded from the per-source `peaks.json` cache. WaveSurfer instances share the same
 `onSeek` callback so seeking one seeks all.
 
-### Add Track
+### Add Track — Peak Generation for New Sources
 
 A "+ Add Track" row at the bottom opens a file browser dialog. Selecting a file:
 1. Calls `timeline.store.addSourceFile(filePath, duration)` (new method — see §5)
 2. Calls `timeline.store.addTrack(name, sourceFileId)`
-3. Triggers peak generation for the new source file
+3. Generates peaks for the new source file via `window.electronAPI.audio.generatePeaks(filePath)`
 4. Registers the new source in the active `IAudioPlayer`
+
+Peak generation for secondary tracks is handled with **per-track loading state** stored
+in a local `Map<trackId, 'loading' | PeakData>` inside the multi-track waveform component
+(not in the global `loadingState` which controls the full-page skeleton). While peaks are
+loading for a secondary track, that track's lane shows a small inline progress indicator.
+Once peaks arrive, the WaveSurfer instance for that track initialises.
 
 ---
 
@@ -103,19 +112,41 @@ Undo restores the original position and track (the store snapshots before every
 
 ### splitAt Bug Fix (inline with drag implementation)
 
-The current `splitAt` implementation sets `right.outputStart = time`, which is only
-correct when `outputStart === sourceStart`. Once clips can be moved, this breaks.
+`time` passed to `splitAt` is an **output-timeline position** (the playhead). Once clips
+have been moved, `outputStart !== sourceStart`, so three things need fixing:
 
-**Fix:**
+**1. The clip search** must use output coordinates, not source coordinates:
 ```typescript
-// Before (wrong):
-right.outputStart = time
+// Before (breaks after moveClip):
+const clip = track.clips.find(c => time > c.sourceStart && time < c.sourceEnd)
 
 // After (correct):
-right.outputStart = targetClip.outputStart + (time - targetClip.sourceStart)
+const clip = track.clips.find(c =>
+  time > c.outputStart && time < c.outputStart + (c.sourceEnd - c.sourceStart)
+)
 ```
 
-This fix is applied in the same PR as clip drag (step 3.4 in ROADMAP.md).
+**2. The left clip** — `sourceEnd` must map `time` back to source coordinates:
+```typescript
+const left: Clip = {
+  ...targetClip,
+  id: nextId('clip'),
+  sourceEnd: targetClip.sourceStart + (time - targetClip.outputStart),
+  // outputStart unchanged
+}
+```
+
+**3. The right clip** — `sourceStart` and `outputStart` both need updating:
+```typescript
+const right: Clip = {
+  ...targetClip,
+  id: nextId('clip'),
+  sourceStart: targetClip.sourceStart + (time - targetClip.outputStart),
+  outputStart: time,
+}
+```
+
+This fix is applied in the same PR as clip drag (ROADMAP step 3.4).
 
 ---
 
@@ -128,29 +159,42 @@ This fix is applied in the same PR as clip drag (step 3.4 in ROADMAP.md).
 // src/shared/project.types.ts
 WordSchema = z.object({
   ...existing fields,
-  trackId: z.string().optional(),  // undefined → primary track (backward compat)
+  sourceFileId: z.string().optional(),  // undefined → primary source file (backward compat)
 })
 ```
 
-Existing project files load without error. `trackId` defaults to `sourceFiles[0].id`
-when undefined (applied on load in `handleOpenProject`).
+The field is named `sourceFileId` (not `trackId`) because it stores the `SourceFile.id`
+of the audio file the word came from. One source file maps to one track in Phase 3, so
+filtering by `sourceFileId` is equivalent to filtering by track.
+
+Existing project files load without error. When loading a project, any word with
+`sourceFileId === undefined` is backfilled to `sourceFiles[0].id` in `handleOpenProject`
+before being written to `transcript.store`.
 
 `transcript.store` gains:
 ```typescript
-activeTrackFilter: string | null   // null = all tracks merged
-setActiveTrackFilter: (id: string | null) => void
+activeTrackFilter: string | null   // null = all tracks merged; non-null = a sourceFileId
+setActiveTrackFilter: (sourceFileId: string | null) => void
 ```
 
-`visibleWords` derivation (already exists in the component) changes from:
+`visibleWords` derivation (already exists in `TranscriptPanel`) changes from:
 ```typescript
 const visibleWords = showMutedWords ? words : words.filter(w => !w.muted)
 ```
 to:
 ```typescript
 const visibleWords = words
-  .filter(w => !activeTrackFilter || w.trackId === activeTrackFilter)
+  .filter(w => !activeTrackFilter || w.sourceFileId === activeTrackFilter)
   .filter(w => showMutedWords || !w.muted)
 ```
+
+### Merged View Word Opacity
+
+When `activeTrackFilter = null`, all tracks' words are shown interleaved sorted by
+`word.start`. Words whose `sourceFileId` is not `sourceFiles[0].id` are dimmed to `opacity: 0.6`.
+
+Words that are both muted **and** from a non-primary track use `opacity: 0.45`
+(the existing muted opacity takes precedence — it is the stronger visual signal).
 
 ### TranscriptPanel Header
 
@@ -161,20 +205,16 @@ A second row is added below the existing "Transcript / Sync to playhead / Hide d
 ```
 
 - **All pill**: sets `activeTrackFilter = null`
-- **Track pill**: sets `activeTrackFilter = track.id`
+- **Track pill**: sets `activeTrackFilter = track.clips[0].sourceFileId` (the sourceFileId for that track)
 - **+ generate** (on pills with no transcript): triggers `handleGenerateTranscript(trackId)`
 - **⚡ All tracks**: loops through all tracks sequentially, generating transcripts for any
   that don't have one yet
 
-### Merged View
-
-When `activeTrackFilter = null`, all tracks' words are shown interleaved sorted by
-`startTime`. Words from the non-primary track are subtly dimmed (opacity 0.7) to
-provide a visual distinction without cluttering the text.
-
 ### Delete-to-Mute Fix
 
-`handleDeleteFromSelection` currently hardcodes `sourceFiles[0]?.id`:
+`handleDeleteFromSelection` currently hardcodes `sourceFiles[0]?.id`. Since `muteRange`
+takes a `sourceFileId`, and `Word.sourceFileId` stores exactly that value, this is a
+direct substitution:
 
 ```typescript
 // Before (wrong for multi-track):
@@ -182,7 +222,7 @@ const sfId = sourceFiles[0]?.id
 if (sfId) muteRange(sfId, start, end, wordIds)
 
 // After (correct):
-const sfId = selected[0]?.trackId ?? sourceFiles[0]?.id
+const sfId = selected[0]?.sourceFileId ?? sourceFiles[0]?.id
 if (sfId) muteRange(sfId, start, end, wordIds)
 ```
 
@@ -191,24 +231,57 @@ active word highlight, auto-scroll, timestamp calibration.
 
 ### Generate Transcript (multi-track)
 
-`handleGenerateTranscript` in `App.tsx` is extended to accept an optional `trackId`:
+`handleGenerateTranscript` in `App.tsx` is extended to accept an optional `trackId`.
+The parameter is a **track id** (not a source file id); the function resolves the
+source file via a two-step lookup. `words` is read from the store directly (not from
+the closed-over React state) to avoid a stale closure:
 
 ```typescript
 const handleGenerateTranscript = useCallback(async (trackId?: string) => {
-  const sf = trackId
-    ? useTimelineStore.getState().sourceFiles.find(s => s.id === trackId)
-    : sourceFiles[0]
+  const { tracks, sourceFiles } = useTimelineStore.getState()
+
+  // Two-step: track id → sourceFileId → SourceFile
+  let sf: SourceFile | undefined
+  if (trackId) {
+    const track = tracks.find(t => t.id === trackId)
+    const sourceFileId = track?.clips[0]?.sourceFileId
+    sf = sourceFiles.find(s => s.id === sourceFileId)
+  } else {
+    sf = sourceFiles[0]
+  }
   if (!sf) return
-  // ... existing generate flow, but tag returned words with sf.id as trackId
+
+  // ... existing generate flow (setIsGenerating, setGeneratingStatus, try/catch) ...
   const transcript = await window.electronAPI.transcript.generate(sf.filePath)
-  const taggedWords = transcript.words.map(w => ({ ...w, trackId: sf.id }))
-  // merge into existing words[], replacing any previous words for this trackId
-  setWords(mergeTrackWords(words, taggedWords, sf.id))
-}, [...])
+  const taggedWords = transcript.words.map(w => ({ ...w, sourceFileId: sf!.id }))
+
+  // Read current words from store (not from closed-over state) to avoid stale closure
+  const currentWords = useTranscriptStore.getState().words
+  setWords(mergeTrackWords(currentWords, taggedWords, sf.id))
+  setIsDirty(true)   // mark project dirty — must remain explicit here
+}, [setWords, setIsGenerating, setGeneratingStatus, setIsDirty, handleError])
 ```
 
-`mergeTrackWords(existing, incoming, trackId)` — pure function: removes existing words
-with `trackId`, appends `incoming`, sorts by `startTime`.
+### `mergeTrackWords` utility
+
+A pure function — lives in `src/renderer/src/utils/transcript.ts`, not in the store.
+**Precondition:** all existing words must have been backfilled with a `sourceFileId` before
+this is called (done in `handleOpenProject` for loaded projects, and guaranteed for
+newly generated words). Words with `sourceFileId === undefined` are treated as belonging to
+the primary source file and are **not** removed by this function.
+
+```typescript
+export function mergeTrackWords(
+  existing: Word[],
+  incoming: Word[],
+  sourceFileId: string,
+): Word[] {
+  return [
+    ...existing.filter(w => w.sourceFileId !== sourceFileId),
+    ...incoming,
+  ].sort((a, b) => a.start - b.start)
+}
+```
 
 ---
 
@@ -218,49 +291,94 @@ with `trackId`, appends `incoming`, sorts by `startTime`.
 
 ```typescript
 addSourceFile(filePath: string, duration: number): string
-// Creates a SourceFile, pushes to sourceFiles[], returns its id.
+// If a SourceFile with this filePath already exists, returns its existing id
+// without creating a duplicate (idempotent — safe to call twice with the same path).
+// Otherwise creates { id: filePath, filePath, duration }, pushes to sourceFiles[],
+// and returns the new id.
+// NOTE: id is set to filePath — this matches the convention in initFromFile and is
+// what makes the idempotency guard above work correctly. Do not use a random id here.
+// Not pushed to undoStack — source file registration is not undoable.
+// Removing a track (removeTrack) does not remove its SourceFile, since
+// another track might reference the same file.
 ```
 
-Required before `addTrack(name, sourceFileId)` can register a second audio file.
-This is the gap identified in DEVLOG.md. Inline fix during step 3.6.
+This resolves the gap tracked in DEVLOG.md § Phase 3.
 
 ---
 
 ## 6. Export Pipeline
 
+### `RenderProgress` type
+
+Defined in `src/shared/ipc.types.ts` alongside the `render` namespace:
+
+```typescript
+export interface RenderProgress {
+  /** 0–1 */
+  percent: number
+  /** Seconds of output rendered so far */
+  currentSeconds: number
+  /** Total output duration in seconds */
+  totalSeconds: number
+}
+```
+
 ### IPC Handler
 
-New `render.ipc.ts` registers `ipcMain.handle('project:export', handler)`.
+New `src/main/ipc/render.ipc.ts` registers `ipcMain.handle('project:export', handler)`.
 Added to `IElectronAPI` in `ipc.types.ts`:
 
 ```typescript
 render: {
   export(project: ProjectFile, outputPath: string): Promise<void>
-  onProgress(cb: (p: RenderProgress) => void): () => void
+}
+```
+
+`onProgress` follows the existing push-subscription pattern in the `on` namespace
+(alongside `peaksProgress`, `transcriptProgress`):
+
+```typescript
+on: {
+  // ... existing subscriptions ...
+  renderProgress(callback: (p: RenderProgress) => void): () => void
 }
 ```
 
 ### FFmpeg Filter Graph
 
-`src/main/audio/renderer.ts` builds a filter graph from the clip timeline:
+`src/main/audio/renderer.ts` builds a filter graph from the clip timeline.
 
-1. For each track, collect non-muted clips sorted by `outputStart`
-2. Per clip: `[N:a]atrim=start=S:end=E,asetpts=PTS-STARTPTS[segN]`
-3. Per track: `[seg0][seg1]...concat=n=X:v=0:a=1[trackN]`
-4. Mix tracks: `[track0][track1]...amix=inputs=N:normalize=0[out]`
+**Gap behavior:** Muted clips are **excluded** from the output — their time is removed,
+not replaced with silence. The output is a contiguous audio stream. This matches the
+preview mode behavior (muted regions are skipped, not silenced).
+
+Filter graph construction:
+
+1. For each track, collect **non-muted** clips sorted by `outputStart`. Skip tracks
+   with zero non-muted clips entirely — they contribute nothing to the output.
+   Let `T` = number of active tracks after this filter.
+2. Per clip: `[SRC:a]atrim=start=S:end=E,asetpts=PTS-STARTPTS[segI]`
+   where `SRC` = FFmpeg input index for the clip's source file, `S = clip.sourceStart`,
+   `E = clip.sourceEnd`, `I` = running global clip index (0 … totalClips−1).
+   `clip.gain` is **not** applied in Phase 3 — per-clip gain is deferred to Phase 4.
+3. Per active track (index `T_i`): `[segA][segB]...concat=n=K:v=0:a=1[trackT_i]`
+   where `K` = number of non-muted clips in this track.
+4. Mix all active tracks: `[track0][track1]...amix=inputs=T:normalize=0[out]`
+   reusing `T` from step 1.
 
 Loudness normalization (`loudnorm`) is deferred to Phase 4.
 
 ### Export Settings UI
 
 Format selector (MP3 / WAV / AAC), output path picker, LUFS target input (shown
-but normalization not applied until Phase 4). Appears as a modal or bottom sheet
-triggered by an "Export" button in the transport bar.
+but normalization not applied until Phase 4). Appears as a modal triggered by an
+"Export" button in the transport bar.
 
 ### Progress Reporting
 
-Parse FFmpeg `stderr` for `time=HH:MM:SS.ss`. Emit `render:progress` IPC events.
-Renderer shows a progress bar in the export modal advancing to 100%.
+Parse FFmpeg `stderr` for `time=HH:MM:SS.ss`. Emit `render:progress` IPC events
+containing `RenderProgress`. Renderer shows a progress bar in the export modal
+advancing to 100%.
 
 ---
 
@@ -268,17 +386,18 @@ Renderer shows a progress bar in the export modal advancing to 100%.
 
 | File | Change |
 |------|--------|
-| `src/shared/project.types.ts` | Add `trackId?: string` to `WordSchema` |
-| `src/shared/ipc.types.ts` | Add `render` namespace |
-| `src/renderer/src/stores/transcript.store.ts` | Add `activeTrackFilter`, `setActiveTrackFilter`, `mergeTrackWords` |
-| `src/renderer/src/stores/timeline.store.ts` | Add `addSourceFile`; fix `splitAt` outputStart |
-| `src/renderer/src/components/Transcript/TranscriptPanel.tsx` | Track filter pills header row; fix delete-to-mute routing |
+| `src/shared/project.types.ts` | Add `sourceFileId?: string` to `WordSchema` |
+| `src/shared/ipc.types.ts` | Add `render` namespace; add `renderProgress` to `on` namespace; add `RenderProgress` type |
+| `src/renderer/src/stores/transcript.store.ts` | Add `activeTrackFilter`, `setActiveTrackFilter` |
+| `src/renderer/src/stores/timeline.store.ts` | Add `addSourceFile`; fix `splitAt` output-coordinate search and source-coordinate mapping |
+| `src/renderer/src/utils/transcript.ts` | New file: `mergeTrackWords` pure utility |
+| `src/renderer/src/components/Transcript/TranscriptPanel.tsx` | Track filter pills header row; fix delete-to-mute routing; `onGenerate` prop becomes `(trackId?: string) => void` |
 | `src/renderer/src/components/Waveform/WaveformView.tsx` | Multi-track layout: one WaveSurfer per track, shared playhead |
 | `src/renderer/src/components/Waveform/TrackHeader.tsx` | New component: name, mute, solo, volume, color, remove |
-| `src/renderer/src/App.tsx` | Multi-track `handleGenerateTranscript`; handle new source file load |
-| `src/main/audio/renderer.ts` | New file: FFmpeg filter graph + loudness stub |
-| `src/main/ipc/render.ipc.ts` | New file: export IPC handler |
-| `src/preload/index.ts` | Expose `render` namespace |
+| `src/renderer/src/App.tsx` | Multi-track `handleGenerateTranscript`; handle new source file load; backfill `word.sourceFileId` in `handleOpenProject` for legacy projects |
+| `src/main/audio/renderer.ts` | New file: FFmpeg filter graph builder |
+| `src/main/ipc/render.ipc.ts` | New file: export IPC handler + progress events |
+| `src/preload/index.ts` | Expose `render.export` and wire `on.renderProgress` subscription |
 
 ---
 
