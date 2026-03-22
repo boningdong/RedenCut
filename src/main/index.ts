@@ -7,6 +7,7 @@ import { pathToFileURL } from 'url'
 import './ipc/audio.ipc'
 import './ipc/project.ipc'
 import './ipc/transcript.ipc'
+import './ipc/render.ipc'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom protocol: podcut://
