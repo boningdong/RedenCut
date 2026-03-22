@@ -303,10 +303,10 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                       borderRadius:    3,
                       border:          clip.id === selectedClipId
                         ? '1px solid var(--color-accent)'
-                        : '1px solid transparent',
+                        : '1px solid rgba(99, 102, 241, 0.25)',
                       backgroundColor: clip.muted
                         ? 'rgba(239, 68, 68, 0.22)'
-                        : 'transparent',
+                        : 'rgba(99, 102, 241, 0.08)',
                       opacity:         isDragging ? 0.4 : 1,
                       cursor:          'grab',
                       pointerEvents:   'all',
