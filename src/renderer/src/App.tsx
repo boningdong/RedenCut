@@ -310,19 +310,23 @@ export default function App() {
       resetTimeline()
       setProjectPath(pPath)
       setProject(project)
-      if (project.transcript?.words) {
-        const primarySfId    = project.sourceFiles[0]?.id ?? project.source.file
-        const firstTrackId   = project.tracks[0]?.id
-        if (!project.sourceFiles[0]?.id) {
-          console.warn('[App] handleOpenProject: sourceFiles[] empty — backfilling words with relative path', primarySfId)
-        }
-        const backfilled = project.transcript.words.map((w) => ({
-          ...w,
-          sourceFileId: w.sourceFileId ?? primarySfId,
-          trackId:      w.trackId      ?? firstTrackId,
-        }))
-        setWords(backfilled)
-      }
+      const rawWords = project.transcript?.words ?? null
+
+      // Backfill sourceFileId now — we know it from the saved project data.
+      // trackId backfill is deferred until after the timeline is initialised
+      // so we use the real track ID rather than a stale lookup on an empty array.
+      let backfilled = rawWords
+        ? (() => {
+            const primarySfId = project.sourceFiles[0]?.id ?? project.source.file
+            if (!project.sourceFiles[0]?.id) {
+              console.warn('[App] handleOpenProject: sourceFiles[] empty — backfilling words with relative path', primarySfId)
+            }
+            return rawWords.map((w) => ({
+              ...w,
+              sourceFileId: w.sourceFileId ?? primarySfId,
+            }))
+          })()
+        : null
 
       // Resolve audio metadata for the saved source file
       const metadata = await window.electronAPI.audio.probeFile(project.source.file)
@@ -345,6 +349,16 @@ export default function App() {
           }
         }
         console.log(`[App] opened legacy project — migrated ${project.edits.length} edits to clips`)
+      }
+
+      // Backfill trackId now that the timeline is initialised and we have the real track ID.
+      if (backfilled) {
+        const actualFirstTrackId = useTimelineStore.getState().tracks[0]?.id
+        const withTrackId = backfilled.map((w) => ({
+          ...w,
+          trackId: w.trackId ?? actualFirstTrackId,
+        }))
+        setWords(withTrackId)
       }
 
       // false = don't call initFromFile — timeline is already set above

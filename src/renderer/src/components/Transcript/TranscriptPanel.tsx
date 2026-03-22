@@ -47,7 +47,6 @@ export function TranscriptPanel({
 
   const words              = useTranscriptStore((s) => s.words)
   const showMutedWords     = useTranscriptStore((s) => s.showMutedWords)
-  const muteWords          = useTranscriptStore((s) => s.muteWords)
   const toggleShowMuted    = useTranscriptStore((s) => s.toggleShowMutedWords)
   const shiftTimestamps    = useTranscriptStore((s) => s.shiftTimestamps)
   const activeTrackFilter  = useTranscriptStore((s) => s.activeTrackFilter)
@@ -156,10 +155,9 @@ export function TranscriptPanel({
               ?? selected[0]?.sourceFileId
               ?? sfList[0]?.id
     if (sfId) muteRange(sfId, start, end, wordIds)
-    muteWords(wordIds)
     sel.removeAllRanges()       // clear the native selection after muting
     setSelection(null)
-  }, [words, muteWords, setSelection, activeTrackFilter])
+  }, [words, setSelection, activeTrackFilter])
 
   // ── Keyboard handler on the contentEditable container ────────────────────
   const handleKeyDown = useCallback(
