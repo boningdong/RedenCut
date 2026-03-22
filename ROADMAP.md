@@ -259,7 +259,41 @@ Drag an audio file onto the timeline or click "Add Track". Calls `addSourceFile`
 PR scope: Drop a second audio file. A new track appears with its waveform. Both
 tracks play in sync. Project saves and reloads with two tracks intact.
 
-**Step 3.7 — IPC handler for export**
+**Step 3.7 — `Word.trackId` + `transcript.store` track filter**
+
+Add `trackId: string` to the `Word` Zod schema (with a sensible default for
+backward compatibility with existing project files). Add `activeTrackFilter:
+string | null` to `transcript.store` (null = all tracks merged). Update
+`visibleWords` derivation to filter by trackId when a filter is active.
+Update `handleDeleteFromSelection` in `TranscriptPanel` to route
+`muteRange` through `word.trackId` instead of the hardcoded `sourceFiles[0]`.
+
+PR scope: Open a legacy project — words load with `trackId` defaulting to the
+primary track. `activeTrackFilter` set to a trackId → only that track's words
+are visible. Delete-to-mute on a filtered word mutes the correct track.
+
+**Step 3.8 — Per-track transcript generation + "Transcribe all"**
+
+Extend `handleGenerateTranscript` in `App.tsx` to accept an optional `trackId`.
+When provided, it generates for that track's source file and tags the resulting
+words with that `trackId`. Add a "⚡ All tracks" button that loops through
+every track sequentially.
+
+PR scope: Two-track project. Generate transcript for Track 2 only — Track 1
+words unaffected. "Transcribe all" generates for both tracks; merged view shows
+words from both interleaved by `startTime`.
+
+**Step 3.9 — Track filter pills in `TranscriptPanel` header**
+
+Add a second header row with pill buttons: "All" + one pill per track (track
+color dot + name). Selecting a pill sets `activeTrackFilter`. Tracks without a
+transcript show a small "+ generate" affordance on their pill.
+
+PR scope: Click Voice pill — only voice words visible. Click Music pill — only
+music words visible. Click All — all words merged. Generating from a pill's
+"+ generate" produces words for that track only.
+
+**Step 3.11 — IPC handler for export**
 
 Register `ipcMain.handle('project:export')` in a new `render.ipc.ts`. Accept
 `{ project: ProjectFile, outputPath: string }`. Wire `window.electronAPI.render.export`
@@ -268,7 +302,7 @@ in the preload and add the channel to `ipc.types.ts`.
 PR scope: Handler reachable from renderer. Calling it with a valid project does
 not throw.
 
-**Step 3.8 — FFmpeg filter graph from clip timeline**
+**Step 3.12 — FFmpeg filter graph from clip timeline**
 
 In `src/main/audio/renderer.ts`, read the ordered clip list from all tracks,
 build an FFmpeg filter graph using `atrim` + `asetpts` per active (non-muted)
@@ -277,7 +311,7 @@ segment per track, mix tracks with `amix`, then `concat` segments.
 PR scope: Export a file with two muted regions. Output duration equals
 (total − muted) ± 0.1 s. No audio from muted regions audible in output.
 
-**Step 3.9 — Export settings UI**
+**Step 3.13 — Export settings UI**
 
 Format selector (MP3 / WAV / AAC), output path picker, LUFS target input,
 true peak ceiling input. Defaults: MP3, −16 LUFS, −1.5 dBTP.
@@ -285,7 +319,7 @@ true peak ceiling input. Defaults: MP3, −16 LUFS, −1.5 dBTP.
 PR scope: User selects WAV, picks output path, clicks Export — correct file
 type appears at the chosen location.
 
-**Step 3.10 — Progress reporting**
+**Step 3.14 — Progress reporting**
 
 Parse FFmpeg `stderr` for `time=HH:MM:SS.ss` lines. Emit
 `render:progress { percent, elapsed, total }` per line via IPC. Renderer shows
