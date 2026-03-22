@@ -317,8 +317,19 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                       pointerEvents:   'all',
                       zIndex:          isDragging ? 0 : 5,
                       boxSizing:       'border-box',
+                      overflow:        'hidden',
                     }}
-                  />
+                  >
+                    {trackPeakData && (
+                      <ClipWaveform
+                        peaks={trackPeakData}
+                        sourceStart={clip.sourceStart}
+                        sourceEnd={clip.sourceEnd}
+                        color={track.color}
+                        muted={clip.muted}
+                      />
+                    )}
+                  </div>
                 )
               })}
 
@@ -359,7 +370,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                         top:             0,
                         bottom:          0,
                         backgroundColor: 'var(--color-bg-secondary)',
-                        opacity:         0.85,
+                        opacity:         1,
                         pointerEvents:   'none',
                         zIndex:          6,
                       }}
@@ -485,8 +496,60 @@ function TrackWaveform({ trackId, peaks, color, trackIndex }: TrackWaveformProps
   return (
     <div
       ref={containerRef}
-      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        // Hide the waveform canvas — per-clip SVG handles visualization.
+        // Keep the component mounted so TimelinePlugin (track 0) continues
+        // rendering into #waveform-timeline.
+        opacity: 0,
+        pointerEvents: 'none',
+      }}
     />
+  )
+}
+
+// ── ClipWaveform — per-clip waveform using peaks data ─────────────────────────
+// Renders the correct source range of the peaks data inside a clip block.
+// This ensures the waveform shown in the clip matches the actual audio
+// regardless of clip repositioning on the output timeline.
+
+interface ClipWaveformProps {
+  peaks:       PeakData
+  sourceStart: number
+  sourceEnd:   number
+  color:       string
+  muted:       boolean
+}
+
+function ClipWaveform({ peaks, sourceStart, sourceEnd, color, muted }: ClipWaveformProps) {
+  const channel = peaks.data[0]
+  if (!channel?.length) return null
+
+  const totalLen  = channel.length
+  const dur       = peaks.durationSeconds
+  const startIdx  = Math.floor((sourceStart / dur) * totalLen)
+  const endIdx    = Math.ceil((sourceEnd / dur) * totalLen)
+  const clipPeaks = channel.slice(startIdx, endIdx)
+  if (clipPeaks.length === 0) return null
+
+  const H    = 80
+  const viewW = clipPeaks.length * 3   // 2px bar + 1px gap
+
+  return (
+    <svg
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      viewBox={`0 0 ${viewW} ${H}`}
+      preserveAspectRatio="none"
+    >
+      <g fill={muted ? 'rgba(239,68,68,0.6)' : (color + 'cc')}>
+        {clipPeaks.map((v, i) => {
+          const bh = Math.max(2, v * H)
+          const y  = (H - bh) / 2
+          return <rect key={i} x={i * 3} y={y} width={2} height={bh} />
+        })}
+      </g>
+    </svg>
   )
 }
 

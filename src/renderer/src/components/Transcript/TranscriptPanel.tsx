@@ -143,9 +143,14 @@ export function TranscriptPanel({
     const end     = Math.max(...selected.map((w) => w.end))
     const wordIds = selected.map((w) => w.id)
 
-    // Mute via timeline.store — route to the correct source file per word
+    // Mute via timeline.store — route to the correct source file per word.
+    // If viewing a specific track, route the delete to that track's source file.
     const { sourceFiles: sfList, muteRange } = useTimelineStore.getState()
-    const sfId = selected[0]?.sourceFileId ?? sfList[0]?.id
+    const { tracks: tList } = useTimelineStore.getState()
+    const activeTrackForDelete = activeTrackFilter ? tList.find((t) => t.id === activeTrackFilter) : null
+    const sfId = activeTrackForDelete?.clips[0]?.sourceFileId
+              ?? selected[0]?.sourceFileId
+              ?? sfList[0]?.id
     if (sfId) muteRange(sfId, start, end, wordIds)
     muteWords(wordIds)
     sel.removeAllRanges()       // clear the native selection after muting
@@ -185,10 +190,16 @@ export function TranscriptPanel({
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const hasTranscript = words.length > 0
+  // Find the active track to get its sourceFileId for word filtering.
+  // activeTrackFilter now stores a trackId (not sourceFileId) for uniqueness.
+  const activeTrack   = activeTrackFilter ? tracks.find((t) => t.id === activeTrackFilter) : null
+  const activeSfId    = activeTrack?.clips[0]?.sourceFileId
+
   const visibleWords  = words
-    .filter((w) => !activeTrackFilter || w.sourceFileId === activeTrackFilter)
+    .filter((w) => !activeTrackFilter || (activeSfId != null ? w.sourceFileId === activeSfId : false))
     .filter((w) => showMutedWords || !w.muted)
+
+  const hasTranscript = visibleWords.length > 0
 
   const primarySfId = sourceFiles[0]?.id
 
@@ -270,7 +281,7 @@ export function TranscriptPanel({
           {/* Per-track pills */}
           {tracks.map((track) => {
             const trackSfId = track.clips[0]?.sourceFileId
-            const isActive  = !!trackSfId && activeTrackFilter === trackSfId
+            const isActive  = activeTrackFilter === track.id
             const hasWords  = trackSfId != null && words.some((w) => w.sourceFileId === trackSfId)
             const dotColor  = track.color
 
@@ -278,10 +289,8 @@ export function TranscriptPanel({
               <button
                 key={track.id}
                 onClick={() => {
-                  if (trackSfId) {
-                    setActiveTrackFilter(trackSfId)
-                  } else if (onGenerate) {
-                    onGenerate(track.id)
+                  if (activeTrackFilter !== track.id) {
+                    setActiveTrackFilter(track.id)
                   }
                 }}
                 style={{
@@ -322,7 +331,7 @@ export function TranscriptPanel({
       {isGenerating ? (
         <GeneratingState status={generatingStatus} />
       ) : !hasTranscript ? (
-        <EmptyTranscriptState onGenerate={onGenerate} />
+        <EmptyTranscriptState onGenerate={onGenerate} activeTrackId={activeTrackFilter} />
       ) : (
         // contentEditable gives a blinking text cursor and native character-
         // level text selection. onBeforeInput prevents any actual DOM edits.
@@ -388,7 +397,13 @@ export function TranscriptPanel({
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function EmptyTranscriptState({ onGenerate }: { onGenerate: (trackId?: string) => void }) {
+function EmptyTranscriptState({
+  onGenerate,
+  activeTrackId,
+}: {
+  onGenerate:    (trackId?: string) => void
+  activeTrackId: string | null
+}) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', textAlign: 'center' }}>
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -401,13 +416,13 @@ function EmptyTranscriptState({ onGenerate }: { onGenerate: (trackId?: string) =
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>No transcript yet</p>
       <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 180 }}>Requires whisper-cli installed via brew</p>
       <button
-        onClick={() => onGenerate()}
+        onClick={() => onGenerate(activeTrackId ?? undefined)}
         style={{ marginTop: 'var(--space-1)', background: 'var(--color-accent)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 'var(--text-xs)', padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.04em' }}
       >
         Generate Transcript
       </button>
       <p style={{ fontSize: 10, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
-        Generates transcripts for all tracks
+        {activeTrackId ? 'Generates transcript for this track' : 'Generates transcripts for all tracks'}
       </p>
     </div>
   )

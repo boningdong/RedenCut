@@ -60,7 +60,15 @@ export function buildSegmentsForSource(
   const anySolo = tracks.some((t) => t.solo)
   const segs: Segment[] = []
 
+  // Track whether any clips for this source exist (even on muted/soloed tracks).
+  // The fallback should only fire when NO clips are defined yet, not when
+  // a track is muted — muted track should produce silence, not the full source.
+  let hasClipsForSource = false
+
   for (const track of tracks) {
+    if (track.clips.some((c) => c.sourceFileId === sourceId)) {
+      hasClipsForSource = true
+    }
     if (track.muted) continue
     if (anySolo && !track.solo) continue
 
@@ -107,14 +115,25 @@ export function buildSegmentsForSource(
 
   // Fallback: no tracks/clips defined yet — decode the full source from startTime
   if (segs.length === 0) {
-    const startFrame = seekFn(startTime)
+    if (!hasClipsForSource) {
+      const startFrame = seekFn(startTime)
+      return [{
+        startByte:    startFrame.byteOffset,
+        endByte:      Number.MAX_SAFE_INTEGER,
+        sourceStart:  startFrame.time,
+        outputStart:  startFrame.time,
+        muted:        false,
+        durationSecs: sourceDuration - startFrame.time,
+      }]
+    }
+    // Clips exist but all tracks were muted/soloed out → pure silence
     return [{
-      startByte:    startFrame.byteOffset,
-      endByte:      Number.MAX_SAFE_INTEGER,
-      sourceStart:  startFrame.time,
-      outputStart:  startFrame.time,
-      muted:        false,
-      durationSecs: sourceDuration - startFrame.time,
+      startByte:    0,
+      endByte:      0,
+      sourceStart:  startTime,
+      outputStart:  startTime,
+      muted:        true,
+      durationSecs: sourceDuration - startTime,
     }]
   }
 
