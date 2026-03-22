@@ -14,6 +14,16 @@
 
 import type { AudioMetadata, PeakData, ProjectFile, Transcript } from './project.types'
 
+/** Progress snapshot emitted during an export render. */
+export interface RenderProgress {
+  /** 0–1 */
+  percent: number
+  /** Seconds of output rendered so far */
+  currentSeconds: number
+  /** Total output duration in seconds */
+  totalSeconds: number
+}
+
 export interface IElectronAPI {
   audio: {
     /**
@@ -71,6 +81,14 @@ export interface IElectronAPI {
     generate(filePath: string, language?: string): Promise<Transcript>
   }
 
+  render: {
+    /**
+     * Runs the FFmpeg export pipeline for the given project.
+     * Emits render:progress events via on.renderProgress.
+     */
+    export(project: ProjectFile, outputPath: string): Promise<void>
+  }
+
   // ── Push-event subscriptions ─────────────────────────────────────────────
   // These are one-way: main → renderer. The renderer subscribes, and receives
   // events as they fire. The return value is a cleanup function (call it to
@@ -85,6 +103,9 @@ export interface IElectronAPI {
      * The renderer can display this as a progress label.
      */
     transcriptProgress(callback: (status: string) => void): () => void
+
+    /** Fired during export with current render progress. */
+    renderProgress(callback: (p: RenderProgress) => void): () => void
   }
 }
 
