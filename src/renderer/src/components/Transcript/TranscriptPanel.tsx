@@ -155,7 +155,7 @@ export function TranscriptPanel({
     muteWords(wordIds)
     sel.removeAllRanges()       // clear the native selection after muting
     setSelection(null)
-  }, [words, muteWords, setSelection])
+  }, [words, muteWords, setSelection, activeTrackFilter])
 
   // ── Keyboard handler on the contentEditable container ────────────────────
   const handleKeyDown = useCallback(

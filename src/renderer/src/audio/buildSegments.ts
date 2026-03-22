@@ -127,13 +127,19 @@ export function buildSegmentsForSource(
       }]
     }
     // Clips exist but all tracks were muted/soloed out → pure silence
+    // Compute how long this source contributes to the output timeline.
+    // Use the furthest clip output-end across all tracks for this source.
+    const outputEnd = tracks
+      .flatMap((t) => t.clips)
+      .filter((c) => c.sourceFileId === sourceId)
+      .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
     return [{
       startByte:    0,
       endByte:      0,
       sourceStart:  startTime,
       outputStart:  startTime,
       muted:        true,
-      durationSecs: sourceDuration - startTime,
+      durationSecs: Math.max(0, outputEnd - startTime),
     }]
   }
 

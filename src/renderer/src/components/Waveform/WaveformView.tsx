@@ -522,7 +522,7 @@ interface ClipWaveformProps {
   muted:       boolean
 }
 
-function ClipWaveform({ peaks, sourceStart, sourceEnd, color, muted }: ClipWaveformProps) {
+const ClipWaveform = React.memo(function ClipWaveform({ peaks, sourceStart, sourceEnd, color, muted }: ClipWaveformProps) {
   const channel = peaks.data[0]
   if (!channel?.length) return null
 
@@ -551,7 +551,7 @@ function ClipWaveform({ peaks, sourceStart, sourceEnd, color, muted }: ClipWavef
       </g>
     </svg>
   )
-}
+})
 
 // ── Module-level handles (kept for backward-compat with existing call sites) ───
 // These are stubs — the multi-track design has no single global WaveSurfer instance.
