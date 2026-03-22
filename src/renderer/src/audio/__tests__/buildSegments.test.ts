@@ -114,13 +114,15 @@ describe('muted clips', () => {
     const clips  = [makeClip('c1', SOURCE_A, 'track1', 20, 60, /* muted */ true)]
     const tracks = [makeTrack('track1', clips)]
     const segs   = buildSegmentsForSource(SOURCE_A, 0, tracks, mockSeek, DURATION, FETCH)
-    // Only the muted segment is in the clip list; a fallback segment is NOT
-    // produced because segs.length > 0 after iterating tracks.
-    const mutedSeg = segs.find((s) => s.muted)
-    expect(mutedSeg).toBeDefined()
-    expect(mutedSeg!.durationSecs).toBeCloseTo(40)
-    expect(mutedSeg!.startByte).toBe(0)
-    expect(mutedSeg!.endByte).toBe(0)
+    // The clip starts at outputStart=20, so the gap-fill inserts a 20s silence
+    // segment from 0→20 before the clip's own 40s silence segment.
+    expect(segs).toHaveLength(2)
+    expect(segs[0].muted).toBe(true)
+    expect(segs[0].durationSecs).toBeCloseTo(20)  // gap: 0→20
+    expect(segs[1].muted).toBe(true)
+    expect(segs[1].durationSecs).toBeCloseTo(40)  // muted clip: 20→60
+    expect(segs[1].startByte).toBe(0)
+    expect(segs[1].endByte).toBe(0)
   })
 
   it('clips duration when startTime falls inside a muted clip', () => {

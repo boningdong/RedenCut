@@ -412,12 +412,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         return { ...t, clips: inserted }
       })
 
-      // Reflow outputStart of clips that come after the insertion point
-      newTracks = newTracks.map((t) => {
-        if (t.id !== destId) return t
-        return { ...t, clips: reflowOutputStarts(t.clips, movedClip.id, newOutputStart, clipDur) }
-      })
-
       return {
         tracks:    newTracks,
         undoStack: [...s.undoStack, { before, wordIds: [], label: `move clip ${clipId}` }],

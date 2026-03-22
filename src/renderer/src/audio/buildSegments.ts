@@ -108,15 +108,39 @@ export function buildSegmentsForSource(
   // Fallback: no tracks/clips defined yet — decode the full source from startTime
   if (segs.length === 0) {
     const startFrame = seekFn(startTime)
-    segs.push({
+    return [{
       startByte:    startFrame.byteOffset,
       endByte:      Number.MAX_SAFE_INTEGER,
       sourceStart:  startFrame.time,
       outputStart:  startFrame.time,
       muted:        false,
       durationSecs: sourceDuration - startFrame.time,
-    })
+    }]
   }
 
-  return segs
+  // Sort segments by outputStart across all tracks/clips
+  segs.sort((a, b) => a.outputStart - b.outputStart)
+
+  // Insert silence segments for any gap between consecutive segments.
+  // This keeps the AudioWorklet FIFO time-aligned when clips have been
+  // repositioned with space between them.
+  const withGaps: Segment[] = []
+  let cursor = startTime
+  for (const seg of segs) {
+    const segStart = Math.max(seg.outputStart, startTime)
+    if (segStart > cursor + 0.001) {
+      withGaps.push({
+        startByte:    0,
+        endByte:      0,
+        sourceStart:  0,
+        outputStart:  cursor,
+        muted:        true,
+        durationSecs: segStart - cursor,
+      })
+    }
+    withGaps.push(seg)
+    cursor = segStart + seg.durationSecs
+  }
+
+  return withGaps
 }
