@@ -47,6 +47,7 @@ import { useTranscriptStore } from './stores/transcript.store'
 import { useTimelineStore } from './stores/timeline.store'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { mergeTrackWords } from './utils/transcript'
+import { ExportModal } from './components/Export/ExportModal'
 
 // ── State shapes ──────────────────────────────────────────────────────────────
 interface OpenedFile {
@@ -65,6 +66,7 @@ type LoadingState =
 export default function App() {
   const [openedFile,   setOpenedFile]   = useState<OpenedFile | null>(null)
   const [loadingState, setLoadingState] = useState<LoadingState>({ status: 'idle' })
+  const [showExport,   setShowExport]   = useState(false)
 
   // The active IAudioPlayer instance — created/destroyed as files open/close
   const playerRef = useRef<IAudioPlayer | null>(null)
@@ -486,6 +488,7 @@ export default function App() {
                 Save
               </Button>
               <Button variant="ghost" size="sm" onClick={handleSaveAs}>Save As…</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>Export</Button>
             </>
           )}
         </div>
@@ -569,6 +572,14 @@ export default function App() {
 
       {/* ── Transport bar ─────────────────────────────────────────────────── */}
       <TransportBar />
+
+      {/* ── Export modal ──────────────────────────────────────────────────── */}
+      {showExport && loadingState.status === 'ready' && (
+        <ExportModal
+          project={buildProject()!}
+          onClose={() => setShowExport(false)}
+        />
+      )}
     </div>
   )
 }
