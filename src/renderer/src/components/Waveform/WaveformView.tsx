@@ -1,24 +1,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// WaveformView
+// WaveformView — multi-track
 //
-// WaveSurfer is used PURELY as a visual renderer. It owns no audio element
-// and never calls play/pause. All audio is managed by IAudioPlayer (see
-// player.types.ts / SimpleAudioPlayer.ts).
+// Layout:
+//   ┌─ Timeline ruler ──────────────────────────────────────────────────────┐
+//   ├─ [TrackHeader 90px] ── [ClipLane, one WaveSurfer] ───────────────────┤
+//   │   (repeats per track)                                                 │
+//   ├─ + Add Track ─────────────────────────────────────────────────────────┤
+//   └───────────────────────────────────────────────────────────────────────┘
 //
 // Architecture:
-//   • WaveSurfer is created with peaks + duration only — no media, no url.
-//     It renders from pre-computed peaks immediately.
-//   • Cursor position is driven by player.onTimeUpdate → ws.setTime(t)
-//   • User clicks the waveform: ws.on('interaction', t) → player.seekTo(t)
-//   • Muted clip regions are rendered from timeline.store.tracks (not edits[])
-//   • Preview Mode skip: when onTimeUpdate fires inside a muted clip, seekTo
-//     the clip's output end.
-//   • Drag-to-select creates ephemeral amber regions stored in editor.store.selection
+//   • One WaveSurfer instance per track, peaks-only (no media element).
+//   • All WaveSurfer instances share the same onSeek callback.
+//   • Shared playhead = an absolutely-positioned div rendered per lane.
+//   • Per-track loading state: Map<trackId, 'loading' | PeakData> (local state,
+//     NOT in the global loadingState — that controls the full-page skeleton).
+//   • Clip blocks are absolutely-positioned <div>s: left = outputStart/duration * 100%,
+//     width = clipDuration/duration * 100%. Muted = red background.
+//   • Clip drag: pointer events on clip block → moveClip() on pointer up.
+//     Ghost copy shown at drag position. Snap within 5px of adjacent clip edges.
+//
+// Preview mode (muted-clip skip) is handled here via onTimeUpdate, same as before.
+// Split markers are rendered as absolutely-positioned 2px lines, same as before.
 //
 // Log prefix: [WaveformView]
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.js'
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js'
@@ -26,309 +33,438 @@ import type { PeakData, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
+import { usePlaybackStore } from '../../stores/playback.store'
+import { TrackHeader } from './TrackHeader'
 
 interface WaveformViewProps {
-  /** Pre-generated peaks from the main process */
+  /** Primary track's peaks (loaded before WaveformView mounts). */
   peaks: PeakData
 }
 
+// ── Track loading state ────────────────────────────────────────────────────────
+type TrackPeakState = 'loading' | PeakData
+
 export function WaveformView({ peaks }: WaveformViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const wsRef        = useRef<WaveSurfer | null>(null)
-  const regionsRef   = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null)
-
-  // Track the ID of the ephemeral drag-selection region
-  const selectionRegionIdRef = useRef<string | null>(null)
-
-  // Store subscriptions
-  const selection         = useEditorStore((s) => s.selection)
-  const previewMode       = useEditorStore((s) => s.previewMode)
-  const setSelection      = useEditorStore((s) => s.setSelection)
-
-  // Timeline store — muted clips drive the red regions on the waveform
   const tracks            = useTimelineStore((s) => s.tracks)
+  const addSourceFile     = useTimelineStore((s) => s.addSourceFile)
+  const addTrack          = useTimelineStore((s) => s.addTrack)
+  const removeTrack       = useTimelineStore((s) => s.removeTrack)
+  const moveClip          = useTimelineStore((s) => s.moveClip)
   const selectedClipId    = useTimelineStore((s) => s.selectedClipId)
   const setSelectedClipId = useTimelineStore((s) => s.setSelectedClipId)
 
-  // Keep a ref so the player callback always sees the latest previewMode value
-  // without needing to re-subscribe when previewMode changes
+  const currentTime = usePlaybackStore((s) => s.currentTime)
+  const duration    = peaks.durationSeconds  // primary peaks duration as timeline length
+
+  const previewMode  = useEditorStore((s) => s.previewMode)
+  const setSelection = useEditorStore((s) => s.setSelection)
+
+  // Per-track peak loading state (secondary tracks only; primary uses `peaks` prop)
+  const [trackPeaks, setTrackPeaks] = useState<Map<string, TrackPeakState>>(() => {
+    const m = new Map<string, TrackPeakState>()
+    if (tracks.length > 0) m.set(tracks[0].id, peaks)  // primary track pre-loaded
+    return m
+  })
+
+  // Sync primary peaks if they change (e.g. new file opened)
+  useEffect(() => {
+    if (tracks.length > 0) {
+      setTrackPeaks((prev) => new Map(prev).set(tracks[0].id, peaks))
+    }
+  }, [peaks, tracks])
+
+  // ── Shared playhead position ──────────────────────────────────────────────
+  const playheadPct = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  // ── Preview mode skip ─────────────────────────────────────────────────────
   const previewModeRef = useRef(previewMode)
   useEffect(() => { previewModeRef.current = previewMode }, [previewMode])
 
-  // ── Create / destroy WaveSurfer instance ──────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current) return
-
-    console.log('[WaveformView] Creating WaveSurfer instance (peaks-only, no media)')
-
-    const wsRegions = RegionsPlugin.create()
-    regionsRef.current = wsRegions
-
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: '#4f46e5',
-      progressColor: '#818cf8',
-      cursorColor: 'rgba(255,255,255,0.6)',
-      cursorWidth: 1,
-      barWidth: 2,
-      barGap: 1,
-      barRadius: 2,
-      height: 80,
-      // No 'media' and no 'url' — WaveSurfer is purely visual.
-      // All audio playback is handled by IAudioPlayer (SimpleAudioPlayer / WebCodecsPlayer).
-      peaks: peaks.data,
-      duration: peaks.durationSeconds,
-      plugins: [
-        TimelinePlugin.create({
-          container: '#waveform-timeline',
-          timeInterval: 10,
-          primaryLabelInterval: 60,
-          style: { fontSize: '10px', color: 'var(--color-text-muted)' },
-        }),
-        wsRegions,
-      ],
-    })
-
-    // Enable drag-to-select a time range on the waveform
-    wsRegions.enableDragSelection({ color: 'rgba(245, 158, 11, 0.15)' })
-
-    // ── Region events ──────────────────────────────────────────────────────
-
-    wsRegions.on('region-created', (region) => {
-      // Clip mute regions are added programmatically with 'clip-' IDs — ignore
-      if (region.id.startsWith('clip-')) return
-
-      // Remove any previous selection region
-      if (selectionRegionIdRef.current && selectionRegionIdRef.current !== region.id) {
-        const prev = wsRegions.getRegions().find((r) => r.id === selectionRegionIdRef.current)
-        prev?.remove()
-      }
-      selectionRegionIdRef.current = region.id
-      setSelection({ start: region.start, end: region.end })
-    })
-
-    wsRegions.on('region-updated', (region) => {
-      if (region.id === selectionRegionIdRef.current) {
-        setSelection({ start: region.start, end: region.end })
-      }
-    })
-
-    // Clicking a clip mute region selects it for Delete/U key
-    wsRegions.on('region-clicked', (region, e) => {
-      e.stopPropagation()
-      if (region.id.startsWith('clip-')) {
-        const clipId = region.id.slice(5)  // 'clip-{clipId}'
-        // Clear any drag-selection
-        if (selectionRegionIdRef.current) {
-          const sel = wsRegions.getRegions().find((r) => r.id === selectionRegionIdRef.current)
-          sel?.remove()
-          selectionRegionIdRef.current = null
-        }
-        setSelectedClipId(clipId)
-        setSelection({ start: region.start, end: region.end })
-        console.log(`[WaveformView] clip region clicked id=${clipId}`)
-      }
-    })
-
-    // Clicking the waveform background clears selections and seeks the player
-    ws.on('interaction', (newTime: number) => {
-      console.log(`[WaveformView] interaction newTime=${newTime.toFixed(2)}s`)
-      if (selectionRegionIdRef.current) {
-        const r = wsRegions.getRegions().find((r) => r.id === selectionRegionIdRef.current)
-        r?.remove()
-        selectionRegionIdRef.current = null
-        setSelection(null)
-      }
-      setSelectedClipId(null)
-      // Move cursor immediately (snappy feel)
-      ws.setTime(newTime)
-      // Seek the player — triggers onTimeUpdate which will also call ws.setTime (idempotent)
-      getAudioPlayerInstance()?.seekTo(newTime)
-    })
-
-    // ── Player → cursor bridge ─────────────────────────────────────────────
-    // Subscribe to the player's time ticks to drive the WaveSurfer cursor.
-    // Also implements Preview Mode: if playhead enters a muted clip, skip to end.
     const player = getAudioPlayerInstance()
-    let unsubTimeUpdate: (() => void) | null = null
-
-    if (player) {
-      console.log('[WaveformView] Subscribing to player.onTimeUpdate')
-      unsubTimeUpdate = player.onTimeUpdate((t) => {
-        ws.setTime(t)
-
-        if (previewModeRef.current) {
-          const { tracks: currentTracks } = useTimelineStore.getState()
-          const hit = currentTracks
-            .flatMap((tr) => tr.clips as Clip[])
-            .find((c) => {
-              if (!c.muted) return false
-              const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-              return t >= c.outputStart && t < outputEnd
-            })
-          if (hit) {
-            const outputEnd = hit.outputStart + (hit.sourceEnd - hit.sourceStart)
-            console.log(`[WaveformView] preview skip t=${t.toFixed(2)}s → ${outputEnd.toFixed(2)}s`)
-            getAudioPlayerInstance()?.seekTo(outputEnd)
-          }
-        }
+    if (!player) return
+    return player.onTimeUpdate((t) => {
+      if (!previewModeRef.current) return
+      const { tracks: currentTracks } = useTimelineStore.getState()
+      const hit = currentTracks.flatMap((tr) => tr.clips as Clip[]).find((c) => {
+        if (!c.muted) return false
+        const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
+        return t >= c.outputStart && t < outputEnd
       })
-    } else {
-      console.warn('[WaveformView] player not yet available at mount — cursor will not move until file opens')
+      if (hit) {
+        const outputEnd = hit.outputStart + (hit.sourceEnd - hit.sourceStart)
+        console.log(`[WaveformView] preview skip t=${t.toFixed(2)}s → ${outputEnd.toFixed(2)}s`)
+        getAudioPlayerInstance()?.seekTo(outputEnd)
+      }
+    })
+  }, [])
+
+  // ── Seek on lane click ────────────────────────────────────────────────────
+  const handleLaneClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pct  = (e.clientX - rect.left) / rect.width
+    const t    = pct * duration
+    getAudioPlayerInstance()?.seekTo(t)
+  }, [duration])
+
+  // ── Add Track ────────────────────────────────────────────────────────────
+  const handleAddTrack = useCallback(async () => {
+    const result = await window.electronAPI.audio.openFile()
+    if (!result) return
+    const sfId    = addSourceFile(result.filePath, result.metadata.durationSeconds)
+    const trackId = addTrack(`Track ${tracks.length + 1}`, sfId)
+    // Register the new source in the active player
+    try {
+      await getAudioPlayerInstance()?.loadSourceFile(sfId, result.filePath)
+    } catch (err) {
+      console.warn('[WaveformView] Could not register source with player:', err)
     }
-
-    // ── Seed clip regions after WaveSurfer finishes its async layout pass ──
-    // WaveSurfer defers internal rendering even when initialized from peaks,
-    // so addRegion() calls made before 'ready' fires land at px-offset 0.
-    // Reading from the store here avoids a stale-closure on `tracks`.
-    ws.on('ready', () => {
-      const { tracks: initTracks, selectedClipId: initSel } = useTimelineStore.getState()
-      initTracks.forEach((track) => {
-        track.clips.forEach((clip) => {
-          if (!clip.muted) return
-          const outputEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
-          wsRegions.addRegion({
-            id:     `clip-${clip.id}`,
-            start:  clip.outputStart,
-            end:    outputEnd,
-            color:  clip.id === initSel
-              ? 'rgba(239, 68, 68, 0.45)'
-              : 'rgba(239, 68, 68, 0.22)',
-            drag:   false,
-            resize: false,
-          })
-        })
-      })
-      console.log(`[WaveformView] seeded ${initTracks.flatMap(t => t.clips).filter(c => c.muted).length} muted region(s) after ready`)
-    })
-
-    wsRef.current = ws
-    setWaveSurferInstance(ws)
-    setRegionsPluginInstance(wsRegions)
-
-    console.log(`[WaveformView] WaveSurfer ready — duration=${peaks.durationSeconds.toFixed(2)}s`)
-
-    return () => {
-      console.log('[WaveformView] Destroying WaveSurfer instance')
-      unsubTimeUpdate?.()
-      ws.destroy()
-      wsRef.current = null
-      regionsRef.current = null
-      selectionRegionIdRef.current = null
-      setWaveSurferInstance(null)
-      setRegionsPluginInstance(null)
+    // Generate peaks for the new track (per-track loading — not full-page skeleton)
+    setTrackPeaks((prev) => new Map(prev).set(trackId, 'loading'))
+    try {
+      const pd = await window.electronAPI.audio.generatePeaks(result.filePath)
+      setTrackPeaks((prev) => new Map(prev).set(trackId, pd))
+    } catch (err) {
+      console.error('[WaveformView] Failed to generate peaks for new track:', err)
+      setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
     }
-  }, [peaks]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [addSourceFile, addTrack, tracks.length])
 
-  // ── Sync muted clip regions → WaveSurfer ──────────────────────────────────
-  // Re-runs when tracks or selectedClipId change (user mutes/unmutes/selects).
-  // The initial seed after a file load is handled by the ws.on('ready') callback
-  // above, which fires after WaveSurfer has finished its async layout pass and
-  // can correctly position regions on screen.
-  useEffect(() => {
-    const wsRegions = regionsRef.current
-    if (!wsRegions) return
+  // ── Remove track ─────────────────────────────────────────────────────────
+  const handleRemoveTrack = useCallback((trackId: string) => {
+    removeTrack(trackId)
+    setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
+  }, [removeTrack])
 
-    // Remove all previously rendered clip regions
-    wsRegions.getRegions().forEach((r) => {
-      if (r.id.startsWith('clip-')) r.remove()
-    })
+  // ── Clip drag ─────────────────────────────────────────────────────────────
+  const dragRef = useRef<{
+    clipId:    string
+    origStart: number
+    ghostPct:  number
+    trackId:   string
+    startX:    number
+  } | null>(null)
+  const [ghostState, setGhostState] = useState<{ pct: number; widthPct: number } | null>(null)
 
-    tracks.forEach((track) => {
-      track.clips.forEach((clip) => {
-        if (!clip.muted) return
-        const outputEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
-        const isSelected = clip.id === selectedClipId
-        wsRegions.addRegion({
-          id: `clip-${clip.id}`,
-          start: clip.outputStart,
-          end: outputEnd,
-          color: isSelected
-            ? 'rgba(239, 68, 68, 0.45)'  // brighter when selected
-            : 'rgba(239, 68, 68, 0.22)',
-          drag: false,
-          resize: false,
-        })
-      })
-    })
-  }, [tracks, selectedClipId])
+  const handleClipPointerDown = useCallback((
+    e: React.PointerEvent,
+    clip: Clip,
+  ) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = {
+      clipId:    clip.id,
+      origStart: clip.outputStart,
+      ghostPct:  duration > 0 ? (clip.outputStart / duration) * 100 : 0,
+      trackId:   clip.trackId,
+      startX:    e.clientX,
+    }
+    const widthPct = duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * 100 : 0
+    setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * 100 : 0, widthPct })
+  }, [duration])
 
-  // ── Split markers (React-rendered, not WaveSurfer regions) ────────────────
-  // Computed as absolute-positioned divs so they're always exactly 2 px wide
-  // on screen — identical in concept to WaveSurfer's own cursor line.
-  const splitPositions = useMemo(() => {
-    if (peaks.durationSeconds <= 0) return []
-    const positions: Array<{ id: string; time: number }> = []
-    tracks.forEach((track) => {
-      const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
-      sorted.slice(1).forEach((clip) => {
-        positions.push({ id: clip.id, time: clip.outputStart })
-      })
-    })
-    return positions
-  }, [tracks, peaks.durationSeconds])
+  const handleClipPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return
+    const delta  = e.clientX - dragRef.current.startX
+    const laneEl = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
+    const laneW  = laneEl?.getBoundingClientRect().width ?? 1
+    // deltaPct relative to lane width
+    const deltaPct = (delta / laneW) * 100
+    const newPct   = Math.max(0, dragRef.current.ghostPct + deltaPct)
+    setGhostState((g) => g ? { ...g, pct: newPct } : null)
+  }, [])
 
-  // ── Sync selection removal from outside (e.g. after a keyboard shortcut) ─
-  useEffect(() => {
-    if (selection !== null) return
-    if (!selectionRegionIdRef.current || !regionsRef.current) return
-    const r = regionsRef.current.getRegions().find(
-      (r) => r.id === selectionRegionIdRef.current,
+  const handleClipPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current || !ghostState) { dragRef.current = null; setGhostState(null); return }
+    const laneEl = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
+    const laneW  = laneEl?.getBoundingClientRect().width ?? 1
+    const newOutputStart = (ghostState.pct / 100) * duration
+
+    // Snap: find if leading/trailing edge is within 5px of another clip's edge
+    const { tracks: allTracks } = useTimelineStore.getState()
+    const allEdges = allTracks.flatMap((t) =>
+      t.clips
+        .filter((c) => c.id !== dragRef.current!.clipId)
+        .flatMap((c) => [
+          c.outputStart,
+          c.outputStart + (c.sourceEnd - c.sourceStart),
+        ])
     )
-    r?.remove()
-    selectionRegionIdRef.current = null
-  }, [selection])
+    const snapThresholdSec = (5 / laneW) * duration
+    const clipped = allTracks
+      .flatMap((t) => t.clips)
+      .find((c) => c.id === dragRef.current!.clipId)
+    const clipDur = clipped ? clipped.sourceEnd - clipped.sourceStart : 0
+    let snapped = newOutputStart
+    for (const edge of allEdges) {
+      if (Math.abs(newOutputStart - edge) < snapThresholdSec) { snapped = edge; break }
+      if (Math.abs(newOutputStart + clipDur - edge) < snapThresholdSec) { snapped = edge - clipDur; break }
+    }
 
+    moveClip(dragRef.current.clipId, Math.max(0, snapped))
+    dragRef.current = null
+    setGhostState(null)
+  }, [ghostState, duration, moveClip])
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
+        display:         'flex',
+        flexDirection:   'column',
         backgroundColor: 'var(--color-bg-secondary)',
-        borderBottom: '1px solid var(--color-border)',
+        borderBottom:    '1px solid var(--color-border)',
+        position:        'relative',
       }}
     >
-      {/* Main waveform canvas + split-marker overlays */}
-      <div style={{ position: 'relative' }}>
-        <div ref={containerRef} style={{ padding: '8px 0', cursor: 'crosshair' }} />
-        {/* Split markers: 2-px-wide lines, always the same visual width regardless of
-            audio duration — same concept as WaveSurfer's own cursor element. */}
-        {splitPositions.map(({ id, time }) => (
-          <div
-            key={id}
-            style={{
-              position:        'absolute',
-              top:             0,
-              bottom:          0,
-              left:            `calc(${(time / peaks.durationSeconds) * 100}% - 1px)`,
-              width:           2,
-              backgroundColor: 'rgba(99, 102, 241, 0.85)',
-              pointerEvents:   'none',
-              zIndex:          10,
-            }}
-          />
-        ))}
+      {/* Shared timeline ruler (spans the clip lanes only, not the headers) */}
+      <div style={{ display: 'flex' }}>
+        <div style={{ width: 90, flexShrink: 0, borderRight: '1px solid var(--color-border)' }} />
+        <div
+          id="waveform-timeline"
+          style={{ flex: 1, borderBottom: '1px solid var(--color-border-subtle)' }}
+        />
       </div>
 
-      {/* Timeline ruler */}
+      {/* Track rows */}
+      {tracks.map((track, trackIndex) => {
+        const peakState     = trackPeaks.get(track.id)
+        const trackPeakData = peakState === 'loading' || peakState === undefined ? null : peakState
+        return (
+          <div
+            key={track.id}
+            style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}
+          >
+            <TrackHeader track={track} onRemove={handleRemoveTrack} />
+
+            {/* Clip lane */}
+            <div
+              data-lane={track.id}
+              data-trackid={track.id}
+              style={{
+                flex:         1,
+                position:     'relative',
+                height:       96,
+                cursor:       'crosshair',
+                overflow:     'hidden',
+              }}
+              onClick={handleLaneClick}
+              onPointerMove={handleClipPointerMove}
+              onPointerUp={handleClipPointerUp}
+            >
+              {peakState === 'loading' && (
+                <div
+                  style={{
+                    position:       'absolute',
+                    inset:          0,
+                    display:        'flex',
+                    alignItems:     'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    Generating waveform…
+                  </span>
+                </div>
+              )}
+
+              {/* WaveSurfer canvas for this track */}
+              {trackPeakData && (
+                <TrackWaveform
+                  key={track.id}
+                  trackId={track.id}
+                  peaks={trackPeakData}
+                  color={track.color}
+                  trackIndex={trackIndex}
+                />
+              )}
+
+              {/* Clip blocks */}
+              {track.clips.map((clip) => {
+                const clipDur    = clip.sourceEnd - clip.sourceStart
+                const leftPct    = duration > 0 ? (clip.outputStart / duration) * 100 : 0
+                const widthPct   = duration > 0 ? (clipDur / duration) * 100 : 0
+                const isDragging = dragRef.current?.clipId === clip.id
+                return (
+                  <div
+                    key={clip.id}
+                    onPointerDown={(e) => handleClipPointerDown(e, clip)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedClipId(clip.id === selectedClipId ? null : clip.id)
+                      setSelection({ start: clip.outputStart, end: clip.outputStart + clipDur })
+                    }}
+                    style={{
+                      position:        'absolute',
+                      left:            `${leftPct}%`,
+                      width:           `${widthPct}%`,
+                      top:             4,
+                      bottom:          4,
+                      borderRadius:    3,
+                      border:          clip.id === selectedClipId
+                        ? '1px solid var(--color-accent)'
+                        : '1px solid transparent',
+                      backgroundColor: clip.muted
+                        ? 'rgba(239, 68, 68, 0.22)'
+                        : 'transparent',
+                      opacity:         isDragging ? 0.4 : 1,
+                      cursor:          'grab',
+                      pointerEvents:   'all',
+                      zIndex:          isDragging ? 0 : 5,
+                      boxSizing:       'border-box',
+                    }}
+                  />
+                )
+              })}
+
+              {/* Drag ghost */}
+              {ghostState && dragRef.current && track.clips.some((c) => c.id === dragRef.current!.clipId) && (
+                <div
+                  style={{
+                    position:        'absolute',
+                    left:            `${ghostState.pct}%`,
+                    width:           `${ghostState.widthPct}%`,
+                    top:             4,
+                    bottom:          4,
+                    borderRadius:    3,
+                    border:          '1px dashed var(--color-accent)',
+                    backgroundColor: 'rgba(99,102,241,0.2)',
+                    pointerEvents:   'none',
+                    zIndex:          20,
+                  }}
+                />
+              )}
+
+              {/* Split markers — lines at the start of each clip after the first */}
+              {track.clips
+                .slice(1)
+                .map((clip) => (
+                  <div
+                    key={`split-${clip.id}`}
+                    style={{
+                      position:        'absolute',
+                      top:             0,
+                      bottom:          0,
+                      left:            duration > 0
+                        ? `calc(${(clip.outputStart / duration) * 100}% - 1px)`
+                        : '0',
+                      width:           2,
+                      backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                      pointerEvents:   'none',
+                      zIndex:          10,
+                    }}
+                  />
+                ))}
+
+              {/* Shared playhead line */}
+              <div
+                style={{
+                  position:        'absolute',
+                  top:             0,
+                  bottom:          0,
+                  left:            `${playheadPct}%`,
+                  width:           1,
+                  backgroundColor: 'rgba(255,255,255,0.7)',
+                  pointerEvents:   'none',
+                  zIndex:          30,
+                }}
+              />
+            </div>
+          </div>
+        )
+      })}
+
+      {/* + Add Track row */}
       <div
-        id="waveform-timeline"
-        style={{ borderTop: '1px solid var(--color-border-subtle)', paddingBottom: 4 }}
-      />
+        onClick={handleAddTrack}
+        style={{
+          display:     'flex',
+          alignItems:  'center',
+          padding:     '6px 12px',
+          cursor:      'pointer',
+          color:       'var(--color-text-muted)',
+          fontSize:    'var(--text-xs)',
+          borderTop:   '1px solid var(--color-border)',
+        }}
+        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-accent)')}
+        onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-text-muted)')}
+      >
+        + Add Track
+      </div>
     </div>
   )
 }
 
-// ── Module-level imperative handles ───────────────────────────────────────────
-// Exposed so keyboard shortcuts can call ws.setTime() for nudge operations.
-// In the new design, these are less critical (use player.seekTo() instead),
-// but keeping them avoids breaking existing call sites.
+// ── TrackWaveform — per-track WaveSurfer instance ─────────────────────────────
+// Isolated component so each track gets its own WaveSurfer lifecycle.
+
+interface TrackWaveformProps {
+  trackId:    string
+  peaks:      PeakData
+  color:      string
+  trackIndex: number
+}
+
+function TrackWaveform({ trackId, peaks, color, trackIndex }: TrackWaveformProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const timelinePluginOptions = trackIndex === 0
+      ? {
+          container:            '#waveform-timeline',
+          timeInterval:         10,
+          primaryLabelInterval: 60,
+          style: { fontSize: '10px', color: 'var(--color-text-muted)' },
+        }
+      : undefined
+
+    const plugins = timelinePluginOptions
+      ? [TimelinePlugin.create(timelinePluginOptions)]
+      : []
+
+    const ws = WaveSurfer.create({
+      container:     containerRef.current,
+      waveColor:     color,
+      progressColor: color + '99',
+      cursorWidth:   0,
+      barWidth:      2,
+      barGap:        1,
+      barRadius:     2,
+      height:        88,
+      peaks:         peaks.data,
+      duration:      peaks.durationSeconds,
+      plugins,
+    })
+
+    ws.on('interaction', (t: number) => {
+      getAudioPlayerInstance()?.seekTo(t)
+    })
+
+    console.log(`[WaveformView] WaveSurfer ready for track ${trackId}`)
+
+    return () => {
+      ws.destroy()
+    }
+  }, [peaks, color, trackId, trackIndex])
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+    />
+  )
+}
+
+// ── Module-level handles (kept for backward-compat with existing call sites) ───
+// These are stubs — the multi-track design has no single global WaveSurfer instance.
+// Callers that previously used ws.setTime() should use player.seekTo() instead.
 
 let _wsInstance: WaveSurfer | null = null
 let _regionsInstance: ReturnType<typeof RegionsPlugin.create> | null = null
 
 export function getWaveSurferInstance(): WaveSurfer | null { return _wsInstance }
 export function setWaveSurferInstance(ws: WaveSurfer | null): void { _wsInstance = ws }
-
 export function getRegionsPluginInstance() { return _regionsInstance }
 export function setRegionsPluginInstance(r: typeof _regionsInstance): void { _regionsInstance = r }
