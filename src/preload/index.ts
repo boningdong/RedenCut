@@ -49,6 +49,11 @@ const api = {
       ipcRenderer.invoke('transcript:generate', filePath, language),
   },
 
+  render: {
+    export: (project: unknown, outputPath: string) =>
+      ipcRenderer.invoke('project:export', project, outputPath),
+  },
+
   // ── Push event subscriptions ───────────────────────────────────────────────
   on: {
     peaksProgress: (callback: (progress: number) => void) => {
@@ -61,6 +66,12 @@ const api = {
       const handler = (_event: IpcRendererEvent, status: string) => callback(status)
       ipcRenderer.on('transcript:progress', handler)
       return () => ipcRenderer.off('transcript:progress', handler)
+    },
+
+    renderProgress: (callback: (p: import('../shared/ipc.types').RenderProgress) => void) => {
+      const handler = (_event: IpcRendererEvent, p: import('../shared/ipc.types').RenderProgress) => callback(p)
+      ipcRenderer.on('render:progress', handler)
+      return () => ipcRenderer.off('render:progress', handler)
     },
   },
 } satisfies IElectronAPI
