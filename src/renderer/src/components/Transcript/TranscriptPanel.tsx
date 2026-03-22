@@ -277,7 +277,13 @@ export function TranscriptPanel({
             return (
               <button
                 key={track.id}
-                onClick={() => { if (trackSfId) setActiveTrackFilter(trackSfId) }}
+                onClick={() => {
+                  if (trackSfId) {
+                    setActiveTrackFilter(trackSfId)
+                  } else if (onGenerate) {
+                    onGenerate(track.id)
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
