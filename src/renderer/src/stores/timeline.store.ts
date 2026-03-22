@@ -86,6 +86,14 @@ interface TimelineState {
    */
   loadFromProject(sourceFiles: SourceFile[], tracks: Track[]): void
 
+  /**
+   * Register a source file in the project. Idempotent — calling with the same
+   * filePath returns the existing id without creating a duplicate.
+   * id is always set to filePath (matches the convention in initFromFile).
+   * Not undoable.
+   */
+  addSourceFile(filePath: string, duration: number): string
+
   // ── Track operations ───────────────────────────────────────────────────────
 
   addTrack(name?: string, sourceFileId?: string): string
@@ -206,6 +214,19 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     set({ sourceFiles, tracks, undoStack: [], selectedClipId: null })
   },
 
+  // ── addSourceFile ────────────────────────────────────────────────────────
+  addSourceFile(filePath, duration) {
+    const existing = get().sourceFiles.find((sf) => sf.filePath === filePath)
+    if (existing) {
+      console.log(`[Timeline] addSourceFile — already registered id=${existing.id}`)
+      return existing.id
+    }
+    const sf: SourceFile = { id: filePath, filePath, duration }
+    console.log(`[Timeline] addSourceFile — registered id=${filePath} duration=${duration.toFixed(2)}s`)
+    set((s) => ({ sourceFiles: [...s.sourceFiles, sf] }))
+    return filePath
+  },
+
   // ── addTrack ────────────────────────────────────────────────────────────────
   addTrack(name, sourceFileId) {
     const trackId = nextId('track')
@@ -323,7 +344,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     let targetClip:    Clip | null   = null
 
     for (const track of tracks) {
-      const clip = track.clips.find((c) => time > c.sourceStart && time < c.sourceEnd)
+      const clip = track.clips.find((c) =>
+        time > c.outputStart && time < c.outputStart + (c.sourceEnd - c.sourceStart)
+      )
       if (clip) { targetTrackId = track.id; targetClip = clip; break }
     }
 
@@ -333,8 +356,19 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     }
 
     const before = cloneTracks(tracks)
-    const left:  Clip = { ...targetClip, id: nextId('clip'), sourceEnd:   time, outputStart: targetClip.outputStart }
-    const right: Clip = { ...targetClip, id: nextId('clip'), sourceStart: time, outputStart: time }
+    const offset = time - targetClip.outputStart
+    const left: Clip = {
+      ...targetClip,
+      id: nextId('clip'),
+      sourceEnd: targetClip.sourceStart + offset,
+      // outputStart unchanged — left clip starts where it always started
+    }
+    const right: Clip = {
+      ...targetClip,
+      id: nextId('clip'),
+      sourceStart: targetClip.sourceStart + offset,
+      outputStart: time,
+    }
 
     console.log(`[Timeline] splitAt ${time.toFixed(2)}s — clip ${targetClip.id} → ${left.id} + ${right.id}`)
 
