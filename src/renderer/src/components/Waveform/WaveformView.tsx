@@ -222,7 +222,12 @@ export function WaveformView({ peaks }: WaveformViewProps) {
         <div style={{ width: 90, flexShrink: 0, borderRight: '1px solid var(--color-border)' }} />
         <div
           id="waveform-timeline"
-          style={{ flex: 1, borderBottom: '1px solid var(--color-border-subtle)' }}
+          onClick={handleLaneClick}
+          style={{
+            flex:         1,
+            borderBottom: '1px solid var(--color-border-subtle)',
+            cursor:       'crosshair',
+          }}
         />
       </div>
 
