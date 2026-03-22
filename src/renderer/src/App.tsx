@@ -46,6 +46,7 @@ import { usePlaybackStore } from './stores/playback.store'
 import { useTranscriptStore } from './stores/transcript.store'
 import { useTimelineStore } from './stores/timeline.store'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { mergeTrackWords } from './utils/transcript'
 
 // ── State shapes ──────────────────────────────────────────────────────────────
 interface OpenedFile {
@@ -303,7 +304,16 @@ export default function App() {
       resetTimeline()
       setProjectPath(pPath)
       setProject(project)
-      if (project.transcript) setWords(project.transcript.words)
+      if (project.transcript?.words) {
+        const primarySfId = project.sourceFiles[0]?.id ?? project.source.file
+        if (!project.sourceFiles[0]?.id) {
+          console.warn('[App] handleOpenProject: sourceFiles[] empty — backfilling words with relative path', primarySfId)
+        }
+        const backfilled = project.transcript.words.map((w) =>
+          w.sourceFileId ? w : { ...w, sourceFileId: primarySfId }
+        )
+        setWords(backfilled)
+      }
 
       // Resolve audio metadata for the saved source file
       const metadata = await window.electronAPI.audio.probeFile(project.source.file)
@@ -398,20 +408,34 @@ export default function App() {
   }, [buildProject, setProjectPath, setIsDirty, handleError])
 
   // ── Generate transcript ────────────────────────────────────────────────────
-  const handleGenerateTranscript = useCallback(async () => {
-    if (!openedFile) return
+  const handleGenerateTranscript = useCallback(async (trackId?: string) => {
     const reason = await window.electronAPI.transcript.checkAvailability()
     if (reason) { handleError(new Error(reason)); return }
+
+    // Two-step lookup: track id → sourceFileId → SourceFile
+    const { tracks: currentTracks, sourceFiles: currentSFs } = useTimelineStore.getState()
+    let sf: ReturnType<typeof currentSFs.find>
+    if (trackId) {
+      const track = currentTracks.find((t) => t.id === trackId)
+      const sfId = track?.clips[0]?.sourceFileId
+      sf = currentSFs.find((s) => s.id === sfId)
+    } else {
+      sf = currentSFs[0]
+    }
+    if (!sf) return
 
     setIsGenerating(true)
     setGeneratingStatus('Starting…')
     try {
-      const transcript = await window.electronAPI.transcript.generate(openedFile.filePath)
-      setWords(transcript.words)
+      const transcript = await window.electronAPI.transcript.generate(sf.filePath)
+      const taggedWords = transcript.words.map((w) => ({ ...w, sourceFileId: sf!.id }))
+      // Read from store — not from closed-over `words` to avoid stale closure
+      const currentWords = useTranscriptStore.getState().words
+      setWords(mergeTrackWords(currentWords, taggedWords, sf.id))
       setIsDirty(true)
     } catch (err) { handleError(err) }
     finally { setIsGenerating(false); setGeneratingStatus('') }
-  }, [openedFile, setIsGenerating, setGeneratingStatus, setWords, setIsDirty, handleError])
+  }, [setIsGenerating, setGeneratingStatus, setWords, setIsDirty, handleError])
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useKeyboardShortcuts({ onSave: handleSave })
