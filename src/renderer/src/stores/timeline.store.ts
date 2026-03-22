@@ -412,6 +412,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         return { ...t, clips: inserted }
       })
 
+      // Free-form positioning: no overlap prevention. Clips can be freely positioned
+      // to create gaps (silence) between them. If clips overlap on the same track,
+      // buildSegmentsForSource will include both — they mix, same as multi-track.
+      // The UI (WaveformView) renders clip blocks sorted by outputStart.
+
       return {
         tracks:    newTracks,
         undoStack: [...s.undoStack, { before, wordIds: [], label: `move clip ${clipId}` }],
