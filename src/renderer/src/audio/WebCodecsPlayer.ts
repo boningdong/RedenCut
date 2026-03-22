@@ -408,9 +408,7 @@ export class WebCodecsPlayer implements IAudioPlayer {
   setTracks(tracks: Track[]): void {
     this.tracks = tracks
     console.log(`[WebCodecsPlayer] setTracks — ${tracks.length} tracks`)
-    if (this._isPlaying) {
-      this.restartAllDecodeLoops(this._currentTime)
-    }
+    this.restartAllDecodeLoops(this._currentTime)
   }
 
   // ── IAudioPlayer — playback control ──────────────────────────────────────
