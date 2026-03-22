@@ -139,7 +139,11 @@ export default function App() {
   // ── Push event subscriptions ──────────────────────────────────────────────
   useEffect(() => {
     return window.electronAPI.on.peaksProgress((progress) => {
-      setLoadingState({ status: 'generating-peaks', progress })
+      setLoadingState((prev) =>
+        prev.status === 'generating-peaks'
+          ? { status: 'generating-peaks', progress }
+          : prev
+      )
     })
   }, [])
 
