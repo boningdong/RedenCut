@@ -28,6 +28,7 @@ import { useTimelineStore } from '../../stores/timeline.store'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import type { Word } from '@shared/project.types'
 import { getWordClipState, type WordClipState } from '../../utils/wordClipState'
+import { getWordOutputTime } from '../../utils/wordOutputTime'
 
 interface TranscriptPanelProps {
   /** Called when the user clicks "Generate Transcript". Optionally scoped to a track. */
@@ -50,8 +51,8 @@ export function TranscriptPanel({
   const showMutedWords     = useTranscriptStore((s) => s.showMutedWords)
   const toggleShowMuted    = useTranscriptStore((s) => s.toggleShowMutedWords)
   const shiftTimestamps    = useTranscriptStore((s) => s.shiftTimestamps)
-  const activeTrackFilter  = useTranscriptStore((s) => s.activeTrackFilter)
-  const setActiveTrackFilter = useTranscriptStore((s) => s.setActiveTrackFilter)
+  const visibleTrackIds        = useTranscriptStore((s) => s.visibleTrackIds)
+  const toggleTrackVisibility  = useTranscriptStore((s) => s.toggleTrackVisibility)
 
   const tracks      = useTimelineStore((s) => s.tracks)
   const sourceFiles = useTimelineStore((s) => s.sourceFiles)
@@ -70,6 +71,30 @@ export function TranscriptPanel({
     for (const t of tracks) m.set(t.id, t.color)
     return m
   }, [tracks])
+
+  // Convert to Set once — O(1) lookups in the visibleWords filter
+  const visibleSet = useMemo(() => new Set(visibleTrackIds), [visibleTrackIds])
+
+  // Tracks that have at least one word (pill is shown for these)
+  const tracksWithTranscript = useMemo(
+    () => tracks.filter((t) => words.some((w) => w.trackId === t.id)),
+    [tracks, words],
+  )
+
+  // Tracks with no words yet — these appear in the Generate dropdown
+  const ungeneratedTracks = useMemo(
+    () => tracks.filter((t) => !words.some((w) => w.trackId === t.id)),
+    [tracks, words],
+  )
+
+  // True when all tracks are generated (generate button becomes inactive)
+  const allGenerated = ungeneratedTracks.length === 0
+
+  // Dropdown state at component level — NEVER inside an IIFE or conditional (Rules of Hooks)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  // True when any words exist, regardless of visibility filter — guards empty-state copy
+  const hasAnyWords = words.length > 0
 
   // ── Current word (playhead → transcript) ─────────────────────────────────
   const currentWordId = useMemo(() => {
@@ -151,21 +176,19 @@ export function TranscriptPanel({
     const wordIds = selected.map((w) => w.id)
 
     // Mute via timeline.store — route to the correct source file per word.
-    // If viewing a specific track, route the delete to that track's source file.
+    // Routing is always word-driven: no filter state involved.
     const { sourceFiles: sfList, muteRange } = useTimelineStore.getState()
     const { tracks: tList } = useTimelineStore.getState()
-    const routingTrack = activeTrackFilter
-      ? tList.find((t) => t.id === activeTrackFilter)
-      : selected[0]?.trackId
-        ? tList.find((t) => t.id === selected[0].trackId)
-        : null
+    const routingTrack = selected[0]?.trackId
+      ? tList.find((t) => t.id === selected[0].trackId)
+      : null
     const sfId = routingTrack?.clips[0]?.sourceFileId
               ?? selected[0]?.sourceFileId
               ?? sfList[0]?.id
     if (sfId) muteRange(sfId, start, end, wordIds)
-    sel.removeAllRanges()       // clear the native selection after muting
+    sel.removeAllRanges()
     setSelection(null)
-  }, [words, setSelection, activeTrackFilter])
+  }, [words, setSelection])
 
   // ── Keyboard handler on the contentEditable container ────────────────────
   const handleKeyDown = useCallback(
@@ -208,20 +231,17 @@ export function TranscriptPanel({
 
   // ── Render ────────────────────────────────────────────────────────────────
   const visibleWords = useMemo(() => words
-    .filter((w) => !activeTrackFilter || w.trackId === activeTrackFilter)
+    .filter((w) => !w.trackId || visibleSet.has(w.trackId))
     .filter((w) => {
       if (!showMutedWords) {
-        // Hide text-edit muted words
         if (w.muted) return false
-        // Hide clip-muted and no-clip words (they produce no audio)
         const cs = clipStateMap.get(w.id)
         if (cs === 'clip-muted' || cs === 'no-clip') return false
       }
       return true
-    }),
-  [words, activeTrackFilter, showMutedWords, clipStateMap])
-
-  const hasTranscript = visibleWords.length > 0
+    })
+    .sort((a, b) => getWordOutputTime(a, tracks) - getWordOutputTime(b, tracks)),
+  [words, visibleSet, showMutedWords, clipStateMap, tracks])
 
   return (
     <div
@@ -247,7 +267,7 @@ export function TranscriptPanel({
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           Transcript
         </span>
-        {hasTranscript && (
+        {hasAnyWords && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button
               onClick={handleCalibrateOffset}
@@ -268,91 +288,169 @@ export function TranscriptPanel({
         )}
       </div>
 
-      {/* ── Track filter pills ───────────────────────────────────────────── */}
-      {tracks.length > 1 && (
+      {/* ── Track visibility pills + Generate button ──────────────────────── */}
+      {tracks.length > 0 && (
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '4px var(--space-3)',
-            borderBottom: '1px solid var(--color-border)',
-            flexShrink: 0,
-            flexWrap: 'wrap',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'space-between',
+            gap:            6,
+            padding:        '4px var(--space-3)',
+            borderBottom:   '1px solid var(--color-border)',
+            flexShrink:     0,
+            flexWrap:       'wrap',
+            position:       'relative',
           }}
         >
-          {/* "All" pill */}
-          <button
-            onClick={() => setActiveTrackFilter(null)}
-            style={{
-              background: activeTrackFilter === null ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
-              border: 'none',
-              borderRadius: 10,
-              color: activeTrackFilter === null ? '#fff' : 'var(--color-text-secondary)',
-              fontSize: 10,
-              padding: '2px 8px',
-              cursor: 'pointer',
-              letterSpacing: '0.03em',
-            }}
-          >
-            All
-          </button>
+          {/* Left: visibility pills OR placeholder */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minHeight: 22 }}>
+            {tracksWithTranscript.length === 0 ? (
+              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                No transcripts yet
+              </span>
+            ) : (
+              <>
+                <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>View:</span>
+                {tracksWithTranscript.map((track) => {
+                  const isOn = visibleSet.has(track.id)
+                  return (
+                    <button
+                      key={track.id}
+                      onClick={() => toggleTrackVisibility(track.id)}
+                      style={{
+                        display:       'inline-flex',
+                        alignItems:    'center',
+                        gap:           4,
+                        background:    isOn ? `${track.color}28` : 'var(--color-bg-elevated)',
+                        border:        `1px solid ${isOn ? track.color + '88' : 'var(--color-border)'}`,
+                        borderRadius:  10,
+                        color:         isOn ? track.color : 'var(--color-text-muted)',
+                        fontSize:      10,
+                        padding:       '2px 8px',
+                        cursor:        'pointer',
+                        letterSpacing: '0.03em',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width:           5,
+                          height:          5,
+                          borderRadius:    '50%',
+                          backgroundColor: isOn ? track.color : 'var(--color-text-muted)',
+                          flexShrink:      0,
+                        }}
+                      />
+                      {track.name}
+                    </button>
+                  )
+                })}
+              </>
+            )}
+          </div>
 
-          {/* Per-track pills */}
-          {tracks.map((track) => {
-            const isActive  = activeTrackFilter === track.id
-            const hasWords  = words.some((w) => w.trackId === track.id)
-            const dotColor  = track.color
+          {/* Right: Generate dropdown button */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              disabled={allGenerated}
+              onClick={() => !allGenerated && setDropdownOpen((o) => !o)}
+              style={{
+                display:      'inline-flex',
+                alignItems:   'center',
+                gap:          4,
+                padding:      '2px 8px',
+                borderRadius: 4,
+                fontSize:     10,
+                border:       `1px solid ${allGenerated ? 'var(--color-border)' : 'rgba(99,102,241,0.45)'}`,
+                background:   allGenerated ? 'var(--color-bg-elevated)' : 'rgba(99,102,241,0.12)',
+                color:        allGenerated ? 'var(--color-text-muted)' : '#a5b4fc',
+                cursor:       allGenerated ? 'not-allowed' : 'pointer',
+                opacity:      allGenerated ? 0.5 : 1,
+              }}
+            >
+              🤖 Generate ▾
+            </button>
 
-            return (
-              <button
-                key={track.id}
-                onClick={() => {
-                  if (activeTrackFilter !== track.id) {
-                    setActiveTrackFilter(track.id)
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  background: isActive ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
-                  border: 'none',
-                  borderRadius: 10,
-                  color: isActive ? '#fff' : 'var(--color-text-secondary)',
-                  fontSize: 10,
-                  padding: '2px 8px',
-                  cursor: 'pointer',
-                  letterSpacing: '0.03em',
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    backgroundColor: isActive ? '#fff' : dotColor,
-                    flexShrink: 0,
-                  }}
+            {dropdownOpen && !allGenerated && (
+              <>
+                {/* Click-away backdrop */}
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                  onClick={() => setDropdownOpen(false)}
                 />
-                {track.name}
-                {!hasWords && (
-                  <span style={{ opacity: 0.7, marginLeft: 2 }}>+ generate</span>
-                )}
-              </button>
-            )
-          })}
-
+                <div
+                  style={{
+                    position:     'absolute',
+                    right:        0,
+                    top:          '100%',
+                    marginTop:    3,
+                    background:   'var(--color-bg-elevated)',
+                    border:       '1px solid var(--color-border)',
+                    borderRadius: 5,
+                    padding:      '3px 0',
+                    zIndex:       50,
+                    minWidth:     140,
+                    boxShadow:    '0 4px 12px rgba(0,0,0,0.35)',
+                  }}
+                >
+                  {ungeneratedTracks.map((track) => (
+                    <button
+                      key={track.id}
+                      onClick={() => { setDropdownOpen(false); onGenerate(track.id) }}
+                      style={{
+                        display:    'flex',
+                        alignItems: 'center',
+                        gap:        6,
+                        width:      '100%',
+                        padding:    '4px 10px',
+                        background: 'none',
+                        border:     'none',
+                        color:      'var(--color-text-secondary)',
+                        fontSize:   10,
+                        cursor:     'pointer',
+                        textAlign:  'left',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(99,102,241,0.1)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                    >
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: track.color, flexShrink: 0 }} />
+                      {track.name}
+                    </button>
+                  ))}
+                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '2px 0' }} />
+                  <button
+                    onClick={() => { setDropdownOpen(false); onGenerate() }}
+                    style={{
+                      display:    'block',
+                      width:      '100%',
+                      padding:    '4px 10px',
+                      background: 'none',
+                      border:     'none',
+                      color:      '#a5b4fc',
+                      fontSize:   10,
+                      cursor:     'pointer',
+                      textAlign:  'left',
+                      fontWeight: 500,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(99,102,241,0.1)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                  >
+                    🤖 {tracksWithTranscript.length === 0 ? 'All tracks' : 'All remaining'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
       {/* ── Body ────────────────────────────────────────────────────────── */}
       {isGenerating ? (
         <GeneratingState status={generatingStatus} />
-      ) : !hasTranscript ? (
-        <EmptyTranscriptState onGenerate={onGenerate} activeTrackId={activeTrackFilter} />
-      ) : tracks.length === 0 && !hasTranscript ? (
-        <EmptyTranscriptState onGenerate={onGenerate} activeTrackId={null} disabled />
+      ) : !hasAnyWords && tracks.length === 0 ? (
+        <EmptyTranscriptState noTracks />
+      ) : !hasAnyWords ? (
+        <EmptyTranscriptState />
       ) : (
         // contentEditable gives a blinking text cursor and native character-
         // level text selection. onBeforeInput prevents any actual DOM edits.
@@ -378,8 +476,8 @@ export function TranscriptPanel({
           {visibleWords.map((word) => {
             const isCurrent  = word.id === currentWordId
             const clipState  = clipStateMap.get(word.id) ?? 'normal'
-            // In "All" view, show a colored underline matching the track color
-            const trackColor = !activeTrackFilter
+            // In merged view (multiple tracks visible), show a colored underline per track
+            const trackColor = visibleSet.size > 1
               ? (trackColorMap.get(word.trackId ?? '') ?? null)
               : null
 
@@ -450,15 +548,7 @@ export function TranscriptPanel({
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function EmptyTranscriptState({
-  onGenerate,
-  activeTrackId,
-  disabled = false,
-}: {
-  onGenerate:    (trackId?: string) => void
-  activeTrackId: string | null
-  disabled?:     boolean
-}) {
+function EmptyTranscriptState({ noTracks = false }: { noTracks?: boolean }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', textAlign: 'center' }}>
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -470,31 +560,10 @@ function EmptyTranscriptState({
       </svg>
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>No transcript yet</p>
       <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 180 }}>
-        {disabled ? 'Add a track to generate a transcript' : 'Requires whisper-cli installed via brew'}
+        {noTracks
+          ? 'Add a track to get started'
+          : 'Use 🤖 Generate above to transcribe a track'}
       </p>
-      <button
-        disabled={disabled}
-        onClick={() => !disabled && onGenerate(activeTrackId ?? undefined)}
-        style={{
-          marginTop:       'var(--space-1)',
-          background:      disabled ? 'var(--color-bg-elevated)' : 'var(--color-accent)',
-          border:          'none',
-          borderRadius:    4,
-          color:           disabled ? 'var(--color-text-muted)' : '#fff',
-          fontSize:        'var(--text-xs)',
-          padding:         '6px 14px',
-          cursor:          disabled ? 'not-allowed' : 'pointer',
-          letterSpacing:   '0.04em',
-          opacity:         disabled ? 0.6 : 1,
-        }}
-      >
-        Generate Transcript
-      </button>
-      {!disabled && (
-        <p style={{ fontSize: 10, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
-          {activeTrackId ? 'Generates transcript for this track' : 'Generates transcripts for all tracks'}
-        </p>
-      )}
     </div>
   )
 }
