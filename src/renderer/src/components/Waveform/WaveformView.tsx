@@ -28,7 +28,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.js'
-import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js'
 import type { PeakData, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
@@ -115,7 +114,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     const result = await window.electronAPI.audio.openFile()
     if (!result) return
     const sfId    = addSourceFile(result.filePath, result.metadata.durationSeconds)
-    const trackId = addTrack(`Track ${tracks.length + 1}`, sfId)
+    const trackId = addTrack(undefined, sfId)
     // Register the new source in the active player
     try {
       await getAudioPlayerInstance()?.loadSourceFile(sfId, result.filePath)
@@ -131,7 +130,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       console.error('[WaveformView] Failed to generate peaks for new track:', err)
       setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
     }
-  }, [addSourceFile, addTrack, tracks.length])
+  }, [addSourceFile, addTrack])
 
   // ── Remove track ─────────────────────────────────────────────────────────
   const handleRemoveTrack = useCallback((trackId: string) => {
@@ -559,14 +558,3 @@ const ClipWaveform = React.memo(function ClipWaveform({ peaks, sourceStart, sour
   )
 })
 
-// ── Module-level handles (kept for backward-compat with existing call sites) ───
-// These are stubs — the multi-track design has no single global WaveSurfer instance.
-// Callers that previously used ws.setTime() should use player.seekTo() instead.
-
-let _wsInstance: WaveSurfer | null = null
-let _regionsInstance: ReturnType<typeof RegionsPlugin.create> | null = null
-
-export function getWaveSurferInstance(): WaveSurfer | null { return _wsInstance }
-export function setWaveSurferInstance(ws: WaveSurfer | null): void { _wsInstance = ws }
-export function getRegionsPluginInstance() { return _regionsInstance }
-export function setRegionsPluginInstance(r: typeof _regionsInstance): void { _regionsInstance = r }

@@ -38,6 +38,8 @@ function nextId(prefix: string): string {
   return `${prefix}-${++_idCounter}-${Date.now()}`
 }
 
+let _colorIndex = 0
+
 /** Deep-clone tracks (metadata only — no audio buffers). */
 function cloneTracks(tracks: Track[]): Track[] {
   return tracks.map((t) => ({
@@ -213,7 +215,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume:  1,
       muted:   false,
       solo:    false,
-      color:   TRACK_COLORS[0],
+      color:   TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
       effects: [],
     }
 
@@ -250,10 +252,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume:  1,
       muted:   false,
       solo:    false,
-      color:   (() => {
-        const used = new Set(get().tracks.map((t) => t.color))
-        return TRACK_COLORS.find((c) => !used.has(c)) ?? TRACK_COLORS[get().tracks.length % TRACK_COLORS.length]
-      })(),
+      color:   TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
       effects: [],
     }
     if (sourceFileId) {
@@ -655,27 +654,6 @@ function mergeAdjacentUnmuted(clips: Clip[]): Clip[] {
     }
   }
   return merged
-}
-
-/**
- * After inserting a moved clip at `newOutputStart`, push subsequent clips
- * forward so nothing overlaps.
- */
-function reflowOutputStarts(
-  clips:          Clip[],
-  movedClipId:    string,
-  newOutputStart: number,
-  movedDuration:  number,
-): Clip[] {
-  const sorted = [...clips].sort((a, b) => a.outputStart - b.outputStart)
-  let cursor = newOutputStart + movedDuration
-  return sorted.map((c) => {
-    if (c.id === movedClipId) return c
-    if (c.outputStart < newOutputStart) return c
-    const out = { ...c, outputStart: cursor }
-    cursor += c.sourceEnd - c.sourceStart
-    return out
-  })
 }
 
 /** Search the undo stack for wordIds associated with a specific clip. */
