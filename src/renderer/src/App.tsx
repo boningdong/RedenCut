@@ -30,7 +30,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import type { AudioMetadata, PeakData, ProjectFile } from '@shared/project.types'
+import type { AudioMetadata, PeakData, ProjectFile, Word } from '@shared/project.types'
 import { APP_NAME, APP_FILE_EXT } from '@shared/constants'
 import type { IAudioPlayer } from '@shared/player.types'
 import { setAudioPlayerInstance } from '@shared/player.types'
@@ -437,37 +437,53 @@ export default function App() {
 
     const { tracks: currentTracks, sourceFiles: currentSFs } = useTimelineStore.getState()
 
-    // Collect which source files to transcribe
+    // Collect which (track, sourceFile) pairs to transcribe.
+    // A track can reference multiple source files (one per clip group), so we
+    // collect all unique sourceFileIds per track.
     const targets: { sf: (typeof currentSFs)[0]; trackId: string }[] = []
-    if (trackId) {
-      const track = currentTracks.find((t) => t.id === trackId)
-      const sfId  = track?.clips[0]?.sourceFileId
-      const sf    = currentSFs.find((s) => s.id === sfId)
-      if (sf) targets.push({ sf, trackId })
-    } else {
-      // No trackId → generate for every track that has a source file
-      for (const track of currentTracks) {
-        const sfId = track.clips[0]?.sourceFileId
-        const sf   = currentSFs.find((s) => s.id === sfId)
+    const addTargetsForTrack = (track: (typeof currentTracks)[0]) => {
+      const sfIds = [...new Set(
+        track.clips.map((c) => c.sourceFileId).filter((id): id is string => !!id)
+      )]
+      for (const sfId of sfIds) {
+        const sf = currentSFs.find((s) => s.id === sfId)
         if (sf) targets.push({ sf, trackId: track.id })
       }
+    }
+
+    if (trackId) {
+      const track = currentTracks.find((t) => t.id === trackId)
+      if (track) addTargetsForTrack(track)
+    } else {
+      for (const track of currentTracks) addTargetsForTrack(track)
     }
     if (targets.length === 0) return
 
     setIsGenerating(true)
     setGeneratingStatus('Starting…')
     try {
-      let currentWords = useTranscriptStore.getState().words
+      // Accumulate tagged words per trackId. We merge once per track at the end
+      // so multiple source files on the same track don't overwrite each other.
+      const taggedByTrack = new Map<string, Word[]>()
+
       for (const { sf, trackId: tId } of targets) {
         setGeneratingStatus(targets.length > 1 ? `Transcribing ${sf.filePath.split('/').pop()}…` : 'Transcribing…')
         const transcript  = await window.electronAPI.transcript.generate(sf.filePath)
-        const taggedWords = transcript.words.map((w) => ({
+        const taggedWords: Word[] = transcript.words.map((w) => ({
           ...w,
-          id:           `${tId}_${w.id}`,
+          // Include sfId so IDs remain unique across multiple source files
+          // (Whisper resets its internal counter per call).
+          id:           `${tId}_${sf.id}_${w.id}`,
           sourceFileId: sf.id,
           trackId:      tId,
         }))
-        currentWords = mergeTrackWords(currentWords, taggedWords, tId, sf.id)
+        taggedByTrack.set(tId, [...(taggedByTrack.get(tId) ?? []), ...taggedWords])
+      }
+
+      let currentWords = useTranscriptStore.getState().words
+      for (const [tId, tagged] of taggedByTrack) {
+        const firstSf = targets.find((t) => t.trackId === tId)?.sf
+        currentWords = mergeTrackWords(currentWords, tagged, tId, firstSf?.id)
       }
       setWords(currentWords)
       setIsDirty(true)

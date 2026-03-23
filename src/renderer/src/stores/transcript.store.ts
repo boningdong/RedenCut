@@ -69,6 +69,13 @@ interface TranscriptState {
    */
   shiftTimestamps: (offsetSeconds: number) => void
 
+  /**
+   * Remove all words that belong to a specific track.
+   * Called when a track is deleted. Also resets activeTrackFilter if it
+   * was pointing at the deleted track.
+   */
+  removeWordsForTrack: (trackId: string) => void
+
   reset: () => void
 }
 
@@ -123,6 +130,12 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
         start: Math.max(0, w.start + offsetSeconds),
         end:   Math.max(0, w.end   + offsetSeconds),
       })),
+    })),
+
+  removeWordsForTrack: (trackId) =>
+    set((s) => ({
+      words:             s.words.filter((w) => w.trackId !== trackId),
+      activeTrackFilter: s.activeTrackFilter === trackId ? null : s.activeTrackFilter,
     })),
 
   reset: () => set(initialState),

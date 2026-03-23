@@ -32,6 +32,7 @@ import type { PeakData, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
+import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { TrackHeader } from './TrackHeader'
 
@@ -135,6 +136,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   // ── Remove track ─────────────────────────────────────────────────────────
   const handleRemoveTrack = useCallback((trackId: string) => {
     removeTrack(trackId)
+    useTranscriptStore.getState().removeWordsForTrack(trackId)
     setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
   }, [removeTrack])
 

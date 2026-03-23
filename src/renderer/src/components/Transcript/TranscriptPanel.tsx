@@ -27,6 +27,7 @@ import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import type { Word } from '@shared/project.types'
+import { getWordClipState, type WordClipState } from '../../utils/wordClipState'
 
 interface TranscriptPanelProps {
   /** Called when the user clicks "Generate Transcript". Optionally scoped to a track. */
@@ -62,6 +63,13 @@ export function TranscriptPanel({
   const currentWordRef = useRef<HTMLSpanElement | null>(null)
   /** Map from word.id → the rendered <span> element, for selection intersection. */
   const wordEls = useRef<Map<string, HTMLSpanElement>>(new Map())
+
+  // ── Track color map — used for per-track underlines in "All" view ────────
+  const trackColorMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of tracks) m.set(t.id, t.color)
+    return m
+  }, [tracks])
 
   // ── Current word (playhead → transcript) ─────────────────────────────────
   const currentWordId = useMemo(() => {
@@ -191,14 +199,29 @@ export function TranscriptPanel({
     [handleDeleteFromSelection],
   )
 
+  // ── Clip state map — computed once per words+tracks change ───────────────
+  const clipStateMap = useMemo(() => {
+    const m = new Map<string, WordClipState>()
+    for (const w of words) m.set(w.id, getWordClipState(w, tracks))
+    return m
+  }, [words, tracks])
+
   // ── Render ────────────────────────────────────────────────────────────────
-  const visibleWords = words
+  const visibleWords = useMemo(() => words
     .filter((w) => !activeTrackFilter || w.trackId === activeTrackFilter)
-    .filter((w) => showMutedWords || !w.muted)
+    .filter((w) => {
+      if (!showMutedWords) {
+        // Hide text-edit muted words
+        if (w.muted) return false
+        // Hide clip-muted and no-clip words (they produce no audio)
+        const cs = clipStateMap.get(w.id)
+        if (cs === 'clip-muted' || cs === 'no-clip') return false
+      }
+      return true
+    }),
+  [words, activeTrackFilter, showMutedWords, clipStateMap])
 
   const hasTranscript = visibleWords.length > 0
-
-  const primarySfId = sourceFiles[0]?.id
 
   return (
     <div
@@ -328,6 +351,8 @@ export function TranscriptPanel({
         <GeneratingState status={generatingStatus} />
       ) : !hasTranscript ? (
         <EmptyTranscriptState onGenerate={onGenerate} activeTrackId={activeTrackFilter} />
+      ) : tracks.length === 0 && !hasTranscript ? (
+        <EmptyTranscriptState onGenerate={onGenerate} activeTrackId={null} disabled />
       ) : (
         // contentEditable gives a blinking text cursor and native character-
         // level text selection. onBeforeInput prevents any actual DOM edits.
@@ -351,7 +376,46 @@ export function TranscriptPanel({
           }}
         >
           {visibleWords.map((word) => {
-            const isCurrent = word.id === currentWordId
+            const isCurrent  = word.id === currentWordId
+            const clipState  = clipStateMap.get(word.id) ?? 'normal'
+            // In "All" view, show a colored underline matching the track color
+            const trackColor = !activeTrackFilter
+              ? (trackColorMap.get(word.trackId ?? '') ?? null)
+              : null
+
+            // Style precedence:
+            //   isCurrent → terminal highlight
+            //   word.muted (type a, text-edit) → red strikethrough
+            //   clip-muted (type b, 'M' on clip) → amber tint, no strikethrough
+            //   no-clip    (type c, clip deleted) → gray dim strikethrough
+            //   normal     → track color underline in All view
+            let bg         = 'transparent'
+            let wordColor  = 'var(--color-text-primary)'
+            let decoration = 'none'
+            let borderBot  = '2px solid transparent'
+            let opacity    = 1
+
+            if (isCurrent) {
+              bg        = 'var(--color-accent)'
+              wordColor = '#fff'
+            } else if (word.muted) {
+              // Type a: explicitly deleted via transcript editing
+              decoration = 'line-through'
+              opacity    = 0.45
+              wordColor  = 'rgba(239, 68, 68, 0.9)'
+            } else if (clipState === 'clip-muted') {
+              // Type b: whole clip muted via 'M' key — audio is silenced as a block
+              bg        = 'rgba(251, 146, 60, 0.12)'
+              wordColor = 'rgba(251, 146, 60, 0.85)'
+            } else if (clipState === 'no-clip') {
+              // Type c: clip was deleted — word produces no audio at all
+              decoration = 'line-through'
+              opacity    = 0.3
+              wordColor  = 'var(--color-text-muted)'
+            } else if (trackColor) {
+              // Normal in All view: colored underline per track
+              borderBot = `2px solid ${trackColor}`
+            }
 
             return (
               <span
@@ -363,22 +427,15 @@ export function TranscriptPanel({
                 }}
                 onClick={(e) => handleWordClick(e, word)}
                 style={{
-                  display: 'inline',
-                  marginRight: word.text.match(/[\u2E80-\u9FFF]/) ? '0' : '0.25em',
-                  borderRadius: 2,
-                  padding: '1px 1px',
-                  // Muted: strikethrough + dimmed; non-primary tracks: slightly dimmed
-                  textDecoration: word.muted ? 'line-through' : 'none',
-                  opacity: word.muted
-                    ? 0.45
-                    : (!word.sourceFileId || word.sourceFileId === primarySfId)
-                      ? 1
-                      : 0.6,
-                  // Current word: accent underline
-                  borderBottom: isCurrent
-                    ? '2px solid var(--color-accent)'
-                    : '2px solid transparent',
-                  color: 'var(--color-text-primary)',
+                  display:         'inline',
+                  marginRight:     word.text.match(/[\u2E80-\u9FFF]/) ? '0' : '0.25em',
+                  borderRadius:    2,
+                  padding:         '1px 2px',
+                  backgroundColor: bg,
+                  color:           wordColor,
+                  textDecoration:  decoration,
+                  borderBottom:    borderBot,
+                  opacity,
                 }}
               >
                 {word.text}
@@ -396,9 +453,11 @@ export function TranscriptPanel({
 function EmptyTranscriptState({
   onGenerate,
   activeTrackId,
+  disabled = false,
 }: {
   onGenerate:    (trackId?: string) => void
   activeTrackId: string | null
+  disabled?:     boolean
 }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', textAlign: 'center' }}>
@@ -410,16 +469,32 @@ function EmptyTranscriptState({
         <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>No transcript yet</p>
-      <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 180 }}>Requires whisper-cli installed via brew</p>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 180 }}>
+        {disabled ? 'Add a track to generate a transcript' : 'Requires whisper-cli installed via brew'}
+      </p>
       <button
-        onClick={() => onGenerate(activeTrackId ?? undefined)}
-        style={{ marginTop: 'var(--space-1)', background: 'var(--color-accent)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 'var(--text-xs)', padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.04em' }}
+        disabled={disabled}
+        onClick={() => !disabled && onGenerate(activeTrackId ?? undefined)}
+        style={{
+          marginTop:       'var(--space-1)',
+          background:      disabled ? 'var(--color-bg-elevated)' : 'var(--color-accent)',
+          border:          'none',
+          borderRadius:    4,
+          color:           disabled ? 'var(--color-text-muted)' : '#fff',
+          fontSize:        'var(--text-xs)',
+          padding:         '6px 14px',
+          cursor:          disabled ? 'not-allowed' : 'pointer',
+          letterSpacing:   '0.04em',
+          opacity:         disabled ? 0.6 : 1,
+        }}
       >
         Generate Transcript
       </button>
-      <p style={{ fontSize: 10, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
-        {activeTrackId ? 'Generates transcript for this track' : 'Generates transcripts for all tracks'}
-      </p>
+      {!disabled && (
+        <p style={{ fontSize: 10, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
+          {activeTrackId ? 'Generates transcript for this track' : 'Generates transcripts for all tracks'}
+        </p>
+      )}
     </div>
   )
 }
