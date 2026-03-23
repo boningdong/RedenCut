@@ -150,15 +150,15 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         }
 
         // ── Delete / Backspace ─────────────────────────────────────────────
-        // If a clip region is selected: unmute it (or remove mute).
+        // If a clip region is selected: remove it.
         // If a drag-selection is active: add a mute.
         case 'Delete':
         case 'Backspace': {
-          const { selectedClipId, tracks, unmuteClip } = useTimelineStore.getState()
+          const { selectedClipId, tracks, removeClip } = useTimelineStore.getState()
           if (selectedClipId) {
             e.preventDefault()
-            console.log(`[Shortcuts] Delete — unmute clip ${selectedClipId}`)
-            unmuteClip(selectedClipId)
+            console.log(`[Shortcuts] Delete — remove clip ${selectedClipId}`)
+            removeClip(selectedClipId)
             break
           }
           if (!selection) break

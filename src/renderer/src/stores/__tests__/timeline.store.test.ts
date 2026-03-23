@@ -73,6 +73,7 @@ describe('initFromFile', () => {
 
   it('clears the undo stack on each call', () => {
     tl().initFromFile('/audio/a.mp3', 60)
+    tl().setSelectedClipId(tl().tracks[0].clips[0].id)
     tl().splitAt(30)
     expect(tl().undoStack).toHaveLength(1)
 
@@ -99,6 +100,7 @@ describe('splitAt', () => {
   })
 
   it('splits the clip at the given time', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(40)
     const clips = primaryClips()
     expect(clips).toHaveLength(2)
@@ -109,6 +111,7 @@ describe('splitAt', () => {
   })
 
   it('preserves outputStart = sourceStart after a simple split', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     const clips = primaryClips()
     expect(clips[0].outputStart).toBe(0)
@@ -116,31 +119,39 @@ describe('splitAt', () => {
   })
 
   it('pushes an entry onto the undo stack', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(25)
     expect(tl().undoStack).toHaveLength(1)
     expect(tl().undoStack[0].label).toContain('split')
   })
 
   it('does nothing when time is at the start boundary (strict <)', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(0)
     expect(primaryClips()).toHaveLength(1)
     expect(tl().undoStack).toHaveLength(0)
   })
 
   it('does nothing when time is at the end boundary (strict <)', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(100)
     expect(primaryClips()).toHaveLength(1)
     expect(tl().undoStack).toHaveLength(0)
   })
 
   it('does nothing when time falls outside all clips', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(150)
     expect(primaryClips()).toHaveLength(1)
     expect(tl().undoStack).toHaveLength(0)
   })
 
   it('can split a previously split clip', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(40)
+    // After first split, select the second clip (40–100) and split at 70
+    const secondClip = primaryClips().find((c) => c.sourceStart === 40)!
+    tl().setSelectedClipId(secondClip.id)
     tl().splitAt(70)
     const clips = primaryClips()
     expect(clips).toHaveLength(3)
@@ -303,6 +314,7 @@ describe('undo', () => {
   })
 
   it('reverts a split operation', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     expect(primaryClips()).toHaveLength(2)
     tl().undo()
@@ -331,7 +343,10 @@ describe('undo', () => {
   })
 
   it('pops the undo stack on each call', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(30)
+    const secondClip = primaryClips().find((c) => c.sourceStart === 30)!
+    tl().setSelectedClipId(secondClip.id)
     tl().splitAt(60)
     expect(tl().undoStack).toHaveLength(2)
     tl().undo()
@@ -346,6 +361,7 @@ describe('undo', () => {
   })
 
   it('reverts multiple operations in LIFO order', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(40)       // op 1: [0–40][40–100]
     tl().muteRange(SF_ID, 60, 80) // op 2: [0–40][40–60][60–80 muted][80–100]
     tl().undo()            // undo op 2
@@ -355,6 +371,7 @@ describe('undo', () => {
   })
 
   it('clears selectedClipId after undo', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().undo()
@@ -375,6 +392,7 @@ describe('redo', () => {
   })
 
   it('re-applies a split that was undone', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     tl().undo()
     expect(primaryClips()).toHaveLength(1)
@@ -409,16 +427,19 @@ describe('redo', () => {
   })
 
   it('is a no-op when the redo stack is empty', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     expect(() => tl().redo()).not.toThrow()
     expect(primaryClips()).toHaveLength(2)
   })
 
   it('clears the redo stack when a new mutation is made after undo', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     tl().undo()
     expect(tl().redoStack).toHaveLength(1)
 
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(30)
     expect(tl().redoStack).toHaveLength(0)
 
@@ -427,6 +448,7 @@ describe('redo', () => {
   })
 
   it('supports undo/redo cycling multiple times', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     for (let i = 0; i < 3; i++) {
       tl().undo()
@@ -437,6 +459,7 @@ describe('redo', () => {
   })
 
   it('pushes a redo entry back to undoStack (enabling undo after redo)', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     tl().undo()
     tl().redo()
@@ -446,7 +469,10 @@ describe('redo', () => {
   })
 
   it('multiple undos followed by multiple redos restores in correct order', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(30)  // op1: [0–30][30–100]
+    const secondClip = primaryClips().find((c) => c.sourceStart === 30)!
+    tl().setSelectedClipId(secondClip.id)
     tl().splitAt(70)  // op2: [0–30][30–70][70–100]
     tl().undo()       // undo op2
     tl().undo()       // undo op1
@@ -496,7 +522,10 @@ describe('getAllClips', () => {
   })
 
   it('returns clips sorted by outputStart', () => {
+    tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(40)
+    const midClip = primaryClips().find((c) => c.sourceStart === 40)!
+    tl().setSelectedClipId(midClip.id)
     tl().splitAt(70)
     const all = tl().getAllClips()
     for (let i = 1; i < all.length; i++) {

@@ -117,6 +117,12 @@ interface TimelineState {
   ): void
 
   /**
+   * Remove a specific clip by ID from its track.
+   * Clears selectedClipId if it matches the removed clip.
+   */
+  removeClip(clipId: string): void
+
+  /**
    * Unmute a specific clip by ID, reversing its associated transcript words.
    * If the clip is adjacent to other unmuted clips it is merged back.
    */
@@ -244,7 +250,10 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume:  1,
       muted:   false,
       solo:    false,
-      color:   TRACK_COLORS[get().tracks.length % TRACK_COLORS.length],
+      color:   (() => {
+        const used = new Set(get().tracks.map((t) => t.color))
+        return TRACK_COLORS.find((c) => !used.has(c)) ?? TRACK_COLORS[get().tracks.length % TRACK_COLORS.length]
+      })(),
       effects: [],
     }
     if (sourceFileId) {
@@ -311,6 +320,28 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     }
   },
 
+  // ── removeClip ──────────────────────────────────────────────────────────────
+  removeClip(clipId) {
+    const { tracks } = get()
+    const track = tracks.find((t) => t.clips.some((c) => c.id === clipId))
+    if (!track) {
+      console.warn(`[Timeline] removeClip — clip ${clipId} not found`)
+      return
+    }
+
+    const before = cloneTracks(tracks)
+    console.log(`[Timeline] removeClip — id=${clipId}`)
+
+    set((s) => ({
+      tracks:         s.tracks.map((t) =>
+        t.id === track.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
+      ),
+      undoStack:      [...s.undoStack, { before, wordIds: [], label: `remove clip ${clipId}` }],
+      redoStack:      [],
+      selectedClipId: s.selectedClipId === clipId ? null : s.selectedClipId,
+    }))
+  },
+
   // ── unmuteClip ──────────────────────────────────────────────────────────────
   unmuteClip(clipId, wordIds = []) {
     const { tracks } = get()
@@ -345,28 +376,34 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── splitAt ─────────────────────────────────────────────────────────────────
   splitAt(time) {
-    const { tracks, selectedTrackId } = get()
+    const { tracks, selectedClipId } = get()
+
+    if (!selectedClipId) {
+      console.log('[Timeline] splitAt — no clip selected, nothing to split')
+      return
+    }
 
     let targetTrackId: string | null = null
     let targetClip:    Clip | null   = null
 
-    // Prefer the selected track — check it first
-    const searchOrder = selectedTrackId
-      ? [
-          tracks.find((t) => t.id === selectedTrackId),
-          ...tracks.filter((t) => t.id !== selectedTrackId),
-        ].filter(Boolean) as Track[]
-      : tracks
-
-    for (const track of searchOrder) {
-      const clip = track.clips.find((c) =>
-        time > c.outputStart && time < c.outputStart + (c.sourceEnd - c.sourceStart)
-      )
-      if (clip) { targetTrackId = track.id; targetClip = clip; break }
+    for (const track of tracks) {
+      const clip = track.clips.find((c) => c.id === selectedClipId)
+      if (clip) {
+        targetTrackId = track.id
+        targetClip    = clip
+        break
+      }
     }
 
     if (!targetTrackId || !targetClip) {
-      console.log(`[Timeline] splitAt ${time.toFixed(2)}s — no clip found at this time`)
+      console.log(`[Timeline] splitAt — selected clip ${selectedClipId} not found`)
+      return
+    }
+
+    // Only split if the playhead is inside the selected clip's output range
+    const clipOutputEnd = targetClip.outputStart + (targetClip.sourceEnd - targetClip.sourceStart)
+    if (time <= targetClip.outputStart || time >= clipOutputEnd) {
+      console.log(`[Timeline] splitAt — playhead not within selected clip's output range`)
       return
     }
 

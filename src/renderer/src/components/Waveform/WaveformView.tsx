@@ -405,23 +405,24 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                   />
                 ))}
 
-              {/* Shared playhead line */}
-              <div
-                style={{
-                  position:        'absolute',
-                  top:             0,
-                  bottom:          0,
-                  left:            `${playheadPct}%`,
-                  width:           1,
-                  backgroundColor: 'rgba(255,255,255,0.7)',
-                  pointerEvents:   'none',
-                  zIndex:          30,
-                }}
-              />
             </div>
           </div>
         )
       })}
+
+      {/* Global playhead — spans ruler + all track lanes */}
+      <div
+        style={{
+          position:        'absolute',
+          top:             0,
+          bottom:          0,
+          left:            `calc(90px + (100% - 90px) * ${(playheadPct / 100).toFixed(6)})`,
+          width:           1,
+          backgroundColor: 'rgba(255,255,255,0.7)',
+          pointerEvents:   'none',
+          zIndex:          30,
+        }}
+      />
 
       {/* + Add Track row */}
       <div

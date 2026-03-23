@@ -463,6 +463,7 @@ export default function App() {
         const transcript  = await window.electronAPI.transcript.generate(sf.filePath)
         const taggedWords = transcript.words.map((w) => ({
           ...w,
+          id:           `${tId}_${w.id}`,
           sourceFileId: sf.id,
           trackId:      tId,
         }))

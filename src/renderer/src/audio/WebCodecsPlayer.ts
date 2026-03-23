@@ -197,6 +197,7 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
   // ── Track model ────────────────────────────────────────────────────────────
   private tracks: Track[] = []
+  private _tracksStructuralKey = ''
 
   // ── Playback state ─────────────────────────────────────────────────────────
   private _isPlaying    = false
@@ -420,7 +421,15 @@ export class WebCodecsPlayer implements IAudioPlayer {
       }
     }
 
-    this.restartAllDecodeLoops(this._currentTime)
+    // Only restart decode loops when track structure changes (not for volume-only updates).
+    // Restarting flushes the AudioWorklet FIFO — unnecessary for gain changes.
+    const structuralKey = JSON.stringify(this.tracks.map((t) => ({
+      id: t.id, muted: t.muted, solo: t.solo, clips: t.clips,
+    })))
+    if (structuralKey !== this._tracksStructuralKey) {
+      this._tracksStructuralKey = structuralKey
+      this.restartAllDecodeLoops(this._currentTime)
+    }
   }
 
   // ── IAudioPlayer — playback control ──────────────────────────────────────

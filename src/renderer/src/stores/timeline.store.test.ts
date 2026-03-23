@@ -40,6 +40,8 @@ describe('splitAt — after moveClip', () => {
     const clip = track.clips[0]
     // Manually move the clip to outputStart=10 by calling moveClip
     useTimelineStore.getState().moveClip(clip.id, 10)
+    // Select the clip before splitting
+    useTimelineStore.getState().setSelectedClipId(clip.id)
 
     // Now splitAt time=12 (inside the clip at output coords 10–20)
     useTimelineStore.getState().splitAt(12)
@@ -54,6 +56,7 @@ describe('splitAt — after moveClip', () => {
     const { tracks } = useTimelineStore.getState()
     const clip = tracks[0].clips[0]
     useTimelineStore.getState().moveClip(clip.id, 10)
+    useTimelineStore.getState().setSelectedClipId(clip.id)
 
     // splitAt output time=12 → offset from outputStart=10 is 2s
     // left.sourceEnd should be sourceStart(0) + 2 = 2
@@ -69,6 +72,7 @@ describe('splitAt — after moveClip', () => {
     const { tracks } = useTimelineStore.getState()
     const clip = tracks[0].clips[0]
     useTimelineStore.getState().moveClip(clip.id, 10)
+    useTimelineStore.getState().setSelectedClipId(clip.id)
 
     useTimelineStore.getState().splitAt(12)
 
@@ -83,6 +87,7 @@ describe('splitAt — after moveClip', () => {
     const { tracks } = useTimelineStore.getState()
     const clip = tracks[0].clips[0]
     useTimelineStore.getState().moveClip(clip.id, 10)
+    useTimelineStore.getState().setSelectedClipId(clip.id)
     const stackBefore = useTimelineStore.getState().undoStack.length
 
     // time === outputStart (not strictly inside clip)
