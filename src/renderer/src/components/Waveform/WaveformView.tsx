@@ -103,11 +103,9 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   const basePxPerSec = duration > 0 && viewportWidth > 0 ? viewportWidth / duration : 100
   const pxPerSec     = basePxPerSec * zoomLevel
 
-  // Call ws.zoom() whenever pxPerSec changes, skipping the first render
-  // (WaveSurfer already fills its container by default).
-  const isFirstZoom = useRef(true)
+  // Call ws.zoom() when pxPerSec changes.
+  // wsTrack0Ref is only set after the 'ready' event, so this is always safe.
   useEffect(() => {
-    if (isFirstZoom.current) { isFirstZoom.current = false; return }
     wsTrack0Ref.current?.zoom(pxPerSec)
   }, [pxPerSec])
 
@@ -629,8 +627,10 @@ function TrackWaveform({ trackId, peaks, color, trackIndex, onWsReady }: TrackWa
       getAudioPlayerInstance()?.seekTo(t)
     })
 
-    onWsReady?.(ws)
-    console.log(`[WaveformView] WaveSurfer ready for track ${trackId}`)
+    ws.on('ready', () => {
+      console.log(`[WaveformView] WaveSurfer ready for track ${trackId}`)
+      onWsReady?.(ws)
+    })
 
     return () => {
       ws.destroy()
