@@ -28,12 +28,20 @@ interface TranscriptState {
   showMutedWords: boolean
 
   /**
-   * When non-null, only words from this sourceFileId are shown.
-   * null = all tracks merged.
+   * IDs of tracks whose words are currently visible.
+   * Stored as string[] for JSON-serializability.
+   * Empty array = no tracks have transcripts yet (show nothing).
    */
-  activeTrackFilter: string | null
+  visibleTrackIds: string[]
 
-  setActiveTrackFilter: (sourceFileId: string | null) => void
+  /** Flip a track's visibility ON↔OFF. Calling twice returns to the original state. */
+  toggleTrackVisibility: (trackId: string) => void
+
+  /**
+   * Ensure a track is visible. Called after generation so the new transcript
+   * appears immediately. Idempotent — safe to call even if already visible.
+   */
+  ensureTrackVisible: (trackId: string) => void
 
   /** True while a transcription job is running. */
   isGenerating: boolean
@@ -71,8 +79,8 @@ interface TranscriptState {
 
   /**
    * Remove all words that belong to a specific track.
-   * Called when a track is deleted. Also resets activeTrackFilter if it
-   * was pointing at the deleted track.
+   * Called when a track is deleted. Atomically removes from both words
+   * and visibleTrackIds.
    */
   removeWordsForTrack: (trackId: string) => void
 
@@ -83,7 +91,7 @@ const initialState = {
   words: [] as Word[],
   selectedWordIds: new Set<string>(),
   showMutedWords: true,
-  activeTrackFilter: null as string | null,
+  visibleTrackIds: [] as string[],
   isGenerating: false,
   generatingStatus: '',
 }
@@ -118,7 +126,19 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
   toggleShowMutedWords: () =>
     set((s) => ({ showMutedWords: !s.showMutedWords })),
 
-  setActiveTrackFilter: (sourceFileId: string | null) => set({ activeTrackFilter: sourceFileId }),
+  toggleTrackVisibility: (trackId) =>
+    set((s) => ({
+      visibleTrackIds: s.visibleTrackIds.includes(trackId)
+        ? s.visibleTrackIds.filter((id) => id !== trackId)
+        : [...s.visibleTrackIds, trackId],
+    })),
+
+  ensureTrackVisible: (trackId) =>
+    set((s) => ({
+      visibleTrackIds: s.visibleTrackIds.includes(trackId)
+        ? s.visibleTrackIds
+        : [...s.visibleTrackIds, trackId],
+    })),
 
   setIsGenerating: (generating) => set({ isGenerating: generating }),
   setGeneratingStatus: (status) => set({ generatingStatus: status }),
@@ -134,8 +154,8 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
 
   removeWordsForTrack: (trackId) =>
     set((s) => ({
-      words:             s.words.filter((w) => w.trackId !== trackId),
-      activeTrackFilter: s.activeTrackFilter === trackId ? null : s.activeTrackFilter,
+      words:           s.words.filter((w) => w.trackId !== trackId),
+      visibleTrackIds: s.visibleTrackIds.filter((id) => id !== trackId),
     })),
 
   reset: () => set(initialState),
