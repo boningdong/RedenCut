@@ -52,6 +52,27 @@
   --waveform-progress-color: #818cf8;   /* played portion */
   --waveform-cursor-color:   #ffffff;
   --waveform-region-muted:   rgba(239, 68, 68, 0.20);
+
+  /* ── Alpha variants / derived tokens ─────────────────────────────────────── */
+  --color-accent-clip-border:    rgba(99, 102, 241, 0.25);
+  --color-accent-clip-bg:        rgba(99, 102, 241, 0.08);
+  --color-accent-ghost:          rgba(99, 102, 241, 0.20);
+  --color-accent-split:          rgba(99, 102, 241, 0.85);
+  --color-accent-track-btn:      rgba(99, 102, 241, 0.30);
+  --color-accent-button-bg:      rgba(99, 102, 241, 0.12);
+  --color-accent-button-border:  rgba(99, 102, 241, 0.45);
+  --color-accent-dropdown-hover: rgba(99, 102, 241, 0.10);
+  --color-accent-light:          #a5b4fc;
+  --color-danger-clip-bg:        rgba(239, 68, 68, 0.22);
+  --color-danger-track-btn:      rgba(239, 68, 68, 0.30);
+  --color-danger-word:           rgba(239, 68, 68, 0.90);
+  --color-warning:               rgba(251, 146, 60, 0.85);
+  --color-warning-muted:         rgba(251, 146, 60, 0.12);
+  --color-playhead:              rgba(255, 255, 255, 0.70);
+  --color-scrim:                 rgba(0, 0, 0, 0.60);
+  --shadow-dropdown:             0 4px 12px rgba(0, 0, 0, 0.35);
+  --color-text-on-accent:        #ffffff;
+  --waveform-color-muted:        rgba(239, 68, 68, 0.60);
 }
 
 /* ── Base resets ─────────────────────────────────────────────────────────── */

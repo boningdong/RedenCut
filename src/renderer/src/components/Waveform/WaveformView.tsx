@@ -462,10 +462,10 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                           borderRadius:    3,
                           border:          clip.id === selectedClipId
                             ? '1px solid var(--color-accent)'
-                            : '1px solid rgba(99, 102, 241, 0.25)',
+                            : '1px solid var(--color-accent-clip-border)',
                           backgroundColor: clip.muted
-                            ? 'rgba(239, 68, 68, 0.22)'
-                            : 'rgba(99, 102, 241, 0.08)',
+                            ? 'var(--color-danger-clip-bg)'
+                            : 'var(--color-accent-clip-bg)',
                           opacity:         isDragging ? 0.4 : 1,
                           cursor:          'grab',
                           pointerEvents:   'all',
@@ -498,7 +498,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                         bottom:          4,
                         borderRadius:    3,
                         border:          '1px dashed var(--color-accent)',
-                        backgroundColor: 'rgba(99,102,241,0.2)',
+                        backgroundColor: 'var(--color-accent-ghost)',
                         pointerEvents:   'none',
                         zIndex:          20,
                       }}
@@ -546,7 +546,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                             ? `calc(${(clip.outputStart / duration) * 100}% - 1px)`
                             : '0',
                           width:           2,
-                          backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                          backgroundColor: 'var(--color-accent-split)',
                           pointerEvents:   'none',
                           zIndex:          10,
                         }}
@@ -565,7 +565,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                 bottom:          0,
                 left:            `${playheadPct}%`,
                 width:           1,
-                backgroundColor: 'rgba(255,255,255,0.7)',
+                backgroundColor: 'var(--color-playhead)',
                 pointerEvents:   'none',
                 zIndex:          30,
               }}
@@ -699,7 +699,7 @@ const ClipWaveform = React.memo(function ClipWaveform({ peaks, sourceStart, sour
       viewBox={`0 0 ${viewW} ${H}`}
       preserveAspectRatio="none"
     >
-      <g fill={muted ? 'rgba(239,68,68,0.6)' : (color + 'cc')}>
+      <g fill={muted ? 'var(--waveform-color-muted)' : (color + 'cc')}>
         {clipPeaks.map((v, i) => {
           const bh = Math.max(2, v * H)
           const y  = (H - bh) / 2

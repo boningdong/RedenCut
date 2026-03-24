@@ -370,9 +370,9 @@ export function TranscriptPanel({
                 padding:      '2px 8px',
                 borderRadius: 4,
                 fontSize:     10,
-                border:       `1px solid ${allGenerated ? 'var(--color-border)' : 'rgba(99,102,241,0.45)'}`,
-                background:   allGenerated ? 'var(--color-bg-elevated)' : 'rgba(99,102,241,0.12)',
-                color:        allGenerated ? 'var(--color-text-muted)' : '#a5b4fc',
+                border:       `1px solid ${allGenerated ? 'var(--color-border)' : 'var(--color-accent-button-border)'}`,
+                background:   allGenerated ? 'var(--color-bg-elevated)' : 'var(--color-accent-button-bg)',
+                color:        allGenerated ? 'var(--color-text-muted)' : 'var(--color-accent-light)',
                 cursor:       allGenerated ? 'not-allowed' : 'pointer',
                 opacity:      allGenerated ? 0.5 : 1,
               }}
@@ -399,7 +399,7 @@ export function TranscriptPanel({
                     padding:      '3px 0',
                     zIndex:       50,
                     minWidth:     140,
-                    boxShadow:    '0 4px 12px rgba(0,0,0,0.35)',
+                    boxShadow:    'var(--shadow-dropdown)',
                   }}
                 >
                   {ungeneratedTracks.map((track) => (
@@ -419,7 +419,7 @@ export function TranscriptPanel({
                         cursor:     'pointer',
                         textAlign:  'left',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(99,102,241,0.1)')}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                     >
                       <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: track.color, flexShrink: 0 }} />
@@ -435,13 +435,13 @@ export function TranscriptPanel({
                       padding:    '4px 10px',
                       background: 'none',
                       border:     'none',
-                      color:      '#a5b4fc',
+                      color:      'var(--color-accent-light)',
                       fontSize:   10,
                       cursor:     'pointer',
                       textAlign:  'left',
                       fontWeight: 500,
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(99,102,241,0.1)')}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                   >
                     🤖 {tracksWithTranscript.length === 0 ? 'All tracks' : 'All remaining'}
@@ -504,16 +504,16 @@ export function TranscriptPanel({
 
             if (isCurrent) {
               bg        = 'var(--color-accent)'
-              wordColor = '#fff'
+              wordColor = 'var(--color-text-on-accent)'
             } else if (word.muted) {
               // Type a: explicitly deleted via transcript editing
               decoration = 'line-through'
               opacity    = 0.45
-              wordColor  = 'rgba(239, 68, 68, 0.9)'
+              wordColor  = 'var(--color-danger-word)'
             } else if (clipState === 'clip-muted') {
               // Type b: whole clip muted via 'M' key — audio is silenced as a block
-              bg        = 'rgba(251, 146, 60, 0.12)'
-              wordColor = 'rgba(251, 146, 60, 0.85)'
+              bg        = 'var(--color-warning-muted)'
+              wordColor = 'var(--color-warning)'
             } else if (clipState === 'no-clip') {
               // Type c: clip was deleted — word produces no audio at all
               decoration = 'line-through'

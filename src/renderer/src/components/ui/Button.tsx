@@ -40,7 +40,7 @@ export function Button({
     ...(variant === 'primary'
       ? {
           backgroundColor: 'var(--color-accent)',
-          color: '#ffffff',
+          color: 'var(--color-text-on-accent)',
         }
       : {
           backgroundColor: 'var(--color-bg-elevated)',

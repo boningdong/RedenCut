@@ -61,7 +61,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
       style={{
         position:        'fixed',
         inset:           0,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'var(--color-scrim)',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
@@ -153,7 +153,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
           <button
             onClick={handleExport}
             disabled={!outputPath || isExporting || exportState.status === 'done'}
-            style={{ background: 'var(--color-accent)', border: 'none', borderRadius: 4, color: '#fff', fontSize: 'var(--text-xs)', padding: '6px 14px', cursor: 'pointer', opacity: (!outputPath || isExporting) ? 0.5 : 1 }}
+            style={{ background: 'var(--color-accent)', border: 'none', borderRadius: 4, color: 'var(--color-text-on-accent)', fontSize: 'var(--text-xs)', padding: '6px 14px', cursor: 'pointer', opacity: (!outputPath || isExporting) ? 0.5 : 1 }}
           >
             {isExporting ? 'Exporting…' : 'Export'}
           </button>
