@@ -360,6 +360,9 @@ export default function App() {
           trackId: w.trackId ?? actualFirstTrackId,
         }))
         setWords(withTrackId)
+        // Make all tracks that have words visible immediately on open
+        const distinctTrackIds = [...new Set(withTrackId.map((w) => w.trackId).filter(Boolean) as string[])]
+        for (const tId of distinctTrackIds) ensureTrackVisible(tId)
       }
 
       // false = don't call initFromFile — timeline is already set above
@@ -367,7 +370,7 @@ export default function App() {
       setIsDirty(false)
     } catch (err) { handleError(err) }
   }, [loadAudio, handleError, resetEditor, resetTranscript, resetTimeline,
-      setProjectPath, setProject, setWords, setIsDirty])
+      setProjectPath, setProject, setWords, setIsDirty, ensureTrackVisible])
 
   // ── Build project snapshot ────────────────────────────────────────────────
   const buildProject = useCallback((): ProjectFile | null => {
