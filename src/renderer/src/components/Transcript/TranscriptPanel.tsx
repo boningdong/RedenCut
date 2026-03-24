@@ -160,6 +160,14 @@ export function TranscriptPanel({
     shiftTimestamps(offset)
   }, [words, currentTime, shiftTimestamps])
 
+  // ── Clip state map — computed once per words+tracks change ───────────────
+  // Declared here (before handleDeleteFromSelection) to avoid temporal dead zone.
+  const clipStateMap = useMemo(() => {
+    const m = new Map<string, WordClipState>()
+    for (const w of words) m.set(w.id, getWordClipState(w, tracks))
+    return m
+  }, [words, tracks])
+
   // ── Delete/Backspace: mute the words that intersect the native selection ──
   const handleDeleteFromSelection = useCallback(() => {
     const sel = window.getSelection()
@@ -221,13 +229,6 @@ export function TranscriptPanel({
     },
     [handleDeleteFromSelection],
   )
-
-  // ── Clip state map — computed once per words+tracks change ───────────────
-  const clipStateMap = useMemo(() => {
-    const m = new Map<string, WordClipState>()
-    for (const w of words) m.set(w.id, getWordClipState(w, tracks))
-    return m
-  }, [words, tracks])
 
   // ── Render ────────────────────────────────────────────────────────────────
   const visibleWords = useMemo(() => words
