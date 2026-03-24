@@ -2,10 +2,13 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './styles/globals.css'
+import { applyTheme } from './stores/theme.store'
+import type { ThemeName } from './stores/theme.store'
 
-// Mount the React app into the #root div defined in index.html.
-// StrictMode deliberately double-invokes effects in development to help
-// surface bugs — you may see useEffect run twice in dev; this is expected.
+// Apply saved theme synchronously before React renders — prevents FOUC in Electron.
+const savedTheme = (localStorage.getItem('theme') as ThemeName | null) ?? 'dark'
+applyTheme(savedTheme)
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
