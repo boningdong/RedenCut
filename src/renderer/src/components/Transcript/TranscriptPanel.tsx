@@ -183,17 +183,25 @@ export function TranscriptPanel({
     })
     if (selected.length === 0) return
 
-    const start   = Math.min(...selected.map((w) => w.start))
-    const end     = Math.max(...selected.map((w) => w.end))
-    const wordIds = selected.map((w) => w.id)
+    // Group by trackId — muteRange is track-scoped so each track gets its own call.
+    // This correctly handles mixed-track selections and prevents a mute on track 2
+    // from landing on track 1 (which happened when routing by sourceFileId, since
+    // multiple tracks can share the same source file).
+    const byTrack = new Map<string, typeof selected>()
+    for (const w of selected) {
+      if (!w.trackId) continue   // legacy words without trackId — skip
+      const arr = byTrack.get(w.trackId) ?? []
+      arr.push(w)
+      byTrack.set(w.trackId, arr)
+    }
 
-    // Mute via timeline.store — route to the correct source file using the
-    // word's own sourceFileId. Using routingTrack?.clips[0]?.sourceFileId was
-    // wrong: a clip's sourceFileId may be shared across tracks, causing the
-    // mute to land on the wrong track.
-    const { sourceFiles: sfList, muteRange } = useTimelineStore.getState()
-    const sfId = selected[0]?.sourceFileId ?? sfList[0]?.id
-    if (sfId) muteRange(sfId, start, end, wordIds)
+    const { muteRange } = useTimelineStore.getState()
+    for (const [trackId, tWords] of byTrack) {
+      const tStart   = Math.min(...tWords.map((w) => w.start))
+      const tEnd     = Math.max(...tWords.map((w) => w.end))
+      const tWordIds = tWords.map((w) => w.id)
+      muteRange(trackId, tStart, tEnd, tWordIds)
+    }
     sel.removeAllRanges()
     setSelection(null)
   }, [words, setSelection, clipStateMap])

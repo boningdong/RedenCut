@@ -105,17 +105,20 @@ interface TimelineState {
   // ── Clip operations ────────────────────────────────────────────────────────
 
   /**
-   * Mute all clips within [startTime, endTime] on the track that owns
-   * the given sourceFileId. Clips are split at the boundaries so the region
-   * can be independently muted/unmuted.
+   * Mute all clips within [startTime, endTime] on the given track.
+   * Clips are split at the boundaries so the region can be independently
+   * muted/unmuted.
+   *
+   * Routes by trackId, NOT sourceFileId — a source file may be referenced
+   * by multiple tracks, so routing by sourceFileId would mute the wrong track.
    *
    * @param wordIds  Transcript word IDs muted together with this operation.
    */
   muteRange(
-    sourceFileId: string,
-    startTime:    number,
-    endTime:      number,
-    wordIds?:     string[],
+    trackId:   string,
+    startTime: number,
+    endTime:   number,
+    wordIds?:  string[],
   ): void
 
   /**
@@ -290,18 +293,18 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   // ── muteRange ───────────────────────────────────────────────────────────────
-  muteRange(sourceFileId, startTime, endTime, wordIds = []) {
+  muteRange(trackId, startTime, endTime, wordIds = []) {
     const { tracks } = get()
-    const track = tracks.find((t) => t.clips.some((c) => c.sourceFileId === sourceFileId))
+    const track = tracks.find((t) => t.id === trackId)
     if (!track) {
-      console.warn(`[Timeline] muteRange — no track found for sourceFileId=${sourceFileId}`)
+      console.warn(`[Timeline] muteRange — no track found for trackId=${trackId}`)
       return
     }
 
     // Snapshot before mutation
     const before = cloneTracks(tracks)
 
-    const newClips = splitAndMute(track.clips, startTime, endTime, track.id, sourceFileId)
+    const newClips = splitAndMute(track.clips, startTime, endTime, track.id)
 
     console.log(
       `[Timeline] muteRange [${startTime.toFixed(2)}s–${endTime.toFixed(2)}s]` +
@@ -565,11 +568,10 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
  * segment, then mark all clips within that range as muted.
  */
 function splitAndMute(
-  clips:        Clip[],
-  startTime:    number,
-  endTime:      number,
-  trackId:      string,
-  sourceFileId: string,
+  clips:     Clip[],
+  startTime: number,
+  endTime:   number,
+  trackId:   string,
 ): Clip[] {
   const result: Clip[] = []
 
@@ -594,12 +596,11 @@ function splitAndMute(
       })
     }
 
-    // The muted segment
+    // The muted segment — trackId updated; sourceFileId inherited from ...clip
     result.push({
       ...clip,
       id:          nextId('clip'),
       trackId,
-      sourceFileId,
       sourceStart:  effectiveMuteStart,
       sourceEnd:    effectiveMuteEnd,
       outputStart:  effectiveMuteStart,

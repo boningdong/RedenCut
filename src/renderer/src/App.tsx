@@ -340,13 +340,13 @@ export default function App() {
       } else {
         // Legacy project: create a single-file timeline from source + edits[]
         useTimelineStore.getState().initFromFile(project.source.file, project.source.durationSeconds)
-        for (const edit of project.edits) {
-          if (edit.type === 'mute') {
-            useTimelineStore.getState().muteRange(
-              project.source.file,
-              edit.start,
-              edit.end,
-            )
+        // Legacy migration: single-file project — the one track is always tracks[0]
+        const legacyTrackId = useTimelineStore.getState().tracks[0]?.id
+        if (legacyTrackId) {
+          for (const edit of project.edits) {
+            if (edit.type === 'mute') {
+              useTimelineStore.getState().muteRange(legacyTrackId, edit.start, edit.end)
+            }
           }
         }
         console.log(`[App] opened legacy project — migrated ${project.edits.length} edits to clips`)

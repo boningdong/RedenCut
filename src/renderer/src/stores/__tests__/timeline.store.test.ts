@@ -163,6 +163,13 @@ describe('splitAt', () => {
   })
 })
 
+/** Returns the track ID of the primary (first) track. */
+function primaryTrackId() {
+  const { tracks } = tl()
+  if (tracks.length === 0) throw new Error('No tracks')
+  return tracks[0].id
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // muteRange
 // ══════════════════════════════════════════════════════════════════════════════
@@ -176,7 +183,7 @@ describe('muteRange', () => {
   })
 
   it('creates a muted clip in the middle of an unmuted clip', () => {
-    tl().muteRange(SF_ID, 20, 60)
+    tl().muteRange(primaryTrackId(), 20, 60)
     const clips = primaryClips()
     // Expected: [0–20 unmuted] [20–60 muted] [60–100 unmuted]
     expect(clips).toHaveLength(3)
@@ -187,7 +194,7 @@ describe('muteRange', () => {
   })
 
   it('produces only two clips when muting from the start', () => {
-    tl().muteRange(SF_ID, 0, 30)
+    tl().muteRange(primaryTrackId(), 0, 30)
     const clips = primaryClips()
     expect(clips).toHaveLength(2)
     expect(clips[0].muted).toBe(true)
@@ -198,7 +205,7 @@ describe('muteRange', () => {
   })
 
   it('produces only two clips when muting to the end', () => {
-    tl().muteRange(SF_ID, 70, 100)
+    tl().muteRange(primaryTrackId(), 70, 100)
     const clips = primaryClips()
     expect(clips).toHaveLength(2)
     expect(clips[0].muted).toBe(false)
@@ -207,7 +214,7 @@ describe('muteRange', () => {
   })
 
   it('pushes to undo stack with the mute range label', () => {
-    tl().muteRange(SF_ID, 10, 50)
+    tl().muteRange(primaryTrackId(), 10, 50)
     expect(tl().undoStack).toHaveLength(1)
     expect(tl().undoStack[0].label).toContain('mute')
   })
@@ -218,7 +225,7 @@ describe('muteRange', () => {
       makeWord('w2', 35, 45),
       makeWord('w3', 80, 90),
     ])
-    tl().muteRange(SF_ID, 20, 60, ['w1', 'w2'])
+    tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     // Undo stack should carry the word IDs
     expect(tl().undoStack[0].wordIds).toEqual(['w1', 'w2'])
     // Transcript store should reflect the mute
@@ -228,14 +235,14 @@ describe('muteRange', () => {
     expect(words.find((w) => w.id === 'w3')!.muted).toBe(false)
   })
 
-  it('does nothing when sourceFileId is not registered', () => {
-    tl().muteRange('unknown-source', 10, 50)
+  it('does nothing when trackId is not registered', () => {
+    tl().muteRange('unknown-track-id', 10, 50)
     expect(primaryClips()).toHaveLength(1)
     expect(tl().undoStack).toHaveLength(0)
   })
 
   it('keeps all clips contiguous (no gaps) after muting', () => {
-    tl().muteRange(SF_ID, 30, 70)
+    tl().muteRange(primaryTrackId(), 30, 70)
     const clips = primaryClips().sort((a, b) => a.sourceStart - b.sourceStart)
     for (let i = 1; i < clips.length; i++) {
       expect(clips[i].sourceStart).toBeCloseTo(clips[i - 1].sourceEnd, 6)
@@ -256,14 +263,14 @@ describe('unmuteClip', () => {
   })
 
   it('unmutes a muted clip by ID', () => {
-    tl().muteRange(SF_ID, 20, 60)
+    tl().muteRange(primaryTrackId(), 20, 60)
     const mutedClip = primaryClips().find((c) => c.muted)!
     tl().unmuteClip(mutedClip.id)
     expect(primaryClips().every((c) => !c.muted)).toBe(true)
   })
 
   it('merges adjacent unmuted clips after unmuting', () => {
-    tl().muteRange(SF_ID, 20, 60)
+    tl().muteRange(primaryTrackId(), 20, 60)
     const mutedClip = primaryClips().find((c) => c.muted)!
     tl().unmuteClip(mutedClip.id)
     // After unmute + merge the three clips should collapse back to one
@@ -277,7 +284,7 @@ describe('unmuteClip', () => {
       makeWord('w1', 22, 30, true),
       makeWord('w2', 35, 45, true),
     ])
-    tl().muteRange(SF_ID, 20, 60, ['w1', 'w2'])
+    tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     const mutedClip = primaryClips().find((c) => c.muted)!
     tl().unmuteClip(mutedClip.id)
     const { words } = useTranscriptStore.getState()
@@ -287,7 +294,7 @@ describe('unmuteClip', () => {
   })
 
   it('clears selectedClipId', () => {
-    tl().muteRange(SF_ID, 20, 60)
+    tl().muteRange(primaryTrackId(), 20, 60)
     const mutedClip = primaryClips().find((c) => c.muted)!
     tl().setSelectedClipId(mutedClip.id)
     tl().unmuteClip(mutedClip.id)
@@ -324,7 +331,7 @@ describe('undo', () => {
   })
 
   it('reverts a muteRange operation', () => {
-    tl().muteRange(SF_ID, 20, 60)
+    tl().muteRange(primaryTrackId(), 20, 60)
     tl().undo()
     expect(primaryClips()).toHaveLength(1)
     expect(primaryClips()[0].muted).toBe(false)
@@ -335,7 +342,7 @@ describe('undo', () => {
       makeWord('w1', 22, 30),
       makeWord('w2', 35, 45),
     ])
-    tl().muteRange(SF_ID, 20, 60, ['w1', 'w2'])
+    tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     tl().undo()
     const { words } = useTranscriptStore.getState()
     expect(words.find((w) => w.id === 'w1')!.muted).toBe(false)
@@ -363,7 +370,7 @@ describe('undo', () => {
   it('reverts multiple operations in LIFO order', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(40)       // op 1: [0–40][40–100]
-    tl().muteRange(SF_ID, 60, 80) // op 2: [0–40][40–60][60–80 muted][80–100]
+    tl().muteRange(primaryTrackId(), 60, 80) // op 2: [0–40][40–60][60–80 muted][80–100]
     tl().undo()            // undo op 2
     expect(primaryClips()).toHaveLength(2)
     tl().undo()            // undo op 1
@@ -403,7 +410,7 @@ describe('redo', () => {
   })
 
   it('re-applies a muteRange that was undone', () => {
-    tl().muteRange(SF_ID, 20, 60)
+    tl().muteRange(primaryTrackId(), 20, 60)
     tl().undo()
     expect(primaryClips().every((c) => !c.muted)).toBe(true)
     tl().redo()
@@ -418,7 +425,7 @@ describe('redo', () => {
       makeWord('w1', 22, 30),
       makeWord('w2', 35, 45),
     ])
-    tl().muteRange(SF_ID, 20, 60, ['w1', 'w2'])
+    tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     tl().undo()
     expect(useTranscriptStore.getState().words.find((w) => w.id === 'w1')!.muted).toBe(false)
     tl().redo()
