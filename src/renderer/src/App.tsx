@@ -92,6 +92,7 @@ export default function App() {
   const setWords            = useTranscriptStore((s) => s.setWords)
   const setIsGenerating     = useTranscriptStore((s) => s.setIsGenerating)
   const setGeneratingStatus = useTranscriptStore((s) => s.setGeneratingStatus)
+  const ensureTrackVisible  = useTranscriptStore((s) => s.ensureTrackVisible)
   const resetTranscript     = useTranscriptStore((s) => s.reset)
 
   // Timeline store
@@ -486,10 +487,13 @@ export default function App() {
         currentWords = mergeTrackWords(currentWords, tagged, tId, firstSf?.id)
       }
       setWords(currentWords)
+      for (const tId of taggedByTrack.keys()) {
+        ensureTrackVisible(tId)
+      }
       setIsDirty(true)
     } catch (err) { handleError(err) }
     finally { setIsGenerating(false); setGeneratingStatus('') }
-  }, [setIsGenerating, setGeneratingStatus, setWords, setIsDirty, handleError])
+  }, [setIsGenerating, setGeneratingStatus, setWords, setIsDirty, handleError, ensureTrackVisible])
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useKeyboardShortcuts({ onSave: handleSave })
