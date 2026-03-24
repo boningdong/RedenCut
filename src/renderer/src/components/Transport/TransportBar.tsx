@@ -15,6 +15,7 @@ import { useEditorStore } from '../../stores/editor.store'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { Button } from '../ui/Button'
+import { useThemeStore } from '../../stores/theme.store'
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -31,6 +32,9 @@ export function TransportBar() {
 
   const previewMode       = useEditorStore((s) => s.previewMode)
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode)
+
+  const theme    = useThemeStore((s) => s.theme)
+  const setTheme = useThemeStore((s) => s.setTheme)
 
   const handlePlayPause = useCallback(async () => {
     const player = getAudioPlayerInstance()
@@ -143,6 +147,26 @@ export function TransportBar() {
           }}
         />
         Preview
+      </button>
+
+      {/* Theme toggle */}
+      <button
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        style={{
+          background:   'none',
+          border:       '1px solid var(--color-border)',
+          borderRadius: 6,
+          cursor:       'pointer',
+          padding:      '0 10px',
+          height:       28,
+          fontSize:     14,
+          color:        'var(--color-text-muted)',
+          display:      'flex',
+          alignItems:   'center',
+        }}
+      >
+        {theme === 'dark' ? '☀' : '🌙'}
       </button>
     </div>
   )
