@@ -125,16 +125,33 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     return player.onTimeUpdate((t) => {
       if (!previewModeRef.current) return
       const { tracks: currentTracks } = useTimelineStore.getState()
-      const hit = currentTracks.flatMap((tr) => tr.clips as Clip[]).find((c) => {
-        if (!c.muted) return false
-        const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-        return t >= c.outputStart && t < outputEnd
-      })
-      if (hit) {
-        const outputEnd = hit.outputStart + (hit.sourceEnd - hit.sourceStart)
-        console.log(`[WaveformView] preview skip t=${t.toFixed(2)}s → ${outputEnd.toFixed(2)}s`)
-        getAudioPlayerInstance()?.seekTo(outputEnd)
+
+      // Skip only when ALL tracks are silent at t — i.e. no track has an
+      // unmuted clip whose output range covers the current time.
+      const anyAudible = currentTracks.some((tr) =>
+        tr.clips.some((c) => {
+          if (c.muted) return false
+          const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
+          return t >= c.outputStart && t < outputEnd
+        }),
+      )
+      if (anyAudible) return
+
+      // All tracks silent — find the earliest future time any track resumes.
+      let nextAudible = Infinity
+      for (const tr of currentTracks) {
+        for (const c of tr.clips) {
+          if (!c.muted && c.outputStart > t) {
+            nextAudible = Math.min(nextAudible, c.outputStart)
+          }
+        }
       }
+
+      if (nextAudible < Infinity) {
+        console.log(`[WaveformView] preview skip t=${t.toFixed(2)}s → ${nextAudible.toFixed(2)}s`)
+        getAudioPlayerInstance()?.seekTo(nextAudible)
+      }
+      // If nextAudible === Infinity, no more audible content — play to end naturally.
     })
   }, [])
 
