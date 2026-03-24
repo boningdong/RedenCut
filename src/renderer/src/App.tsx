@@ -459,7 +459,11 @@ export default function App() {
       const track = currentTracks.find((t) => t.id === trackId)
       if (track) addTargetsForTrack(track)
     } else {
-      for (const track of currentTracks) addTargetsForTrack(track)
+      // "All remaining" — skip tracks that already have a generated transcript
+      const existingWords = useTranscriptStore.getState().words
+      for (const track of currentTracks) {
+        if (!existingWords.some((w) => w.trackId === track.id)) addTargetsForTrack(track)
+      }
     }
     if (targets.length === 0) return
 

@@ -141,9 +141,11 @@ export function TranscriptPanel({
   const handleWordClick = useCallback(
     (e: React.MouseEvent, word: Word) => {
       e.stopPropagation()
-      if (duration > 0) getAudioPlayerInstance()?.seekTo(word.start)
+      // Seek to the word's output-timeline position so the playhead lands at
+      // the correct time even when clips have been repositioned.
+      if (duration > 0) getAudioPlayerInstance()?.seekTo(getWordOutputTime(word, tracks))
     },
-    [duration],
+    [duration, tracks],
   )
 
   // ── Manual timestamp calibration ─────────────────────────────────────────
@@ -167,7 +169,9 @@ export function TranscriptPanel({
 
     const selected = words.filter((w) => {
       const el = wordEls.current.get(w.id)
-      return el != null && range.intersectsNode(el)
+      const cs = clipStateMap.get(w.id)
+      // Exclude no-clip words — their clip is gone so they cannot be muted
+      return el != null && range.intersectsNode(el) && cs !== 'no-clip'
     })
     if (selected.length === 0) return
 
@@ -175,20 +179,16 @@ export function TranscriptPanel({
     const end     = Math.max(...selected.map((w) => w.end))
     const wordIds = selected.map((w) => w.id)
 
-    // Mute via timeline.store — route to the correct source file per word.
-    // Routing is always word-driven: no filter state involved.
+    // Mute via timeline.store — route to the correct source file using the
+    // word's own sourceFileId. Using routingTrack?.clips[0]?.sourceFileId was
+    // wrong: a clip's sourceFileId may be shared across tracks, causing the
+    // mute to land on the wrong track.
     const { sourceFiles: sfList, muteRange } = useTimelineStore.getState()
-    const { tracks: tList } = useTimelineStore.getState()
-    const routingTrack = selected[0]?.trackId
-      ? tList.find((t) => t.id === selected[0].trackId)
-      : null
-    const sfId = routingTrack?.clips[0]?.sourceFileId
-              ?? selected[0]?.sourceFileId
-              ?? sfList[0]?.id
+    const sfId = selected[0]?.sourceFileId ?? sfList[0]?.id
     if (sfId) muteRange(sfId, start, end, wordIds)
     sel.removeAllRanges()
     setSelection(null)
-  }, [words, setSelection])
+  }, [words, setSelection, clipStateMap])
 
   // ── Keyboard handler on the contentEditable container ────────────────────
   const handleKeyDown = useCallback(
