@@ -22,7 +22,7 @@ const themes: Record<ThemeName, Record<string, string>> = {
 export function applyTheme(name: ThemeName): void {
   const root = document.documentElement
   for (const [key, val] of Object.entries(themes[name])) {
-    root.style.setProperty(key, val)
+    root.style.setProperty(`--${key}`, val)
   }
 }
 
