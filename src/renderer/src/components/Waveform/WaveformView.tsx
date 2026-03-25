@@ -109,11 +109,34 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     wsTrack0Ref.current?.zoom(pxPerSec)
   }, [pxPerSec])
 
+  const MIN_ZOOM = 1 / 32  // symmetrical with max zoom-in of 32×
+
   const handleZoomIn  = useCallback(() => setZoomLevel((z) => Math.min(32, z * 2)), [])
-  const handleZoomOut = useCallback(() => setZoomLevel((z) => Math.max(1, z / 2)), [])
+  const handleZoomOut = useCallback(() => setZoomLevel((z) => Math.max(MIN_ZOOM, z / 2)), [])
+
+  // ── Scroll-to-zoom (imperative — must be non-passive to call preventDefault) ──
+  useEffect(() => {
+    const el = scrollViewportRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      // Horizontal trackpad swipe — let native overflow-x:auto handle pan
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      // Vertical scroll / pinch → zoom
+      e.preventDefault()
+      const factor = e.deltaY > 0 ? 1 / 1.2 : 1.2
+      setZoomLevel((z) => Math.min(32, Math.max(MIN_ZOOM, z * factor)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])  // setZoomLevel is stable; MIN_ZOOM is a constant
+
+  // scaleFactor compresses clip positions when zoomed out below 1×.
+  // At zoomLevel ≥ 1 it equals 1 (no change). At zoomLevel < 1 clips scale
+  // proportionally so a larger time span is visible in the full-width viewport.
+  const scaleFactor = Math.min(1, zoomLevel)
 
   // ── Shared playhead position ──────────────────────────────────────────────
-  const playheadPct = duration > 0 ? (currentTime / duration) * 100 : 0
+  const playheadPct = duration > 0 ? (currentTime / duration) * scaleFactor * 100 : 0
 
   // ── Preview mode skip ─────────────────────────────────────────────────────
   const previewModeRef = useRef(previewMode)
@@ -208,16 +231,17 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   ) => {
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
+    const sf = Math.min(1, zoomLevel)
     dragRef.current = {
       clipId:    clip.id,
       origStart: clip.outputStart,
-      ghostPct:  duration > 0 ? (clip.outputStart / duration) * 100 : 0,
+      ghostPct:  duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0,
       trackId:   clip.trackId,
       startX:    e.clientX,
     }
-    const widthPct = duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * 100 : 0
-    setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * 100 : 0, widthPct })
-  }, [duration])
+    const widthPct = duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * sf * 100 : 0
+    setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0, widthPct })
+  }, [duration, zoomLevel])
 
   const handleClipPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return
@@ -231,9 +255,9 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
   const handleClipPointerUp = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current || !ghostState) { dragRef.current = null; setGhostState(null); return }
-    const laneEl = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
-    const laneW  = laneEl?.getBoundingClientRect().width ?? 1
-    const newOutputStart = (ghostState.pct / 100) * duration
+    const sf = Math.min(1, zoomLevel)
+    // Recover actual output time from ghost pct (reverse of the scaleFactor encoding)
+    const newOutputStart = (ghostState.pct / 100) * (duration / sf)
 
     const { tracks: allTracks } = useTimelineStore.getState()
     const allEdges = allTracks.flatMap((t) =>
@@ -244,7 +268,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
           c.outputStart + (c.sourceEnd - c.sourceStart),
         ])
     )
-    const snapThresholdSec = (5 / laneW) * duration
+    const snapThresholdSec = 5 / pxPerSec  // always 5px in screen space
     const clipped = allTracks
       .flatMap((t) => t.clips)
       .find((c) => c.id === dragRef.current!.clipId)
@@ -255,10 +279,26 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       if (Math.abs(newOutputStart + clipDur - edge) < snapThresholdSec) { snapped = edge - clipDur; break }
     }
 
-    moveClip(dragRef.current.clipId, Math.max(0, snapped))
+    // Same-track overlap prevention — push to nearest non-overlapping edge
+    const sameTrack = allTracks.find((t) => t.id === dragRef.current!.trackId)
+    const others    = sameTrack?.clips.filter((c) => c.id !== dragRef.current!.clipId) ?? []
+    let finalStart = Math.max(0, snapped)
+    for (const other of others) {
+      const otherEnd = other.outputStart + (other.sourceEnd - other.sourceStart)
+      const myEnd    = finalStart + clipDur
+      if (finalStart < otherEnd && myEnd > other.outputStart) {
+        const moveRight = otherEnd - finalStart
+        const moveLeft  = myEnd - other.outputStart
+        finalStart = moveRight <= moveLeft
+          ? otherEnd
+          : Math.max(0, other.outputStart - clipDur)
+      }
+    }
+
+    moveClip(dragRef.current.clipId, finalStart)
     dragRef.current = null
     setGhostState(null)
-  }, [ghostState, duration, moveClip])
+  }, [ghostState, duration, zoomLevel, pxPerSec, moveClip])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -299,18 +339,18 @@ export function WaveformView({ peaks }: WaveformViewProps) {
           >
             <button
               onClick={handleZoomOut}
-              disabled={zoomLevel <= 1}
+              disabled={zoomLevel <= MIN_ZOOM}
               title="Zoom out"
               style={{
                 background: 'none',
                 border:     '1px solid var(--color-border)',
                 borderRadius: 2,
-                color:      zoomLevel <= 1 ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
+                color:      zoomLevel <= MIN_ZOOM ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
                 fontSize:   10,
                 lineHeight:  1,
-                cursor:     zoomLevel <= 1 ? 'not-allowed' : 'pointer',
+                cursor:     zoomLevel <= MIN_ZOOM ? 'not-allowed' : 'pointer',
                 padding:    '1px 3px',
-                opacity:    zoomLevel <= 1 ? 0.4 : 1,
+                opacity:    zoomLevel <= MIN_ZOOM ? 0.4 : 1,
               }}
             >
               −
@@ -324,7 +364,11 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {zoomLevel === 1 ? 'fit' : `${zoomLevel}×`}
+              {zoomLevel === 1
+                ? 'fit'
+                : zoomLevel > 1
+                  ? `${zoomLevel}×`
+                  : `1/${Math.round(1 / zoomLevel)}×`}
             </span>
             <button
               onClick={handleZoomIn}
@@ -440,8 +484,8 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                   {/* Clip blocks */}
                   {track.clips.map((clip) => {
                     const clipDur    = clip.sourceEnd - clip.sourceStart
-                    const leftPct    = duration > 0 ? (clip.outputStart / duration) * 100 : 0
-                    const widthPct   = duration > 0 ? (clipDur / duration) * 100 : 0
+                    const leftPct    = duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
+                    const widthPct   = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
                     const isDragging = dragRef.current?.clipId === clip.id
                     return (
                       <div
@@ -512,8 +556,8 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                       const clipEnd   = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
                       const nextStart = sorted[i + 1].outputStart
                       if (nextStart <= clipEnd + 0.001) return []
-                      const leftPct  = duration > 0 ? (clipEnd / duration) * 100 : 0
-                      const widthPct = duration > 0 ? ((nextStart - clipEnd) / duration) * 100 : 0
+                      const leftPct  = duration > 0 ? (clipEnd / duration) * scaleFactor * 100 : 0
+                      const widthPct = duration > 0 ? ((nextStart - clipEnd) / duration) * scaleFactor * 100 : 0
                       return [(
                         <div
                           key={`gap-${clip.id}`}
@@ -543,7 +587,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                           top:             0,
                           bottom:          0,
                           left:            duration > 0
-                            ? `calc(${(clip.outputStart / duration) * 100}% - 1px)`
+                            ? `calc(${(clip.outputStart / duration) * scaleFactor * 100}% - 1px)`
                             : '0',
                           width:           2,
                           backgroundColor: 'var(--color-accent-split)',

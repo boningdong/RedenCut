@@ -458,18 +458,29 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         t.id === srcTrack.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
       )
 
-      // Insert into dest track (maintaining outputStart order)
+      // Insert into dest track, then resolve same-track overlaps by pushing to nearest edge.
+      // Cross-track overlap is allowed (clips on different tracks mix in audio).
       const movedClip: Clip = { ...clip, trackId: destId, outputStart: newOutputStart }
       newTracks = newTracks.map((t) => {
         if (t.id !== destId) return t
-        const inserted = [...t.clips, movedClip].sort((a, b) => a.outputStart - b.outputStart)
+        const others = t.clips  // source clip was already removed above
+        let start = movedClip.outputStart
+        for (const other of others) {
+          const otherEnd = other.outputStart + (other.sourceEnd - other.sourceStart)
+          const myEnd    = start + clipDur
+          if (start < otherEnd && myEnd > other.outputStart) {
+            // Overlap — push to whichever side requires less movement
+            const moveRight = otherEnd - start
+            const moveLeft  = myEnd - other.outputStart
+            start = moveRight <= moveLeft
+              ? otherEnd
+              : Math.max(0, other.outputStart - clipDur)
+          }
+        }
+        const resolved = { ...movedClip, outputStart: start }
+        const inserted = [...others, resolved].sort((a, b) => a.outputStart - b.outputStart)
         return { ...t, clips: inserted }
       })
-
-      // Free-form positioning: no overlap prevention. Clips can be freely positioned
-      // to create gaps (silence) between them. If clips overlap on the same track,
-      // buildSegmentsForSource will include both — they mix, same as multi-track.
-      // The UI (WaveformView) renders clip blocks sorted by outputStart.
 
       return {
         tracks:    newTracks,
