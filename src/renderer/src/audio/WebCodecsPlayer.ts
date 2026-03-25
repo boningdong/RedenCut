@@ -349,8 +349,12 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
       if (isPrimary) {
         this.primarySourceId = id
+      }
+      // Seed: expand _duration to this source's length as a lower bound.
+      // setTracks() derives the accurate duration from clip extents once tracks are set.
+      if (duration > this._duration) {
         this._duration = duration
-        this.durationChangeCbs.forEach((cb) => cb(duration))
+        this.durationChangeCbs.forEach((cb) => cb(this._duration))
       }
       console.log(
         `[WebCodecsPlayer] loaded WAV id=${id} duration=${duration.toFixed(2)}s ` +
@@ -393,8 +397,12 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
     if (isPrimary) {
       this.primarySourceId = id
+    }
+    // Seed: expand _duration to this source's length as a lower bound.
+    // setTracks() derives the accurate duration from clip extents once tracks are set.
+    if (duration > this._duration) {
       this._duration = duration
-      this.durationChangeCbs.forEach((cb) => cb(duration))
+      this.durationChangeCbs.forEach((cb) => cb(this._duration))
     }
 
     console.log(
@@ -419,6 +427,17 @@ export class WebCodecsPlayer implements IAudioPlayer {
         const volume = track?.volume ?? 1
         entry.gainNode.gain.setValueAtTime(volume, this.ctx.currentTime)
       }
+    }
+
+    // Derive accurate total duration from clip output extents.
+    // This is more correct than source file lengths: a clip placed at a later
+    // outputStart extends the timeline beyond any individual source's duration.
+    const clipMaxEnd = tracks
+      .flatMap((t) => t.clips)
+      .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
+    if (clipMaxEnd > 0 && clipMaxEnd !== this._duration) {
+      this._duration = clipMaxEnd
+      this.durationChangeCbs.forEach((cb) => cb(this._duration))
     }
 
     // Only restart decode loops when track structure changes (not for volume-only updates).
@@ -527,6 +546,38 @@ export class WebCodecsPlayer implements IAudioPlayer {
   }
   onEnded(cb: () => void): () => void {
     this.endedCbs.add(cb); return () => this.endedCbs.delete(cb)
+  }
+
+  // ── IAudioPlayer — removeSourceFile ──────────────────────────────────────
+
+  removeSourceFile(id: string): void {
+    const entry = this.sources.get(id)
+    if (!entry) return
+    entry.decodeCtrl?.abort()
+    entry.worklet?.disconnect()
+    entry.gainNode?.disconnect()
+    this.sources.delete(id)
+
+    if (this.primarySourceId === id) {
+      this.primarySourceId = null
+      // Promote the next remaining source to primary so _ctxTimeAtPlay gets set
+      // when audio starts draining, keeping the rAF clock anchor alive.
+      const next = this.sources.entries().next()
+      if (!next.done) {
+        const [nextId, nextEntry] = next.value
+        this.primarySourceId = nextId
+        if (nextEntry.worklet) {
+          nextEntry.worklet.port.onmessage = ({ data }) => {
+            if (data.type === 'started' && this._isPlaying && this.ctx) {
+              this._ctxTimeAtPlay = this.ctx.currentTime
+              console.log('[WebCodecsPlayer] audio started (promoted primary) — clock zeroed')
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[WebCodecsPlayer] removeSourceFile id=${id}`)
   }
 
   // ── IAudioPlayer — lifecycle ──────────────────────────────────────────────

@@ -458,26 +458,48 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         t.id === srcTrack.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
       )
 
-      // Insert into dest track, then resolve same-track overlaps by pushing to nearest edge.
+      // Insert into dest track at the nearest valid (non-overlapping) position.
+      // Uses slot enumeration rather than iterative pushing to avoid oscillation
+      // when the drop zone gap is too small for the clip.
       // Cross-track overlap is allowed (clips on different tracks mix in audio).
       const movedClip: Clip = { ...clip, trackId: destId, outputStart: newOutputStart }
       newTracks = newTracks.map((t) => {
         if (t.id !== destId) return t
         const others = t.clips  // source clip was already removed above
-        let start = movedClip.outputStart
-        for (const other of others) {
-          const otherEnd = other.outputStart + (other.sourceEnd - other.sourceStart)
-          const myEnd    = start + clipDur
-          if (start < otherEnd && myEnd > other.outputStart) {
-            // Overlap — push to whichever side requires less movement
-            const moveRight = otherEnd - start
-            const moveLeft  = myEnd - other.outputStart
-            start = moveRight <= moveLeft
-              ? otherEnd
-              : Math.max(0, other.outputStart - clipDur)
-          }
+
+        // Sort others by outputStart to enumerate valid placement slots
+        const sorted = [...others].sort((a, b) => a.outputStart - b.outputStart)
+        let bestStart = Math.max(0, newOutputStart)
+        let bestDist  = Infinity
+
+        const tryCandidate = (pos: number) => {
+          const dist = Math.abs(pos - newOutputStart)
+          if (dist < bestDist) { bestDist = dist; bestStart = pos }
         }
-        const resolved = { ...movedClip, outputStart: start }
+
+        if (sorted.length === 0) {
+          bestStart = Math.max(0, newOutputStart)
+        } else {
+          // Slot before first clip: [0, first.outputStart - clipDur]
+          const firstStart = sorted[0].outputStart
+          if (firstStart >= clipDur) {
+            tryCandidate(Math.min(Math.max(0, newOutputStart), firstStart - clipDur))
+          }
+          // Slots between consecutive clips
+          for (let i = 0; i < sorted.length - 1; i++) {
+            const slotFrom = sorted[i].outputStart + (sorted[i].sourceEnd - sorted[i].sourceStart)
+            const slotTo   = sorted[i + 1].outputStart - clipDur
+            if (slotFrom <= slotTo) {
+              tryCandidate(Math.min(Math.max(slotFrom, newOutputStart), slotTo))
+            }
+          }
+          // Slot after last clip: [lastEnd, ∞)
+          const lastEnd = sorted[sorted.length - 1].outputStart +
+            (sorted[sorted.length - 1].sourceEnd - sorted[sorted.length - 1].sourceStart)
+          tryCandidate(Math.max(lastEnd, newOutputStart))
+        }
+
+        const resolved = { ...movedClip, outputStart: bestStart }
         const inserted = [...others, resolved].sort((a, b) => a.outputStart - b.outputStart)
         return { ...t, clips: inserted }
       })

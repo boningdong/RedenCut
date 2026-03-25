@@ -97,10 +97,16 @@ export function TranscriptPanel({
   const hasAnyWords = words.length > 0
 
   // ── Current word (playhead → transcript) ─────────────────────────────────
+  // Compare against output-timeline time (not source timestamps) so reordered
+  // clips highlight the correct word.
   const currentWordId = useMemo(() => {
     if (words.length === 0) return null
-    return words.find((w) => currentTime >= w.start && currentTime <= w.end)?.id ?? null
-  }, [currentTime, words])
+    return words.find((w) => {
+      const outputStart = getWordOutputTime(w, tracks)
+      const outputEnd   = outputStart + (w.end - w.start)
+      return currentTime >= outputStart && currentTime <= outputEnd
+    })?.id ?? null
+  }, [currentTime, words, tracks])
 
   // Scroll current word into view
   useEffect(() => {

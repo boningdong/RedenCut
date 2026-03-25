@@ -117,8 +117,10 @@ export class SimpleAudioPlayer implements IAudioPlayer {
       const onMeta = () => {
         entry.duration = element.duration || 0
         console.log(`[SimpleAudioPlayer] loadedmetadata id=${id} duration=${entry.duration}s`)
-        if (id === this.primarySourceId) {
-          this.durationChangeCbs.forEach(cb => cb(entry.duration))
+        // Fire durationChangeCbs whenever the max duration across all sources increases.
+        const newMax = this.getDuration()
+        if (newMax > 0) {
+          this.durationChangeCbs.forEach(cb => cb(newMax))
         }
         cleanup()
         resolve()
@@ -206,7 +208,7 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   seekTo(outputTime: number): void {
     const el = this.primaryElement
     if (!el) return
-    const clamped = Math.max(0, Math.min(outputTime, el.duration || 0))
+    const clamped = Math.max(0, Math.min(outputTime, this.getDuration() || 0))
     console.log(`[SimpleAudioPlayer] seekTo outputTime=${outputTime} clamped=${clamped}`)
     // Seek all sources to the same output time so they stay in sync.
     // For secondary sources we use outputTime directly (output === source time
@@ -226,8 +228,11 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   }
 
   getDuration(): number {
-    if (!this.primarySourceId) return 0
-    return this.sources.get(this.primarySourceId)?.duration ?? 0
+    let max = 0
+    for (const entry of this.sources.values()) {
+      max = Math.max(max, entry.duration)
+    }
+    return max
   }
 
   isPlaying(): boolean {
@@ -254,6 +259,22 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   onEnded(cb: () => void): () => void {
     this.endedCbs.add(cb)
     return () => this.endedCbs.delete(cb)
+  }
+
+  // ── IAudioPlayer — removeSourceFile ──────────────────────────────────────
+
+  removeSourceFile(id: string): void {
+    const entry = this.sources.get(id)
+    if (!entry) return
+    entry.element.pause()
+    entry.element.src = ''
+    entry.source.disconnect()
+    entry.gainNode.disconnect()
+    this.sources.delete(id)
+    if (this.primarySourceId === id) {
+      this.primarySourceId = this.sources.keys().next().value ?? null
+    }
+    console.log(`[SimpleAudioPlayer] removeSourceFile id=${id}`)
   }
 
   // ── IAudioPlayer — lifecycle ──────────────────────────────────────────────

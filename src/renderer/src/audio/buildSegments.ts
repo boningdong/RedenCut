@@ -113,18 +113,11 @@ export function buildSegmentsForSource(
     }
   }
 
-  // Fallback: no tracks/clips defined yet — decode the full source from startTime
+  // Fallback: no active segments built.
   if (segs.length === 0) {
+    // No clips reference this source — nothing to play (orphaned or just removed).
     if (!hasClipsForSource) {
-      const startFrame = seekFn(startTime)
-      return [{
-        startByte:    startFrame.byteOffset,
-        endByte:      Number.MAX_SAFE_INTEGER,
-        sourceStart:  startFrame.time,
-        outputStart:  startFrame.time,
-        muted:        false,
-        durationSecs: sourceDuration - startFrame.time,
-      }]
+      return []
     }
     // Clips exist but all tracks were muted/soloed out → pure silence
     // Compute how long this source contributes to the output timeline.

@@ -60,6 +60,12 @@ export interface IAudioPlayer {
    */
   setTracks(tracks: Track[]): void
 
+  /**
+   * Unregister a source file. Stops any in-flight decode, disconnects audio
+   * nodes, and frees resources. Safe to call even if id is unknown.
+   */
+  removeSourceFile(id: string): void
+
   // ── Event subscriptions ────────────────────────────────────────────────────
   // All subscriptions return an unsubscribe function — use in useEffect cleanup.
 

@@ -29,7 +29,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
-import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.js'
 import type { PeakData, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
@@ -63,7 +62,16 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   const setSelectedTrackId = useTimelineStore((s) => s.setSelectedTrackId)
 
   const currentTime = usePlaybackStore((s) => s.currentTime)
-  const duration    = peaks.durationSeconds
+
+  // Duration = furthest output end across all clips on all tracks.
+  // Falls back to the primary peaks duration when there are no clips.
+  // This ensures the ruler and seek mapping always cover the full timeline,
+  // even after the original track is removed or a longer clip is added.
+  const maxClipEnd = tracks.flatMap((t) => t.clips).reduce(
+    (max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)),
+    0,
+  )
+  const duration = Math.max(peaks.durationSeconds, maxClipEnd)
 
   const previewMode  = useEditorStore((s) => s.previewMode)
   const setSelection = useEditorStore((s) => s.setSelection)
@@ -75,18 +83,21 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     return m
   })
 
-  // Sync primary peaks if they change (e.g. new file opened)
+  // Sync primary peaks if they change (e.g. new file opened).
+  // Only depend on `peaks` — track structure changes are irrelevant here;
+  // new tracks receive their peaks via the explicit setTrackPeaks call in handleAddTrack.
+  // Including `tracks` caused the old peaks to be stamped onto a newly-added track id.
   useEffect(() => {
     if (tracks.length > 0) {
       setTrackPeaks((prev) => new Map(prev).set(tracks[0].id, peaks))
     }
-  }, [peaks, tracks])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peaks])
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel]     = useState(1.0)
   const [viewportWidth, setViewportWidth] = useState(800)
   const scrollViewportRef = useRef<HTMLDivElement>(null)
-  const wsTrack0Ref       = useRef<WaveSurfer | null>(null)
 
   // Track scroll viewport width for basePxPerSec computation
   useEffect(() => {
@@ -102,12 +113,6 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   // basePxPerSec: fills viewport at zoom=1. Falls back to 100 when duration unknown.
   const basePxPerSec = duration > 0 && viewportWidth > 0 ? viewportWidth / duration : 100
   const pxPerSec     = basePxPerSec * zoomLevel
-
-  // Call ws.zoom() when pxPerSec changes.
-  // wsTrack0Ref is only set after the 'ready' event, so this is always safe.
-  useEffect(() => {
-    wsTrack0Ref.current?.zoom(pxPerSec)
-  }, [pxPerSec])
 
   const MIN_ZOOM = 1 / 32  // symmetrical with max zoom-in of 32×
 
@@ -179,13 +184,15 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   }, [])
 
   // ── Seek on lane/ruler click ───────────────────────────────────────────────
+  // At zoom < 1, clips occupy only scaleFactor * 100% of the content div.
+  // Dividing by scaleFactor maps click position back to the correct time.
   const handleLaneClick = useCallback((e: React.MouseEvent<HTMLDivElement>, trackId?: string) => {
     if (trackId) setSelectedTrackId(trackId)
     const rect = e.currentTarget.getBoundingClientRect()
     const pct  = (e.clientX - rect.left) / rect.width
-    const t    = pct * duration
+    const t    = Math.min(duration, Math.max(0, (pct / scaleFactor) * duration))
     getAudioPlayerInstance()?.seekTo(t)
-  }, [duration, setSelectedTrackId])
+  }, [duration, scaleFactor, setSelectedTrackId])
 
   // ── Add Track ────────────────────────────────────────────────────────────
   const handleAddTrack = useCallback(async () => {
@@ -210,10 +217,23 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
   // ── Remove track ─────────────────────────────────────────────────────────
   const handleRemoveTrack = useCallback((trackId: string) => {
+    // Snapshot sourceFileIds exclusively owned by this track before removing.
+    // A source shared with another track must NOT be unloaded from the player.
+    const track = tracks.find((t) => t.id === trackId)
+    const ownedSourceIds = track
+      ? [...new Set(track.clips.map((c) => c.sourceFileId))]
+          .filter((sfId) => !tracks.some((t) => t.id !== trackId && t.clips.some((c) => c.sourceFileId === sfId)))
+      : []
+
     removeTrack(trackId)
     useTranscriptStore.getState().removeWordsForTrack(trackId)
     setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
-  }, [removeTrack])
+
+    const player = getAudioPlayerInstance()
+    for (const sfId of ownedSourceIds) {
+      player?.removeSourceFile(sfId)
+    }
+  }, [removeTrack, tracks])
 
   // ── Clip drag ─────────────────────────────────────────────────────────────
   const dragRef = useRef<{
@@ -222,6 +242,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     ghostPct:  number
     trackId:   string
     startX:    number
+    clipDur:   number
   } | null>(null)
   const [ghostState, setGhostState] = useState<{ pct: number; widthPct: number } | null>(null)
 
@@ -238,6 +259,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       ghostPct:  duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0,
       trackId:   clip.trackId,
       startX:    e.clientX,
+      clipDur:   clip.sourceEnd - clip.sourceStart,
     }
     const widthPct = duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * sf * 100 : 0
     setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0, widthPct })
@@ -245,60 +267,43 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
   const handleClipPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return
-    const delta  = e.clientX - dragRef.current.startX
-    const laneEl = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
-    const laneW  = laneEl?.getBoundingClientRect().width ?? 1
+    const delta    = e.clientX - dragRef.current.startX
+    const laneEl   = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
+    const laneW    = laneEl?.getBoundingClientRect().width ?? 1
     const deltaPct = (delta / laneW) * 100
-    const newPct   = Math.max(0, dragRef.current.ghostPct + deltaPct)
-    setGhostState((g) => g ? { ...g, pct: newPct } : null)
-  }, [])
+    const rawPct   = Math.max(0, dragRef.current.ghostPct + deltaPct)
 
-  const handleClipPointerUp = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current || !ghostState) { dragRef.current = null; setGhostState(null); return }
-    const sf = Math.min(1, zoomLevel)
-    // Recover actual output time from ghost pct (reverse of the scaleFactor encoding)
-    const newOutputStart = (ghostState.pct / 100) * (duration / sf)
-
-    const { tracks: allTracks } = useTimelineStore.getState()
-    const allEdges = allTracks.flatMap((t) =>
+    // Convert to output-time, snap to nearby edges, convert back to pct
+    const sf              = Math.min(1, zoomLevel)
+    const rawStart        = (rawPct / 100) * (duration / sf)
+    const clipDur         = dragRef.current.clipDur
+    const snapThreshSec   = 5 / pxPerSec
+    const { tracks: all } = useTimelineStore.getState()
+    const allEdges        = all.flatMap((t) =>
       t.clips
         .filter((c) => c.id !== dragRef.current!.clipId)
-        .flatMap((c) => [
-          c.outputStart,
-          c.outputStart + (c.sourceEnd - c.sourceStart),
-        ])
+        .flatMap((c) => [c.outputStart, c.outputStart + (c.sourceEnd - c.sourceStart)])
     )
-    const snapThresholdSec = 5 / pxPerSec  // always 5px in screen space
-    const clipped = allTracks
-      .flatMap((t) => t.clips)
-      .find((c) => c.id === dragRef.current!.clipId)
-    const clipDur = clipped ? clipped.sourceEnd - clipped.sourceStart : 0
-    let snapped = newOutputStart
+    let snapped = rawStart
     for (const edge of allEdges) {
-      if (Math.abs(newOutputStart - edge) < snapThresholdSec) { snapped = edge; break }
-      if (Math.abs(newOutputStart + clipDur - edge) < snapThresholdSec) { snapped = edge - clipDur; break }
+      if (Math.abs(rawStart - edge) < snapThreshSec) { snapped = edge; break }
+      if (Math.abs(rawStart + clipDur - edge) < snapThreshSec) { snapped = edge - clipDur; break }
     }
+    const snappedPct = (snapped / duration) * sf * 100
 
-    // Same-track overlap prevention — push to nearest non-overlapping edge
-    const sameTrack = allTracks.find((t) => t.id === dragRef.current!.trackId)
-    const others    = sameTrack?.clips.filter((c) => c.id !== dragRef.current!.clipId) ?? []
-    let finalStart = Math.max(0, snapped)
-    for (const other of others) {
-      const otherEnd = other.outputStart + (other.sourceEnd - other.sourceStart)
-      const myEnd    = finalStart + clipDur
-      if (finalStart < otherEnd && myEnd > other.outputStart) {
-        const moveRight = otherEnd - finalStart
-        const moveLeft  = myEnd - other.outputStart
-        finalStart = moveRight <= moveLeft
-          ? otherEnd
-          : Math.max(0, other.outputStart - clipDur)
-      }
-    }
+    setGhostState((g) => g ? { ...g, pct: snappedPct } : null)
+  }, [duration, zoomLevel, pxPerSec])
 
-    moveClip(dragRef.current.clipId, finalStart)
+  const handleClipPointerUp = useCallback((_e: React.PointerEvent) => {
+    if (!dragRef.current || !ghostState) { dragRef.current = null; setGhostState(null); return }
+    const sf       = Math.min(1, zoomLevel)
+    // Snap already applied by handleClipPointerMove — recover output time and commit.
+    // Overlap resolution is handled entirely inside moveClip (slot-based, no oscillation).
+    const rawStart = (ghostState.pct / 100) * (duration / sf)
+    moveClip(dragRef.current.clipId, Math.max(0, rawStart))
     dragRef.current = null
     setGhostState(null)
-  }, [ghostState, duration, zoomLevel, pxPerSec, moveClip])
+  }, [ghostState, duration, zoomLevel, moveClip])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -421,11 +426,19 @@ export function WaveformView({ peaks }: WaveformViewProps) {
               style={{
                 height:       RULER_HEIGHT,
                 width:        '100%',
+                position:     'relative',
                 boxSizing:    'border-box',
                 borderBottom: '1px solid var(--color-border-subtle)',
                 cursor:       'crosshair',
+                overflow:     'hidden',
               }}
-            />
+            >
+              <TimelineRuler
+                duration={duration}
+                pxPerSec={pxPerSec}
+                scaleFactor={scaleFactor}
+              />
+            </div>
 
             {/* Track lanes */}
             {tracks.map((track, trackIndex) => {
@@ -473,11 +486,6 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                       trackId={track.id}
                       peaks={trackPeakData}
                       color={track.color}
-                      trackIndex={trackIndex}
-                      onWsReady={trackIndex === 0
-                        ? (ws) => { wsTrack0Ref.current = ws }
-                        : undefined
-                      }
                     />
                   )}
 
@@ -646,29 +654,13 @@ interface TrackWaveformProps {
   trackId:    string
   peaks:      PeakData
   color:      string
-  trackIndex: number
-  /** Called once WaveSurfer is ready, with the WaveSurfer instance. */
-  onWsReady?: (ws: WaveSurfer) => void
 }
 
-function TrackWaveform({ trackId, peaks, color, trackIndex, onWsReady }: TrackWaveformProps) {
+function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
-
-    const timelinePluginOptions = trackIndex === 0
-      ? {
-          container:            '#waveform-timeline',
-          timeInterval:         10,
-          primaryLabelInterval: 60,
-          style: { fontSize: '10px', color: 'var(--color-text-muted)' },
-        }
-      : undefined
-
-    const plugins = timelinePluginOptions
-      ? [TimelinePlugin.create(timelinePluginOptions)]
-      : []
 
     const ws = WaveSurfer.create({
       container:     containerRef.current,
@@ -681,7 +673,6 @@ function TrackWaveform({ trackId, peaks, color, trackIndex, onWsReady }: TrackWa
       height:        LANE_HEIGHT - 8,
       peaks:         peaks.data,
       duration:      peaks.durationSeconds,
-      plugins,
     })
 
     ws.on('interaction', (t: number) => {
@@ -690,15 +681,12 @@ function TrackWaveform({ trackId, peaks, color, trackIndex, onWsReady }: TrackWa
 
     ws.on('ready', () => {
       console.log(`[WaveformView] WaveSurfer ready for track ${trackId}`)
-      onWsReady?.(ws)
     })
 
     return () => {
       ws.destroy()
     }
-  // onWsReady intentionally excluded — changing the callback shouldn't recreate WaveSurfer
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [peaks, color, trackId, trackIndex])
+  }, [peaks, color, trackId])
 
   return (
     <div
@@ -710,6 +698,66 @@ function TrackWaveform({ trackId, peaks, color, trackIndex, onWsReady }: TrackWa
         pointerEvents: 'none',
       }}
     />
+  )
+}
+
+// ── TimelineRuler — custom ruler replacing WaveSurfer's TimelinePlugin ────────
+//
+// WaveSurfer's TimelinePlugin renders ticks at absolute pixel offsets
+// (time × pxPerSec). At pxPerSec < ~1, ticks are sub-pixel and it renders
+// nothing. This component uses the same scaleFactor-based % positioning as clips,
+// so it works correctly at any zoom level.
+
+interface TimelineRulerProps {
+  duration:    number
+  pxPerSec:    number
+  scaleFactor: number
+}
+
+function TimelineRuler({ duration, pxPerSec, scaleFactor }: TimelineRulerProps) {
+  if (duration <= 0 || pxPerSec <= 0) return null
+
+  // Pick the smallest "nice" interval that keeps ticks ≥ 40px apart
+  const MIN_PX  = 40
+  const rawSec  = MIN_PX / pxPerSec
+  const NICE    = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
+  const interval = NICE.find((n) => n >= rawSec) ?? NICE[NICE.length - 1]
+
+  const ticks: number[] = []
+  for (let t = 0; t <= duration + interval; t += interval) ticks.push(t)
+
+  return (
+    <>
+      {ticks.map((t) => {
+        const left = (t / duration) * scaleFactor * 100
+        if (left > scaleFactor * 100 + 0.1) return null
+        const label = t >= 3600
+          ? `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}m`
+          : t >= 60
+            ? `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
+            : `${t}s`
+        return (
+          <div
+            key={t}
+            style={{
+              position:      'absolute',
+              left:          `${left}%`,
+              top:           0,
+              bottom:        0,
+              borderLeft:    '1px solid var(--color-border-subtle)',
+              paddingLeft:   3,
+              display:       'flex',
+              alignItems:    'flex-end',
+              paddingBottom: 2,
+              pointerEvents: 'none',
+              whiteSpace:    'nowrap',
+            }}
+          >
+            <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{label}</span>
+          </div>
+        )
+      })}
+    </>
   )
 }
 
