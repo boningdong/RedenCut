@@ -290,7 +290,7 @@ async function detectLeadingSilence(audioFilePath: string): Promise<number> {
 }
 
 // ── WhisperTranscriber ────────────────────────────────────────────────────────
-export class WhisperTranscriber implements ITranscriber {
+class WhisperTranscriber implements ITranscriber {
   readonly name = 'Whisper.cpp (local)'
 
   async isAvailable(): Promise<boolean> {

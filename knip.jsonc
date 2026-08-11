@@ -3,7 +3,8 @@
   // electron-vite and Vitest discover the real application, config, and test entries.
   "project": ["src/**/*.{ts,tsx,css}", "*.config.ts"],
   "ignoreDependencies": [
-    // Loaded by package name at runtime in src/main/audio/binaries.ts.
+    // Apple Silicon fallbacks loaded by resolveFromStaticPackage(packageName)
+    // through runtime require(packageName) in src/main/audio/binaries.ts.
     "ffmpeg-static",
     "ffprobe-static",
   ],

@@ -16,7 +16,7 @@
 import { create } from 'zustand'
 import type { ProjectFile } from '@shared/project.types'
 
-export interface TimeRange {
+interface TimeRange {
   start: number
   end: number
 }

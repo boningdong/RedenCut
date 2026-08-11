@@ -7,4 +7,3 @@
 
 export const APP_NAME = 'PodCut'
 export const APP_FILE_EXT = '.podcut'
-export const APP_FILE_MIME = 'application/x-podcut'

@@ -15,7 +15,7 @@
 import { z } from 'zod'
 
 // ── Audio source ──────────────────────────────────────────────────────────────
-export const AudioSourceSchema = z.object({
+const AudioSourceSchema = z.object({
   /** Relative path to the original audio file — always in the same directory. */
   file: z.string(),
   /** SHA-256 of the audio file at the time of import. Used to detect moved/replaced files. */
@@ -24,10 +24,9 @@ export const AudioSourceSchema = z.object({
   channels: z.number(),
   durationSeconds: z.number(),
 })
-export type AudioSource = z.infer<typeof AudioSourceSchema>
 
 // ── Transcript ────────────────────────────────────────────────────────────────
-export const WordSchema = z.object({
+const WordSchema = z.object({
   id: z.string(),
   text: z.string(),
   /** Start time in seconds within the original audio. */
@@ -57,11 +56,11 @@ export const WordSchema = z.object({
 })
 export type Word = z.infer<typeof WordSchema>
 
-export const SpeakerSchema = z.object({
+const SpeakerSchema = z.object({
   label: z.string(), // display name, e.g. "Host", "Guest"
 })
 
-export const TranscriptSchema = z.object({
+const TranscriptSchema = z.object({
   engine: z.string(), // e.g. "whisper.cpp", "assemblyai"
   model: z.string().optional(),
   words: z.array(WordSchema),
@@ -73,10 +72,9 @@ export type Transcript = z.infer<typeof TranscriptSchema>
 // An Edit is a non-destructive instruction applied during export. The source
 // audio is never modified; edits are metadata only.
 
-export const EditTypeSchema = z.enum(['mute', 'cut'])
-export type EditType = z.infer<typeof EditTypeSchema>
+const EditTypeSchema = z.enum(['mute', 'cut'])
 
-export const EditSchema = z.object({
+const EditSchema = z.object({
   id: z.string(),
   type: EditTypeSchema,
   /** Start of the edit in seconds on the original timeline. */
@@ -88,10 +86,9 @@ export const EditSchema = z.object({
   /** How this edit was created: manually by the user, via text selection, or by a detector. */
   source: z.enum(['manual', 'text', 'filler_detect', 'plugin']).default('manual'),
 })
-export type Edit = z.infer<typeof EditSchema>
 
 // ── Adjustments ───────────────────────────────────────────────────────────────
-export const GainAdjustmentSchema = z.object({
+const GainAdjustmentSchema = z.object({
   id: z.string(),
   type: z.literal('gain'),
   start: z.number(),
@@ -100,7 +97,7 @@ export const GainAdjustmentSchema = z.object({
   valueDb: z.number(),
 })
 
-export const CrossfadeAdjustmentSchema = z.object({
+const CrossfadeAdjustmentSchema = z.object({
   id: z.string(),
   type: z.literal('crossfade'),
   /** Position of the edit boundary where this crossfade is applied. */
@@ -109,14 +106,13 @@ export const CrossfadeAdjustmentSchema = z.object({
   durationMs: z.number().default(30),
 })
 
-export const AdjustmentSchema = z.discriminatedUnion('type', [
+const AdjustmentSchema = z.discriminatedUnion('type', [
   GainAdjustmentSchema,
   CrossfadeAdjustmentSchema,
 ])
-export type Adjustment = z.infer<typeof AdjustmentSchema>
 
 // ── Markers ───────────────────────────────────────────────────────────────────
-export const MarkerSchema = z.object({
+const MarkerSchema = z.object({
   id: z.string(),
   time: z.number(),
   type: z.enum(['jump_cut', 'note', 'todo']),
@@ -124,10 +120,9 @@ export const MarkerSchema = z.object({
   severity: z.enum(['low', 'medium', 'high']).optional(),
   resolved: z.boolean().default(false),
 })
-export type Marker = z.infer<typeof MarkerSchema>
 
 // ── Export settings ───────────────────────────────────────────────────────────
-export const ExportSettingsSchema = z.object({
+const ExportSettingsSchema = z.object({
   /** Integrated loudness target in LUFS. Apple Podcasts / Spotify standard: -16. */
   targetLUFS: z.number().default(-16),
   /** True peak ceiling in dBTP. */
@@ -135,12 +130,11 @@ export const ExportSettingsSchema = z.object({
   format: z.enum(['mp3', 'wav', 'flac', 'aac']).default('mp3'),
   sampleRate: z.number().default(48000),
 })
-export type ExportSettings = z.infer<typeof ExportSettingsSchema>
 
 // ── Plugin data ───────────────────────────────────────────────────────────────
 // Plugins store their project-scoped data here. The key is the plugin's ID
 // (e.g. "com.example.noise-reducer"). The host never inspects this data.
-export const PluginDataSchema = z.record(z.string(), z.unknown())
+const PluginDataSchema = z.record(z.string(), z.unknown())
 
 // ── Multi-track model ─────────────────────────────────────────────────────────
 // These types form the new clip/track abstraction layer. The older flat edits[]
@@ -148,14 +142,13 @@ export const PluginDataSchema = z.record(z.string(), z.unknown())
 // migrated into the track model automatically.
 
 /** A single audio effect in a clip or track's processing chain. */
-export const EffectSchema = z.object({
+const EffectSchema = z.object({
   id: z.string(),
   type: z.enum(['gain', 'eq', 'compressor', 'noise-reduction']),
   enabled: z.boolean().default(true),
   /** Arbitrary numeric parameters keyed by name, e.g. { gainDb: -6 }. */
   params: z.record(z.string(), z.number()).default({}),
 })
-export type Effect = z.infer<typeof EffectSchema>
 
 /**
  * A contiguous slice of a source file placed at a position on a track's
@@ -168,7 +161,7 @@ export type Effect = z.infer<typeof EffectSchema>
  *   muted                    — true  → audio is silenced (region visible on waveform)
  *                              false → plays normally
  */
-export const ClipSchema = z.object({
+const ClipSchema = z.object({
   id: z.string(),
   trackId: z.string(),
   sourceFileId: z.string(),
@@ -185,7 +178,7 @@ export type Clip = z.infer<typeof ClipSchema>
  * A track holds an ordered sequence of clips drawn from one or more source
  * files, plus track-level processing.
  */
-export const TrackSchema = z.object({
+const TrackSchema = z.object({
   id: z.string(),
   name: z.string(),
   clips: z.array(ClipSchema).default([]),
@@ -198,7 +191,7 @@ export const TrackSchema = z.object({
 export type Track = z.infer<typeof TrackSchema>
 
 /** A source audio file registered in the project. */
-export const SourceFileSchema = z.object({
+const SourceFileSchema = z.object({
   id: z.string(),
   filePath: z.string(),
   duration: z.number(),

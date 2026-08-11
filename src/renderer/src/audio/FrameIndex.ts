@@ -9,7 +9,7 @@
 // Supported formats:
 //   MP3  — sync-word scan (0xFFE0 mask); each frame header gives bitrate/mode
 //   WAV  — passthrough; PCM is already uncompressed, byte offset = time × rate × channels × depth
-//   M4A  — mp4box.js extracts the "stts" and "stco" sample-to-chunk tables
+//   M4A  — uniform AAC frame estimate (1024 samples per frame)
 //   FLAC — frame sync (0xFFFx), fixed overhead per frame
 //
 // Returns:
@@ -267,65 +267,11 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
 
 // ── M4A / AAC ────────────────────────────────────────────────────────────────
 //
-// Uses mp4box.js to parse the MP4 container and extract sample metadata.
-// mp4box gives us each sample's offset + duration, from which we build
-// a precise frame index.
+// M4A uses the same uniform AAC index that was the reachable fallback before
+// the unused MP4Box dependency was removed.
 
 async function buildM4aIndex(url: string): Promise<FrameIndex> {
-  // mp4box.js is loaded globally via a <script> tag in index.html (see Phase 2 note)
-  // Fallback: fetch first 1 MB, pass to mp4box
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const MP4Box = (window as any).MP4Box
-  if (!MP4Box) {
-    console.warn('[FrameIndex] mp4box.js not available — using fallback uniform index for M4A')
-    return buildUniformIndex(url, 'aac', 1024)
-  }
-
-  return new Promise<FrameIndex>((resolve) => {
-    const mp4boxFile = MP4Box.createFile()
-    const frames: FrameEntry[] = []
-
-    mp4boxFile.onReady = (info: {
-      tracks: Array<{ id: number; type: string; movie_duration: number; movie_timescale: number }>
-    }) => {
-      const audioTrack = info.tracks.find((t) => t.type === 'audio')
-      if (!audioTrack) {
-        resolve(createIndex(frames))
-        return
-      }
-      mp4boxFile.setExtractionOptions(audioTrack.id, null, { nbSamples: 100 })
-      mp4boxFile.start()
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mp4boxFile.onSamples = (_id: number, _user: unknown, samples: any[]) => {
-      for (const sample of samples) {
-        frames.push({
-          byteOffset: sample.offset,
-          time: sample.cts / sample.timescale,
-          duration: sample.duration / sample.timescale,
-        })
-      }
-      resolve(createIndex(frames))
-    }
-
-    mp4boxFile.onError = () => {
-      console.warn('[FrameIndex] mp4box error — using uniform fallback')
-      resolve(buildUniformIndex(url, 'aac', 1024))
-    }
-
-    // Fetch and feed data in chunks
-    fetch(url, { headers: { Range: 'bytes=0-2097151' } }) // first 2 MB
-      .then((r) => r.arrayBuffer())
-      .then((buf) => {
-        // mp4box requires a file start property on the buffer
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(buf as any).fileStart = 0
-        mp4boxFile.appendBuffer(buf)
-        mp4boxFile.flush()
-      })
-      .catch(() => resolve(buildUniformIndex(url, 'aac', 1024)))
-  })
+  return buildUniformIndex(url, 'aac', 1024)
 }
 
 // ── Uniform fallback ──────────────────────────────────────────────────────────

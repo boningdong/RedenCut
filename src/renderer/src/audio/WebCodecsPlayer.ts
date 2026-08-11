@@ -48,9 +48,6 @@ import { buildFrameIndex, type FrameIndex } from './FrameIndex'
 import { WORKLET_CODE, sendPcmChunk } from './AudioPlayerWorklet'
 import { buildSegmentsForSource, type Segment } from './buildSegments'
 
-// Suppress unused-import lint (Segment is re-exported for external consumers)
-export type { Segment }
-
 // ── WAV PCM descriptor ────────────────────────────────────────────────────────
 
 interface WavInfo {
@@ -706,7 +703,7 @@ export class WebCodecsPlayer implements IAudioPlayer {
     const entry = this.sources.get(sourceId)
     if (!entry || !entry.worklet) return
 
-    const segments = buildSegmentsForSource(
+    const segments: Segment[] = buildSegmentsForSource(
       sourceId,
       startTime,
       this.tracks,
