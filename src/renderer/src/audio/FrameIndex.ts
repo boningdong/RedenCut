@@ -10,12 +10,12 @@
 //   MP3  — sync-word scan (0xFFE0 mask); each frame header gives bitrate/mode
 //   WAV  — passthrough; PCM is already uncompressed, byte offset = time × rate × channels × depth
 //   M4A  — uniform AAC frame estimate (1024 samples per frame)
-//   FLAC — frame sync (0xFFFx), fixed overhead per frame
+//   FLAC — uniform frame estimate (4096 samples per frame)
 //
 // Returns:
-//   FrameIndex — an object with a seekTo(seconds) method that returns
-//     { byteOffset, frameTime } — where to start a Range request and what
-//     presentation timestamp to expect from the first decoded frame.
+//   FrameIndex — an object with a seek(seconds) method that returns
+//     { byteOffset, time, duration } — where to start a Range request and the
+//     presentation timing to expect from the first decoded frame.
 //
 // NOTE: Accuracy matters for preview-mode skip. An incorrect byte offset will
 // cause the decoder to fail (no sync found) or produce a gap at the cut boundary.

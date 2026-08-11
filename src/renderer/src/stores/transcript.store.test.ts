@@ -4,13 +4,9 @@
 // Pure state/logic tests with no browser or Electron dependencies.
 //
 // Coverage:
-//   • setWords              — initialise the word list
-//   • muteWords / unmuteWords — bulk toggle by ID
-//   • setWordMuted           — single-word toggle
-//   • shiftTimestamps        — offset all timestamps, clamp to >= 0
-//   • toggleShowMutedWords   — display toggle
-//   • clearSelection / setSelectedWordIds
-//   • reset                  — restore initial state
+//   • word list, mute state, and timestamp changes
+//   • track visibility and track-word removal
+//   • selection, display preferences, and reset
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, beforeEach } from 'vitest'

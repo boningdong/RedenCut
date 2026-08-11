@@ -57,6 +57,10 @@ export default tseslint.config(
           ],
           patterns: [
             {
+              group: ['electron/*'],
+              message: 'Renderer code must use window.electronAPI.',
+            },
+            {
               group: ['@main/*', '@preload/*', '**/main/**', '**/preload/**'],
               message: 'Renderer code cannot import main or preload internals.',
             },
@@ -110,6 +114,10 @@ export default tseslint.config(
             ...restrictedNodeImports,
           ],
           patterns: [
+            {
+              group: ['electron/*'],
+              message: 'Shared code must remain process-neutral.',
+            },
             {
               group: [
                 '@main/*',

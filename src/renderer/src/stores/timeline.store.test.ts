@@ -5,13 +5,10 @@
 // browser or Electron dependencies. All assertions run in the Node environment.
 //
 // Coverage:
-//   • initFromFile      — bootstrap a single-file project
-//   • splitAt           — clip splitting, boundary edge cases
-//   • muteRange         — region muting with clip surgery, word ID threading
-//   • unmuteClip        — unmuting + adjacent-clip merging
-//   • undo              — state rollback including transcript word IDs
-//   • loadFromProject   — restore without touching undo stack
-//   • getAllClips        — ordering guarantee
+//   • source registration and project initialization
+//   • clip splitting, muting, and unmuting, including moved clips
+//   • undo and redo history, including transcript word IDs
+//   • project restoration and clip ordering
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, beforeEach } from 'vitest'

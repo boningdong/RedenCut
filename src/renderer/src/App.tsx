@@ -166,7 +166,7 @@ export default function App() {
    * Given an already-probed file path + metadata:
    *   1. Tear down any existing player
    *   2. Init timeline.store (creates Track + Clip for the full duration)
-   *   3. Create SimpleAudioPlayer, load source file, wire callbacks → stores
+   *   3. Create the preferred player with fallback, load sources, wire callbacks → stores
    *   4. Generate waveform peaks (may take a few seconds for large files)
    *   5. Transition to 'ready' state → WaveformView mounts
    */

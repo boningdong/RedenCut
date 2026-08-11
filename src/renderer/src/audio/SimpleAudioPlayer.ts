@@ -1,21 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SimpleAudioPlayer — Phase 1 IAudioPlayer implementation
+// SimpleAudioPlayer — HTML media-element IAudioPlayer fallback
 //
 // Strategy:
 //   • One HTMLAudioElement per source file, served via podcut:// protocol
 //   • All elements connected to a shared AudioContext via createMediaElementSource()
 //     → per-element GainNode → destination
-//   • Playback is driven by the FIRST source file's <audio> element (single-track
-//     for now; multi-track mixing comes in WebCodecsPlayer Phase 2)
+//   • The first source file's <audio> element drives the playback clock while all
+//     loaded source elements play in parallel
 //   • Real-time muting: each animation frame, we check which clips are currently
 //     active and whether they are muted → set GainNode.gain.value = 0 or 1
 //   • onTimeUpdate fires on every rAF tick while playing, and also immediately
 //     after seekTo() so the waveform cursor stays in sync
 //
-// Limitations (acceptable for Phase 1):
+// Limitations:
 //   • <audio> element plays linearly — muted clips play silently rather than
-//     being skipped (true skip is Phase 2 / WebCodecsPlayer)
-//   • Multi-track mixing is not supported; only Track 0 drives time
+//     being skipped (WebCodecsPlayer performs frame-accurate skipping)
+//   • The primary element drives the shared timeline for all loaded sources
 //   • GainNode transitions are instant (no crossfade) — acceptable for preview
 //
 // Thread safety: all Web Audio API calls happen on the renderer main thread.
@@ -321,8 +321,7 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   // "Active" means: there exists a non-muted clip on a non-muted, non-solo-
   // excluded track whose outputStart..outputEnd window contains currentTime.
   //
-  // Phase 1 simplification: we only support one source file, so we set the
-  // single GainNode based on whether the primary clip at currentTime is muted.
+  // Each source has its own GainNode, calculated from active clips that reference it.
 
   private updateGains(): void {
     if (this.sources.size === 0 || this.tracks.length === 0) return
