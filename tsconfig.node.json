@@ -1,16 +1,17 @@
 {
   // TypeScript config for the Node.js side: main process + preload scripts.
-  // Uses CommonJS modules because Electron's main process is Node.js CJS.
-  // Also covers electron.vite.config.ts itself (the build tool config).
+  // NodeNext models modern Node package exports; package.json keeps .ts files
+  // in CommonJS mode, while electron-vite still owns emitted bundles.
   "compilerOptions": {
     "composite": true,            // required for project references
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "target": "ES2022",
     "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,      // allows `import x from 'cjs-module'`
     "skipLibCheck": true,
+    "types": ["electron-vite/node"],
     "outDir": "dist-electron",
     "baseUrl": ".",
     "paths": {
@@ -19,7 +20,7 @@
     }
   },
   "include": [
-    "electron.vite.config.*",
+    "*.config.ts",
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*"

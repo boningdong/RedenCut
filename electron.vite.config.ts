@@ -29,7 +29,7 @@ export default defineConfig({
   // ── Renderer process ──────────────────────────────────────────────────────
   // Compiled as ESM and served by Vite (dev: HMR dev server, prod: static).
   renderer: {
-    plugins: [react(), tailwindcss()],
+    plugins: [react({}), tailwindcss({})],
     resolve: {
       alias: {
         '@shared': resolve('src/shared'),

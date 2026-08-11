@@ -12,6 +12,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md'
 }
 
+type ElectronCSSProperties = React.CSSProperties & {
+  WebkitAppRegion?: 'drag' | 'no-drag'
+}
+
 export function Button({
   variant = 'ghost',
   size = 'md',
@@ -19,7 +23,7 @@ export function Button({
   style,
   ...props
 }: ButtonProps) {
-  const base: React.CSSProperties = {
+  const base: ElectronCSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -33,7 +37,7 @@ export function Button({
     transition: 'background 0.1s, color 0.1s, opacity 0.1s',
     opacity: props.disabled ? 0.4 : 1,
     outline: 'none',
-    WebkitAppRegion: 'no-drag' as string,  // prevent drag interference in title bar
+    WebkitAppRegion: 'no-drag',  // prevent drag interference in title bar
     ...(size === 'sm'
       ? { fontSize: 'var(--text-xs)', padding: '4px 10px', height: 26 }
       : { fontSize: 'var(--text-sm)', padding: '6px 14px', height: 32 }),

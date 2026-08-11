@@ -214,7 +214,7 @@ export const ProjectFileSchema = z.object({
   edits: z.array(EditSchema).default([]),
   adjustments: z.array(AdjustmentSchema).default([]),
   markers: z.array(MarkerSchema).default([]),
-  export: ExportSettingsSchema.default({}),
+  export: ExportSettingsSchema.prefault({}),
   /** Plugin-contributed metadata. See addendum §3.3. */
   pluginData: PluginDataSchema.optional().default({}),
   // ── Multi-track fields (added alongside v1; migration from edits[] on load) ─

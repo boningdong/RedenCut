@@ -5,13 +5,13 @@
 // Tests verify that the function correctly maps clip model → Segment list.
 //
 // Coverage:
-//   • Single unmuted clip       — full-source fallback vs explicit clip
+//   • Single unmuted clip       — explicit clip segments
 //   • Muted clips               — produces silence segments with correct duration
 //   • Mixed muted/unmuted clips — correct interleaving
 //   • Multi-source filtering    — only clips from the target sourceId included
 //   • Solo/muted tracks         — track-level filtering respected
 //   • startTime skip            — clips entirely before startTime are excluded
-//   • Fallback (no tracks)      — full-source segment at startTime
+//   • Orphan-source suppression — no segments when no clip references a source
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest'
@@ -56,28 +56,13 @@ const DURATION = 100
 const FETCH    = 32_768
 
 // ══════════════════════════════════════════════════════════════════════════════
-// No tracks — fallback to full-source segment
+// No tracks — orphan-source suppression
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('fallback: no tracks defined', () => {
-  it('returns a single full-source segment', () => {
+describe('orphan-source suppression', () => {
+  it('returns no segments when no clip references the source', () => {
     const segs = buildSegmentsForSource(SOURCE_A, 0, [], mockSeek, DURATION, FETCH)
-    expect(segs).toHaveLength(1)
-    expect(segs[0].muted).toBe(false)
-    expect(segs[0].sourceStart).toBe(0)
-    expect(segs[0].durationSecs).toBeCloseTo(DURATION)
-  })
-
-  it('starts at startTime when seeking into the file', () => {
-    const segs = buildSegmentsForSource(SOURCE_A, 30, [], mockSeek, DURATION, FETCH)
-    expect(segs).toHaveLength(1)
-    expect(segs[0].sourceStart).toBe(30)
-    expect(segs[0].durationSecs).toBeCloseTo(DURATION - 30)
-  })
-
-  it('startByte uses the seek function result', () => {
-    const segs = buildSegmentsForSource(SOURCE_A, 20, [], mockSeek, DURATION, FETCH)
-    expect(segs[0].startByte).toBe(mockSeek(20).byteOffset)
+    expect(segs).toEqual([])
   })
 })
 
@@ -99,9 +84,9 @@ describe('single unmuted clip', () => {
     const clips  = [makeClip('c1', SOURCE_A, 'track1', 0, 50)]
     const tracks = [makeTrack('track1', clips)]
     const segs   = buildSegmentsForSource(SOURCE_A, 60, tracks, mockSeek, DURATION, FETCH)
-    // No clips remain after 60s — fall back to full-source from 60s
     expect(segs).toHaveLength(1)
-    expect(segs[0].sourceStart).toBe(60)
+    expect(segs[0].muted).toBe(true)
+    expect(segs[0].durationSecs).toBe(0)
   })
 })
 
@@ -188,13 +173,10 @@ describe('multi-source filtering', () => {
     expect(realSegs.reduce((acc, s) => acc + s.durationSecs, 0)).toBeCloseTo(60)
   })
 
-  it('falls back to full-source if no clips match sourceId', () => {
+  it('returns no segments if no clips match sourceId', () => {
     const trackB = makeTrack('t2', [makeClip('cb', SOURCE_B, 't2', 0, 60)])
-    // Ask for source A — no clips match, should fall back
     const segs = buildSegmentsForSource(SOURCE_A, 0, [trackB], mockSeek, DURATION, FETCH)
-    expect(segs).toHaveLength(1)
-    expect(segs[0].muted).toBe(false)
-    expect(segs[0].durationSecs).toBeCloseTo(DURATION)
+    expect(segs).toEqual([])
   })
 })
 
@@ -207,9 +189,9 @@ describe('track muted/solo', () => {
     const clips  = [makeClip('c1', SOURCE_A, 't1', 0, 100)]
     const tracks = [makeTrack('t1', clips, { muted: true })]
     const segs   = buildSegmentsForSource(SOURCE_A, 0, tracks, mockSeek, DURATION, FETCH)
-    // No clips survived — falls back to full-source
+    // The source contributes silence because its only track is muted.
     expect(segs).toHaveLength(1)
-    expect(segs[0].startByte).toBe(mockSeek(0).byteOffset)
+    expect(segs[0].muted).toBe(true)
   })
 
   it('includes only solo tracks when any track is soloed', () => {
