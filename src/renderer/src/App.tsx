@@ -80,8 +80,6 @@ export default function App() {
   const resetEditor = useEditorStore((s) => s.reset)
 
   // Playback store setters (written from player callbacks, NOT from WaveSurfer)
-  const setCurrentTime = usePlaybackStore((s) => s.setCurrentTime)
-  const setPlaying = usePlaybackStore((s) => s.setPlaying)
   const setDuration = usePlaybackStore((s) => s.setDuration)
   const resetPlayback = usePlaybackStore((s) => s.reset)
 
@@ -184,7 +182,6 @@ export default function App() {
 
       // ── 1. Destroy existing player ───────────────────────────────────────
       if (playerRef.current) {
-        console.log('[App] destroying old player')
         playerRef.current.destroy()
         playerRef.current = null
         setAudioPlayerInstance(null)
@@ -196,7 +193,6 @@ export default function App() {
         useTimelineStore.getState().initFromFile(filePath, metadata.durationSeconds)
       }
       const { tracks: initTracks } = useTimelineStore.getState()
-      console.log(`[App] timeline init — ${initTracks.length} tracks, sourceFileId=${filePath}`)
 
       // ── 3. Create player and load all source files ────────────────────────
       // Prefer WebCodecsPlayer (frame-accurate skip + multi-source mixing).
@@ -221,7 +217,6 @@ export default function App() {
             await wcPlayer.loadSourceFile(id, fp)
           }
           player = wcPlayer
-          console.log(`[App] using WebCodecsPlayer (${orderedSources.length} source(s))`)
         } catch (err) {
           console.warn('[App] WebCodecsPlayer unavailable, falling back to SimpleAudioPlayer:', err)
           wcPlayer.destroy()
@@ -234,7 +229,6 @@ export default function App() {
           player = sPlayer
         }
       } else {
-        console.log('[App] AudioDecoder not available — using SimpleAudioPlayer')
         const sPlayer = new SimpleAudioPlayer()
         for (const { id, filePath: fp } of orderedSources) {
           await sPlayer.loadSourceFile(id, fp).catch((e) => {
@@ -253,7 +247,6 @@ export default function App() {
       player.onTimeUpdate((t) => usePlaybackStore.getState().setCurrentTime(t))
       player.onPlayStateChange((p) => usePlaybackStore.getState().setPlaying(p))
       player.onDurationChange((d) => {
-        console.log(`[App] player duration changed: ${d.toFixed(2)}s`)
         usePlaybackStore.getState().setDuration(d)
       })
       player.onEnded(() => {
@@ -266,7 +259,6 @@ export default function App() {
 
       // Expose to WaveformView, TransportBar, keyboard shortcuts
       setAudioPlayerInstance(player)
-      console.log('[App] player ready and registered')
 
       // ── 4. Generate waveform peaks (main-process FFmpeg call) ─────────────
       const peaks = await window.electronAPI.audio.generatePeaks(filePath)
@@ -275,13 +267,11 @@ export default function App() {
       setLoadingState({ status: 'ready', peaks })
     },
     [resetPlayback, setDuration],
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   const handleError = useCallback((err: unknown) => {
     const message = (err as Error).message ?? String(err)
-    console.group('[PodCut] Error')
     console.error(err)
-    console.groupEnd()
     setLoadingState((prev) => ({
       status: 'error',
       message,
@@ -328,7 +318,7 @@ export default function App() {
       // Backfill sourceFileId now — we know it from the saved project data.
       // trackId backfill is deferred until after the timeline is initialised
       // so we use the real track ID rather than a stale lookup on an empty array.
-      let backfilled = rawWords
+      const backfilled = rawWords
         ? (() => {
             const primarySfId = project.sourceFiles[0]?.id ?? project.source.file
             if (!project.sourceFiles[0]?.id) {
@@ -351,7 +341,6 @@ export default function App() {
       if (project.sourceFiles.length > 0 && project.tracks.length > 0) {
         // Project was saved with the new multi-track model — load directly
         useTimelineStore.getState().loadFromProject(project.sourceFiles, project.tracks)
-        console.log('[App] opened project with multi-track model')
       } else {
         // Legacy project: create a single-file timeline from source + edits[]
         useTimelineStore
@@ -366,7 +355,6 @@ export default function App() {
             }
           }
         }
-        console.log(`[App] opened legacy project — migrated ${project.edits.length} edits to clips`)
       }
 
       // Backfill trackId now that the timeline is initialised and we have the real track ID.
@@ -473,6 +461,10 @@ export default function App() {
     }
   }, [buildProject, setProjectPath, setIsDirty, handleError])
 
+  const handleShortcutSave = useCallback(() => {
+    void handleSave().catch(handleError)
+  }, [handleSave, handleError])
+
   // ── Generate transcript ────────────────────────────────────────────────────
   const handleGenerateTranscript = useCallback(
     async (trackId?: string) => {
@@ -554,7 +546,7 @@ export default function App() {
   )
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
-  useKeyboardShortcuts({ onSave: handleSave })
+  useKeyboardShortcuts({ onSave: handleShortcutSave })
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const isLoading = loadingState.status === 'opening' || loadingState.status === 'generating-peaks'
@@ -617,10 +609,24 @@ export default function App() {
             } as React.CSSProperties
           }
         >
-          <Button variant="ghost" size="sm" onClick={handleOpenProject} disabled={isLoading}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              void handleOpenProject()
+            }}
+            disabled={isLoading}
+          >
             Open Project
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleOpenAudio} disabled={isLoading}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              void handleOpenAudio()
+            }}
+            disabled={isLoading}
+          >
             {isLoading ? 'Loading…' : 'Open Audio'}
           </Button>
           {openedFile && (
@@ -628,12 +634,20 @@ export default function App() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleSave}
+                onClick={() => {
+                  void handleSave()
+                }}
                 disabled={!isDirty && !!projectPath}
               >
                 Save
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleSaveAs}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  void handleSaveAs()
+                }}
+              >
                 Save As…
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>
@@ -681,8 +695,12 @@ export default function App() {
             <PeakGenerationProgress progress={loadingState.progress} />
           ) : (
             <EmptyState
-              onOpenAudio={handleOpenAudio}
-              onOpenProject={handleOpenProject}
+              onOpenAudio={() => {
+                void handleOpenAudio()
+              }}
+              onOpenProject={() => {
+                void handleOpenProject()
+              }}
               isLoading={isLoading}
             />
           )}
@@ -718,7 +736,9 @@ export default function App() {
               }}
             >
               <TranscriptPanel
-                onGenerate={handleGenerateTranscript}
+                onGenerate={(trackId) => {
+                  void handleGenerateTranscript(trackId).catch(handleError)
+                }}
                 isGenerating={isGeneratingTx}
                 generatingStatus={generatingTxStatus}
               />
@@ -775,7 +795,11 @@ function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () =>
         {message}
       </span>
       <button
-        onClick={handleCopy}
+        onClick={() => {
+          void handleCopy().catch((error: unknown) => {
+            console.error('[ErrorBanner] Failed to copy error details:', error)
+          })
+        }}
         style={{
           flexShrink: 0,
           background: 'none',

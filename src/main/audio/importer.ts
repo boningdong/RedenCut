@@ -51,7 +51,7 @@ export async function probeAudio(filePath: string): Promise<AudioMetadata> {
     ])
     stdout = result.stdout
   } catch (err) {
-    throw new Error(`ffprobe failed for "${filePath}": ${(err as Error).message}`)
+    throw new Error(`ffprobe failed for "${filePath}": ${(err as Error).message}`, { cause: err })
   }
 
   let output: FFprobeOutput

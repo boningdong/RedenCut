@@ -217,17 +217,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       effects: [],
     }
 
-    console.log(
-      `[Timeline] initFromFile — sourceFileId=${sourceFileId} duration=${duration.toFixed(2)}s`,
-    )
     set({ sourceFiles: [sourceFile], tracks: [track], undoStack: [], selectedClipId: null })
   },
 
   // ── loadFromProject ─────────────────────────────────────────────────────────
   loadFromProject(sourceFiles, tracks) {
-    console.log(
-      `[Timeline] loadFromProject — ${tracks.length} tracks, ${sourceFiles.length} sources`,
-    )
     set({ sourceFiles, tracks, undoStack: [], selectedClipId: null })
   },
 
@@ -235,13 +229,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   addSourceFile(filePath, duration) {
     const existing = get().sourceFiles.find((sf) => sf.filePath === filePath)
     if (existing) {
-      console.log(`[Timeline] addSourceFile — already registered id=${existing.id}`)
       return existing.id
     }
     const sf: SourceFile = { id: filePath, filePath, duration }
-    console.log(
-      `[Timeline] addSourceFile — registered id=${filePath} duration=${duration.toFixed(2)}s`,
-    )
     set((s) => ({ sourceFiles: [...s.sourceFiles, sf] }))
     return filePath
   },
@@ -275,14 +265,12 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         })
       }
     }
-    console.log(`[Timeline] addTrack — id=${trackId} name="${track.name}"`)
     set((s) => ({ tracks: [...s.tracks, track] }))
     return trackId
   },
 
   // ── removeTrack ─────────────────────────────────────────────────────────────
   removeTrack(trackId) {
-    console.log(`[Timeline] removeTrack — id=${trackId}`)
     set((s) => ({ tracks: s.tracks.filter((t) => t.id !== trackId) }))
   },
 
@@ -306,11 +294,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const before = cloneTracks(tracks)
 
     const newClips = splitAndMute(track.clips, startTime, endTime, track.id)
-
-    console.log(
-      `[Timeline] muteRange [${startTime.toFixed(2)}s–${endTime.toFixed(2)}s]` +
-        ` wordIds=${wordIds.length}`,
-    )
 
     set((s) => ({
       tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),
@@ -336,7 +319,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     }
 
     const before = cloneTracks(tracks)
-    console.log(`[Timeline] removeClip — id=${clipId}`)
 
     set((s) => ({
       tracks: s.tracks.map((t) =>
@@ -355,11 +337,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!track) return
 
     const before = cloneTracks(tracks)
-    const clip = track.clips.find((c) => c.id === clipId)!
-
-    console.log(
-      `[Timeline] unmuteClip — id=${clipId} [${clip.sourceStart.toFixed(2)}–${clip.sourceEnd.toFixed(2)}]`,
-    )
 
     // Set clip unmuted, then merge adjacent unmuted clips
     const updated = track.clips.map((c) => (c.id === clipId ? { ...c, muted: false } : c))
@@ -388,10 +365,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   splitAt(time) {
     const { tracks, selectedClipId } = get()
 
-    if (!selectedClipId) {
-      console.log('[Timeline] splitAt — no clip selected, nothing to split')
-      return
-    }
+    if (!selectedClipId) return
 
     let targetTrackId: string | null = null
     let targetClip: Clip | null = null
@@ -405,17 +379,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       }
     }
 
-    if (!targetTrackId || !targetClip) {
-      console.log(`[Timeline] splitAt — selected clip ${selectedClipId} not found`)
-      return
-    }
+    if (!targetTrackId || !targetClip) return
 
     // Only split if the playhead is inside the selected clip's output range
     const clipOutputEnd = targetClip.outputStart + (targetClip.sourceEnd - targetClip.sourceStart)
-    if (time <= targetClip.outputStart || time >= clipOutputEnd) {
-      console.log(`[Timeline] splitAt — playhead not within selected clip's output range`)
-      return
-    }
+    if (time <= targetClip.outputStart || time >= clipOutputEnd) return
 
     const before = cloneTracks(tracks)
     const offset = time - targetClip.outputStart
@@ -431,10 +399,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       sourceStart: targetClip.sourceStart + offset,
       outputStart: time,
     }
-
-    console.log(
-      `[Timeline] splitAt ${time.toFixed(2)}s — clip ${targetClip.id} → ${left.id} + ${right.id}`,
-    )
 
     set((s) => ({
       tracks: s.tracks.map((t) =>
@@ -457,10 +421,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const clip = srcTrack.clips.find((c) => c.id === clipId)!
     const destId = newTrackId ?? srcTrack.id
     const clipDur = clip.sourceEnd - clip.sourceStart
-
-    console.log(
-      `[Timeline] moveClip ${clipId} → outputStart=${newOutputStart.toFixed(2)}s track=${destId}`,
-    )
 
     set((s) => {
       let newTracks = s.tracks
@@ -543,7 +503,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const { undoStack, tracks } = get()
     if (undoStack.length === 0) return
     const entry = undoStack[undoStack.length - 1]
-    console.log(`[Timeline] undo — "${entry.label}" wordIds=${entry.wordIds.length}`)
 
     // Capture current state as a redo entry so we can re-apply this op.
     // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
@@ -570,7 +529,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const { redoStack, tracks } = get()
     if (redoStack.length === 0) return
     const entry = redoStack[redoStack.length - 1]
-    console.log(`[Timeline] redo — "${entry.label}" wordIds=${entry.wordIds.length}`)
 
     // Capture current (pre-redo) state as an undo entry so the user can undo again.
     const undoEntry: HistoryEntry = {
@@ -605,7 +563,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── reset ────────────────────────────────────────────────────────────────────
   reset() {
-    console.log('[Timeline] reset')
     set({ ...initialState })
   },
 }))

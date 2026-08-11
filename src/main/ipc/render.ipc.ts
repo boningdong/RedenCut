@@ -18,8 +18,6 @@ ipcMain.handle('project:export', async (event, project: ProjectFile, outputPath:
   const args = buildRenderArgs(validated, outputPath)
   const ffmpeg = spawn(getFfmpegPath(), args)
 
-  console.log(`[RenderIPC] spawning ffmpeg: ${getFfmpegPath()} ${args.join(' ')}`)
-
   await new Promise<void>((resolve, reject) => {
     let stderr = ''
 

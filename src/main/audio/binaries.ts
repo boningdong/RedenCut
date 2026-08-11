@@ -19,7 +19,7 @@
 // with a cryptic "spawn Unknown system error" message.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { existsSync, statSync } from 'fs'
+import { statSync } from 'fs'
 import { execFileSync } from 'child_process'
 
 // Known Homebrew install locations (checked in order):
@@ -76,7 +76,7 @@ function findInPath(candidates: string[], whichName: string): string | null {
 
 function resolveFromStaticPackage(packageName: string): string | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- The package name is selected at runtime so a missing fallback can be caught.
     const pkg = require(packageName)
     // ffprobe-static v3 exports { path, version, url }
     // ffmpeg-static exports a plain string

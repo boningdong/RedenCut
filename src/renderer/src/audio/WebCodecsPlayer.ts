@@ -71,14 +71,11 @@ interface WavInfo {
 async function parseWavInfo(url: string): Promise<WavInfo> {
   const resp = await fetch(url, { headers: { Range: 'bytes=0-255' } })
 
-  let totalBytes = 0
   const contentRange = resp.headers.get('content-range') ?? ''
   const crMatch = contentRange.match(/\/(\d+)$/)
-  if (crMatch) {
-    totalBytes = parseInt(crMatch[1])
-  } else {
-    totalBytes = parseInt(resp.headers.get('content-length') ?? '0')
-  }
+  let totalBytes = crMatch
+    ? parseInt(crMatch[1])
+    : parseInt(resp.headers.get('content-length') ?? '0')
 
   const reader = resp.body!.getReader()
   const scratch = new Uint8Array(256)
@@ -102,7 +99,6 @@ async function parseWavInfo(url: string): Promise<WavInfo> {
   // RIFF chunk-size fallback: Electron's net.fetch often omits Content-Length
   if (totalBytes === 0 && bytesRead >= 8) {
     totalBytes = view.getUint32(4, true) + 8
-    console.log(`[WebCodecsPlayer] WAV totalBytes from RIFF header: ${totalBytes}`)
   }
 
   const audioFormat = view.getUint16(20, true)
@@ -234,9 +230,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
   private async ensureCtx(sampleRate?: number): Promise<AudioContext> {
     if (this.ctx && this.ctx.state !== 'closed') {
       if (sampleRate && this.ctx.sampleRate !== sampleRate) {
-        console.log(
-          `[WebCodecsPlayer] Recreating AudioContext: ${this.ctx.sampleRate} → ${sampleRate}`,
-        )
         // Tear down all per-source Web Audio nodes before closing the context
         for (const entry of this.sources.values()) {
           entry.worklet?.disconnect()
@@ -255,7 +248,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
       }
     }
     this.ctx = new AudioContext(sampleRate ? { sampleRate } : undefined)
-    console.log('[WebCodecsPlayer] AudioContext created, sampleRate:', this.ctx.sampleRate)
     return this.ctx
   }
 
@@ -273,7 +265,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
     } finally {
       URL.revokeObjectURL(blobUrl)
     }
-    console.log('[WebCodecsPlayer] AudioWorklet module registered')
   }
 
   /**
@@ -296,7 +287,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
       workletNode.port.onmessage = ({ data }) => {
         if (data.type === 'started' && this._isPlaying && this.ctx) {
           this._ctxTimeAtPlay = this.ctx.currentTime
-          console.log('[WebCodecsPlayer] audio started — clock zeroed')
         }
       }
     }
@@ -308,12 +298,8 @@ export class WebCodecsPlayer implements IAudioPlayer {
   // ── IAudioPlayer — loadSourceFile ─────────────────────────────────────────
 
   async loadSourceFile(id: string, filePath: string): Promise<void> {
-    if (this.sources.has(id)) {
-      console.log(`[WebCodecsPlayer] source already loaded id=${id}`)
-      return
-    }
+    if (this.sources.has(id)) return
 
-    console.log(`[WebCodecsPlayer] loadSourceFile id=${id} — probing + building FrameIndex`)
     const url = `podcut://localhost/${encodeURIComponent(filePath)}`
 
     const index = await buildFrameIndex(url)
@@ -324,11 +310,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
       let wavInfo: WavInfo
       try {
         wavInfo = await parseWavInfo(url)
-        console.log(
-          `[WebCodecsPlayer] WAV header — ${wavInfo.channels}ch ${wavInfo.sampleRate}Hz ` +
-            `${wavInfo.bitDepth}-bit${wavInfo.isFloat ? ' float' : ''} ` +
-            `dataOffset=${wavInfo.dataOffset} totalBytes=${wavInfo.totalBytes}`,
-        )
       } catch (err) {
         console.error('[WebCodecsPlayer] parseWavInfo failed:', err)
         throw err
@@ -374,10 +355,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
         this._duration = duration
         this.durationChangeCbs.forEach((cb) => cb(this._duration))
       }
-      console.log(
-        `[WebCodecsPlayer] loaded WAV id=${id} duration=${duration.toFixed(2)}s ` +
-          `(primary=${isPrimary})`,
-      )
       this.startSourceDecodeLoop(id, this._currentTime)
       return
     }
@@ -430,10 +407,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
       this.durationChangeCbs.forEach((cb) => cb(this._duration))
     }
 
-    console.log(
-      `[WebCodecsPlayer] loaded id=${id} codec=${codec.codec} ` +
-        `sampleRate=${sampleRate} duration=${duration.toFixed(2)}s (primary=${isPrimary})`,
-    )
     this.startSourceDecodeLoop(id, this._currentTime)
   }
 
@@ -441,7 +414,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
   setTracks(tracks: Track[]): void {
     this.tracks = tracks
-    console.log(`[WebCodecsPlayer] setTracks — ${tracks.length} tracks`)
 
     // Apply per-track volume to each source's gain node.
     // Each source is controlled by the volume of its associated track.
@@ -507,14 +479,10 @@ export class WebCodecsPlayer implements IAudioPlayer {
         this.startSourceDecodeLoop(sourceId, this._currentTime)
       }
     }
-    console.log(
-      `[WebCodecsPlayer] play() t=${this._currentTime.toFixed(2)}s sources=${this.sources.size}`,
-    )
   }
 
   pause(): void {
     if (!this._isPlaying) return
-    console.log(`[WebCodecsPlayer] pause() t=${this._currentTime.toFixed(2)}s`)
     for (const entry of this.sources.values()) {
       entry.worklet?.port.postMessage({ type: 'pause' })
     }
@@ -532,7 +500,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
   seekTo(outputTime: number): void {
     const clamped = Math.max(0, Math.min(outputTime, this._duration))
-    console.log(`[WebCodecsPlayer] seekTo ${clamped.toFixed(2)}s`)
 
     const wasPlaying = this._isPlaying
     if (wasPlaying) {
@@ -612,20 +579,16 @@ export class WebCodecsPlayer implements IAudioPlayer {
           nextEntry.worklet.port.onmessage = ({ data }) => {
             if (data.type === 'started' && this._isPlaying && this.ctx) {
               this._ctxTimeAtPlay = this.ctx.currentTime
-              console.log('[WebCodecsPlayer] audio started (promoted primary) — clock zeroed')
             }
           }
         }
       }
     }
-
-    console.log(`[WebCodecsPlayer] removeSourceFile id=${id}`)
   }
 
   // ── IAudioPlayer — lifecycle ──────────────────────────────────────────────
 
   destroy(): void {
-    console.log('[WebCodecsPlayer] destroy()')
     this.pause()
     this.stopAllDecodeLoops()
     for (const entry of this.sources.values()) {
@@ -751,10 +714,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
       entry.duration,
       FETCH_CHUNK,
     )
-    console.log(
-      `[WebCodecsPlayer] decode loop [${sourceId.split('/').pop()}]: ` +
-        `${segments.length} segs from ${startTime.toFixed(2)}s`,
-    )
 
     const sampleRate = entry.wavInfo?.sampleRate ?? entry.codec.sampleRate
     const numChannels = entry.wavInfo?.channels ?? entry.codec.numberOfChannels
@@ -783,7 +742,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
 
     if (!signal.aborted) {
       entry.worklet.port.postMessage({ type: 'end' })
-      console.log(`[WebCodecsPlayer] decode loop complete [${sourceId.split('/').pop()}]`)
     }
   }
 
@@ -858,9 +816,6 @@ export class WebCodecsPlayer implements IAudioPlayer {
     decoder.configure(config)
     if (decoderError) throw decoderError
     entry.decoder = decoder
-    console.log(
-      `[WebCodecsPlayer] AudioDecoder: ${entry.codec.codec} @ ${entry.codec.sampleRate} Hz`,
-    )
     return decoder
   }
 

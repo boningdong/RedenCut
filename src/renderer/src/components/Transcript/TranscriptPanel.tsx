@@ -55,7 +55,6 @@ export function TranscriptPanel({
   const toggleTrackVisibility = useTranscriptStore((s) => s.toggleTrackVisibility)
 
   const tracks = useTimelineStore((s) => s.tracks)
-  const sourceFiles = useTimelineStore((s) => s.sourceFiles)
 
   const setSelection = useEditorStore((s) => s.setSelection)
 

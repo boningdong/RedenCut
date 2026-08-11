@@ -102,7 +102,6 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           e.preventDefault()
           if (!player) break
           const time = player.getCurrentTime()
-          console.log(`[Shortcuts] S — split at ${time.toFixed(2)}s`)
           useTimelineStore.getState().splitAt(time)
           break
         }
@@ -116,9 +115,6 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           if (!sfId) break
           // Collect word IDs for transcript muting
           const wordIds = useTranscriptStore.getState().selectedWordIds
-          console.log(
-            `[Shortcuts] M — mute [${selection.start.toFixed(2)}–${selection.end.toFixed(2)}]`,
-          )
           useTimelineStore.getState().muteRange(sfId, selection.start, selection.end, [...wordIds])
           setSelection(null)
           break
@@ -131,7 +127,6 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           e.preventDefault()
           const { selectedClipId, tracks, unmuteClip } = useTimelineStore.getState()
           if (selectedClipId) {
-            console.log(`[Shortcuts] U — unmute selected clip ${selectedClipId}`)
             unmuteClip(selectedClipId)
             break
           }
@@ -144,7 +139,6 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
               return c.outputStart < selection.end && outputEnd > selection.start
             })
           overlapping.forEach((c) => {
-            console.log(`[Shortcuts] U — unmuting clip ${c.id}`)
             useTimelineStore.getState().unmuteClip(c.id)
           })
           setSelection(null)
@@ -159,7 +153,6 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           const { selectedClipId, tracks, removeClip } = useTimelineStore.getState()
           if (selectedClipId) {
             e.preventDefault()
-            console.log(`[Shortcuts] Delete — remove clip ${selectedClipId}`)
             removeClip(selectedClipId)
             break
           }
@@ -178,9 +171,6 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
               return c.outputStart < selection.end && outputEnd > selection.start
             })
           if (hits.length > 0) {
-            console.log(
-              `[Shortcuts] Delete — mute [${selection.start.toFixed(2)}–${selection.end.toFixed(2)}]`,
-            )
             useTimelineStore
               .getState()
               .muteRange(sfId, selection.start, selection.end, [...wordIds])

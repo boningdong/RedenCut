@@ -34,7 +34,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
     })
   }, [])
 
-  const handlePickPath = useCallback(async () => {
+  const handlePickPath = useCallback(() => {
     const path = window.prompt('Export to path (e.g. /Users/you/output.mp3)')
     if (path) setOutputPath(path)
   }, [])
@@ -231,7 +231,9 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
             {exportState.status === 'done' ? 'Close' : 'Cancel'}
           </button>
           <button
-            onClick={handleExport}
+            onClick={() => {
+              void handleExport()
+            }}
             disabled={!outputPath || isExporting || exportState.status === 'done'}
             style={{
               background: 'var(--color-accent)',

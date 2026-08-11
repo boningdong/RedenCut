@@ -11,8 +11,9 @@
 //     and the privileged main process — keep it minimal and auditable
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import type { IElectronAPI } from '../shared/ipc.types'
+import type { IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import type { IElectronAPI, RenderProgress } from '../shared/ipc.types'
 
 // ── The API object ────────────────────────────────────────────────────────────
 // `satisfies IElectronAPI` gives a compile-time check that this object
@@ -62,9 +63,8 @@ const api = {
       return () => ipcRenderer.off('transcript:progress', handler)
     },
 
-    renderProgress: (callback: (p: import('../shared/ipc.types').RenderProgress) => void) => {
-      const handler = (_event: IpcRendererEvent, p: import('../shared/ipc.types').RenderProgress) =>
-        callback(p)
+    renderProgress: (callback: (p: RenderProgress) => void) => {
+      const handler = (_event: IpcRendererEvent, p: RenderProgress) => callback(p)
       ipcRenderer.on('render:progress', handler)
       return () => ipcRenderer.off('render:progress', handler)
     },

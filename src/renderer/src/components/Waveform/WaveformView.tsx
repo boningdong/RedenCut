@@ -46,6 +46,7 @@ interface WaveformViewProps {
 const HEADER_WIDTH = 90 // px — header column width
 const RULER_HEIGHT = 28 // px — ruler row height (matches TimelinePlugin canvas)
 const LANE_HEIGHT = 96 // px — clip lane height
+const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
 // ── Track loading state ────────────────────────────────────────────────────────
 type TrackPeakState = 'loading' | PeakData
@@ -113,8 +114,6 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   const basePxPerSec = duration > 0 && viewportWidth > 0 ? viewportWidth / duration : 100
   const pxPerSec = basePxPerSec * zoomLevel
 
-  const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
-
   const handleZoomIn = useCallback(() => setZoomLevel((z) => Math.min(32, z * 2)), [])
   const handleZoomOut = useCallback(() => setZoomLevel((z) => Math.max(MIN_ZOOM, z / 2)), [])
 
@@ -177,7 +176,6 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       }
 
       if (nextAudible < Infinity) {
-        console.log(`[WaveformView] preview skip t=${t.toFixed(2)}s → ${nextAudible.toFixed(2)}s`)
         getAudioPlayerInstance()?.seekTo(nextAudible)
       }
       // If nextAudible === Infinity, no more audible content — play to end naturally.
@@ -468,7 +466,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
             </div>
 
             {/* Track lanes */}
-            {tracks.map((track, trackIndex) => {
+            {tracks.map((track) => {
               const peakState = trackPeaks.get(track.id)
               const trackPeakData =
                 peakState === 'loading' || peakState === undefined ? null : peakState
@@ -512,12 +510,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
                   {/* WaveSurfer canvas for this track */}
                   {trackPeakData && (
-                    <TrackWaveform
-                      key={track.id}
-                      trackId={track.id}
-                      peaks={trackPeakData}
-                      color={track.color}
-                    />
+                    <TrackWaveform key={track.id} peaks={trackPeakData} color={track.color} />
                   )}
 
                   {/* Clip blocks */}
@@ -662,7 +655,11 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
       {/* + Add Track row */}
       <div
-        onClick={handleAddTrack}
+        onClick={() => {
+          void handleAddTrack().catch((error: unknown) => {
+            console.error('[WaveformView] Failed to add track:', error)
+          })
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -688,12 +685,11 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 // ── TrackWaveform — per-track WaveSurfer instance ─────────────────────────────
 
 interface TrackWaveformProps {
-  trackId: string
   peaks: PeakData
   color: string
 }
 
-function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
+function TrackWaveform({ peaks, color }: TrackWaveformProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -716,14 +712,10 @@ function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
       getAudioPlayerInstance()?.seekTo(t)
     })
 
-    ws.on('ready', () => {
-      console.log(`[WaveformView] WaveSurfer ready for track ${trackId}`)
-    })
-
     return () => {
       ws.destroy()
     }
-  }, [peaks, color, trackId])
+  }, [peaks, color])
 
   return (
     <div

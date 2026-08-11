@@ -93,8 +93,6 @@ function parseMp3Header(
 }
 
 async function buildMp3Index(url: string): Promise<FrameIndex> {
-  console.log('[FrameIndex] Building MP3 index for', url)
-
   // Fetch the first 256 KB to probe for the initial frame parameters.
   const headResponse = await fetch(url, { headers: { Range: 'bytes=0-262143' } })
   const headBuffer = await headResponse.arrayBuffer()
@@ -128,14 +126,10 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
       ((data[8] & 0x7f) << 7) |
       (data[9] & 0x7f)
     const tagEnd = 10 + id3Size
-    console.log(`[FrameIndex] MP3 ID3v2 tag: ${id3Size} bytes, tagEnd=${tagEnd}`)
 
     if (tagEnd >= data.length) {
       // Tag larger than initial buffer — fetch 64 KB right after it
       const fetchEnd = tagEnd + 65535
-      console.log(
-        `[FrameIndex] MP3 large ID3 tag (>${data.length} bytes); fetching bytes ${tagEnd}-${fetchEnd}`,
-      )
       try {
         const secondResp = await fetch(url, { headers: { Range: `bytes=${tagEnd}-${fetchEnd}` } })
         const secondBuf = await secondResp.arrayBuffer()
@@ -202,9 +196,6 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
     }
   }
 
-  console.log(
-    `[FrameIndex] MP3 index built: ${frames.length} entries, ~${currentTime.toFixed(1)}s scanned`,
-  )
   return createIndex(frames)
 }
 
@@ -214,8 +205,6 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
 // We create a synthetic index with one entry per second for fast seeking.
 
 async function buildWavIndex(url: string): Promise<FrameIndex> {
-  console.log('[FrameIndex] Building WAV index for', url)
-
   // Fetch the first 44 bytes using a streaming read — safe for large WAV files.
   // IMPORTANT: do NOT call resp.arrayBuffer() here.  If the server ignores the
   // Range header and returns the full body, arrayBuffer() would load hundreds of
@@ -223,14 +212,11 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   const headResp = await fetch(url, { headers: { Range: 'bytes=0-43' } })
 
   // ── Total file size ───────────────────────────────────────────────────────
-  let totalBytes = 0
   const cr = headResp.headers.get('content-range') ?? ''
   const crMatch = cr.match(/\/(\d+)$/)
-  if (crMatch) {
-    totalBytes = parseInt(crMatch[1])
-  } else {
-    totalBytes = parseInt(headResp.headers.get('content-length') ?? '0')
-  }
+  let totalBytes = crMatch
+    ? parseInt(crMatch[1])
+    : parseInt(headResp.headers.get('content-length') ?? '0')
 
   // ── Stream-read only the first 44 bytes ───────────────────────────────────
   const reader = headResp.body!.getReader()
@@ -255,7 +241,6 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   // always contain (fileSize - 8) as uint32 LE.
   if (totalBytes === 0 && bytesRead >= 8) {
     totalBytes = header.getUint32(4, true) + 8
-    console.log(`[FrameIndex] WAV totalBytes from RIFF header: ${totalBytes}`)
   }
 
   // WAV header: "RIFF" at 0, "WAVE" at 8, "fmt " at 12
@@ -277,9 +262,6 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
     frames.push({ byteOffset, time: t, duration: stepSeconds })
   }
 
-  console.log(
-    `[FrameIndex] WAV index: ${frames.length} entries, sampleRate=${sampleRate} channels=${channels} bitDepth=${bitDepth}`,
-  )
   return createIndex(frames)
 }
 
@@ -290,8 +272,6 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
 // a precise frame index.
 
 async function buildM4aIndex(url: string): Promise<FrameIndex> {
-  console.log('[FrameIndex] Building M4A index for', url)
-
   // mp4box.js is loaded globally via a <script> tag in index.html (see Phase 2 note)
   // Fallback: fetch first 1 MB, pass to mp4box
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -356,11 +336,9 @@ async function buildM4aIndex(url: string): Promise<FrameIndex> {
 
 async function buildUniformIndex(
   url: string,
-  codec: string,
+  _codec: string,
   samplesPerFrame: number,
 ): Promise<FrameIndex> {
-  console.log(`[FrameIndex] building uniform index for ${codec} (${samplesPerFrame} spf)`)
-
   // Get file size and rough duration from headers
   const resp = await fetch(url, { method: 'HEAD' })
   const contentLength = parseInt(resp.headers.get('content-length') ?? '0')
@@ -381,7 +359,6 @@ async function buildUniformIndex(
     })
   }
 
-  console.log(`[FrameIndex] uniform index: ${frames.length} entries`)
   return createIndex(frames)
 }
 

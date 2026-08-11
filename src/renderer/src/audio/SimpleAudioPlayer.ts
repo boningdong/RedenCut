@@ -61,7 +61,6 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   private getCtx(): AudioContext {
     if (!this.ctx || this.ctx.state === 'closed') {
       this.ctx = new AudioContext()
-      console.log('[SimpleAudioPlayer] AudioContext created, sampleRate:', this.ctx.sampleRate)
     }
     return this.ctx
   }
@@ -74,12 +73,7 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   // ── IAudioPlayer — loadSourceFile ─────────────────────────────────────────
 
   async loadSourceFile(id: string, filePath: string): Promise<void> {
-    if (this.sources.has(id)) {
-      console.log(`[SimpleAudioPlayer] loadSourceFile: already loaded id=${id}`)
-      return
-    }
-
-    console.log(`[SimpleAudioPlayer] loadSourceFile id=${id} path=${filePath}`)
+    if (this.sources.has(id)) return
 
     const ctx = this.getCtx()
     const element = new Audio()
@@ -99,12 +93,10 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     // Set first loaded source as primary
     if (!this.primarySourceId) {
       this.primarySourceId = id
-      console.log(`[SimpleAudioPlayer] primary source set to id=${id}`)
     }
 
     // Wire element events
     element.addEventListener('ended', () => {
-      console.log(`[SimpleAudioPlayer] ended — source id=${id}`)
       this._isPlaying = false
       this.stopRaf()
       this.emitPlayState(false)
@@ -116,7 +108,6 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     await new Promise<void>((resolve, reject) => {
       const onMeta = () => {
         entry.duration = element.duration || 0
-        console.log(`[SimpleAudioPlayer] loadedmetadata id=${id} duration=${entry.duration}s`)
         // Fire durationChangeCbs whenever the max duration across all sources increases.
         const newMax = this.getDuration()
         if (newMax > 0) {
@@ -143,7 +134,6 @@ export class SimpleAudioPlayer implements IAudioPlayer {
       // Construct podcut:// URL — same format as App.tsx audioUrl.
       // The protocol handler expects: podcut://localhost/<encodedAbsolutePath>
       const url = `podcut://localhost/${encodeURIComponent(filePath)}`
-      console.log(`[SimpleAudioPlayer] setting src=${url}`)
       element.src = url
       element.load()
     })
@@ -153,10 +143,6 @@ export class SimpleAudioPlayer implements IAudioPlayer {
 
   setTracks(tracks: Track[]): void {
     this.tracks = tracks
-    console.log(
-      `[SimpleAudioPlayer] setTracks — ${tracks.length} tracks, total clips:`,
-      tracks.reduce((n, t) => n + t.clips.length, 0),
-    )
     // Update gain immediately based on current time
     this.updateGains()
   }
@@ -171,10 +157,8 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     }
     const ctx = this.getCtx()
     if (ctx.state === 'suspended') {
-      console.log('[SimpleAudioPlayer] resuming AudioContext')
       await ctx.resume()
     }
-    console.log('[SimpleAudioPlayer] play() currentTime=', el.currentTime)
     // Play all sources in parallel; errors on secondary sources are non-fatal
     await Promise.all(
       [...this.sources.entries()].map(([id, entry]) =>
@@ -191,7 +175,6 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   pause(): void {
     const el = this.primaryElement
     if (!el) return
-    console.log('[SimpleAudioPlayer] pause() currentTime=', el.currentTime)
     for (const entry of this.sources.values()) {
       entry.element.pause()
     }
@@ -213,7 +196,6 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     const el = this.primaryElement
     if (!el) return
     const clamped = Math.max(0, Math.min(outputTime, this.getDuration() || 0))
-    console.log(`[SimpleAudioPlayer] seekTo outputTime=${outputTime} clamped=${clamped}`)
     // Seek all sources to the same output time so they stay in sync.
     // For secondary sources we use outputTime directly (output === source time
     // for the typical background-music use case where clips start at t=0).
@@ -278,20 +260,17 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     if (this.primarySourceId === id) {
       this.primarySourceId = this.sources.keys().next().value ?? null
     }
-    console.log(`[SimpleAudioPlayer] removeSourceFile id=${id}`)
   }
 
   // ── IAudioPlayer — lifecycle ──────────────────────────────────────────────
 
   destroy(): void {
-    console.log('[SimpleAudioPlayer] destroy()')
     this.stopRaf()
-    for (const [id, entry] of this.sources) {
+    for (const entry of this.sources.values()) {
       entry.element.pause()
       entry.element.src = ''
       entry.source.disconnect()
       entry.gainNode.disconnect()
-      console.log(`[SimpleAudioPlayer] destroyed source id=${id}`)
     }
     this.sources.clear()
     this.primarySourceId = null

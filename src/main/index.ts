@@ -63,73 +63,80 @@ function createWindow(): void {
   // In dev, electron-vite starts a Vite dev server and injects
   // ELECTRON_RENDERER_URL. In prod, we load the built HTML file.
   if (process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win
+      .loadURL(process.env['ELECTRON_RENDERER_URL'])
+      .catch((error) => console.error('[Main] Failed to load development renderer:', error))
     win.webContents.openDevTools() // auto-open DevTools in dev
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    win
+      .loadFile(join(__dirname, '../renderer/index.html'))
+      .catch((error) => console.error('[Main] Failed to load production renderer:', error))
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App lifecycle
 // ─────────────────────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
-  // ── Register podcut:// handler ──────────────────────────────────────────
-  // Translates podcut://localhost/%2FUsers%2F...%2Ftrack.mp3
-  // back to a file:// URL and delegates to net.fetch (which runs in the
-  // privileged main process and CAN load local files).
-  // Map file extension → correct audio MIME type.
-  // Without this, net.fetch returns audio files as application/octet-stream
-  // which Chromium refuses to decode in an <audio> element.
-  const AUDIO_MIME: Record<string, string> = {
-    '.mp3': 'audio/mpeg',
-    '.wav': 'audio/wav',
-    '.flac': 'audio/flac',
-    '.aac': 'audio/aac',
-    '.m4a': 'audio/mp4',
-    '.ogg': 'audio/ogg',
-    '.opus': 'audio/ogg',
-  }
-
-  protocol.handle('podcut', async (request) => {
-    const { pathname } = new URL(request.url)
-    // pathname is like /%2FUsers%2Fboning%2FDownloads%2Ftrack.mp3
-    // slice(1) removes the leading '/', then we decode to get the real path.
-    const filePath = decodeURIComponent(pathname.slice(1))
-
-    // Forward ALL headers from the renderer's request — critically the
-    // Range header that <audio> sends for byte-range streaming and seeking.
-    const response = await net.fetch(pathToFileURL(filePath).href, {
-      headers: Object.fromEntries(request.headers.entries()),
-    })
-
-    // Always rebuild headers so we can:
-    //   a) patch Content-Type for correct audio MIME
-    //   b) add Access-Control-Allow-Origin so createMediaElementSource() works
-    //      (the Web Audio API treats podcut:// as a cross-origin resource and
-    //       requires CORS headers even for local files)
-    const ext = extname(filePath).toLowerCase()
-    const mimeType = AUDIO_MIME[ext]
-    const existing = response.headers.get('content-type') ?? ''
-    const headers = new Headers(response.headers)
-    headers.set('access-control-allow-origin', '*')
-    if (mimeType && !existing.startsWith('audio/')) {
-      headers.set('content-type', mimeType)
+app
+  .whenReady()
+  .then(() => {
+    // ── Register podcut:// handler ──────────────────────────────────────────
+    // Translates podcut://localhost/%2FUsers%2F...%2Ftrack.mp3
+    // back to a file:// URL and delegates to net.fetch (which runs in the
+    // privileged main process and CAN load local files).
+    // Map file extension → correct audio MIME type.
+    // Without this, net.fetch returns audio files as application/octet-stream
+    // which Chromium refuses to decode in an <audio> element.
+    const AUDIO_MIME: Record<string, string> = {
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.flac': 'audio/flac',
+      '.aac': 'audio/aac',
+      '.m4a': 'audio/mp4',
+      '.ogg': 'audio/ogg',
+      '.opus': 'audio/ogg',
     }
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+
+    protocol.handle('podcut', async (request) => {
+      const { pathname } = new URL(request.url)
+      // pathname is like /%2FUsers%2Fboning%2FDownloads%2Ftrack.mp3
+      // slice(1) removes the leading '/', then we decode to get the real path.
+      const filePath = decodeURIComponent(pathname.slice(1))
+
+      // Forward ALL headers from the renderer's request — critically the
+      // Range header that <audio> sends for byte-range streaming and seeking.
+      const response = await net.fetch(pathToFileURL(filePath).href, {
+        headers: Object.fromEntries(request.headers.entries()),
+      })
+
+      // Always rebuild headers so we can:
+      //   a) patch Content-Type for correct audio MIME
+      //   b) add Access-Control-Allow-Origin so createMediaElementSource() works
+      //      (the Web Audio API treats podcut:// as a cross-origin resource and
+      //       requires CORS headers even for local files)
+      const ext = extname(filePath).toLowerCase()
+      const mimeType = AUDIO_MIME[ext]
+      const existing = response.headers.get('content-type') ?? ''
+      const headers = new Headers(response.headers)
+      headers.set('access-control-allow-origin', '*')
+      if (mimeType && !existing.startsWith('audio/')) {
+        headers.set('content-type', mimeType)
+      }
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      })
+    })
+
+    createWindow()
+
+    // macOS: re-create a window when the dock icon is clicked and no windows exist
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
   })
-
-  createWindow()
-
-  // macOS: re-create a window when the dock icon is clicked and no windows exist
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+  .catch((error) => console.error('[Main] Application startup failed:', error))
 
 // Quit when all windows are closed (except on macOS where the app stays active)
 app.on('window-all-closed', () => {

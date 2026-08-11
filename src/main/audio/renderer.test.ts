@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildRenderArgs } from './renderer'
-import type { ProjectFile } from '@shared/project.types'
+import type { ProjectFile, Track } from '@shared/project.types'
 
 // Minimal project factory — shape must match actual ProjectFile schema
 function makeProject(
@@ -76,7 +76,7 @@ describe('buildRenderArgs', () => {
   it('skips fully-muted tracks and does not include them in amix', () => {
     const project = makeProject([{ sfIdx: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0 }])
     // Manually add a second track with all muted clips
-    project.tracks.push({
+    const mutedTrack: Track = {
       id: 'track-1',
       name: 'Music',
       clips: [
@@ -97,7 +97,8 @@ describe('buildRenderArgs', () => {
       solo: false,
       color: '#10b981',
       effects: [],
-    } as any)
+    }
+    project.tracks.push(mutedTrack)
     const args = buildRenderArgs(project, '/tmp/out.mp3')
     const fc = args[args.indexOf('-filter_complex') + 1]
     // Only 1 active track — no amix=inputs=2, and -map must be present

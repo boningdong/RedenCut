@@ -90,7 +90,11 @@ export function TransportBar() {
       <Button
         size="sm"
         variant="primary"
-        onClick={handlePlayPause}
+        onClick={() => {
+          void handlePlayPause().catch((error: unknown) => {
+            console.error('[TransportBar] Failed to toggle playback:', error)
+          })
+        }}
         title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
       >
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
