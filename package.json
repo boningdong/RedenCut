@@ -9,7 +9,12 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --build --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\" \"*.{ts,mjs,json}\" .prettierrc.json",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\" \"*.{ts,mjs,json}\" .prettierrc.json",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"*.config.ts\"",
+    "deadcode": "knip",
+    "check": "npm run format:check && npm run lint && npm run deadcode && npm run typecheck && npm test && npm run build"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +24,7 @@
     "node": "24.14.0"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^25.3.5",
     "@types/react": "^19.2.14",
@@ -26,8 +32,15 @@
     "@vitejs/plugin-react": "^5.1.4",
     "electron": "^40.8.0",
     "electron-vite": "^5.0.0",
+    "eslint": "10.8.1",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.9.0",
+    "knip": "6.32.1",
+    "prettier": "3.9.6",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
+    "typescript-eslint": "8.67.0",
     "vite": "^7.3.1",
     "vitest": "^4.1.0"
   },
