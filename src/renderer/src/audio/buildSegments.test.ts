@@ -15,9 +15,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest'
-import { buildSegmentsForSource } from '../buildSegments'
+import { buildSegmentsForSource } from './buildSegments'
 import type { Track, Clip } from '@shared/project.types'
-import type { FrameEntry } from '../FrameIndex'
+import type { FrameEntry } from './FrameIndex'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

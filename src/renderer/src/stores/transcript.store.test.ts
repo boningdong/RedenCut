@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useTranscriptStore } from '../transcript.store'
+import { useTranscriptStore } from './transcript.store'
 import type { Word } from '@shared/project.types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -37,6 +37,78 @@ function seedWords() {
     makeWord('w4', 20, 30),
   ])
 }
+
+describe('toggleTrackVisibility', () => {
+  beforeEach(resetStore)
+
+  it('adds a track that is not yet visible', () => {
+    ts().toggleTrackVisibility('t1')
+    expect(ts().visibleTrackIds).toContain('t1')
+  })
+
+  it('removes a track that is already visible', () => {
+    ts().toggleTrackVisibility('t1')
+    ts().toggleTrackVisibility('t1')
+    expect(ts().visibleTrackIds).not.toContain('t1')
+  })
+
+  it('toggling one track does not affect another', () => {
+    ts().toggleTrackVisibility('t1')
+    ts().toggleTrackVisibility('t2')
+    ts().toggleTrackVisibility('t1')
+    expect(ts().visibleTrackIds).not.toContain('t1')
+    expect(ts().visibleTrackIds).toContain('t2')
+  })
+})
+
+describe('ensureTrackVisible', () => {
+  beforeEach(resetStore)
+
+  it('adds track when absent', () => {
+    ts().ensureTrackVisible('t1')
+    expect(ts().visibleTrackIds).toContain('t1')
+  })
+
+  it('is idempotent — calling twice does not duplicate the id', () => {
+    ts().ensureTrackVisible('t1')
+    ts().ensureTrackVisible('t1')
+    expect(ts().visibleTrackIds.filter((id) => id === 't1')).toHaveLength(1)
+  })
+})
+
+describe('removeWordsForTrack', () => {
+  beforeEach(resetStore)
+
+  function setWordsForTwoTracks() {
+    ts().setWords([
+      { ...makeWord('w1', 0, 1), trackId: 't1' },
+      { ...makeWord('w2', 1, 2), trackId: 't2' },
+    ])
+  }
+
+  it('removes words belonging to the track', () => {
+    setWordsForTwoTracks()
+    ts().removeWordsForTrack('t1')
+    expect(ts().words).toHaveLength(1)
+    expect(ts().words[0].id).toBe('w2')
+  })
+
+  it('removes both the track id from visibleTrackIds and its words atomically', () => {
+    setWordsForTwoTracks()
+    ts().ensureTrackVisible('t1')
+    ts().ensureTrackVisible('t2')
+    ts().removeWordsForTrack('t1')
+    expect(ts().visibleTrackIds).not.toContain('t1')
+    expect(ts().visibleTrackIds).toContain('t2')
+    expect(ts().words.some((word) => word.trackId === 't1')).toBe(false)
+  })
+
+  it('leaves other words untouched', () => {
+    setWordsForTwoTracks()
+    ts().removeWordsForTrack('t1')
+    expect(ts().words[0].trackId).toBe('t2')
+  })
+})
 
 // ══════════════════════════════════════════════════════════════════════════════
 // setWords
