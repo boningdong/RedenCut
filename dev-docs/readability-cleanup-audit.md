@@ -85,3 +85,52 @@ All reference evidence below was captured before editing. A result described as 
 - Post-edit `npx knip --files`: exit 0, no findings.
 - Post-edit `npx knip --dependencies`: exit 0, no findings.
 - No new Knip exceptions were added; the two existing dynamic binary exceptions were retained and clarified with the runtime consumer.
+
+## Final Verification
+
+Tested commit: `61412d67ed92efbd1a691ab21e7c464501a0a2d0` (`refactor: remove confirmed unused code`). The tracked worktree was clean before verification.
+
+### Automated gate
+
+`npm run check` exited 0. Its complete chained gate ran every component:
+
+| Command | Exit status | Evidence |
+| --- | --- | --- |
+| `npm run format:check` | 0 | Prettier reported `All matched files use Prettier code style!` |
+| `npm run lint` | 0 | ESLint completed with no findings. |
+| `npm run deadcode` | 0 | Knip completed with no findings. |
+| `npm run typecheck` | 0 | `tsc --build --noEmit` completed with no diagnostics. |
+| `npm test` | 0 | Vitest reported 7 test files passed and 112 tests passed. |
+| `npm run build` | 0 | electron-vite built main, preload, and renderer outputs successfully. |
+
+The independent process-boundary searches both produced no matches (`rg` exit 1 is the expected no-match status):
+
+- `rg -n "from ['\"](electron|node:|fs|path|child_process|@main/|@preload/)" src/renderer`: exit 1, no renderer imports of Node, Electron, main, or preload modules.
+- `rg -n "from ['\"](@renderer/|.*renderer/)" src/main src/preload`: exit 1, no main/preload imports of renderer modules.
+
+### Smoke test
+
+`npm run dev` was first attempted in the sandbox. Main and preload built, but the renderer server could not bind `::1:5173` (`EPERM`), so that attempt exited 1. An escalated retry built main and preload, served the renderer at `http://localhost:5173/`, printed `starting electron app...`, and remained alive without additional terminal output until it was intentionally stopped with Ctrl-C. Desktop capture failed with `could not create image from display`, and macOS window inspection did not return because the required permission was unavailable. Repository search found no supported audio files or `.podcut` fixtures. `command -v` found `/opt/homebrew/bin/ffmpeg`, `/opt/homebrew/bin/ffprobe`, and `/opt/homebrew/bin/whisper-cli`, but dependency presence alone does not verify the corresponding UI paths.
+
+| Smoke item | Status | Evidence and reason |
+| --- | --- | --- |
+| Electron window opens without a startup error | Not run | The dev process reached `starting electron app...` and stayed alive, but direct window observation was unavailable; terminal liveness is not sufficient evidence that a window opened. |
+| Supported audio opens and generates a waveform | Not run | No supported audio fixture was present, and the window could not be controlled. |
+| Playback starts, pauses, seeks, and stops at the end | Not run | No supported audio fixture was present, and the window could not be controlled. |
+| Preview mode skips muted regions | Not run | No supported audio fixture was present, and the window could not be controlled. |
+| Adding and removing a track produces no ghost audio | Not run | No supported audio fixture was present, and the window could not be controlled. |
+| Successful playback has no routine debug logging; fallback warnings still use `SimpleAudioPlayer` with the primary source | Not run | No playback occurred and no fallback branch was exercised. |
+| A current project saves and reopens | Not run | No current project fixture or controllable window was available. |
+| A legacy project opens through migration | Not run | No legacy `.podcut` fixture was present. |
+| Transcript generation availability reaches its existing success or actionable error state | Not run | `whisper-cli` is installed, but no media was available and the transcript UI could not be exercised. |
+| Export dialogs reach their existing success or actionable error states | Not run | FFmpeg and FFprobe are installed, but no media/project was available and the export UI could not be exercised. |
+
+### Retained narrow exceptions
+
+- `knip.jsonc` ignores `ffmpeg-static` and `ffprobe-static` because `src/main/audio/binaries.ts` selects those Apple Silicon fallback package names at runtime and loads them through `require(packageName)`, which static dependency analysis cannot resolve.
+- `src/main/audio/binaries.ts` suppresses `@typescript-eslint/no-require-imports` on that dynamic load because runtime `require(packageName)` permits the optional fallback to be selected by name and a missing package to be caught.
+- `src/renderer/src/components/Waveform/WaveformView.tsx` suppresses `react-hooks/exhaustive-deps` for primary peak synchronization because the effect must run only when `peaks` changes; adding `tracks` would stamp the old primary peaks onto a newly added track ID.
+
+### Remaining verification risk
+
+Package 1 has a clean automated baseline, but all interactive smoke behaviors remain unverified for the reasons recorded above and require a manual run with supported media plus current and legacy project fixtures. The coverage inventories at the top of `timeline.store.test.ts` and `transcript.store.test.ts` omit some suites added during test colocation; Task 7 permits final-documentation edits only, so those test-file comments remain a deferred minor cleanup.
