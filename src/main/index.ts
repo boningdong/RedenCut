@@ -28,10 +28,10 @@ protocol.registerSchemesAsPrivileged([
   {
     scheme: 'podcut',
     privileges: {
-      secure: true,           // treated as a secure origin (no mixed-content blocks)
-      supportFetchAPI: true,  // allow fetch() against this scheme from the renderer
-      stream: true,           // enable byte-range requests (required for audio seeking)
-      bypassCSP: true,        // bypass CSP so the <audio> element can load it
+      secure: true, // treated as a secure origin (no mixed-content blocks)
+      supportFetchAPI: true, // allow fetch() against this scheme from the renderer
+      stream: true, // enable byte-range requests (required for audio seeking)
+      bypassCSP: true, // bypass CSP so the <audio> element can load it
     },
   },
 ])
@@ -45,8 +45,8 @@ function createWindow(): void {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    backgroundColor: '#0f0f0f',       // match --color-bg-primary so no white flash
-    titleBarStyle: 'hiddenInset',      // macOS: integrated traffic-light buttons
+    backgroundColor: '#0f0f0f', // match --color-bg-primary so no white flash
+    titleBarStyle: 'hiddenInset', // macOS: integrated traffic-light buttons
     // Windows note: titleBarStyle 'hiddenInset' is ignored on Windows.
     // Add `frame: false` + custom drag region for Windows later.
     webPreferences: {
@@ -64,7 +64,7 @@ function createWindow(): void {
   // ELECTRON_RENDERER_URL. In prod, we load the built HTML file.
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-    win.webContents.openDevTools()     // auto-open DevTools in dev
+    win.webContents.openDevTools() // auto-open DevTools in dev
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
@@ -116,7 +116,11 @@ app.whenReady().then(() => {
     if (mimeType && !existing.startsWith('audio/')) {
       headers.set('content-type', mimeType)
     }
-    return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    })
   })
 
   createWindow()

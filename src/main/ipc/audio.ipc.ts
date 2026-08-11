@@ -66,17 +66,13 @@ ipcMain.handle('audio:generate-peaks', async (event, filePath: string) => {
   // First probe the file to get its duration (needed for progress estimation)
   const metadata = await probeAudio(filePath)
 
-  const peaks = await generatePeaks(
-    filePath,
-    metadata.durationSeconds,
-    (progress) => {
-      // Push progress to the renderer — the renderer subscribed via
-      // window.electronAPI.on.peaksProgress() in the useEffect
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('audio:peaks-progress', progress)
-      }
-    },
-  )
+  const peaks = await generatePeaks(filePath, metadata.durationSeconds, (progress) => {
+    // Push progress to the renderer — the renderer subscribed via
+    // window.electronAPI.on.peaksProgress() in the useEffect
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('audio:peaks-progress', progress)
+    }
+  })
 
   return peaks
 })

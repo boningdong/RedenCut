@@ -4,23 +4,20 @@
   "compilerOptions": {
     "composite": true,
     "module": "ESNext",
-    "moduleResolution": "Bundler",   // Vite uses bundler-style resolution
+    "moduleResolution": "Bundler", // Vite uses bundler-style resolution
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",              // React 17+ automatic JSX transform
+    "jsx": "react-jsx", // React 17+ automatic JSX transform
     "strict": true,
     "useDefineForClassFields": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true,                  // Vite handles output; tsc is type-check only
+    "noEmit": true, // Vite handles output; tsc is type-check only
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"],
       "@renderer/*": ["src/renderer/src/*"]
     }
   },
-  "include": [
-    "src/renderer/**/*",
-    "src/shared/**/*"
-  ]
+  "include": ["src/renderer/**/*", "src/shared/**/*"]
 }

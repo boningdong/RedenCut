@@ -59,7 +59,7 @@ describe('removeWordsForTrack', () => {
     useTranscriptStore.getState().ensureTrackVisible('t1')
     useTranscriptStore.getState().ensureTrackVisible('t2')
     useTranscriptStore.getState().removeWordsForTrack('t1')
-    const ids   = useTranscriptStore.getState().visibleTrackIds
+    const ids = useTranscriptStore.getState().visibleTrackIds
     const words = useTranscriptStore.getState().words
     expect(ids).not.toContain('t1')
     expect(ids).toContain('t2')

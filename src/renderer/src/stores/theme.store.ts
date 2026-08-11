@@ -8,14 +8,14 @@
 // applyTheme() is exported for synchronous use in main.tsx (prevents FOUC).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { create }   from 'zustand'
-import darkTheme    from '../themes/dark.json'
-import lightTheme   from '../themes/light.json'
+import { create } from 'zustand'
+import darkTheme from '../themes/dark.json'
+import lightTheme from '../themes/light.json'
 
 export type ThemeName = 'dark' | 'light'
 
 const themes: Record<ThemeName, Record<string, string>> = {
-  dark:  darkTheme  as Record<string, string>,
+  dark: darkTheme as Record<string, string>,
   light: lightTheme as Record<string, string>,
 }
 

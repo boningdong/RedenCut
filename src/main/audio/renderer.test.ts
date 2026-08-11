@@ -3,48 +3,52 @@ import { buildRenderArgs } from './renderer'
 import type { ProjectFile } from '@shared/project.types'
 
 // Minimal project factory — shape must match actual ProjectFile schema
-function makeProject(clips: {
-  sfIdx: number      // index into sourceFiles
-  sourceStart: number
-  sourceEnd: number
-  outputStart: number
-  muted?: boolean
-}[]): ProjectFile {
+function makeProject(
+  clips: {
+    sfIdx: number // index into sourceFiles
+    sourceStart: number
+    sourceEnd: number
+    outputStart: number
+    muted?: boolean
+  }[],
+): ProjectFile {
   const sourceFiles = [
     { id: '/tmp/a.mp3', filePath: '/tmp/a.mp3', duration: 30 },
     { id: '/tmp/b.mp3', filePath: '/tmp/b.mp3', duration: 30 },
   ]
   const trackClips = clips.map((c, i) => ({
-    id:           `clip-${i}`,
-    trackId:      'track-0',
+    id: `clip-${i}`,
+    trackId: 'track-0',
     sourceFileId: sourceFiles[c.sfIdx].id,
-    sourceStart:  c.sourceStart,
-    sourceEnd:    c.sourceEnd,
-    outputStart:  c.outputStart,
-    gain:         1,
-    muted:        c.muted ?? false,
-    effects:      [],
+    sourceStart: c.sourceStart,
+    sourceEnd: c.sourceEnd,
+    outputStart: c.outputStart,
+    gain: 1,
+    muted: c.muted ?? false,
+    effects: [],
   }))
   return {
-    version:     1,
-    createdAt:   '2026-01-01T00:00:00.000Z',
-    source:      { file: '/tmp/a.mp3', sampleRate: 44100, channels: 2, durationSeconds: 30 },
-    edits:       [],
+    version: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    source: { file: '/tmp/a.mp3', sampleRate: 44100, channels: 2, durationSeconds: 30 },
+    edits: [],
     adjustments: [],
-    markers:     [],
-    export:      { targetLUFS: -16, truePeakDbTP: -1.5, format: 'mp3', sampleRate: 48000 },
-    pluginData:  {},
+    markers: [],
+    export: { targetLUFS: -16, truePeakDbTP: -1.5, format: 'mp3', sampleRate: 48000 },
+    pluginData: {},
     sourceFiles,
-    tracks:      [{
-      id:      'track-0',
-      name:    'Voice',
-      clips:   trackClips,
-      volume:  1,
-      muted:   false,
-      solo:    false,
-      color:   '#4f46e5',
-      effects: [],
-    }],
+    tracks: [
+      {
+        id: 'track-0',
+        name: 'Voice',
+        clips: trackClips,
+        volume: 1,
+        muted: false,
+        solo: false,
+        color: '#4f46e5',
+        effects: [],
+      },
+    ],
   } as unknown as ProjectFile
 }
 
@@ -70,15 +74,29 @@ describe('buildRenderArgs', () => {
   })
 
   it('skips fully-muted tracks and does not include them in amix', () => {
-    const project = makeProject([
-      { sfIdx: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0 },
-    ])
+    const project = makeProject([{ sfIdx: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0 }])
     // Manually add a second track with all muted clips
     project.tracks.push({
-      id: 'track-1', name: 'Music',
-      clips: [{ id: 'clip-m', trackId: 'track-1', sourceFileId: '/tmp/b.mp3',
-        sourceStart: 0, sourceEnd: 5, outputStart: 0, gain: 1, muted: true, effects: [] }],
-      volume: 1, muted: false, solo: false, color: '#10b981', effects: [],
+      id: 'track-1',
+      name: 'Music',
+      clips: [
+        {
+          id: 'clip-m',
+          trackId: 'track-1',
+          sourceFileId: '/tmp/b.mp3',
+          sourceStart: 0,
+          sourceEnd: 5,
+          outputStart: 0,
+          gain: 1,
+          muted: true,
+          effects: [],
+        },
+      ],
+      volume: 1,
+      muted: false,
+      solo: false,
+      color: '#10b981',
+      effects: [],
     } as any)
     const args = buildRenderArgs(project, '/tmp/out.mp3')
     const fc = args[args.indexOf('-filter_complex') + 1]
@@ -103,7 +121,9 @@ describe('buildRenderArgs', () => {
     const args = buildRenderArgs(project, '/tmp/out.mp3')
     // Both source files should appear as -i inputs
     const iIndices: number[] = []
-    args.forEach((a, i) => { if (a === '-i') iIndices.push(i + 1) })
+    args.forEach((a, i) => {
+      if (a === '-i') iIndices.push(i + 1)
+    })
     expect(iIndices).toHaveLength(2)
     const fc = args[args.indexOf('-filter_complex') + 1]
     // Second clip references input 1

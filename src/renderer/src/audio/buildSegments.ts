@@ -24,15 +24,15 @@ import type { FrameEntry } from './FrameIndex'
 
 export interface Segment {
   /** Byte offset of the first compressed byte to fetch. 0 for muted segments. */
-  startByte:    number
+  startByte: number
   /** Byte offset of the last byte to fetch (exclusive). 0 for muted segments. */
-  endByte:      number
+  endByte: number
   /** Source-file presentation timestamp at segment start (seconds). */
-  sourceStart:  number
+  sourceStart: number
   /** Output-timeline position at segment start (seconds). */
-  outputStart:  number
+  outputStart: number
   /** Whether this segment should output silence instead of decoded audio. */
-  muted:        boolean
+  muted: boolean
   /** Duration of this segment in seconds. */
   durationSecs: number
 }
@@ -50,12 +50,12 @@ export interface Segment {
  * @param fetchChunkSize  Byte chunk size appended to endByte to ensure a full last frame
  */
 export function buildSegmentsForSource(
-  sourceId:        string,
-  startTime:       number,
-  tracks:          Track[],
-  seekFn:          (time: number) => FrameEntry,
-  sourceDuration:  number,
-  fetchChunkSize:  number,
+  sourceId: string,
+  startTime: number,
+  tracks: Track[],
+  seekFn: (time: number) => FrameEntry,
+  sourceDuration: number,
+  fetchChunkSize: number,
 ): Segment[] {
   const anySolo = tracks.some((t) => t.solo)
   const segs: Segment[] = []
@@ -89,25 +89,25 @@ export function buildSegmentsForSource(
       if (clip.muted) {
         // Muted clip: include as silence so the worklet FIFO stays time-aligned
         segs.push({
-          startByte:    0,
-          endByte:      0,
-          sourceStart:  seekSourceTime,
-          outputStart:  clip.outputStart + (seekSourceTime - clip.sourceStart),
-          muted:        true,
+          startByte: 0,
+          endByte: 0,
+          sourceStart: seekSourceTime,
+          outputStart: clip.outputStart + (seekSourceTime - clip.sourceStart),
+          muted: true,
           durationSecs: clip.sourceEnd - seekSourceTime,
         })
         continue
       }
 
       const startFrame = seekFn(seekSourceTime)
-      const endFrame   = seekFn(clip.sourceEnd)
+      const endFrame = seekFn(clip.sourceEnd)
 
       segs.push({
-        startByte:    startFrame.byteOffset,
-        endByte:      endFrame.byteOffset + fetchChunkSize,  // slightly past to capture last frame
-        sourceStart:  startFrame.time,
-        outputStart:  clip.outputStart + (startFrame.time - clip.sourceStart),
-        muted:        false,
+        startByte: startFrame.byteOffset,
+        endByte: endFrame.byteOffset + fetchChunkSize, // slightly past to capture last frame
+        sourceStart: startFrame.time,
+        outputStart: clip.outputStart + (startFrame.time - clip.sourceStart),
+        muted: false,
         durationSecs: clip.sourceEnd - startFrame.time,
       })
     }
@@ -126,14 +126,16 @@ export function buildSegmentsForSource(
       .flatMap((t) => t.clips)
       .filter((c) => c.sourceFileId === sourceId)
       .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
-    return [{
-      startByte:    0,
-      endByte:      0,
-      sourceStart:  startTime,
-      outputStart:  startTime,
-      muted:        true,
-      durationSecs: Math.max(0, outputEnd - startTime),
-    }]
+    return [
+      {
+        startByte: 0,
+        endByte: 0,
+        sourceStart: startTime,
+        outputStart: startTime,
+        muted: true,
+        durationSecs: Math.max(0, outputEnd - startTime),
+      },
+    ]
   }
 
   // Sort segments by outputStart across all tracks/clips
@@ -148,11 +150,11 @@ export function buildSegmentsForSource(
     const segStart = Math.max(seg.outputStart, startTime)
     if (segStart > cursor + 0.001) {
       withGaps.push({
-        startByte:    0,
-        endByte:      0,
-        sourceStart:  0,
-        outputStart:  cursor,
-        muted:        true,
+        startByte: 0,
+        endByte: 0,
+        sourceStart: 0,
+        outputStart: cursor,
+        muted: true,
         durationSecs: segStart - cursor,
       })
     }

@@ -67,8 +67,8 @@ export const useEditorStore = create<EditorState>()((set) => ({
   ...initialState,
 
   setProjectPath: (path) => set({ projectPath: path }),
-  setIsDirty:     (dirty) => set({ isDirty: dirty }),
-  setProject:     (project) => set({ project }),
+  setIsDirty: (dirty) => set({ isDirty: dirty }),
+  setProject: (project) => set({ project }),
 
   setSelection: (sel) => set({ selection: sel }),
 

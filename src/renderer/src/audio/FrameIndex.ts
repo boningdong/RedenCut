@@ -58,35 +58,37 @@ export interface FrameIndex {
 //
 // Frame size (bytes) = 144 × bitrate / sampleRate + padding
 
-const MP3_BITRATES_V1_L3 = [
-  0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0,
-] // kbps
+const MP3_BITRATES_V1_L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0] // kbps
 
-const MP3_SAMPLE_RATES = [44100, 48000, 32000, 0]   // Hz for MPEG-1
+const MP3_SAMPLE_RATES = [44100, 48000, 32000, 0] // Hz for MPEG-1
 
-const MP3_SAMPLES_PER_FRAME = 1152  // MPEG-1 Layer 3
+const MP3_SAMPLES_PER_FRAME = 1152 // MPEG-1 Layer 3
 
-function parseMp3Header(b0: number, b1: number, b2: number): {
+function parseMp3Header(
+  b0: number,
+  b1: number,
+  b2: number,
+): {
   frameSize: number
   sampleRate: number
 } | null {
   // Check sync word (bits 31-21, first 11 bits all 1)
   if ((b0 & 0xff) !== 0xff || (b1 & 0xe0) !== 0xe0) return null
 
-  const mpegVersion = (b1 >> 3) & 0x03   // 0b11 = MPEG-1, 0b10 = MPEG-2
-  const layer       = (b1 >> 1) & 0x03   // 0b01 = Layer 3
-  if (mpegVersion !== 3 || layer !== 1) return null   // only MPEG-1 Layer 3
+  const mpegVersion = (b1 >> 3) & 0x03 // 0b11 = MPEG-1, 0b10 = MPEG-2
+  const layer = (b1 >> 1) & 0x03 // 0b01 = Layer 3
+  if (mpegVersion !== 3 || layer !== 1) return null // only MPEG-1 Layer 3
 
-  const bitrateIdx  = (b2 >> 4) & 0x0f
-  const sampleIdx   = (b2 >> 2) & 0x03
-  const padding     = (b2 >> 1) & 0x01
+  const bitrateIdx = (b2 >> 4) & 0x0f
+  const sampleIdx = (b2 >> 2) & 0x03
+  const padding = (b2 >> 1) & 0x01
 
-  const bitrate   = MP3_BITRATES_V1_L3[bitrateIdx]
+  const bitrate = MP3_BITRATES_V1_L3[bitrateIdx]
   const sampleRate = MP3_SAMPLE_RATES[sampleIdx]
 
   if (!bitrate || !sampleRate) return null
 
-  const frameSize = Math.floor(144 * (bitrate * 1000) / sampleRate) + padding
+  const frameSize = Math.floor((144 * (bitrate * 1000)) / sampleRate) + padding
   return { frameSize, sampleRate }
 }
 
@@ -115,28 +117,35 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
   // Podcast MP3s often embed cover art in their ID3 tags, making them larger
   // than our initial 256 KB fetch window.  When the tag extends past our
   // buffer, fetch a second 64 KB chunk immediately after the tag.
-  let fileBase = 0      // byte offset of scanData relative to the full file
+  let fileBase = 0 // byte offset of scanData relative to the full file
   let scanData = data
-  let offset   = 0
+  let offset = 0
 
   if (data.length >= 10 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
-    const id3Size = ((data[6] & 0x7f) << 21) | ((data[7] & 0x7f) << 14) |
-                   ((data[8] & 0x7f) <<  7) |  (data[9] & 0x7f)
+    const id3Size =
+      ((data[6] & 0x7f) << 21) |
+      ((data[7] & 0x7f) << 14) |
+      ((data[8] & 0x7f) << 7) |
+      (data[9] & 0x7f)
     const tagEnd = 10 + id3Size
     console.log(`[FrameIndex] MP3 ID3v2 tag: ${id3Size} bytes, tagEnd=${tagEnd}`)
 
     if (tagEnd >= data.length) {
       // Tag larger than initial buffer — fetch 64 KB right after it
       const fetchEnd = tagEnd + 65535
-      console.log(`[FrameIndex] MP3 large ID3 tag (>${data.length} bytes); fetching bytes ${tagEnd}-${fetchEnd}`)
+      console.log(
+        `[FrameIndex] MP3 large ID3 tag (>${data.length} bytes); fetching bytes ${tagEnd}-${fetchEnd}`,
+      )
       try {
         const secondResp = await fetch(url, { headers: { Range: `bytes=${tagEnd}-${fetchEnd}` } })
-        const secondBuf  = await secondResp.arrayBuffer()
-        scanData  = new Uint8Array(secondBuf)
-        fileBase  = tagEnd
-        offset    = 0
+        const secondBuf = await secondResp.arrayBuffer()
+        scanData = new Uint8Array(secondBuf)
+        fileBase = tagEnd
+        offset = 0
       } catch {
-        console.warn('[FrameIndex] MP3 second-chunk fetch failed after large ID3 — uniform fallback')
+        console.warn(
+          '[FrameIndex] MP3 second-chunk fetch failed after large ID3 — uniform fallback',
+        )
         return buildUniformIndex(url, 'mp3', MP3_SAMPLES_PER_FRAME)
       }
     } else {
@@ -159,12 +168,12 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
     const frameDuration = MP3_SAMPLES_PER_FRAME / sampleRate
 
     // Sparse index (every ~0.5 s) to keep memory reasonable
-    if (framesScanned % Math.max(1, Math.round(0.5 * sampleRate / MP3_SAMPLES_PER_FRAME)) === 0) {
+    if (framesScanned % Math.max(1, Math.round((0.5 * sampleRate) / MP3_SAMPLES_PER_FRAME)) === 0) {
       frames.push({ byteOffset: fileBase + offset, time: currentTime, duration: frameDuration })
     }
 
     currentTime += frameDuration
-    offset      += frameSize
+    offset += frameSize
     framesScanned++
   }
 
@@ -178,23 +187,24 @@ async function buildMp3Index(url: string): Promise<FrameIndex> {
   const bytesScanned = fileBase + scanData.length
   if (totalBytes > bytesScanned) {
     const lastFrame = frames[frames.length - 1]
-    const avgBytesPerSec = lastFrame.byteOffset > 0
-      ? lastFrame.byteOffset / Math.max(lastFrame.time, 0.1)
-      : 16000  // 128 kbps fallback
+    const avgBytesPerSec =
+      lastFrame.byteOffset > 0 ? lastFrame.byteOffset / Math.max(lastFrame.time, 0.1) : 16000 // 128 kbps fallback
 
     let extraOffset = bytesScanned
-    let extraTime   = currentTime
+    let extraTime = currentTime
 
     while (extraOffset < totalBytes) {
       const frameDuration = MP3_SAMPLES_PER_FRAME / lastSampleRate
       frames.push({ byteOffset: extraOffset, time: extraTime, duration: frameDuration })
       const approxFrameSize = Math.round(avgBytesPerSec * frameDuration)
       extraOffset += Math.max(1, approxFrameSize)
-      extraTime   += frameDuration
+      extraTime += frameDuration
     }
   }
 
-  console.log(`[FrameIndex] MP3 index built: ${frames.length} entries, ~${currentTime.toFixed(1)}s scanned`)
+  console.log(
+    `[FrameIndex] MP3 index built: ${frames.length} entries, ~${currentTime.toFixed(1)}s scanned`,
+  )
   return createIndex(frames)
 }
 
@@ -214,7 +224,7 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
 
   // ── Total file size ───────────────────────────────────────────────────────
   let totalBytes = 0
-  const cr      = headResp.headers.get('content-range') ?? ''
+  const cr = headResp.headers.get('content-range') ?? ''
   const crMatch = cr.match(/\/(\d+)$/)
   if (crMatch) {
     totalBytes = parseInt(crMatch[1])
@@ -223,9 +233,9 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   }
 
   // ── Stream-read only the first 44 bytes ───────────────────────────────────
-  const reader  = headResp.body!.getReader()
+  const reader = headResp.body!.getReader()
   const scratch = new Uint8Array(44)
-  let   bytesRead = 0
+  let bytesRead = 0
   while (bytesRead < 44) {
     const { done, value } = await reader.read()
     if (done || !value) break
@@ -233,7 +243,9 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
     scratch.set(value.subarray(0, toCopy), bytesRead)
     bytesRead += toCopy
   }
-  reader.cancel().catch(() => { /* ignore */ })
+  reader.cancel().catch(() => {
+    /* ignore */
+  })
 
   const header = new DataView(scratch.buffer)
 
@@ -247,10 +259,10 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   }
 
   // WAV header: "RIFF" at 0, "WAVE" at 8, "fmt " at 12
-  const channels   = header.getUint16(22, true)
+  const channels = header.getUint16(22, true)
   const sampleRate = header.getUint32(24, true)
-  const bitDepth   = header.getUint16(34, true)
-  const dataOffset = 44  // standard PCM header
+  const bitDepth = header.getUint16(34, true)
+  const dataOffset = 44 // standard PCM header
 
   const bytesPerSample = (bitDepth / 8) * channels
   const bytesPerSecond = sampleRate * bytesPerSample
@@ -258,14 +270,16 @@ async function buildWavIndex(url: string): Promise<FrameIndex> {
   const dataBytes = totalBytes > 0 ? totalBytes - dataOffset : 0
 
   const frames: FrameEntry[] = []
-  const stepSeconds = 1.0  // one entry per second
+  const stepSeconds = 1.0 // one entry per second
 
   for (let t = 0; t * bytesPerSecond < dataBytes; t += stepSeconds) {
     const byteOffset = dataOffset + Math.floor(t * bytesPerSecond)
     frames.push({ byteOffset, time: t, duration: stepSeconds })
   }
 
-  console.log(`[FrameIndex] WAV index: ${frames.length} entries, sampleRate=${sampleRate} channels=${channels} bitDepth=${bitDepth}`)
+  console.log(
+    `[FrameIndex] WAV index: ${frames.length} entries, sampleRate=${sampleRate} channels=${channels} bitDepth=${bitDepth}`,
+  )
   return createIndex(frames)
 }
 
@@ -291,7 +305,9 @@ async function buildM4aIndex(url: string): Promise<FrameIndex> {
     const mp4boxFile = MP4Box.createFile()
     const frames: FrameEntry[] = []
 
-    mp4boxFile.onReady = (info: { tracks: Array<{ id: number; type: string; movie_duration: number; movie_timescale: number }> }) => {
+    mp4boxFile.onReady = (info: {
+      tracks: Array<{ id: number; type: string; movie_duration: number; movie_timescale: number }>
+    }) => {
       const audioTrack = info.tracks.find((t) => t.type === 'audio')
       if (!audioTrack) {
         resolve(createIndex(frames))
@@ -319,7 +335,7 @@ async function buildM4aIndex(url: string): Promise<FrameIndex> {
     }
 
     // Fetch and feed data in chunks
-    fetch(url, { headers: { Range: 'bytes=0-2097151' } })  // first 2 MB
+    fetch(url, { headers: { Range: 'bytes=0-2097151' } }) // first 2 MB
       .then((r) => r.arrayBuffer())
       .then((buf) => {
         // mp4box requires a file start property on the buffer
@@ -339,8 +355,8 @@ async function buildM4aIndex(url: string): Promise<FrameIndex> {
 // when the exact parser isn't available.
 
 async function buildUniformIndex(
-  url:             string,
-  codec:           string,
+  url: string,
+  codec: string,
   samplesPerFrame: number,
 ): Promise<FrameIndex> {
   console.log(`[FrameIndex] building uniform index for ${codec} (${samplesPerFrame} spf)`)
@@ -350,7 +366,7 @@ async function buildUniformIndex(
   const contentLength = parseInt(resp.headers.get('content-length') ?? '0')
 
   // Assume 128 kbps for estimating duration if we have no better info
-  const estimatedDuration = contentLength / (128 * 1000 / 8)
+  const estimatedDuration = contentLength / ((128 * 1000) / 8)
   const sampleRate = 44100
   const frameDuration = samplesPerFrame / sampleRate
 
@@ -382,7 +398,8 @@ function createIndex(frames: FrameEntry[]): FrameIndex {
       if (targetTime <= 0) return frames[0]
 
       // Binary search for the last frame whose time <= targetTime
-      let lo = 0, hi = frames.length - 1
+      let lo = 0,
+        hi = frames.length - 1
       while (lo < hi) {
         const mid = (lo + hi + 1) >> 1
         if (frames[mid].time <= targetTime) lo = mid

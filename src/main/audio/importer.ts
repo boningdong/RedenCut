@@ -21,7 +21,7 @@ const execFileAsync = promisify(execFile)
 interface FFprobeStream {
   codec_type: 'audio' | 'video' | 'subtitle'
   codec_name: string
-  sample_rate: string   // ffprobe returns numbers as strings
+  sample_rate: string // ffprobe returns numbers as strings
   channels: number
   duration: string
   bit_rate: string
@@ -42,9 +42,11 @@ export async function probeAudio(filePath: string): Promise<AudioMetadata> {
 
   try {
     const result = await execFileAsync(getFfprobePath(), [
-      '-v', 'quiet',               // suppress banner/warnings
-      '-print_format', 'json',     // output as JSON
-      '-show_streams',             // include stream info (codec, sample rate, etc.)
+      '-v',
+      'quiet', // suppress banner/warnings
+      '-print_format',
+      'json', // output as JSON
+      '-show_streams', // include stream info (codec, sample rate, etc.)
       filePath,
     ])
     stdout = result.stdout

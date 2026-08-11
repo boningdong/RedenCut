@@ -3,13 +3,13 @@
   // NodeNext models modern Node package exports; package.json keeps .ts files
   // in CommonJS mode, while electron-vite still owns emitted bundles.
   "compilerOptions": {
-    "composite": true,            // required for project references
+    "composite": true, // required for project references
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
     "lib": ["ES2022"],
     "strict": true,
-    "esModuleInterop": true,      // allows `import x from 'cjs-module'`
+    "esModuleInterop": true, // allows `import x from 'cjs-module'`
     "skipLibCheck": true,
     "types": ["electron-vite/node"],
     "outDir": "dist-electron",
@@ -19,10 +19,5 @@
       "@main/*": ["src/main/*"]
     }
   },
-  "include": [
-    "*.config.ts",
-    "src/main/**/*",
-    "src/preload/**/*",
-    "src/shared/**/*"
-  ]
+  "include": ["*.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
 }

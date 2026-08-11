@@ -34,10 +34,23 @@ function Pill({ label, value }: { label: string; value: string }) {
         border: '1px solid var(--color-border)',
       }}
     >
-      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <span
+        style={{
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+        }}
+      >
         {label}
       </span>
-      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+      <span
+        style={{
+          fontSize: 'var(--text-sm)',
+          color: 'var(--color-text-primary)',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
         {value}
       </span>
     </div>
@@ -81,7 +94,16 @@ export function FileInfoPanel({ filePath, metadata }: FileInfoPanelProps) {
       <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
         <Pill label="Duration" value={formatDuration(metadata.durationSeconds)} />
         <Pill label="Sample Rate" value={`${(metadata.sampleRate / 1000).toFixed(1)} kHz`} />
-        <Pill label="Channels" value={metadata.channels === 1 ? 'Mono' : metadata.channels === 2 ? 'Stereo' : `${metadata.channels}ch`} />
+        <Pill
+          label="Channels"
+          value={
+            metadata.channels === 1
+              ? 'Mono'
+              : metadata.channels === 2
+                ? 'Stereo'
+                : `${metadata.channels}ch`
+          }
+        />
         <Pill label="Codec" value={metadata.codec.toUpperCase()} />
         {metadata.bitrateKbps > 0 && (
           <Pill label="Bitrate" value={`${metadata.bitrateKbps} kbps`} />

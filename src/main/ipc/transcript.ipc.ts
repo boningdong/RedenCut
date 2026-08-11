@@ -15,13 +15,9 @@ ipcMain.handle('transcript:check-availability', async () => {
 // Transcribes the given audio file using whisper.cpp.
 // Pushes progress status strings on the 'transcript:progress' channel.
 ipcMain.handle('transcript:generate', async (event, filePath: string, language?: string) => {
-  return whisperTranscriber.transcribe(
-    filePath,
-    { language },
-    (status) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send('transcript:progress', status)
-      }
-    },
-  )
+  return whisperTranscriber.transcribe(filePath, { language }, (status) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('transcript:progress', status)
+    }
+  })
 })

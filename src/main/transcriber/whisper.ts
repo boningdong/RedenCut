@@ -40,7 +40,13 @@ import type { Transcript, Word } from '../../shared/project.types'
 
 // ── Model discovery ───────────────────────────────────────────────────────────
 // Checked in priority order — smaller models are faster, larger are more accurate.
-const MODEL_NAMES = ['ggml-base.bin', 'ggml-small.bin', 'ggml-tiny.bin', 'ggml-medium.bin', 'ggml-large-v3.bin']
+const MODEL_NAMES = [
+  'ggml-base.bin',
+  'ggml-small.bin',
+  'ggml-tiny.bin',
+  'ggml-medium.bin',
+  'ggml-large-v3.bin',
+]
 
 const MODEL_SEARCH_DIRS = [
   join(homedir(), '.cache', 'whisper'),
@@ -73,14 +79,14 @@ function parseTimestamp(ts: string): number {
 /** Returns true if the code point is a CJK ideograph or related character. */
 function isCJKCodePoint(cp: number): boolean {
   return (
-    (cp >= 0x2E80 && cp <= 0x2FFF) ||  // CJK Radicals Supplement, Kangxi Radicals
-    (cp >= 0x3000 && cp <= 0x303F) ||  // CJK Symbols and Punctuation
-    (cp >= 0x3040 && cp <= 0x318F) ||  // Hiragana, Katakana, Bopomofo
-    (cp >= 0x3400 && cp <= 0x4DBF) ||  // CJK Extension A
-    (cp >= 0x4E00 && cp <= 0x9FFF) ||  // CJK Unified Ideographs (core)
-    (cp >= 0xF900 && cp <= 0xFAFF) ||  // CJK Compatibility Ideographs
-    (cp >= 0xFE30 && cp <= 0xFE4F) ||  // CJK Compatibility Forms
-    (cp >= 0xFF00 && cp <= 0xFFEF)     // Halfwidth and Fullwidth Forms
+    (cp >= 0x2e80 && cp <= 0x2fff) || // CJK Radicals Supplement, Kangxi Radicals
+    (cp >= 0x3000 && cp <= 0x303f) || // CJK Symbols and Punctuation
+    (cp >= 0x3040 && cp <= 0x318f) || // Hiragana, Katakana, Bopomofo
+    (cp >= 0x3400 && cp <= 0x4dbf) || // CJK Extension A
+    (cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs (core)
+    (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
+    (cp >= 0xfe30 && cp <= 0xfe4f) || // CJK Compatibility Forms
+    (cp >= 0xff00 && cp <= 0xffef) // Halfwidth and Fullwidth Forms
   )
 }
 
@@ -95,16 +101,20 @@ function isCJKCodePoint(cp: number): boolean {
  *   " Hi你好"   → ["Hi", "你", "好"]
  */
 function tokenToUnits(rawText: string): string[] {
-  const text = rawText.replace(/^\s+/, '')  // strip leading whitespace
+  const text = rawText.replace(/^\s+/, '') // strip leading whitespace
   if (!text) return []
 
   const units: string[] = []
   let latinRun = ''
 
-  for (const ch of text) {  // iterates by Unicode code point (handles surrogates)
+  for (const ch of text) {
+    // iterates by Unicode code point (handles surrogates)
     const cp = ch.codePointAt(0) ?? 0
     if (isCJKCodePoint(cp)) {
-      if (latinRun) { units.push(latinRun); latinRun = '' }
+      if (latinRun) {
+        units.push(latinRun)
+        latinRun = ''
+      }
       units.push(ch)
     } else {
       latinRun += ch
@@ -112,7 +122,7 @@ function tokenToUnits(rawText: string): string[] {
   }
   if (latinRun.trim()) units.push(latinRun)
 
-  return units.filter(u => u.trim().length > 0)
+  return units.filter((u) => u.trim().length > 0)
 }
 
 // ── Whisper JSON types ────────────────────────────────────────────────────────
@@ -155,23 +165,17 @@ function nextId(): string {
  */
 function extractWords(segment: WhisperSegment): Word[] {
   const segStart = parseTimestamp(segment.timestamps.from)
-  const segEnd   = parseTimestamp(segment.timestamps.to)
+  const segEnd = parseTimestamp(segment.timestamps.to)
 
   // ── Token-level path ─────────────────────────────────────────────────────
-  const tokens = segment.tokens?.filter(
-    (t) => !t.text.startsWith('[') && t.text.trim().length > 0,
-  )
+  const tokens = segment.tokens?.filter((t) => !t.text.startsWith('[') && t.text.trim().length > 0)
 
   if (tokens && tokens.length > 0 && tokens[0].timestamps) {
     const words: Word[] = []
 
     for (const token of tokens) {
-      const tStart = token.timestamps?.from
-        ? parseTimestamp(token.timestamps.from)
-        : segStart
-      const tEnd = token.timestamps?.to
-        ? parseTimestamp(token.timestamps.to)
-        : segEnd
+      const tStart = token.timestamps?.from ? parseTimestamp(token.timestamps.from) : segStart
+      const tEnd = token.timestamps?.to ? parseTimestamp(token.timestamps.to) : segEnd
 
       const units = tokenToUnits(token.text)
       if (units.length === 0) continue
@@ -212,7 +216,7 @@ function extractWords(segment: WhisperSegment): Word[] {
     }
   }
 
-  const filtered = allUnits.filter(u => u.trim())
+  const filtered = allUnits.filter((u) => u.trim())
   if (filtered.length === 0) return []
 
   const duration = segEnd - segStart
@@ -244,17 +248,30 @@ function extractWords(segment: WhisperSegment): Word[] {
 async function detectLeadingSilence(audioFilePath: string): Promise<number> {
   return new Promise((resolve) => {
     let ffmpegPath: string
-    try { ffmpegPath = getFfmpegPath() }
-    catch { return resolve(0) }   // ffmpeg not available — not fatal here
+    try {
+      ffmpegPath = getFfmpegPath()
+    } catch {
+      return resolve(0)
+    } // ffmpeg not available — not fatal here
 
-    const proc = spawn(ffmpegPath, [
-      '-i', audioFilePath,
-      '-af', 'silencedetect=n=-40dB:d=0.1',   // silence < -40 dB for >= 0.1 s
-      '-f', 'null', '-',
-    ], { stdio: ['ignore', 'ignore', 'pipe'] })
+    const proc = spawn(
+      ffmpegPath,
+      [
+        '-i',
+        audioFilePath,
+        '-af',
+        'silencedetect=n=-40dB:d=0.1', // silence < -40 dB for >= 0.1 s
+        '-f',
+        'null',
+        '-',
+      ],
+      { stdio: ['ignore', 'ignore', 'pipe'] },
+    )
 
     let stderr = ''
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
 
     proc.on('close', () => {
       // FFmpeg prints: "[silencedetect] silence_end: 5.023 | silence_duration: 5.023"
@@ -262,13 +279,13 @@ async function detectLeadingSilence(audioFilePath: string): Promise<number> {
       const match = stderr.match(/silence_end:\s*([\d.]+)/)
       if (match) {
         const endSeconds = parseFloat(match[1])
-        resolve(Math.round(endSeconds * 1000))   // convert to integer ms
+        resolve(Math.round(endSeconds * 1000)) // convert to integer ms
       } else {
-        resolve(0)   // audio starts immediately — no offset needed
+        resolve(0) // audio starts immediately — no offset needed
       }
     })
 
-    proc.on('error', () => resolve(0))   // non-fatal: proceed without offset
+    proc.on('error', () => resolve(0)) // non-fatal: proceed without offset
   })
 }
 
@@ -313,12 +330,10 @@ export class WhisperTranscriber implements ITranscriber {
     onProgress?: (status: string) => void,
   ): Promise<Transcript> {
     const binary = getWhisperPath()
-    if (!binary) throw new Error(await this.unavailableReason() ?? 'whisper-cli not found')
+    if (!binary) throw new Error((await this.unavailableReason()) ?? 'whisper-cli not found')
 
-    const model = options.model && existsSync(options.model)
-      ? options.model
-      : findModel()
-    if (!model) throw new Error(await this.unavailableReason() ?? 'No Whisper model found')
+    const model = options.model && existsSync(options.model) ? options.model : findModel()
+    if (!model) throw new Error((await this.unavailableReason()) ?? 'No Whisper model found')
 
     // Write output to a temp directory so we don't litter the audio folder
     const tmpDir = await mkdtemp(join(tmpdir(), 'podcut-whisper-'))
@@ -336,11 +351,14 @@ export class WhisperTranscriber implements ITranscriber {
       onProgress?.('Starting transcription…')
 
       const args = [
-        '-m', model,
-        '-f', audioFilePath,
+        '-m',
+        model,
+        '-f',
+        audioFilePath,
         '--output-json',
-        '-of', outputPrefix,
-        '--print-progress',   // whisper-cli prints progress lines to stderr
+        '-of',
+        outputPrefix,
+        '--print-progress', // whisper-cli prints progress lines to stderr
       ]
 
       if (leadingSilenceMs > 0) {
@@ -353,7 +371,7 @@ export class WhisperTranscriber implements ITranscriber {
       if (options.language) {
         args.push('-l', options.language)
       } else {
-        args.push('-l', 'auto')   // auto-detect language
+        args.push('-l', 'auto') // auto-detect language
       }
 
       // ── Spawn with streaming stderr for real-time progress ──────────────
@@ -378,10 +396,13 @@ export class WhisperTranscriber implements ITranscriber {
         })
 
         // Kill the process after 20 minutes to avoid hanging indefinitely
-        const timeout = setTimeout(() => {
-          proc.kill()
-          reject(new Error('Transcription timed out after 20 minutes'))
-        }, 20 * 60 * 1000)
+        const timeout = setTimeout(
+          () => {
+            proc.kill()
+            reject(new Error('Transcription timed out after 20 minutes'))
+          },
+          20 * 60 * 1000,
+        )
 
         proc.on('close', (code) => {
           clearTimeout(timeout)
@@ -414,7 +435,6 @@ export class WhisperTranscriber implements ITranscriber {
         speakers: {},
         ...({ language } as object),
       } as Transcript
-
     } finally {
       // Clean up temp directory
       await rm(tmpDir, { recursive: true, force: true })

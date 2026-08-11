@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useTimelineStore }  from '../timeline.store'
+import { useTimelineStore } from '../timeline.store'
 import { useTranscriptStore } from '../transcript.store'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -220,11 +220,9 @@ describe('muteRange', () => {
   })
 
   it('stores wordIds in the undo entry and mutes them in transcript store', () => {
-    useTranscriptStore.getState().setWords([
-      makeWord('w1', 22, 30),
-      makeWord('w2', 35, 45),
-      makeWord('w3', 80, 90),
-    ])
+    useTranscriptStore
+      .getState()
+      .setWords([makeWord('w1', 22, 30), makeWord('w2', 35, 45), makeWord('w3', 80, 90)])
     tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     // Undo stack should carry the word IDs
     expect(tl().undoStack[0].wordIds).toEqual(['w1', 'w2'])
@@ -280,10 +278,9 @@ describe('unmuteClip', () => {
   })
 
   it('unmutes transcript words when wordIds are provided', () => {
-    useTranscriptStore.getState().setWords([
-      makeWord('w1', 22, 30, true),
-      makeWord('w2', 35, 45, true),
-    ])
+    useTranscriptStore
+      .getState()
+      .setWords([makeWord('w1', 22, 30, true), makeWord('w2', 35, 45, true)])
     tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     const mutedClip = primaryClips().find((c) => c.muted)!
     tl().unmuteClip(mutedClip.id)
@@ -338,10 +335,7 @@ describe('undo', () => {
   })
 
   it('unmutes transcript words when undoing a mute', () => {
-    useTranscriptStore.getState().setWords([
-      makeWord('w1', 22, 30),
-      makeWord('w2', 35, 45),
-    ])
+    useTranscriptStore.getState().setWords([makeWord('w1', 22, 30), makeWord('w2', 35, 45)])
     tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     tl().undo()
     const { words } = useTranscriptStore.getState()
@@ -369,11 +363,11 @@ describe('undo', () => {
 
   it('reverts multiple operations in LIFO order', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
-    tl().splitAt(40)       // op 1: [0–40][40–100]
+    tl().splitAt(40) // op 1: [0–40][40–100]
     tl().muteRange(primaryTrackId(), 60, 80) // op 2: [0–40][40–60][60–80 muted][80–100]
-    tl().undo()            // undo op 2
+    tl().undo() // undo op 2
     expect(primaryClips()).toHaveLength(2)
-    tl().undo()            // undo op 1
+    tl().undo() // undo op 1
     expect(primaryClips()).toHaveLength(1)
   })
 
@@ -421,10 +415,7 @@ describe('redo', () => {
   })
 
   it('re-mutes transcript words when redoing a mute operation', () => {
-    useTranscriptStore.getState().setWords([
-      makeWord('w1', 22, 30),
-      makeWord('w2', 35, 45),
-    ])
+    useTranscriptStore.getState().setWords([makeWord('w1', 22, 30), makeWord('w2', 35, 45)])
     tl().muteRange(primaryTrackId(), 20, 60, ['w1', 'w2'])
     tl().undo()
     expect(useTranscriptStore.getState().words.find((w) => w.id === 'w1')!.muted).toBe(false)
@@ -477,17 +468,17 @@ describe('redo', () => {
 
   it('multiple undos followed by multiple redos restores in correct order', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
-    tl().splitAt(30)  // op1: [0–30][30–100]
+    tl().splitAt(30) // op1: [0–30][30–100]
     const secondClip = primaryClips().find((c) => c.sourceStart === 30)!
     tl().setSelectedClipId(secondClip.id)
-    tl().splitAt(70)  // op2: [0–30][30–70][70–100]
-    tl().undo()       // undo op2
-    tl().undo()       // undo op1
+    tl().splitAt(70) // op2: [0–30][30–70][70–100]
+    tl().undo() // undo op2
+    tl().undo() // undo op1
     expect(primaryClips()).toHaveLength(1)
 
-    tl().redo()  // redo op1
+    tl().redo() // redo op1
     expect(primaryClips()).toHaveLength(2)
-    tl().redo()  // redo op2
+    tl().redo() // redo op2
     expect(primaryClips()).toHaveLength(3)
   })
 })
@@ -501,14 +492,30 @@ describe('loadFromProject', () => {
 
   it('restores tracks and source files without affecting undo stack', () => {
     const sourceFiles = [{ id: 'sf1', filePath: '/a.mp3', duration: 60 }]
-    const tracks = [{
-      id: 't1', name: 'Track 1', clips: [{
-        id: 'c1', trackId: 't1', sourceFileId: 'sf1',
-        sourceStart: 0, sourceEnd: 60, outputStart: 0,
-        gain: 1, muted: false, effects: [],
-      }],
-      volume: 1, muted: false, solo: false, color: '#fff', effects: [],
-    }]
+    const tracks = [
+      {
+        id: 't1',
+        name: 'Track 1',
+        clips: [
+          {
+            id: 'c1',
+            trackId: 't1',
+            sourceFileId: 'sf1',
+            sourceStart: 0,
+            sourceEnd: 60,
+            outputStart: 0,
+            gain: 1,
+            muted: false,
+            effects: [],
+          },
+        ],
+        volume: 1,
+        muted: false,
+        solo: false,
+        color: '#fff',
+        effects: [],
+      },
+    ]
     tl().loadFromProject(sourceFiles, tracks)
     expect(tl().sourceFiles).toEqual(sourceFiles)
     expect(tl().tracks).toEqual(tracks)
@@ -546,14 +553,31 @@ describe('getAllClips', () => {
     // Manually add a second source + track for this test
     tl().loadFromProject(
       [...sourceFiles, { id: sfId2, filePath: sfId2, duration: 60 }],
-      [...tracks, {
-        id: 't2', name: 'Track 2', clips: [{
-          id: 'c-bg', trackId: 't2', sourceFileId: sfId2,
-          sourceStart: 0, sourceEnd: 60, outputStart: 0,
-          gain: 1, muted: false, effects: [],
-        }],
-        volume: 1, muted: false, solo: false, color: '#f00', effects: [],
-      }],
+      [
+        ...tracks,
+        {
+          id: 't2',
+          name: 'Track 2',
+          clips: [
+            {
+              id: 'c-bg',
+              trackId: 't2',
+              sourceFileId: sfId2,
+              sourceStart: 0,
+              sourceEnd: 60,
+              outputStart: 0,
+              gain: 1,
+              muted: false,
+              effects: [],
+            },
+          ],
+          volume: 1,
+          muted: false,
+          solo: false,
+          color: '#f00',
+          effects: [],
+        },
+      ],
     )
     expect(tl().getAllClips()).toHaveLength(2)
   })

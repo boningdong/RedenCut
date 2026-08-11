@@ -123,8 +123,7 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
   setSelectedWordIds: (ids) => set({ selectedWordIds: ids }),
   clearSelection: () => set({ selectedWordIds: new Set() }),
 
-  toggleShowMutedWords: () =>
-    set((s) => ({ showMutedWords: !s.showMutedWords })),
+  toggleShowMutedWords: () => set((s) => ({ showMutedWords: !s.showMutedWords })),
 
   toggleTrackVisibility: (trackId) =>
     set((s) => ({
@@ -148,13 +147,13 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
       words: s.words.map((w) => ({
         ...w,
         start: Math.max(0, w.start + offsetSeconds),
-        end:   Math.max(0, w.end   + offsetSeconds),
+        end: Math.max(0, w.end + offsetSeconds),
       })),
     })),
 
   removeWordsForTrack: (trackId) =>
     set((s) => ({
-      words:           s.words.filter((w) => w.trackId !== trackId),
+      words: s.words.filter((w) => w.trackId !== trackId),
       visibleTrackIds: s.visibleTrackIds.filter((id) => id !== trackId),
     })),
 

@@ -9,7 +9,7 @@ import type { Word, Track } from '@shared/project.types'
  * to be positioned at their source-file timestamp).
  */
 export function getWordOutputTime(word: Word, tracks: Track[]): number {
-  if (!word.trackId) return word.start   // legacy fallback
+  if (!word.trackId) return word.start // legacy fallback
 
   const track = tracks.find((t) => t.id === word.trackId)
   if (!track) return word.start

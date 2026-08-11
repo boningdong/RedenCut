@@ -7,9 +7,9 @@ import type { Word } from '@shared/project.types'
  * words sorted by start time.
  */
 export function mergeTrackWords(
-  existing:            Word[],
-  incoming:            Word[],
-  trackId:             string,
+  existing: Word[],
+  incoming: Word[],
+  trackId: string,
   legacySourceFileId?: string,
 ): Word[] {
   return [

@@ -20,8 +20,8 @@ import { create } from 'zustand'
 
 interface PlaybackState {
   isPlaying: boolean
-  currentTime: number      // seconds — updated on every animation tick
-  duration: number         // seconds — set once when audio is loaded
+  currentTime: number // seconds — updated on every animation tick
+  duration: number // seconds — set once when audio is loaded
 
   // ── Actions ──────────────────────────────────────────────────────────────
   setPlaying: (playing: boolean) => void

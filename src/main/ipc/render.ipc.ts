@@ -59,7 +59,11 @@ ipcMain.handle('project:export', async (event, project: ProjectFile, outputPath:
     ffmpeg.on('close', (code) => {
       if (code === 0) {
         if (!event.sender.isDestroyed()) {
-          event.sender.send('render:progress', { percent: 1, currentSeconds: totalSeconds, totalSeconds })
+          event.sender.send('render:progress', {
+            percent: 1,
+            currentSeconds: totalSeconds,
+            totalSeconds,
+          })
         }
         resolve()
       } else {

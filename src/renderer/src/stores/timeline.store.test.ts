@@ -78,8 +78,8 @@ describe('splitAt — after moveClip', () => {
 
     const clips = useTimelineStore.getState().tracks[0].clips
     const rightClip = clips[1]
-    expect(rightClip.sourceStart).toBeCloseTo(2)   // sourceStart + offset
-    expect(rightClip.outputStart).toBeCloseTo(12)  // = time
+    expect(rightClip.sourceStart).toBeCloseTo(2) // sourceStart + offset
+    expect(rightClip.outputStart).toBeCloseTo(12) // = time
   })
 
   it('is a no-op when time is at exactly the clip boundary (not strictly inside)', () => {
@@ -104,6 +104,6 @@ describe('addSourceFile — same path, different duration', () => {
     useTimelineStore.getState().addSourceFile('/tmp/a.mp3', 10)
     useTimelineStore.getState().addSourceFile('/tmp/a.mp3', 99)
     const sf = useTimelineStore.getState().sourceFiles[0]
-    expect(sf.duration).toBe(10)  // original duration preserved
+    expect(sf.duration).toBe(10) // original duration preserved
   })
 })

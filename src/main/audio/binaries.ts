@@ -31,19 +31,15 @@ const FFPROBE_CANDIDATES = [
   '/usr/local/bin/ffprobe',
   '/usr/bin/ffprobe',
 ]
-const FFMPEG_CANDIDATES = [
-  '/opt/homebrew/bin/ffmpeg',
-  '/usr/local/bin/ffmpeg',
-  '/usr/bin/ffmpeg',
-]
+const FFMPEG_CANDIDATES = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg']
 
 // whisper.cpp installed via `brew install whisper-cpp` provides `whisper-cli`.
 // Older formula versions used `whisper` as the binary name.
 const WHISPER_CANDIDATES = [
-  '/opt/homebrew/bin/whisper-cli',   // Apple Silicon (brew install whisper-cpp)
-  '/usr/local/bin/whisper-cli',      // Intel Mac
-  '/usr/bin/whisper-cli',            // Linux
-  '/opt/homebrew/bin/whisper',       // older whisper-cpp formula name
+  '/opt/homebrew/bin/whisper-cli', // Apple Silicon (brew install whisper-cpp)
+  '/usr/local/bin/whisper-cli', // Intel Mac
+  '/usr/bin/whisper-cli', // Linux
+  '/opt/homebrew/bin/whisper', // older whisper-cpp formula name
   '/usr/local/bin/whisper',
 ]
 
@@ -118,9 +114,7 @@ export function getFfprobePath(): string {
   }
 
   throw new Error(
-    'ffprobe not found.\n' +
-    'Install it with: brew install ffmpeg\n' +
-    'Then restart the app.',
+    'ffprobe not found.\n' + 'Install it with: brew install ffmpeg\n' + 'Then restart the app.',
   )
 }
 
@@ -140,9 +134,7 @@ export function getFfmpegPath(): string {
   }
 
   throw new Error(
-    'ffmpeg not found.\n' +
-    'Install it with: brew install ffmpeg\n' +
-    'Then restart the app.',
+    'ffmpeg not found.\n' + 'Install it with: brew install ffmpeg\n' + 'Then restart the app.',
   )
 }
 
@@ -152,7 +144,7 @@ export function getFfmpegPath(): string {
  * availability via `getWhisperPath()` returning null before showing UI.
  */
 export function getWhisperPath(): string | null {
-  if (_whisperPath !== null) return _whisperPath   // cached (may be empty string = not found)
+  if (_whisperPath !== null) return _whisperPath // cached (may be empty string = not found)
 
   const fromPath = findInPath(WHISPER_CANDIDATES, 'whisper-cli')
   if (fromPath) {
@@ -170,8 +162,10 @@ export function getWhisperPath(): string | null {
       _whisperPath = result
       return _whisperPath
     }
-  } catch { /* not found */ }
+  } catch {
+    /* not found */
+  }
 
-  _whisperPath = ''   // cache negative result
+  _whisperPath = '' // cache negative result
   return null
 }

@@ -56,7 +56,11 @@ describe('mergeTrackWords', () => {
   })
 
   it('does not affect words from a different trackId', () => {
-    const existing = [w('x', 0, 'track1', 'sf1'), w('y', 1, 'track2', 'sf2'), w('z', 2, 'track1', 'sf1')]
+    const existing = [
+      w('x', 0, 'track1', 'sf1'),
+      w('y', 1, 'track2', 'sf2'),
+      w('z', 2, 'track1', 'sf1'),
+    ]
     const incoming = [w('new', 0.5, 'track1', 'sf1')]
     const result = mergeTrackWords(existing, incoming, 'track1')
     expect(result.some((r) => r.id === 'y')).toBe(true)
@@ -66,7 +70,7 @@ describe('mergeTrackWords', () => {
   it('is idempotent when called twice with the same incoming', () => {
     const existing = [w('a', 0, 'track1', 'sf1')]
     const incoming = [w('b', 0, 'track1', 'sf1')]
-    const once  = mergeTrackWords(existing, incoming, 'track1')
+    const once = mergeTrackWords(existing, incoming, 'track1')
     const twice = mergeTrackWords(once, incoming, 'track1')
     expect(twice.map((x) => x.id)).toEqual(['b'])
   })

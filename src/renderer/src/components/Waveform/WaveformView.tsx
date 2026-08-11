@@ -43,22 +43,22 @@ interface WaveformViewProps {
 }
 
 // Layout constants
-const HEADER_WIDTH = 90    // px — header column width
-const RULER_HEIGHT = 28    // px — ruler row height (matches TimelinePlugin canvas)
-const LANE_HEIGHT  = 96    // px — clip lane height
+const HEADER_WIDTH = 90 // px — header column width
+const RULER_HEIGHT = 28 // px — ruler row height (matches TimelinePlugin canvas)
+const LANE_HEIGHT = 96 // px — clip lane height
 
 // ── Track loading state ────────────────────────────────────────────────────────
 type TrackPeakState = 'loading' | PeakData
 
 export function WaveformView({ peaks }: WaveformViewProps) {
-  const tracks             = useTimelineStore((s) => s.tracks)
-  const addSourceFile      = useTimelineStore((s) => s.addSourceFile)
-  const addTrack           = useTimelineStore((s) => s.addTrack)
-  const removeTrack        = useTimelineStore((s) => s.removeTrack)
-  const moveClip           = useTimelineStore((s) => s.moveClip)
-  const selectedClipId     = useTimelineStore((s) => s.selectedClipId)
-  const setSelectedClipId  = useTimelineStore((s) => s.setSelectedClipId)
-  const selectedTrackId    = useTimelineStore((s) => s.selectedTrackId)
+  const tracks = useTimelineStore((s) => s.tracks)
+  const addSourceFile = useTimelineStore((s) => s.addSourceFile)
+  const addTrack = useTimelineStore((s) => s.addTrack)
+  const removeTrack = useTimelineStore((s) => s.removeTrack)
+  const moveClip = useTimelineStore((s) => s.moveClip)
+  const selectedClipId = useTimelineStore((s) => s.selectedClipId)
+  const setSelectedClipId = useTimelineStore((s) => s.setSelectedClipId)
+  const selectedTrackId = useTimelineStore((s) => s.selectedTrackId)
   const setSelectedTrackId = useTimelineStore((s) => s.setSelectedTrackId)
 
   const currentTime = usePlaybackStore((s) => s.currentTime)
@@ -67,13 +67,12 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   // Falls back to the primary peaks duration when there are no clips.
   // This ensures the ruler and seek mapping always cover the full timeline,
   // even after the original track is removed or a longer clip is added.
-  const maxClipEnd = tracks.flatMap((t) => t.clips).reduce(
-    (max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)),
-    0,
-  )
+  const maxClipEnd = tracks
+    .flatMap((t) => t.clips)
+    .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
   const duration = Math.max(peaks.durationSeconds, maxClipEnd)
 
-  const previewMode  = useEditorStore((s) => s.previewMode)
+  const previewMode = useEditorStore((s) => s.previewMode)
   const setSelection = useEditorStore((s) => s.setSelection)
 
   // Per-track peak loading state (secondary tracks only; primary uses `peaks` prop)
@@ -91,11 +90,11 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     if (tracks.length > 0) {
       setTrackPeaks((prev) => new Map(prev).set(tracks[0].id, peaks))
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [peaks])
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
-  const [zoomLevel, setZoomLevel]     = useState(1.0)
+  const [zoomLevel, setZoomLevel] = useState(1.0)
   const [viewportWidth, setViewportWidth] = useState(800)
   const scrollViewportRef = useRef<HTMLDivElement>(null)
 
@@ -112,11 +111,11 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
   // basePxPerSec: fills viewport at zoom=1. Falls back to 100 when duration unknown.
   const basePxPerSec = duration > 0 && viewportWidth > 0 ? viewportWidth / duration : 100
-  const pxPerSec     = basePxPerSec * zoomLevel
+  const pxPerSec = basePxPerSec * zoomLevel
 
-  const MIN_ZOOM = 1 / 32  // symmetrical with max zoom-in of 32×
+  const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
-  const handleZoomIn  = useCallback(() => setZoomLevel((z) => Math.min(32, z * 2)), [])
+  const handleZoomIn = useCallback(() => setZoomLevel((z) => Math.min(32, z * 2)), [])
   const handleZoomOut = useCallback(() => setZoomLevel((z) => Math.max(MIN_ZOOM, z / 2)), [])
 
   // ── Scroll-to-zoom (imperative — must be non-passive to call preventDefault) ──
@@ -133,7 +132,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [])  // setZoomLevel is stable; MIN_ZOOM is a constant
+  }, []) // setZoomLevel is stable; MIN_ZOOM is a constant
 
   // scaleFactor compresses clip positions when zoomed out below 1×.
   // At zoomLevel ≥ 1 it equals 1 (no change). At zoomLevel < 1 clips scale
@@ -145,7 +144,9 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
   // ── Preview mode skip ─────────────────────────────────────────────────────
   const previewModeRef = useRef(previewMode)
-  useEffect(() => { previewModeRef.current = previewMode }, [previewMode])
+  useEffect(() => {
+    previewModeRef.current = previewMode
+  }, [previewMode])
 
   useEffect(() => {
     const player = getAudioPlayerInstance()
@@ -186,19 +187,22 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   // ── Seek on lane/ruler click ───────────────────────────────────────────────
   // At zoom < 1, clips occupy only scaleFactor * 100% of the content div.
   // Dividing by scaleFactor maps click position back to the correct time.
-  const handleLaneClick = useCallback((e: React.MouseEvent<HTMLDivElement>, trackId?: string) => {
-    if (trackId) setSelectedTrackId(trackId)
-    const rect = e.currentTarget.getBoundingClientRect()
-    const pct  = (e.clientX - rect.left) / rect.width
-    const t    = Math.min(duration, Math.max(0, (pct / scaleFactor) * duration))
-    getAudioPlayerInstance()?.seekTo(t)
-  }, [duration, scaleFactor, setSelectedTrackId])
+  const handleLaneClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>, trackId?: string) => {
+      if (trackId) setSelectedTrackId(trackId)
+      const rect = e.currentTarget.getBoundingClientRect()
+      const pct = (e.clientX - rect.left) / rect.width
+      const t = Math.min(duration, Math.max(0, (pct / scaleFactor) * duration))
+      getAudioPlayerInstance()?.seekTo(t)
+    },
+    [duration, scaleFactor, setSelectedTrackId],
+  )
 
   // ── Add Track ────────────────────────────────────────────────────────────
   const handleAddTrack = useCallback(async () => {
     const result = await window.electronAPI.audio.openFile()
     if (!result) return
-    const sfId    = addSourceFile(result.filePath, result.metadata.durationSeconds)
+    const sfId = addSourceFile(result.filePath, result.metadata.durationSeconds)
     const trackId = addTrack(undefined, sfId)
     try {
       await getAudioPlayerInstance()?.loadSourceFile(sfId, result.filePath)
@@ -211,134 +215,163 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       setTrackPeaks((prev) => new Map(prev).set(trackId, pd))
     } catch (err) {
       console.error('[WaveformView] Failed to generate peaks for new track:', err)
-      setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
+      setTrackPeaks((prev) => {
+        const m = new Map(prev)
+        m.delete(trackId)
+        return m
+      })
     }
   }, [addSourceFile, addTrack])
 
   // ── Remove track ─────────────────────────────────────────────────────────
-  const handleRemoveTrack = useCallback((trackId: string) => {
-    // Snapshot sourceFileIds exclusively owned by this track before removing.
-    // A source shared with another track must NOT be unloaded from the player.
-    const track = tracks.find((t) => t.id === trackId)
-    const ownedSourceIds = track
-      ? [...new Set(track.clips.map((c) => c.sourceFileId))]
-          .filter((sfId) => !tracks.some((t) => t.id !== trackId && t.clips.some((c) => c.sourceFileId === sfId)))
-      : []
+  const handleRemoveTrack = useCallback(
+    (trackId: string) => {
+      // Snapshot sourceFileIds exclusively owned by this track before removing.
+      // A source shared with another track must NOT be unloaded from the player.
+      const track = tracks.find((t) => t.id === trackId)
+      const ownedSourceIds = track
+        ? [...new Set(track.clips.map((c) => c.sourceFileId))].filter(
+            (sfId) =>
+              !tracks.some((t) => t.id !== trackId && t.clips.some((c) => c.sourceFileId === sfId)),
+          )
+        : []
 
-    removeTrack(trackId)
-    useTranscriptStore.getState().removeWordsForTrack(trackId)
-    setTrackPeaks((prev) => { const m = new Map(prev); m.delete(trackId); return m })
+      removeTrack(trackId)
+      useTranscriptStore.getState().removeWordsForTrack(trackId)
+      setTrackPeaks((prev) => {
+        const m = new Map(prev)
+        m.delete(trackId)
+        return m
+      })
 
-    const player = getAudioPlayerInstance()
-    for (const sfId of ownedSourceIds) {
-      player?.removeSourceFile(sfId)
-    }
-  }, [removeTrack, tracks])
+      const player = getAudioPlayerInstance()
+      for (const sfId of ownedSourceIds) {
+        player?.removeSourceFile(sfId)
+      }
+    },
+    [removeTrack, tracks],
+  )
 
   // ── Clip drag ─────────────────────────────────────────────────────────────
   const dragRef = useRef<{
-    clipId:    string
+    clipId: string
     origStart: number
-    ghostPct:  number
-    trackId:   string
-    startX:    number
-    clipDur:   number
+    ghostPct: number
+    trackId: string
+    startX: number
+    clipDur: number
   } | null>(null)
   const [ghostState, setGhostState] = useState<{ pct: number; widthPct: number } | null>(null)
 
-  const handleClipPointerDown = useCallback((
-    e: React.PointerEvent,
-    clip: Clip,
-  ) => {
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    const sf = Math.min(1, zoomLevel)
-    dragRef.current = {
-      clipId:    clip.id,
-      origStart: clip.outputStart,
-      ghostPct:  duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0,
-      trackId:   clip.trackId,
-      startX:    e.clientX,
-      clipDur:   clip.sourceEnd - clip.sourceStart,
-    }
-    const widthPct = duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * sf * 100 : 0
-    setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0, widthPct })
-  }, [duration, zoomLevel])
+  const handleClipPointerDown = useCallback(
+    (e: React.PointerEvent, clip: Clip) => {
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      const sf = Math.min(1, zoomLevel)
+      dragRef.current = {
+        clipId: clip.id,
+        origStart: clip.outputStart,
+        ghostPct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0,
+        trackId: clip.trackId,
+        startX: e.clientX,
+        clipDur: clip.sourceEnd - clip.sourceStart,
+      }
+      const widthPct =
+        duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * sf * 100 : 0
+      setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0, widthPct })
+    },
+    [duration, zoomLevel],
+  )
 
-  const handleClipPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return
-    const delta    = e.clientX - dragRef.current.startX
-    const laneEl   = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
-    const laneW    = laneEl?.getBoundingClientRect().width ?? 1
-    const deltaPct = (delta / laneW) * 100
-    const rawPct   = Math.max(0, dragRef.current.ghostPct + deltaPct)
+  const handleClipPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragRef.current) return
+      const delta = e.clientX - dragRef.current.startX
+      const laneEl = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
+      const laneW = laneEl?.getBoundingClientRect().width ?? 1
+      const deltaPct = (delta / laneW) * 100
+      const rawPct = Math.max(0, dragRef.current.ghostPct + deltaPct)
 
-    // Convert to output-time, snap to nearby edges, convert back to pct
-    const sf              = Math.min(1, zoomLevel)
-    const rawStart        = (rawPct / 100) * (duration / sf)
-    const clipDur         = dragRef.current.clipDur
-    const snapThreshSec   = 5 / pxPerSec
-    const { tracks: all } = useTimelineStore.getState()
-    const allEdges        = all.flatMap((t) =>
-      t.clips
-        .filter((c) => c.id !== dragRef.current!.clipId)
-        .flatMap((c) => [c.outputStart, c.outputStart + (c.sourceEnd - c.sourceStart)])
-    )
-    let snapped = rawStart
-    for (const edge of allEdges) {
-      if (Math.abs(rawStart - edge) < snapThreshSec) { snapped = edge; break }
-      if (Math.abs(rawStart + clipDur - edge) < snapThreshSec) { snapped = edge - clipDur; break }
-    }
-    const snappedPct = (snapped / duration) * sf * 100
+      // Convert to output-time, snap to nearby edges, convert back to pct
+      const sf = Math.min(1, zoomLevel)
+      const rawStart = (rawPct / 100) * (duration / sf)
+      const clipDur = dragRef.current.clipDur
+      const snapThreshSec = 5 / pxPerSec
+      const { tracks: all } = useTimelineStore.getState()
+      const allEdges = all.flatMap((t) =>
+        t.clips
+          .filter((c) => c.id !== dragRef.current!.clipId)
+          .flatMap((c) => [c.outputStart, c.outputStart + (c.sourceEnd - c.sourceStart)]),
+      )
+      let snapped = rawStart
+      for (const edge of allEdges) {
+        if (Math.abs(rawStart - edge) < snapThreshSec) {
+          snapped = edge
+          break
+        }
+        if (Math.abs(rawStart + clipDur - edge) < snapThreshSec) {
+          snapped = edge - clipDur
+          break
+        }
+      }
+      const snappedPct = (snapped / duration) * sf * 100
 
-    setGhostState((g) => g ? { ...g, pct: snappedPct } : null)
-  }, [duration, zoomLevel, pxPerSec])
+      setGhostState((g) => (g ? { ...g, pct: snappedPct } : null))
+    },
+    [duration, zoomLevel, pxPerSec],
+  )
 
-  const handleClipPointerUp = useCallback((_e: React.PointerEvent) => {
-    if (!dragRef.current || !ghostState) { dragRef.current = null; setGhostState(null); return }
-    const sf       = Math.min(1, zoomLevel)
-    // Snap already applied by handleClipPointerMove — recover output time and commit.
-    // Overlap resolution is handled entirely inside moveClip (slot-based, no oscillation).
-    const rawStart = (ghostState.pct / 100) * (duration / sf)
-    moveClip(dragRef.current.clipId, Math.max(0, rawStart))
-    dragRef.current = null
-    setGhostState(null)
-  }, [ghostState, duration, zoomLevel, moveClip])
+  const handleClipPointerUp = useCallback(
+    (_e: React.PointerEvent) => {
+      if (!dragRef.current || !ghostState) {
+        dragRef.current = null
+        setGhostState(null)
+        return
+      }
+      const sf = Math.min(1, zoomLevel)
+      // Snap already applied by handleClipPointerMove — recover output time and commit.
+      // Overlap resolution is handled entirely inside moveClip (slot-based, no oscillation).
+      const rawStart = (ghostState.pct / 100) * (duration / sf)
+      moveClip(dragRef.current.clipId, Math.max(0, rawStart))
+      dragRef.current = null
+      setGhostState(null)
+    },
+    [ghostState, duration, zoomLevel, moveClip],
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
-        display:         'flex',
-        flexDirection:   'column',
+        display: 'flex',
+        flexDirection: 'column',
         backgroundColor: 'var(--color-bg-secondary)',
-        borderBottom:    '1px solid var(--color-border)',
+        borderBottom: '1px solid var(--color-border)',
       }}
     >
       {/* Main area: fixed headers column + scrollable timeline */}
       <div style={{ display: 'flex', flexDirection: 'row' }}>
-
         {/* ── Fixed headers column ──────────────────────────────────────── */}
         <div
           style={{
-            width:     HEADER_WIDTH,
+            width: HEADER_WIDTH,
             flexShrink: 0,
-            display:   'flex',
+            display: 'flex',
             flexDirection: 'column',
           }}
         >
           {/* Ruler spacer — contains zoom controls */}
           <div
             style={{
-              height:          RULER_HEIGHT,
-              boxSizing:       'border-box',
-              borderRight:     '1px solid var(--color-border)',
-              borderBottom:    '1px solid var(--color-border-subtle)',
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'flex-end',
-              padding:         '0 4px',
-              gap:             2,
+              height: RULER_HEIGHT,
+              boxSizing: 'border-box',
+              borderRight: '1px solid var(--color-border)',
+              borderBottom: '1px solid var(--color-border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              padding: '0 4px',
+              gap: 2,
               backgroundColor: 'var(--color-bg-secondary)',
             }}
           >
@@ -348,23 +381,24 @@ export function WaveformView({ peaks }: WaveformViewProps) {
               title="Zoom out"
               style={{
                 background: 'none',
-                border:     '1px solid var(--color-border)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 2,
-                color:      zoomLevel <= MIN_ZOOM ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
-                fontSize:   10,
-                lineHeight:  1,
-                cursor:     zoomLevel <= MIN_ZOOM ? 'not-allowed' : 'pointer',
-                padding:    '1px 3px',
-                opacity:    zoomLevel <= MIN_ZOOM ? 0.4 : 1,
+                color:
+                  zoomLevel <= MIN_ZOOM ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
+                fontSize: 10,
+                lineHeight: 1,
+                cursor: zoomLevel <= MIN_ZOOM ? 'not-allowed' : 'pointer',
+                padding: '1px 3px',
+                opacity: zoomLevel <= MIN_ZOOM ? 0.4 : 1,
               }}
             >
               −
             </button>
             <span
               style={{
-                fontSize:  9,
-                color:     'var(--color-text-muted)',
-                minWidth:  22,
+                fontSize: 9,
+                color: 'var(--color-text-muted)',
+                minWidth: 22,
                 textAlign: 'center',
                 fontVariantNumeric: 'tabular-nums',
               }}
@@ -381,14 +415,14 @@ export function WaveformView({ peaks }: WaveformViewProps) {
               title="Zoom in"
               style={{
                 background: 'none',
-                border:     '1px solid var(--color-border)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 2,
-                color:      zoomLevel >= 32 ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
-                fontSize:   10,
-                lineHeight:  1,
-                cursor:     zoomLevel >= 32 ? 'not-allowed' : 'pointer',
-                padding:    '1px 3px',
-                opacity:    zoomLevel >= 32 ? 0.4 : 1,
+                color: zoomLevel >= 32 ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
+                fontSize: 10,
+                lineHeight: 1,
+                cursor: zoomLevel >= 32 ? 'not-allowed' : 'pointer',
+                padding: '1px 3px',
+                opacity: zoomLevel >= 32 ? 0.4 : 1,
               }}
             >
               +
@@ -407,16 +441,13 @@ export function WaveformView({ peaks }: WaveformViewProps) {
         </div>
 
         {/* ── Scrollable timeline viewport ──────────────────────────────── */}
-        <div
-          ref={scrollViewportRef}
-          style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}
-        >
+        <div ref={scrollViewportRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
           {/* Timeline content — width = zoomLevel × viewport width (min 100%) */}
           <div
             style={{
-              minWidth:  '100%',
-              width:     duration > 0 ? `${pxPerSec * duration}px` : '100%',
-              position:  'relative',
+              minWidth: '100%',
+              width: duration > 0 ? `${pxPerSec * duration}px` : '100%',
+              position: 'relative',
             }}
           >
             {/* Ruler row */}
@@ -424,40 +455,38 @@ export function WaveformView({ peaks }: WaveformViewProps) {
               id="waveform-timeline"
               onClick={handleLaneClick}
               style={{
-                height:       RULER_HEIGHT,
-                width:        '100%',
-                position:     'relative',
-                boxSizing:    'border-box',
+                height: RULER_HEIGHT,
+                width: '100%',
+                position: 'relative',
+                boxSizing: 'border-box',
                 borderBottom: '1px solid var(--color-border-subtle)',
-                cursor:       'crosshair',
-                overflow:     'hidden',
+                cursor: 'crosshair',
+                overflow: 'hidden',
               }}
             >
-              <TimelineRuler
-                duration={duration}
-                pxPerSec={pxPerSec}
-                scaleFactor={scaleFactor}
-              />
+              <TimelineRuler duration={duration} pxPerSec={pxPerSec} scaleFactor={scaleFactor} />
             </div>
 
             {/* Track lanes */}
             {tracks.map((track, trackIndex) => {
-              const peakState     = trackPeaks.get(track.id)
-              const trackPeakData = peakState === 'loading' || peakState === undefined ? null : peakState
+              const peakState = trackPeaks.get(track.id)
+              const trackPeakData =
+                peakState === 'loading' || peakState === undefined ? null : peakState
               return (
                 <div
                   key={track.id}
                   data-lane={track.id}
                   data-trackid={track.id}
                   style={{
-                    height:       LANE_HEIGHT,
-                    position:     'relative',
-                    cursor:       'crosshair',
-                    overflow:     'hidden',
+                    height: LANE_HEIGHT,
+                    position: 'relative',
+                    cursor: 'crosshair',
+                    overflow: 'hidden',
                     borderBottom: '1px solid var(--color-border)',
-                    borderLeft:   track.id === selectedTrackId
-                      ? '2px solid var(--color-accent)'
-                      : '2px solid transparent',
+                    borderLeft:
+                      track.id === selectedTrackId
+                        ? '2px solid var(--color-accent)'
+                        : '2px solid transparent',
                   }}
                   onClick={(e) => handleLaneClick(e, track.id)}
                   onPointerMove={handleClipPointerMove}
@@ -466,14 +495,16 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                   {peakState === 'loading' && (
                     <div
                       style={{
-                        position:       'absolute',
-                        inset:          0,
-                        display:        'flex',
-                        alignItems:     'center',
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                      <span
+                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
+                      >
                         Generating waveform…
                       </span>
                     </div>
@@ -491,9 +522,10 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
                   {/* Clip blocks */}
                   {track.clips.map((clip) => {
-                    const clipDur    = clip.sourceEnd - clip.sourceStart
-                    const leftPct    = duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
-                    const widthPct   = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
+                    const clipDur = clip.sourceEnd - clip.sourceStart
+                    const leftPct =
+                      duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
+                    const widthPct = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
                     const isDragging = dragRef.current?.clipId === clip.id
                     return (
                       <div
@@ -506,24 +538,25 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                           setSelection({ start: clip.outputStart, end: clip.outputStart + clipDur })
                         }}
                         style={{
-                          position:        'absolute',
-                          left:            `${leftPct}%`,
-                          width:           `${widthPct}%`,
-                          top:             4,
-                          bottom:          4,
-                          borderRadius:    3,
-                          border:          clip.id === selectedClipId
-                            ? '1px solid var(--color-accent)'
-                            : '1px solid var(--color-accent-clip-border)',
+                          position: 'absolute',
+                          left: `${leftPct}%`,
+                          width: `${widthPct}%`,
+                          top: 4,
+                          bottom: 4,
+                          borderRadius: 3,
+                          border:
+                            clip.id === selectedClipId
+                              ? '1px solid var(--color-accent)'
+                              : '1px solid var(--color-accent-clip-border)',
                           backgroundColor: clip.muted
                             ? 'var(--color-danger-clip-bg)'
                             : 'var(--color-accent-clip-bg)',
-                          opacity:         isDragging ? 0.4 : 1,
-                          cursor:          'grab',
-                          pointerEvents:   'all',
-                          zIndex:          isDragging ? 0 : 5,
-                          boxSizing:       'border-box',
-                          overflow:        'hidden',
+                          opacity: isDragging ? 0.4 : 1,
+                          cursor: 'grab',
+                          pointerEvents: 'all',
+                          zIndex: isDragging ? 0 : 5,
+                          boxSizing: 'border-box',
+                          overflow: 'hidden',
                         }}
                       >
                         {trackPeakData && (
@@ -540,71 +573,72 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                   })}
 
                   {/* Drag ghost */}
-                  {ghostState && dragRef.current && track.clips.some((c) => c.id === dragRef.current!.clipId) && (
-                    <div
-                      style={{
-                        position:        'absolute',
-                        left:            `${ghostState.pct}%`,
-                        width:           `${ghostState.widthPct}%`,
-                        top:             4,
-                        bottom:          4,
-                        borderRadius:    3,
-                        border:          '1px dashed var(--color-accent)',
-                        backgroundColor: 'var(--color-accent-ghost)',
-                        pointerEvents:   'none',
-                        zIndex:          20,
-                      }}
-                    />
-                  )}
+                  {ghostState &&
+                    dragRef.current &&
+                    track.clips.some((c) => c.id === dragRef.current!.clipId) && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: `${ghostState.pct}%`,
+                          width: `${ghostState.widthPct}%`,
+                          top: 4,
+                          bottom: 4,
+                          borderRadius: 3,
+                          border: '1px dashed var(--color-accent)',
+                          backgroundColor: 'var(--color-accent-ghost)',
+                          pointerEvents: 'none',
+                          zIndex: 20,
+                        }}
+                      />
+                    )}
 
                   {/* Gap overlays — cover waveform between clips */}
                   {(() => {
                     const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
                     return sorted.slice(0, -1).flatMap((clip, i) => {
-                      const clipEnd   = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
+                      const clipEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
                       const nextStart = sorted[i + 1].outputStart
                       if (nextStart <= clipEnd + 0.001) return []
-                      const leftPct  = duration > 0 ? (clipEnd / duration) * scaleFactor * 100 : 0
-                      const widthPct = duration > 0 ? ((nextStart - clipEnd) / duration) * scaleFactor * 100 : 0
-                      return [(
+                      const leftPct = duration > 0 ? (clipEnd / duration) * scaleFactor * 100 : 0
+                      const widthPct =
+                        duration > 0 ? ((nextStart - clipEnd) / duration) * scaleFactor * 100 : 0
+                      return [
                         <div
                           key={`gap-${clip.id}`}
                           style={{
-                            position:        'absolute',
-                            left:            `${leftPct}%`,
-                            width:           `${widthPct}%`,
-                            top:             0,
-                            bottom:          0,
+                            position: 'absolute',
+                            left: `${leftPct}%`,
+                            width: `${widthPct}%`,
+                            top: 0,
+                            bottom: 0,
                             backgroundColor: 'var(--color-bg-secondary)',
-                            pointerEvents:   'none',
-                            zIndex:          6,
+                            pointerEvents: 'none',
+                            zIndex: 6,
                           }}
-                        />
-                      )]
+                        />,
+                      ]
                     })
                   })()}
 
                   {/* Split markers */}
-                  {track.clips
-                    .slice(1)
-                    .map((clip) => (
-                      <div
-                        key={`split-${clip.id}`}
-                        style={{
-                          position:        'absolute',
-                          top:             0,
-                          bottom:          0,
-                          left:            duration > 0
+                  {track.clips.slice(1).map((clip) => (
+                    <div
+                      key={`split-${clip.id}`}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left:
+                          duration > 0
                             ? `calc(${(clip.outputStart / duration) * scaleFactor * 100}% - 1px)`
                             : '0',
-                          width:           2,
-                          backgroundColor: 'var(--color-accent-split)',
-                          pointerEvents:   'none',
-                          zIndex:          10,
-                        }}
-                      />
-                    ))}
-
+                        width: 2,
+                        backgroundColor: 'var(--color-accent-split)',
+                        pointerEvents: 'none',
+                        zIndex: 10,
+                      }}
+                    />
+                  ))}
                 </div>
               )
             })}
@@ -612,17 +646,16 @@ export function WaveformView({ peaks }: WaveformViewProps) {
             {/* Global playhead — inside scrollable content so it scrolls with clips */}
             <div
               style={{
-                position:        'absolute',
-                top:             0,
-                bottom:          0,
-                left:            `${playheadPct}%`,
-                width:           1,
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: `${playheadPct}%`,
+                width: 1,
                 backgroundColor: 'var(--color-playhead)',
-                pointerEvents:   'none',
-                zIndex:          30,
+                pointerEvents: 'none',
+                zIndex: 30,
               }}
             />
-
           </div>
         </div>
       </div>
@@ -631,16 +664,20 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       <div
         onClick={handleAddTrack}
         style={{
-          display:    'flex',
+          display: 'flex',
           alignItems: 'center',
-          padding:    '6px 12px',
-          cursor:     'pointer',
-          color:      'var(--color-text-muted)',
-          fontSize:   'var(--text-xs)',
-          borderTop:  '1px solid var(--color-border)',
+          padding: '6px 12px',
+          cursor: 'pointer',
+          color: 'var(--color-text-muted)',
+          fontSize: 'var(--text-xs)',
+          borderTop: '1px solid var(--color-border)',
         }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-accent)')}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-text-muted)')}
+        onMouseEnter={(e) =>
+          ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-accent)')
+        }
+        onMouseLeave={(e) =>
+          ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-text-muted)')
+        }
       >
         + Add Track
       </div>
@@ -651,9 +688,9 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 // ── TrackWaveform — per-track WaveSurfer instance ─────────────────────────────
 
 interface TrackWaveformProps {
-  trackId:    string
-  peaks:      PeakData
-  color:      string
+  trackId: string
+  peaks: PeakData
+  color: string
 }
 
 function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
@@ -663,16 +700,16 @@ function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
     if (!containerRef.current) return
 
     const ws = WaveSurfer.create({
-      container:     containerRef.current,
-      waveColor:     color,
+      container: containerRef.current,
+      waveColor: color,
       progressColor: color + '99',
-      cursorWidth:   0,
-      barWidth:      2,
-      barGap:        1,
-      barRadius:     2,
-      height:        LANE_HEIGHT - 8,
-      peaks:         peaks.data,
-      duration:      peaks.durationSeconds,
+      cursorWidth: 0,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 2,
+      height: LANE_HEIGHT - 8,
+      peaks: peaks.data,
+      duration: peaks.durationSeconds,
     })
 
     ws.on('interaction', (t: number) => {
@@ -692,9 +729,9 @@ function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
     <div
       ref={containerRef}
       style={{
-        position:      'absolute',
-        inset:         0,
-        opacity:       0,
+        position: 'absolute',
+        inset: 0,
+        opacity: 0,
         pointerEvents: 'none',
       }}
     />
@@ -709,8 +746,8 @@ function TrackWaveform({ trackId, peaks, color }: TrackWaveformProps) {
 // so it works correctly at any zoom level.
 
 interface TimelineRulerProps {
-  duration:    number
-  pxPerSec:    number
+  duration: number
+  pxPerSec: number
   scaleFactor: number
 }
 
@@ -718,9 +755,9 @@ function TimelineRuler({ duration, pxPerSec, scaleFactor }: TimelineRulerProps) 
   if (duration <= 0 || pxPerSec <= 0) return null
 
   // Pick the smallest "nice" interval that keeps ticks ≥ 40px apart
-  const MIN_PX  = 40
-  const rawSec  = MIN_PX / pxPerSec
-  const NICE    = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
+  const MIN_PX = 40
+  const rawSec = MIN_PX / pxPerSec
+  const NICE = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
   const interval = NICE.find((n) => n >= rawSec) ?? NICE[NICE.length - 1]
 
   const ticks: number[] = []
@@ -731,26 +768,27 @@ function TimelineRuler({ duration, pxPerSec, scaleFactor }: TimelineRulerProps) 
       {ticks.map((t) => {
         const left = (t / duration) * scaleFactor * 100
         if (left > scaleFactor * 100 + 0.1) return null
-        const label = t >= 3600
-          ? `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}m`
-          : t >= 60
-            ? `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
-            : `${t}s`
+        const label =
+          t >= 3600
+            ? `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}m`
+            : t >= 60
+              ? `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
+              : `${t}s`
         return (
           <div
             key={t}
             style={{
-              position:      'absolute',
-              left:          `${left}%`,
-              top:           0,
-              bottom:        0,
-              borderLeft:    '1px solid var(--color-border-subtle)',
-              paddingLeft:   3,
-              display:       'flex',
-              alignItems:    'flex-end',
+              position: 'absolute',
+              left: `${left}%`,
+              top: 0,
+              bottom: 0,
+              borderLeft: '1px solid var(--color-border-subtle)',
+              paddingLeft: 3,
+              display: 'flex',
+              alignItems: 'flex-end',
               paddingBottom: 2,
               pointerEvents: 'none',
-              whiteSpace:    'nowrap',
+              whiteSpace: 'nowrap',
             }}
           >
             <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{label}</span>
@@ -764,37 +802,49 @@ function TimelineRuler({ duration, pxPerSec, scaleFactor }: TimelineRulerProps) 
 // ── ClipWaveform — per-clip waveform SVG ──────────────────────────────────────
 
 interface ClipWaveformProps {
-  peaks:       PeakData
+  peaks: PeakData
   sourceStart: number
-  sourceEnd:   number
-  color:       string
-  muted:       boolean
+  sourceEnd: number
+  color: string
+  muted: boolean
 }
 
-const ClipWaveform = React.memo(function ClipWaveform({ peaks, sourceStart, sourceEnd, color, muted }: ClipWaveformProps) {
+const ClipWaveform = React.memo(function ClipWaveform({
+  peaks,
+  sourceStart,
+  sourceEnd,
+  color,
+  muted,
+}: ClipWaveformProps) {
   const channel = peaks.data[0]
   if (!channel?.length) return null
 
-  const totalLen  = channel.length
-  const dur       = peaks.durationSeconds
-  const startIdx  = Math.floor((sourceStart / dur) * totalLen)
-  const endIdx    = Math.ceil((sourceEnd / dur) * totalLen)
+  const totalLen = channel.length
+  const dur = peaks.durationSeconds
+  const startIdx = Math.floor((sourceStart / dur) * totalLen)
+  const endIdx = Math.ceil((sourceEnd / dur) * totalLen)
   const clipPeaks = channel.slice(startIdx, endIdx)
   if (clipPeaks.length === 0) return null
 
-  const H    = 80
+  const H = 80
   const viewW = clipPeaks.length * 3
 
   return (
     <svg
-      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+      }}
       viewBox={`0 0 ${viewW} ${H}`}
       preserveAspectRatio="none"
     >
-      <g fill={muted ? 'var(--waveform-color-muted)' : (color + 'cc')}>
+      <g fill={muted ? 'var(--waveform-color-muted)' : color + 'cc'}>
         {clipPeaks.map((v, i) => {
           const bh = Math.max(2, v * H)
-          const y  = (H - bh) / 2
+          const y = (H - bh) / 2
           return <rect key={i} x={i * 3} y={y} width={2} height={bh} />
         })}
       </g>

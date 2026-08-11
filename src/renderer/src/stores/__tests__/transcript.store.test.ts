@@ -25,21 +25,16 @@ function resetStore() {
 
 const ts = () => useTranscriptStore.getState()
 
-function makeWord(
-  id: string,
-  start: number,
-  end: number,
-  muted = false,
-): Word {
+function makeWord(id: string, start: number, end: number, muted = false): Word {
   return { id, text: id, start, end, muted }
 }
 
 function seedWords() {
   ts().setWords([
-    makeWord('w1', 0,   5),
-    makeWord('w2', 5,   10),
-    makeWord('w3', 10,  20),
-    makeWord('w4', 20,  30),
+    makeWord('w1', 0, 5),
+    makeWord('w2', 5, 10),
+    makeWord('w3', 10, 20),
+    makeWord('w4', 20, 30),
   ])
 }
 
@@ -69,7 +64,10 @@ describe('setWords', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('muteWords', () => {
-  beforeEach(() => { resetStore(); seedWords() })
+  beforeEach(() => {
+    resetStore()
+    seedWords()
+  })
 
   it('marks the specified words as muted', () => {
     ts().muteWords(['w1', 'w3'])
@@ -99,8 +97,8 @@ describe('unmuteWords', () => {
   beforeEach(() => {
     resetStore()
     ts().setWords([
-      makeWord('w1', 0,  5,  true),
-      makeWord('w2', 5,  10, true),
+      makeWord('w1', 0, 5, true),
+      makeWord('w2', 5, 10, true),
       makeWord('w3', 10, 20, false),
     ])
   })
@@ -128,7 +126,10 @@ describe('unmuteWords', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('setWordMuted', () => {
-  beforeEach(() => { resetStore(); seedWords() })
+  beforeEach(() => {
+    resetStore()
+    seedWords()
+  })
 
   it('mutes a single word by ID', () => {
     ts().setWordMuted('w2', true)
@@ -152,7 +153,10 @@ describe('setWordMuted', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('shiftTimestamps', () => {
-  beforeEach(() => { resetStore(); seedWords() })
+  beforeEach(() => {
+    resetStore()
+    seedWords()
+  })
 
   it('shifts all word timestamps by a positive offset', () => {
     ts().shiftTimestamps(2)
@@ -246,7 +250,7 @@ describe('reset', () => {
 
   it('restores all initial values', () => {
     ts().setWords([makeWord('w1', 0, 5, true)])
-    ts().toggleShowMutedWords()  // now false
+    ts().toggleShowMutedWords() // now false
     ts().setSelectedWordIds(new Set(['w1']))
     ts().setIsGenerating(true)
     ts().setGeneratingStatus('loading…')

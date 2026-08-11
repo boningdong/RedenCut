@@ -26,10 +26,10 @@ import type { Track } from '@shared/project.types'
 
 // ── Internal per-source entry ─────────────────────────────────────────────────
 interface SourceEntry {
-  element:  HTMLAudioElement
-  source:   MediaElementAudioSourceNode
+  element: HTMLAudioElement
+  source: MediaElementAudioSourceNode
   gainNode: GainNode
-  duration: number   // seconds, 0 until loadedmetadata fires
+  duration: number // seconds, 0 until loadedmetadata fires
 }
 
 // ── SimpleAudioPlayer ─────────────────────────────────────────────────────────
@@ -51,10 +51,10 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   private _rafId: number | null = null
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
-  private timeUpdateCbs    = new Set<(t: number) => void>()
-  private playStateCbs     = new Set<(p: boolean) => void>()
+  private timeUpdateCbs = new Set<(t: number) => void>()
+  private playStateCbs = new Set<(p: boolean) => void>()
   private durationChangeCbs = new Set<(d: number) => void>()
-  private endedCbs         = new Set<() => void>()
+  private endedCbs = new Set<() => void>()
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -86,7 +86,7 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     element.crossOrigin = 'anonymous'
     element.preload = 'metadata'
 
-    const source   = ctx.createMediaElementSource(element)
+    const source = ctx.createMediaElementSource(element)
     const gainNode = ctx.createGain()
     gainNode.gain.value = 1
 
@@ -109,7 +109,7 @@ export class SimpleAudioPlayer implements IAudioPlayer {
       this.stopRaf()
       this.emitPlayState(false)
       this.emitTimeUpdate(this.getCurrentTime())
-      this.endedCbs.forEach(cb => cb())
+      this.endedCbs.forEach((cb) => cb())
     })
 
     // Wait for enough metadata to know duration
@@ -120,7 +120,7 @@ export class SimpleAudioPlayer implements IAudioPlayer {
         // Fire durationChangeCbs whenever the max duration across all sources increases.
         const newMax = this.getDuration()
         if (newMax > 0) {
-          this.durationChangeCbs.forEach(cb => cb(newMax))
+          this.durationChangeCbs.forEach((cb) => cb(newMax))
         }
         cleanup()
         resolve()
@@ -128,7 +128,9 @@ export class SimpleAudioPlayer implements IAudioPlayer {
       const onError = () => {
         console.error(`[SimpleAudioPlayer] error loading id=${id}`, element.error)
         cleanup()
-        reject(new Error(`Failed to load audio: ${filePath} (${element.error?.message ?? 'unknown'})`))
+        reject(
+          new Error(`Failed to load audio: ${filePath} (${element.error?.message ?? 'unknown'})`),
+        )
       }
       const cleanup = () => {
         element.removeEventListener('loadedmetadata', onMeta)
@@ -151,8 +153,10 @@ export class SimpleAudioPlayer implements IAudioPlayer {
 
   setTracks(tracks: Track[]): void {
     this.tracks = tracks
-    console.log(`[SimpleAudioPlayer] setTracks — ${tracks.length} tracks, total clips:`,
-      tracks.reduce((n, t) => n + t.clips.length, 0))
+    console.log(
+      `[SimpleAudioPlayer] setTracks — ${tracks.length} tracks, total clips:`,
+      tracks.reduce((n, t) => n + t.clips.length, 0),
+    )
     // Update gain immediately based on current time
     this.updateGains()
   }
@@ -297,7 +301,9 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     this.durationChangeCbs.clear()
     this.endedCbs.clear()
     if (this.ctx && this.ctx.state !== 'closed') {
-      this.ctx.close().catch(() => {/* ignore */})
+      this.ctx.close().catch(() => {
+        /* ignore */
+      })
       this.ctx = null
     }
   }
@@ -345,10 +351,10 @@ export class SimpleAudioPlayer implements IAudioPlayer {
     const t = this.getCurrentTime()
 
     // Determine solo mode — if any track is soloed, only soloed tracks play
-    const anySolo = this.tracks.some(tr => tr.solo)
+    const anySolo = this.tracks.some((tr) => tr.solo)
 
     for (const [sourceId, entry] of this.sources) {
-      let gain = 0  // default: silent until we find an active unmuted clip
+      let gain = 0 // default: silent until we find an active unmuted clip
 
       for (const track of this.tracks) {
         // Skip muted tracks or non-solo tracks when solo mode is active
@@ -380,10 +386,10 @@ export class SimpleAudioPlayer implements IAudioPlayer {
   // ── Emitters ──────────────────────────────────────────────────────────────
 
   private emitTimeUpdate(t: number): void {
-    this.timeUpdateCbs.forEach(cb => cb(t))
+    this.timeUpdateCbs.forEach((cb) => cb(t))
   }
 
   private emitPlayState(playing: boolean): void {
-    this.playStateCbs.forEach(cb => cb(playing))
+    this.playStateCbs.forEach((cb) => cb(playing))
   }
 }

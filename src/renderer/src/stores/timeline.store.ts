@@ -53,25 +53,25 @@ function cloneTracks(tracks: Track[]): Track[] {
 
 interface HistoryEntry {
   /** Snapshot of tracks[] BEFORE this operation — restored on undo. */
-  before:  Track[]
+  before: Track[]
   /** Transcript word IDs that were muted by this operation (un-muted on undo). */
   wordIds: string[]
   /** Human-readable description for debugging. */
-  label:   string
+  label: string
 }
 
 // ── Store shape ────────────────────────────────────────────────────────────────
 
 interface TimelineState {
   sourceFiles: SourceFile[]
-  tracks:      Track[]
-  undoStack:   HistoryEntry[]
+  tracks: Track[]
+  undoStack: HistoryEntry[]
   /**
    * Populated by undo(); cleared by any new mutation.
    * Each entry holds a snapshot of tracks[] before the operation was undone,
    * along with the word IDs that were un-muted so redo can re-mute them.
    */
-  redoStack:   HistoryEntry[]
+  redoStack: HistoryEntry[]
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -114,12 +114,7 @@ interface TimelineState {
    *
    * @param wordIds  Transcript word IDs muted together with this operation.
    */
-  muteRange(
-    trackId:   string,
-    startTime: number,
-    endTime:   number,
-    wordIds?:  string[],
-  ): void
+  muteRange(trackId: string, startTime: number, endTime: number, wordIds?: string[]): void
 
   /**
    * Remove a specific clip by ID from its track.
@@ -180,11 +175,11 @@ interface TimelineState {
 const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
 
 const initialState = {
-  sourceFiles:     [] as SourceFile[],
-  tracks:          [] as Track[],
-  undoStack:       [] as HistoryEntry[],
-  redoStack:       [] as HistoryEntry[],
-  selectedClipId:  null as string | null,
+  sourceFiles: [] as SourceFile[],
+  tracks: [] as Track[],
+  undoStack: [] as HistoryEntry[],
+  redoStack: [] as HistoryEntry[],
+  selectedClipId: null as string | null,
   selectedTrackId: null as string | null,
 }
 
@@ -196,39 +191,43 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     // Use the filePath as sourceFileId so App.tsx can pass the same ID
     // to player.loadSourceFile() without a round-trip to read the store.
     const sourceFileId = filePath
-    const trackId      = nextId('track')
-    const clipId       = nextId('clip')
+    const trackId = nextId('track')
+    const clipId = nextId('clip')
 
     const sourceFile: SourceFile = { id: sourceFileId, filePath, duration }
     const clip: Clip = {
-      id:           clipId,
+      id: clipId,
       trackId,
       sourceFileId,
-      sourceStart:  0,
-      sourceEnd:    duration,
-      outputStart:  0,
-      gain:         1,
-      muted:        false,
-      effects:      [],
+      sourceStart: 0,
+      sourceEnd: duration,
+      outputStart: 0,
+      gain: 1,
+      muted: false,
+      effects: [],
     }
     const track: Track = {
-      id:      trackId,
-      name:    'Track 1',
-      clips:   [clip],
-      volume:  1,
-      muted:   false,
-      solo:    false,
-      color:   TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
+      id: trackId,
+      name: 'Track 1',
+      clips: [clip],
+      volume: 1,
+      muted: false,
+      solo: false,
+      color: TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
       effects: [],
     }
 
-    console.log(`[Timeline] initFromFile — sourceFileId=${sourceFileId} duration=${duration.toFixed(2)}s`)
+    console.log(
+      `[Timeline] initFromFile — sourceFileId=${sourceFileId} duration=${duration.toFixed(2)}s`,
+    )
     set({ sourceFiles: [sourceFile], tracks: [track], undoStack: [], selectedClipId: null })
   },
 
   // ── loadFromProject ─────────────────────────────────────────────────────────
   loadFromProject(sourceFiles, tracks) {
-    console.log(`[Timeline] loadFromProject — ${tracks.length} tracks, ${sourceFiles.length} sources`)
+    console.log(
+      `[Timeline] loadFromProject — ${tracks.length} tracks, ${sourceFiles.length} sources`,
+    )
     set({ sourceFiles, tracks, undoStack: [], selectedClipId: null })
   },
 
@@ -240,7 +239,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       return existing.id
     }
     const sf: SourceFile = { id: filePath, filePath, duration }
-    console.log(`[Timeline] addSourceFile — registered id=${filePath} duration=${duration.toFixed(2)}s`)
+    console.log(
+      `[Timeline] addSourceFile — registered id=${filePath} duration=${duration.toFixed(2)}s`,
+    )
     set((s) => ({ sourceFiles: [...s.sourceFiles, sf] }))
     return filePath
   },
@@ -249,28 +250,28 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   addTrack(name, sourceFileId) {
     const trackId = nextId('track')
     const track: Track = {
-      id:      trackId,
-      name:    name ?? `Track ${get().tracks.length + 1}`,
-      clips:   [],
-      volume:  1,
-      muted:   false,
-      solo:    false,
-      color:   TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
+      id: trackId,
+      name: name ?? `Track ${get().tracks.length + 1}`,
+      clips: [],
+      volume: 1,
+      muted: false,
+      solo: false,
+      color: TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
       effects: [],
     }
     if (sourceFileId) {
       const sf = get().sourceFiles.find((s) => s.id === sourceFileId)
       if (sf) {
         track.clips.push({
-          id:           nextId('clip'),
+          id: nextId('clip'),
           trackId,
           sourceFileId,
-          sourceStart:  0,
-          sourceEnd:    sf.duration,
-          outputStart:  0,
-          gain:         1,
-          muted:        false,
-          effects:      [],
+          sourceStart: 0,
+          sourceEnd: sf.duration,
+          outputStart: 0,
+          gain: 1,
+          muted: false,
+          effects: [],
         })
       }
     }
@@ -308,13 +309,16 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
     console.log(
       `[Timeline] muteRange [${startTime.toFixed(2)}s–${endTime.toFixed(2)}s]` +
-      ` wordIds=${wordIds.length}`,
+        ` wordIds=${wordIds.length}`,
     )
 
     set((s) => ({
-      tracks:    s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),
-      undoStack: [...s.undoStack, { before, wordIds, label: `mute [${startTime.toFixed(1)}–${endTime.toFixed(1)}]` }],
-      redoStack: [],   // any new mutation invalidates the redo future
+      tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),
+      undoStack: [
+        ...s.undoStack,
+        { before, wordIds, label: `mute [${startTime.toFixed(1)}–${endTime.toFixed(1)}]` },
+      ],
+      redoStack: [], // any new mutation invalidates the redo future
     }))
 
     if (wordIds.length > 0) {
@@ -335,11 +339,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     console.log(`[Timeline] removeClip — id=${clipId}`)
 
     set((s) => ({
-      tracks:         s.tracks.map((t) =>
+      tracks: s.tracks.map((t) =>
         t.id === track.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
       ),
-      undoStack:      [...s.undoStack, { before, wordIds: [], label: `remove clip ${clipId}` }],
-      redoStack:      [],
+      undoStack: [...s.undoStack, { before, wordIds: [], label: `remove clip ${clipId}` }],
+      redoStack: [],
       selectedClipId: s.selectedClipId === clipId ? null : s.selectedClipId,
     }))
   },
@@ -351,23 +355,27 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!track) return
 
     const before = cloneTracks(tracks)
-    const clip   = track.clips.find((c) => c.id === clipId)!
+    const clip = track.clips.find((c) => c.id === clipId)!
 
-    console.log(`[Timeline] unmuteClip — id=${clipId} [${clip.sourceStart.toFixed(2)}–${clip.sourceEnd.toFixed(2)}]`)
+    console.log(
+      `[Timeline] unmuteClip — id=${clipId} [${clip.sourceStart.toFixed(2)}–${clip.sourceEnd.toFixed(2)}]`,
+    )
 
     // Set clip unmuted, then merge adjacent unmuted clips
     const updated = track.clips.map((c) => (c.id === clipId ? { ...c, muted: false } : c))
-    const merged  = mergeAdjacentUnmuted(updated)
+    const merged = mergeAdjacentUnmuted(updated)
 
     // Find wordIds from undo stack if not provided
-    const resolvedWordIds = wordIds.length > 0
-      ? wordIds
-      : findWordIdsForClip(get().undoStack, clipId)
+    const resolvedWordIds =
+      wordIds.length > 0 ? wordIds : findWordIdsForClip(get().undoStack, clipId)
 
     set((s) => ({
-      tracks:         s.tracks.map((t) => (t.id === track.id ? { ...t, clips: merged } : t)),
-      undoStack:      [...s.undoStack, { before, wordIds: resolvedWordIds, label: `unmute clip ${clipId}` }],
-      redoStack:      [],   // new mutation invalidates the redo future
+      tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: merged } : t)),
+      undoStack: [
+        ...s.undoStack,
+        { before, wordIds: resolvedWordIds, label: `unmute clip ${clipId}` },
+      ],
+      redoStack: [], // new mutation invalidates the redo future
       selectedClipId: null,
     }))
 
@@ -386,13 +394,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     }
 
     let targetTrackId: string | null = null
-    let targetClip:    Clip | null   = null
+    let targetClip: Clip | null = null
 
     for (const track of tracks) {
       const clip = track.clips.find((c) => c.id === selectedClipId)
       if (clip) {
         targetTrackId = track.id
-        targetClip    = clip
+        targetClip = clip
         break
       }
     }
@@ -424,7 +432,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       outputStart: time,
     }
 
-    console.log(`[Timeline] splitAt ${time.toFixed(2)}s — clip ${targetClip.id} → ${left.id} + ${right.id}`)
+    console.log(
+      `[Timeline] splitAt ${time.toFixed(2)}s — clip ${targetClip.id} → ${left.id} + ${right.id}`,
+    )
 
     set((s) => ({
       tracks: s.tracks.map((t) =>
@@ -433,7 +443,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
           : t,
       ),
       undoStack: [...s.undoStack, { before, wordIds: [], label: `split at ${time.toFixed(1)}` }],
-      redoStack: [],   // new mutation invalidates the redo future
+      redoStack: [], // new mutation invalidates the redo future
     }))
   },
 
@@ -443,12 +453,14 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const srcTrack = tracks.find((t) => t.clips.some((c) => c.id === clipId))
     if (!srcTrack) return
 
-    const before  = cloneTracks(tracks)
-    const clip    = srcTrack.clips.find((c) => c.id === clipId)!
-    const destId  = newTrackId ?? srcTrack.id
+    const before = cloneTracks(tracks)
+    const clip = srcTrack.clips.find((c) => c.id === clipId)!
+    const destId = newTrackId ?? srcTrack.id
     const clipDur = clip.sourceEnd - clip.sourceStart
 
-    console.log(`[Timeline] moveClip ${clipId} → outputStart=${newOutputStart.toFixed(2)}s track=${destId}`)
+    console.log(
+      `[Timeline] moveClip ${clipId} → outputStart=${newOutputStart.toFixed(2)}s track=${destId}`,
+    )
 
     set((s) => {
       let newTracks = s.tracks
@@ -465,16 +477,19 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       const movedClip: Clip = { ...clip, trackId: destId, outputStart: newOutputStart }
       newTracks = newTracks.map((t) => {
         if (t.id !== destId) return t
-        const others = t.clips  // source clip was already removed above
+        const others = t.clips // source clip was already removed above
 
         // Sort others by outputStart to enumerate valid placement slots
         const sorted = [...others].sort((a, b) => a.outputStart - b.outputStart)
         let bestStart = Math.max(0, newOutputStart)
-        let bestDist  = Infinity
+        let bestDist = Infinity
 
         const tryCandidate = (pos: number) => {
           const dist = Math.abs(pos - newOutputStart)
-          if (dist < bestDist) { bestDist = dist; bestStart = pos }
+          if (dist < bestDist) {
+            bestDist = dist
+            bestStart = pos
+          }
         }
 
         if (sorted.length === 0) {
@@ -488,13 +503,14 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
           // Slots between consecutive clips
           for (let i = 0; i < sorted.length - 1; i++) {
             const slotFrom = sorted[i].outputStart + (sorted[i].sourceEnd - sorted[i].sourceStart)
-            const slotTo   = sorted[i + 1].outputStart - clipDur
+            const slotTo = sorted[i + 1].outputStart - clipDur
             if (slotFrom <= slotTo) {
               tryCandidate(Math.min(Math.max(slotFrom, newOutputStart), slotTo))
             }
           }
           // Slot after last clip: [lastEnd, ∞)
-          const lastEnd = sorted[sorted.length - 1].outputStart +
+          const lastEnd =
+            sorted[sorted.length - 1].outputStart +
             (sorted[sorted.length - 1].sourceEnd - sorted[sorted.length - 1].sourceStart)
           tryCandidate(Math.max(lastEnd, newOutputStart))
         }
@@ -505,9 +521,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       })
 
       return {
-        tracks:    newTracks,
+        tracks: newTracks,
         undoStack: [...s.undoStack, { before, wordIds: [], label: `move clip ${clipId}` }],
-        redoStack: [],   // new mutation invalidates the redo future
+        redoStack: [], // new mutation invalidates the redo future
       }
     })
   },
@@ -533,15 +549,15 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
     // and its `wordIds` are re-muted on redo.
     const redoEntry: HistoryEntry = {
-      before:  cloneTracks(tracks),
+      before: cloneTracks(tracks),
       wordIds: entry.wordIds,
-      label:   entry.label,
+      label: entry.label,
     }
 
     set((s) => ({
-      tracks:         entry.before,
-      undoStack:      s.undoStack.slice(0, -1),
-      redoStack:      [...s.redoStack, redoEntry],
+      tracks: entry.before,
+      undoStack: s.undoStack.slice(0, -1),
+      redoStack: [...s.redoStack, redoEntry],
       selectedClipId: null,
     }))
     if (entry.wordIds.length > 0) {
@@ -558,15 +574,15 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
     // Capture current (pre-redo) state as an undo entry so the user can undo again.
     const undoEntry: HistoryEntry = {
-      before:  cloneTracks(tracks),
+      before: cloneTracks(tracks),
       wordIds: entry.wordIds,
-      label:   entry.label,
+      label: entry.label,
     }
 
     set((s) => ({
-      tracks:         entry.before,
-      redoStack:      s.redoStack.slice(0, -1),
-      undoStack:      [...s.undoStack, undoEntry],
+      tracks: entry.before,
+      redoStack: s.redoStack.slice(0, -1),
+      undoStack: [...s.undoStack, undoEntry],
       selectedClipId: null,
     }))
     if (entry.wordIds.length > 0) {
@@ -600,12 +616,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
  * Split clips in a track so that [startTime, endTime] forms its own clip
  * segment, then mark all clips within that range as muted.
  */
-function splitAndMute(
-  clips:     Clip[],
-  startTime: number,
-  endTime:   number,
-  trackId:   string,
-): Clip[] {
+function splitAndMute(clips: Clip[], startTime: number, endTime: number, trackId: string): Clip[] {
   const result: Clip[] = []
 
   for (const clip of clips) {
@@ -617,14 +628,14 @@ function splitAndMute(
 
     // Clip partially or fully inside the mute range — split at boundaries
     const effectiveMuteStart = Math.max(clip.sourceStart, startTime)
-    const effectiveMuteEnd   = Math.min(clip.sourceEnd,   endTime)
+    const effectiveMuteEnd = Math.min(clip.sourceEnd, endTime)
 
     // Left remainder (before the mute region)
     if (clip.sourceStart < effectiveMuteStart) {
       result.push({
         ...clip,
-        id:          nextId('clip'),
-        sourceEnd:   effectiveMuteStart,
+        id: nextId('clip'),
+        sourceEnd: effectiveMuteStart,
         outputStart: clip.sourceStart,
       })
     }
@@ -632,19 +643,19 @@ function splitAndMute(
     // The muted segment — trackId updated; sourceFileId inherited from ...clip
     result.push({
       ...clip,
-      id:          nextId('clip'),
+      id: nextId('clip'),
       trackId,
-      sourceStart:  effectiveMuteStart,
-      sourceEnd:    effectiveMuteEnd,
-      outputStart:  effectiveMuteStart,
-      muted:        true,
+      sourceStart: effectiveMuteStart,
+      sourceEnd: effectiveMuteEnd,
+      outputStart: effectiveMuteStart,
+      muted: true,
     })
 
     // Right remainder (after the mute region)
     if (clip.sourceEnd > effectiveMuteEnd) {
       result.push({
         ...clip,
-        id:          nextId('clip'),
+        id: nextId('clip'),
         sourceStart: effectiveMuteEnd,
         outputStart: effectiveMuteEnd,
       })
@@ -677,9 +688,9 @@ function mergeAdjacentUnmuted(clips: Clip[]): Clip[] {
       !prev.muted &&
       !curr.muted &&
       prev.sourceFileId === curr.sourceFileId &&
-      prev.trackId      === curr.trackId &&
-      Math.abs(prev.sourceEnd   - curr.sourceStart) < 0.001 &&   // source adjacent
-      Math.abs(prevOutputEnd    - curr.outputStart)  < 0.001     // output adjacent
+      prev.trackId === curr.trackId &&
+      Math.abs(prev.sourceEnd - curr.sourceStart) < 0.001 && // source adjacent
+      Math.abs(prevOutputEnd - curr.outputStart) < 0.001 // output adjacent
     ) {
       // Merge: extend prev's source range; output position unchanged
       merged[merged.length - 1] = { ...prev, sourceEnd: curr.sourceEnd }

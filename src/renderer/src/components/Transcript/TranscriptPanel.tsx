@@ -45,22 +45,22 @@ export function TranscriptPanel({
   generatingStatus,
 }: TranscriptPanelProps) {
   const currentTime = usePlaybackStore((s) => s.currentTime)
-  const duration    = usePlaybackStore((s) => s.duration)
+  const duration = usePlaybackStore((s) => s.duration)
 
-  const words              = useTranscriptStore((s) => s.words)
-  const showMutedWords     = useTranscriptStore((s) => s.showMutedWords)
-  const toggleShowMuted    = useTranscriptStore((s) => s.toggleShowMutedWords)
-  const shiftTimestamps    = useTranscriptStore((s) => s.shiftTimestamps)
-  const visibleTrackIds        = useTranscriptStore((s) => s.visibleTrackIds)
-  const toggleTrackVisibility  = useTranscriptStore((s) => s.toggleTrackVisibility)
+  const words = useTranscriptStore((s) => s.words)
+  const showMutedWords = useTranscriptStore((s) => s.showMutedWords)
+  const toggleShowMuted = useTranscriptStore((s) => s.toggleShowMutedWords)
+  const shiftTimestamps = useTranscriptStore((s) => s.shiftTimestamps)
+  const visibleTrackIds = useTranscriptStore((s) => s.visibleTrackIds)
+  const toggleTrackVisibility = useTranscriptStore((s) => s.toggleTrackVisibility)
 
-  const tracks      = useTimelineStore((s) => s.tracks)
+  const tracks = useTimelineStore((s) => s.tracks)
   const sourceFiles = useTimelineStore((s) => s.sourceFiles)
 
   const setSelection = useEditorStore((s) => s.setSelection)
 
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const containerRef  = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const currentWordRef = useRef<HTMLSpanElement | null>(null)
   /** Map from word.id → the rendered <span> element, for selection intersection. */
   const wordEls = useRef<Map<string, HTMLSpanElement>>(new Map())
@@ -101,11 +101,13 @@ export function TranscriptPanel({
   // clips highlight the correct word.
   const currentWordId = useMemo(() => {
     if (words.length === 0) return null
-    return words.find((w) => {
-      const outputStart = getWordOutputTime(w, tracks)
-      const outputEnd   = outputStart + (w.end - w.start)
-      return currentTime >= outputStart && currentTime <= outputEnd
-    })?.id ?? null
+    return (
+      words.find((w) => {
+        const outputStart = getWordOutputTime(w, tracks)
+        const outputEnd = outputStart + (w.end - w.start)
+        return currentTime >= outputStart && currentTime <= outputEnd
+      })?.id ?? null
+    )
   }, [currentTime, words, tracks])
 
   // Scroll current word into view
@@ -131,10 +133,13 @@ export function TranscriptPanel({
         const el = wordEls.current.get(w.id)
         return el != null && range.intersectsNode(el)
       })
-      if (selected.length === 0) { setSelection(null); return }
+      if (selected.length === 0) {
+        setSelection(null)
+        return
+      }
       setSelection({
         start: Math.min(...selected.map((w) => w.start)),
-        end:   Math.max(...selected.map((w) => w.end)),
+        end: Math.max(...selected.map((w) => w.end)),
       })
     }
 
@@ -162,7 +167,7 @@ export function TranscriptPanel({
     if (words.length === 0) return
     const firstWord = words[0]
     const offset = currentTime - firstWord.start
-    if (Math.abs(offset) < 0.01) return   // already aligned — nothing to do
+    if (Math.abs(offset) < 0.01) return // already aligned — nothing to do
     shiftTimestamps(offset)
   }, [words, currentTime, shiftTimestamps])
 
@@ -195,7 +200,7 @@ export function TranscriptPanel({
     // multiple tracks can share the same source file).
     const byTrack = new Map<string, typeof selected>()
     for (const w of selected) {
-      if (!w.trackId) continue   // legacy words without trackId — skip
+      if (!w.trackId) continue // legacy words without trackId — skip
       const arr = byTrack.get(w.trackId) ?? []
       arr.push(w)
       byTrack.set(w.trackId, arr)
@@ -203,8 +208,8 @@ export function TranscriptPanel({
 
     const { muteRange } = useTimelineStore.getState()
     for (const [trackId, tWords] of byTrack) {
-      const tStart   = Math.min(...tWords.map((w) => w.start))
-      const tEnd     = Math.max(...tWords.map((w) => w.end))
+      const tStart = Math.min(...tWords.map((w) => w.start))
+      const tEnd = Math.max(...tWords.map((w) => w.end))
       const tWordIds = tWords.map((w) => w.id)
       muteRange(trackId, tStart, tEnd, tWordIds)
     }
@@ -220,7 +225,7 @@ export function TranscriptPanel({
 
       if (e.code === 'Delete' || e.code === 'Backspace') {
         e.preventDefault()
-        e.stopPropagation()   // don't let the global shortcut double-fire
+        e.stopPropagation() // don't let the global shortcut double-fire
         handleDeleteFromSelection()
         return
       }
@@ -245,18 +250,21 @@ export function TranscriptPanel({
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const visibleWords = useMemo(() => words
-    .filter((w) => !w.trackId || visibleSet.has(w.trackId))
-    .filter((w) => {
-      if (!showMutedWords) {
-        if (w.muted) return false
-        const cs = clipStateMap.get(w.id)
-        if (cs === 'clip-muted' || cs === 'no-clip') return false
-      }
-      return true
-    })
-    .sort((a, b) => getWordOutputTime(a, tracks) - getWordOutputTime(b, tracks)),
-  [words, visibleSet, showMutedWords, clipStateMap, tracks])
+  const visibleWords = useMemo(
+    () =>
+      words
+        .filter((w) => !w.trackId || visibleSet.has(w.trackId))
+        .filter((w) => {
+          if (!showMutedWords) {
+            if (w.muted) return false
+            const cs = clipStateMap.get(w.id)
+            if (cs === 'clip-muted' || cs === 'no-clip') return false
+          }
+          return true
+        })
+        .sort((a, b) => getWordOutputTime(a, tracks) - getWordOutputTime(b, tracks)),
+    [words, visibleSet, showMutedWords, clipStateMap, tracks],
+  )
 
   return (
     <div
@@ -279,14 +287,28 @@ export function TranscriptPanel({
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        <span
+          style={{
+            fontSize: 'var(--text-xs)',
+            color: 'var(--color-text-muted)',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}
+        >
           Transcript
         </span>
         {hasAnyWords && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button
               onClick={handleCalibrateOffset}
-              style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '2px 4px' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-muted)',
+                fontSize: 'var(--text-xs)',
+                cursor: 'pointer',
+                padding: '2px 4px',
+              }}
               title="Shift all word timestamps so the first word aligns with the current playhead position"
             >
               Sync to playhead
@@ -294,7 +316,14 @@ export function TranscriptPanel({
             <span style={{ color: 'var(--color-border)', userSelect: 'none' }}>·</span>
             <button
               onClick={toggleShowMuted}
-              style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '2px 4px' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-muted)',
+                fontSize: 'var(--text-xs)',
+                cursor: 'pointer',
+                padding: '2px 4px',
+              }}
               title={showMutedWords ? 'Hide deleted words' : 'Show deleted words'}
             >
               {showMutedWords ? 'Hide deleted' : 'Show deleted'}
@@ -307,19 +336,27 @@ export function TranscriptPanel({
       {tracks.length > 0 && (
         <div
           style={{
-            display:        'flex',
-            alignItems:     'center',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            gap:            6,
-            padding:        '4px var(--space-3)',
-            borderBottom:   '1px solid var(--color-border)',
-            flexShrink:     0,
-            flexWrap:       'wrap',
-            position:       'relative',
+            gap: 6,
+            padding: '4px var(--space-3)',
+            borderBottom: '1px solid var(--color-border)',
+            flexShrink: 0,
+            flexWrap: 'wrap',
+            position: 'relative',
           }}
         >
           {/* Left: visibility pills OR placeholder */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minHeight: 22 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              flexWrap: 'wrap',
+              minHeight: 22,
+            }}
+          >
             {tracksWithTranscript.length === 0 ? (
               <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                 No transcripts yet
@@ -334,26 +371,26 @@ export function TranscriptPanel({
                       key={track.id}
                       onClick={() => toggleTrackVisibility(track.id)}
                       style={{
-                        display:       'inline-flex',
-                        alignItems:    'center',
-                        gap:           4,
-                        background:    isOn ? `${track.color}28` : 'var(--color-bg-elevated)',
-                        border:        `1px solid ${isOn ? track.color + '88' : 'var(--color-border)'}`,
-                        borderRadius:  10,
-                        color:         isOn ? track.color : 'var(--color-text-muted)',
-                        fontSize:      10,
-                        padding:       '2px 8px',
-                        cursor:        'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: isOn ? `${track.color}28` : 'var(--color-bg-elevated)',
+                        border: `1px solid ${isOn ? track.color + '88' : 'var(--color-border)'}`,
+                        borderRadius: 10,
+                        color: isOn ? track.color : 'var(--color-text-muted)',
+                        fontSize: 10,
+                        padding: '2px 8px',
+                        cursor: 'pointer',
                         letterSpacing: '0.03em',
                       }}
                     >
                       <span
                         style={{
-                          width:           5,
-                          height:          5,
-                          borderRadius:    '50%',
+                          width: 5,
+                          height: 5,
+                          borderRadius: '50%',
                           backgroundColor: isOn ? track.color : 'var(--color-text-muted)',
-                          flexShrink:      0,
+                          flexShrink: 0,
                         }}
                       />
                       {track.name}
@@ -370,17 +407,19 @@ export function TranscriptPanel({
               disabled={allGenerated}
               onClick={() => !allGenerated && setDropdownOpen((o) => !o)}
               style={{
-                display:      'inline-flex',
-                alignItems:   'center',
-                gap:          4,
-                padding:      '2px 8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 8px',
                 borderRadius: 4,
-                fontSize:     10,
-                border:       `1px solid ${allGenerated ? 'var(--color-border)' : 'var(--color-accent-button-border)'}`,
-                background:   allGenerated ? 'var(--color-bg-elevated)' : 'var(--color-accent-button-bg)',
-                color:        allGenerated ? 'var(--color-text-muted)' : 'var(--color-accent-light)',
-                cursor:       allGenerated ? 'not-allowed' : 'pointer',
-                opacity:      allGenerated ? 0.5 : 1,
+                fontSize: 10,
+                border: `1px solid ${allGenerated ? 'var(--color-border)' : 'var(--color-accent-button-border)'}`,
+                background: allGenerated
+                  ? 'var(--color-bg-elevated)'
+                  : 'var(--color-accent-button-bg)',
+                color: allGenerated ? 'var(--color-text-muted)' : 'var(--color-accent-light)',
+                cursor: allGenerated ? 'not-allowed' : 'pointer',
+                opacity: allGenerated ? 0.5 : 1,
               }}
             >
               🤖 Generate ▾
@@ -395,59 +434,77 @@ export function TranscriptPanel({
                 />
                 <div
                   style={{
-                    position:     'absolute',
-                    right:        0,
-                    top:          '100%',
-                    marginTop:    3,
-                    background:   'var(--color-bg-elevated)',
-                    border:       '1px solid var(--color-border)',
+                    position: 'absolute',
+                    right: 0,
+                    top: '100%',
+                    marginTop: 3,
+                    background: 'var(--color-bg-elevated)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: 5,
-                    padding:      '3px 0',
-                    zIndex:       50,
-                    minWidth:     140,
-                    boxShadow:    'var(--shadow-dropdown)',
+                    padding: '3px 0',
+                    zIndex: 50,
+                    minWidth: 140,
+                    boxShadow: 'var(--shadow-dropdown)',
                   }}
                 >
                   {ungeneratedTracks.map((track) => (
                     <button
                       key={track.id}
-                      onClick={() => { setDropdownOpen(false); onGenerate(track.id) }}
-                      style={{
-                        display:    'flex',
-                        alignItems: 'center',
-                        gap:        6,
-                        width:      '100%',
-                        padding:    '4px 10px',
-                        background: 'none',
-                        border:     'none',
-                        color:      'var(--color-text-secondary)',
-                        fontSize:   10,
-                        cursor:     'pointer',
-                        textAlign:  'left',
+                      onClick={() => {
+                        setDropdownOpen(false)
+                        onGenerate(track.id)
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        width: '100%',
+                        padding: '4px 10px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-secondary)',
+                        fontSize: 10,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')
+                      }
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                     >
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: track.color, flexShrink: 0 }} />
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          backgroundColor: track.color,
+                          flexShrink: 0,
+                        }}
+                      />
                       {track.name}
                     </button>
                   ))}
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '2px 0' }} />
                   <button
-                    onClick={() => { setDropdownOpen(false); onGenerate() }}
+                    onClick={() => {
+                      setDropdownOpen(false)
+                      onGenerate()
+                    }}
                     style={{
-                      display:    'block',
-                      width:      '100%',
-                      padding:    '4px 10px',
+                      display: 'block',
+                      width: '100%',
+                      padding: '4px 10px',
                       background: 'none',
-                      border:     'none',
-                      color:      'var(--color-accent-light)',
-                      fontSize:   10,
-                      cursor:     'pointer',
-                      textAlign:  'left',
+                      border: 'none',
+                      color: 'var(--color-accent-light)',
+                      fontSize: 10,
+                      cursor: 'pointer',
+                      textAlign: 'left',
                       fontWeight: 500,
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')
+                    }
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                   >
                     🤖 {tracksWithTranscript.length === 0 ? 'All tracks' : 'All remaining'}
@@ -489,12 +546,11 @@ export function TranscriptPanel({
           }}
         >
           {visibleWords.map((word) => {
-            const isCurrent  = word.id === currentWordId
-            const clipState  = clipStateMap.get(word.id) ?? 'normal'
+            const isCurrent = word.id === currentWordId
+            const clipState = clipStateMap.get(word.id) ?? 'normal'
             // In merged view (multiple tracks visible), show a colored underline per track
-            const trackColor = visibleSet.size > 1
-              ? (trackColorMap.get(word.trackId ?? '') ?? null)
-              : null
+            const trackColor =
+              visibleSet.size > 1 ? (trackColorMap.get(word.trackId ?? '') ?? null) : null
 
             // Style precedence:
             //   isCurrent → terminal highlight
@@ -502,29 +558,29 @@ export function TranscriptPanel({
             //   clip-muted (type b, 'M' on clip) → amber tint, no strikethrough
             //   no-clip    (type c, clip deleted) → gray dim strikethrough
             //   normal     → track color underline in All view
-            let bg         = 'transparent'
-            let wordColor  = 'var(--color-text-primary)'
+            let bg = 'transparent'
+            let wordColor = 'var(--color-text-primary)'
             let decoration = 'none'
-            let borderBot  = '2px solid transparent'
-            let opacity    = 1
+            let borderBot = '2px solid transparent'
+            let opacity = 1
 
             if (isCurrent) {
-              bg        = 'var(--color-accent)'
+              bg = 'var(--color-accent)'
               wordColor = 'var(--color-text-on-accent)'
             } else if (word.muted) {
               // Type a: explicitly deleted via transcript editing
               decoration = 'line-through'
-              opacity    = 0.45
-              wordColor  = 'var(--color-danger-word)'
+              opacity = 0.45
+              wordColor = 'var(--color-danger-word)'
             } else if (clipState === 'clip-muted') {
               // Type b: whole clip muted via 'M' key — audio is silenced as a block
-              bg        = 'var(--color-warning-muted)'
+              bg = 'var(--color-warning-muted)'
               wordColor = 'var(--color-warning)'
             } else if (clipState === 'no-clip') {
               // Type c: clip was deleted — word produces no audio at all
               decoration = 'line-through'
-              opacity    = 0.3
-              wordColor  = 'var(--color-text-muted)'
+              opacity = 0.3
+              wordColor = 'var(--color-text-muted)'
             } else if (trackColor) {
               // Normal in All view: colored underline per track
               borderBot = `2px solid ${trackColor}`
@@ -540,14 +596,14 @@ export function TranscriptPanel({
                 }}
                 onClick={(e) => handleWordClick(e, word)}
                 style={{
-                  display:         'inline',
-                  marginRight:     word.text.match(/[\u2E80-\u9FFF]/) ? '0' : '0.25em',
-                  borderRadius:    2,
-                  padding:         '1px 2px',
+                  display: 'inline',
+                  marginRight: word.text.match(/[\u2E80-\u9FFF]/) ? '0' : '0.25em',
+                  borderRadius: 2,
+                  padding: '1px 2px',
                   backgroundColor: bg,
-                  color:           wordColor,
-                  textDecoration:  decoration,
-                  borderBottom:    borderBot,
+                  color: wordColor,
+                  textDecoration: decoration,
+                  borderBottom: borderBot,
                   opacity,
                 }}
               >
@@ -565,19 +621,38 @@ export function TranscriptPanel({
 
 function EmptyTranscriptState({ noTracks = false }: { noTracks?: boolean }) {
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', textAlign: 'center' }}>
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-        stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 'var(--space-3)',
+        padding: 'var(--space-4)',
+        textAlign: 'center',
+      }}
+    >
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--color-text-muted)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
         <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
         <line x1="12" y1="19" x2="12" y2="23" />
         <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
-      <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>No transcript yet</p>
+      <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+        No transcript yet
+      </p>
       <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 180 }}>
-        {noTracks
-          ? 'Add a track to get started'
-          : 'Use 🤖 Generate above to transcribe a track'}
+        {noTracks ? 'Add a track to get started' : 'Use 🤖 Generate above to transcribe a track'}
       </p>
     </div>
   )
@@ -602,7 +677,18 @@ function GeneratingState({ status }: { status: string }) {
   const pct = pctMatch ? parseInt(pctMatch[1], 10) : null
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', textAlign: 'center' }}>
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 'var(--space-3)',
+        padding: 'var(--space-4)',
+        textAlign: 'center',
+      }}
+    >
       <SpinnerIcon />
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
         Generating transcript…
@@ -611,10 +697,31 @@ function GeneratingState({ status }: { status: string }) {
       {/* Progress bar — shown once whisper starts reporting percentages */}
       {pct !== null && (
         <div style={{ width: 180, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ width: '100%', height: 3, backgroundColor: 'var(--color-bg-elevated)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', backgroundColor: 'var(--color-accent)', transition: 'width 0.4s ease' }} />
+          <div
+            style={{
+              width: '100%',
+              height: 3,
+              backgroundColor: 'var(--color-bg-elevated)',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${pct}%`,
+                height: '100%',
+                backgroundColor: 'var(--color-accent)',
+                transition: 'width 0.4s ease',
+              }}
+            />
           </div>
-          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', fontVariantNumeric: 'tabular-nums' }}>
+          <span
+            style={{
+              color: 'var(--color-text-muted)',
+              fontSize: 'var(--text-xs)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
             {pct}%
           </span>
         </div>
@@ -627,7 +734,13 @@ function GeneratingState({ status }: { status: string }) {
       )}
 
       {elapsed > 0 && (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', fontVariantNumeric: 'tabular-nums' }}>
+        <p
+          style={{
+            color: 'var(--color-text-muted)',
+            fontSize: 'var(--text-xs)',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
           {formatElapsed(elapsed)} elapsed
         </p>
       )}
@@ -637,8 +750,16 @@ function GeneratingState({ status }: { status: string }) {
 
 function SpinnerIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round"
-      style={{ animation: 'spin 1s linear infinite' }}>
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--color-accent)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      style={{ animation: 'spin 1s linear infinite' }}
+    >
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <circle cx="12" cy="12" r="10" strokeOpacity="0.2" />
       <path d="M12 2 a10 10 0 0 1 10 10" />

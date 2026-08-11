@@ -34,7 +34,7 @@ export function buildRenderArgs(project: ProjectFile, outputPath: string): strin
   }
 
   // Collect active tracks (tracks with at least one non-muted clip)
-  type ActiveTrack = { trackIdx: number; clips: typeof tracks[0]['clips'] }
+  type ActiveTrack = { trackIdx: number; clips: (typeof tracks)[0]['clips'] }
   const activeTrackClips: ActiveTrack[] = []
   for (let i = 0; i < tracks.length; i++) {
     const nonMuted = tracks[i].clips
@@ -63,7 +63,7 @@ export function buildRenderArgs(project: ProjectFile, outputPath: string): strin
       if (srcIdx === undefined) throw new Error(`Unknown sourceFileId: ${clip.sourceFileId}`)
       const label = `seg${segIndex++}`
       parts.push(
-        `[${srcIdx}:a]atrim=start=${clip.sourceStart}:end=${clip.sourceEnd},asetpts=PTS-STARTPTS[${label}]`
+        `[${srcIdx}:a]atrim=start=${clip.sourceStart}:end=${clip.sourceEnd},asetpts=PTS-STARTPTS[${label}]`,
       )
       segLabels.push(`[${label}]`)
     }
@@ -83,9 +83,7 @@ export function buildRenderArgs(project: ProjectFile, outputPath: string): strin
     // Single active track — use its label directly; no amix needed
     outLabel = trackLabels[0]
   } else {
-    parts.push(
-      `${trackLabels.join('')}amix=inputs=${trackLabels.length}:normalize=0[out]`
-    )
+    parts.push(`${trackLabels.join('')}amix=inputs=${trackLabels.length}:normalize=0[out]`)
     outLabel = '[out]'
   }
 
@@ -97,8 +95,10 @@ export function buildRenderArgs(project: ProjectFile, outputPath: string): strin
 
   return [
     ...inputArgs,
-    '-filter_complex', filterComplex,
-    '-map', outLabel,
+    '-filter_complex',
+    filterComplex,
+    '-map',
+    outLabel,
     ...encodeArgs,
     outputPath,
   ]
@@ -106,9 +106,12 @@ export function buildRenderArgs(project: ProjectFile, outputPath: string): strin
 
 function formatToEncodeArgs(format: string): string[] {
   switch (format) {
-    case 'wav':  return ['-c:a', 'pcm_s16le']
-    case 'aac':  return ['-c:a', 'aac', '-b:a', '192k']
+    case 'wav':
+      return ['-c:a', 'pcm_s16le']
+    case 'aac':
+      return ['-c:a', 'aac', '-b:a', '192k']
     case 'mp3':
-    default:     return ['-c:a', 'libmp3lame', '-q:a', '2']
+    default:
+      return ['-c:a', 'libmp3lame', '-q:a', '2']
   }
 }

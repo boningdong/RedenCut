@@ -23,13 +23,14 @@ export function getWordClipState(word: Word, tracks: Track[]): WordClipState {
   if (!word.trackId) return 'normal'
 
   const track = tracks.find((t) => t.id === word.trackId)
-  if (!track) return 'no-clip'   // track deleted
+  if (!track) return 'no-clip' // track deleted
 
   // Find a clip on this track that covers word.start in source-file time.
-  const coveringClip = track.clips.find((c) =>
-    (!word.sourceFileId || c.sourceFileId === word.sourceFileId) &&
-    c.sourceStart <= word.start &&
-    word.start <  c.sourceEnd,
+  const coveringClip = track.clips.find(
+    (c) =>
+      (!word.sourceFileId || c.sourceFileId === word.sourceFileId) &&
+      c.sourceStart <= word.start &&
+      word.start < c.sourceEnd,
   )
 
   if (!coveringClip) return 'no-clip'

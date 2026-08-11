@@ -20,30 +20,24 @@ import type { IElectronAPI } from '../shared/ipc.types'
 // method to IElectronAPI and forget to implement it here, TypeScript errors.
 const api = {
   audio: {
-    openFile: () =>
-      ipcRenderer.invoke('audio:open-file'),
+    openFile: () => ipcRenderer.invoke('audio:open-file'),
 
-    probeFile: (filePath: string) =>
-      ipcRenderer.invoke('audio:probe-file', filePath),
+    probeFile: (filePath: string) => ipcRenderer.invoke('audio:probe-file', filePath),
 
-    generatePeaks: (filePath: string) =>
-      ipcRenderer.invoke('audio:generate-peaks', filePath),
+    generatePeaks: (filePath: string) => ipcRenderer.invoke('audio:generate-peaks', filePath),
   },
 
   project: {
-    openDialog: () =>
-      ipcRenderer.invoke('project:open-dialog'),
+    openDialog: () => ipcRenderer.invoke('project:open-dialog'),
 
     save: (project: unknown, filePath: string) =>
       ipcRenderer.invoke('project:save', project, filePath),
 
-    saveAs: (project: unknown) =>
-      ipcRenderer.invoke('project:save-as', project),
+    saveAs: (project: unknown) => ipcRenderer.invoke('project:save-as', project),
   },
 
   transcript: {
-    checkAvailability: () =>
-      ipcRenderer.invoke('transcript:check-availability'),
+    checkAvailability: () => ipcRenderer.invoke('transcript:check-availability'),
 
     generate: (filePath: string, language?: string) =>
       ipcRenderer.invoke('transcript:generate', filePath, language),
@@ -69,7 +63,8 @@ const api = {
     },
 
     renderProgress: (callback: (p: import('../shared/ipc.types').RenderProgress) => void) => {
-      const handler = (_event: IpcRendererEvent, p: import('../shared/ipc.types').RenderProgress) => callback(p)
+      const handler = (_event: IpcRendererEvent, p: import('../shared/ipc.types').RenderProgress) =>
+        callback(p)
       ipcRenderer.on('render:progress', handler)
       return () => ipcRenderer.off('render:progress', handler)
     },

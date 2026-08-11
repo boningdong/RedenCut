@@ -72,16 +72,14 @@ export async function generatePeaks(
   const estimatedTotalSamples = Math.ceil(durationSeconds * 44100)
 
   await new Promise<void>((resolve, reject) => {
-    const ffmpeg = spawn(getFfmpegPath(), [
-      '-i', audioFilePath,
-      '-f', 'f32le',
-      '-ac', '1',
-      '-ar', '44100',
-      'pipe:1',
-    ], {
-      // We only care about stdout (PCM). Suppress stderr (ffmpeg banner/progress).
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
+    const ffmpeg = spawn(
+      getFfmpegPath(),
+      ['-i', audioFilePath, '-f', 'f32le', '-ac', '1', '-ar', '44100', 'pipe:1'],
+      {
+        // We only care about stdout (PCM). Suppress stderr (ffmpeg banner/progress).
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    )
 
     ffmpeg.stdout.on('data', (chunk: Buffer) => {
       // Accumulate chunk bytes
@@ -92,13 +90,9 @@ export async function generatePeaks(
       const samplesInBuffer = Math.floor(chunkBuffer.length / bytesPerSample)
       const bytesToProcess = samplesInBuffer * bytesPerSample
 
-      if (samplesInBuffer < SAMPLES_PER_PEAK) return   // wait for more data
+      if (samplesInBuffer < SAMPLES_PER_PEAK) return // wait for more data
 
-      const samples = new Float32Array(
-        chunkBuffer.buffer,
-        chunkBuffer.byteOffset,
-        samplesInBuffer,
-      )
+      const samples = new Float32Array(chunkBuffer.buffer, chunkBuffer.byteOffset, samplesInBuffer)
 
       // Downsample: take max absolute value per SAMPLES_PER_PEAK window
       let i = 0
@@ -145,7 +139,7 @@ export async function generatePeaks(
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 interface CacheFile {
-  audioFileSize: number   // used as cheap invalidation key
+  audioFileSize: number // used as cheap invalidation key
   peaks: PeakData
 }
 
@@ -159,7 +153,7 @@ function loadCache(audioFilePath: string, cacheFilePath: string): PeakData | nul
     if (!fs.existsSync(cacheFilePath)) return null
     const audioSize = fs.statSync(audioFilePath).size
     const cache: CacheFile = JSON.parse(fs.readFileSync(cacheFilePath, 'utf-8'))
-    if (cache.audioFileSize !== audioSize) return null   // file changed → invalidate
+    if (cache.audioFileSize !== audioSize) return null // file changed → invalidate
     return cache.peaks
   } catch {
     return null

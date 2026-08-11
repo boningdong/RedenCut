@@ -57,9 +57,7 @@ ipcMain.handle('project:save-as', async (event, project: unknown) => {
   const result = await dialog.showSaveDialog(win ?? BrowserWindow.getFocusedWindow()!, {
     title: `Save ${APP_NAME} Project`,
     defaultPath: `Untitled${APP_FILE_EXT}`,
-    filters: [
-      { name: `${APP_NAME} Project`, extensions: [APP_FILE_EXT.slice(1)] },
-    ],
+    filters: [{ name: `${APP_NAME} Project`, extensions: [APP_FILE_EXT.slice(1)] }],
   })
 
   if (result.canceled || !result.filePath) return null

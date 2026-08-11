@@ -29,7 +29,7 @@ interface Options {
 }
 
 export function useKeyboardShortcuts({ onSave }: Options = {}) {
-  const selection    = useEditorStore((s) => s.selection)
+  const selection = useEditorStore((s) => s.selection)
   const setSelection = useEditorStore((s) => s.setSelection)
 
   useEffect(() => {
@@ -116,7 +116,9 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           if (!sfId) break
           // Collect word IDs for transcript muting
           const wordIds = useTranscriptStore.getState().selectedWordIds
-          console.log(`[Shortcuts] M — mute [${selection.start.toFixed(2)}–${selection.end.toFixed(2)}]`)
+          console.log(
+            `[Shortcuts] M — mute [${selection.start.toFixed(2)}–${selection.end.toFixed(2)}]`,
+          )
           useTimelineStore.getState().muteRange(sfId, selection.start, selection.end, [...wordIds])
           setSelection(null)
           break
@@ -176,8 +178,12 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
               return c.outputStart < selection.end && outputEnd > selection.start
             })
           if (hits.length > 0) {
-            console.log(`[Shortcuts] Delete — mute [${selection.start.toFixed(2)}–${selection.end.toFixed(2)}]`)
-            useTimelineStore.getState().muteRange(sfId, selection.start, selection.end, [...wordIds])
+            console.log(
+              `[Shortcuts] Delete — mute [${selection.start.toFixed(2)}–${selection.end.toFixed(2)}]`,
+            )
+            useTimelineStore
+              .getState()
+              .muteRange(sfId, selection.start, selection.end, [...wordIds])
           }
           setSelection(null)
           break

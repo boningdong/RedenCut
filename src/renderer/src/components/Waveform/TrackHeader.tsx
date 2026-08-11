@@ -31,7 +31,7 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
     if (trimmed && trimmed !== track.name) {
       updateTrack(track.id, { name: trimmed })
     } else {
-      setNameInput(track.name)  // revert if empty or unchanged
+      setNameInput(track.name) // revert if empty or unchanged
     }
   }, [nameInput, track.id, track.name, updateTrack])
 
@@ -59,8 +59,11 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
           onBlur={commitName}
           onKeyDown={(e) => {
             if (e.key === 'Enter') commitName()
-            if (e.key === 'Escape') { setNameInput(track.name); setEditing(false) }
-            e.stopPropagation()  // prevent global keyboard shortcuts
+            if (e.key === 'Escape') {
+              setNameInput(track.name)
+              setEditing(false)
+            }
+            e.stopPropagation() // prevent global keyboard shortcuts
           }}
           style={{
             background: 'var(--color-bg-elevated)',
@@ -114,7 +117,9 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
             border: '1px solid var(--color-border)',
             borderRadius: 2,
             cursor: 'pointer',
-            backgroundColor: track.muted ? 'var(--color-danger-track-btn)' : 'var(--color-bg-elevated)',
+            backgroundColor: track.muted
+              ? 'var(--color-danger-track-btn)'
+              : 'var(--color-bg-elevated)',
             color: track.muted ? 'var(--color-danger)' : 'var(--color-text-muted)',
           }}
         >
@@ -130,7 +135,9 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
             border: '1px solid var(--color-border)',
             borderRadius: 2,
             cursor: 'pointer',
-            backgroundColor: track.solo ? 'var(--color-accent-track-btn)' : 'var(--color-bg-elevated)',
+            backgroundColor: track.solo
+              ? 'var(--color-accent-track-btn)'
+              : 'var(--color-bg-elevated)',
             color: track.solo ? 'var(--color-accent)' : 'var(--color-text-muted)',
           }}
         >

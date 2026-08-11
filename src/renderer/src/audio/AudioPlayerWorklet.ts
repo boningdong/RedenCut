@@ -43,7 +43,7 @@
  *   const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' })
  *   await ctx.audioWorklet.addModule(URL.createObjectURL(blob))
  */
-export const WORKLET_CODE = /* javascript */`
+export const WORKLET_CODE = /* javascript */ `
 class PodCutPlayerProcessor extends AudioWorkletProcessor {
   constructor() {
     super()
@@ -147,7 +147,7 @@ registerProcessor('podcut-player', PodCutPlayerProcessor)
 /** A decoded PCM chunk ready to be sent to the worklet. */
 export interface PcmChunk {
   /** One Float32Array per channel (planar). */
-  channels:  Float32Array[]
+  channels: Float32Array[]
   /** Presentation timestamp in seconds (informational, not used by worklet). */
   timestamp: number
 }

@@ -26,14 +26,14 @@ function formatTime(seconds: number): string {
 }
 
 export function TransportBar() {
-  const isPlaying   = usePlaybackStore((s) => s.isPlaying)
+  const isPlaying = usePlaybackStore((s) => s.isPlaying)
   const currentTime = usePlaybackStore((s) => s.currentTime)
-  const duration    = usePlaybackStore((s) => s.duration)
+  const duration = usePlaybackStore((s) => s.duration)
 
-  const previewMode       = useEditorStore((s) => s.previewMode)
+  const previewMode = useEditorStore((s) => s.previewMode)
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode)
 
-  const theme    = useThemeStore((s) => s.theme)
+  const theme = useThemeStore((s) => s.theme)
   const setTheme = useThemeStore((s) => s.setTheme)
 
   const handlePlayPause = useCallback(async () => {
@@ -87,7 +87,12 @@ export function TransportBar() {
       </Button>
 
       {/* Play / Pause */}
-      <Button size="sm" variant="primary" onClick={handlePlayPause} title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}>
+      <Button
+        size="sm"
+        variant="primary"
+        onClick={handlePlayPause}
+        title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+      >
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </Button>
 
@@ -154,16 +159,16 @@ export function TransportBar() {
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
         style={{
-          background:   'none',
-          border:       '1px solid var(--color-border)',
+          background: 'none',
+          border: '1px solid var(--color-border)',
           borderRadius: 6,
-          cursor:       'pointer',
-          padding:      '0 10px',
-          height:       28,
-          fontSize:     14,
-          color:        'var(--color-text-muted)',
-          display:      'flex',
-          alignItems:   'center',
+          cursor: 'pointer',
+          padding: '0 10px',
+          height: 28,
+          fontSize: 14,
+          color: 'var(--color-text-muted)',
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
         {theme === 'dark' ? '☀' : '🌙'}

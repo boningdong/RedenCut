@@ -58,11 +58,11 @@ export const WordSchema = z.object({
 export type Word = z.infer<typeof WordSchema>
 
 export const SpeakerSchema = z.object({
-  label: z.string(),   // display name, e.g. "Host", "Guest"
+  label: z.string(), // display name, e.g. "Host", "Guest"
 })
 
 export const TranscriptSchema = z.object({
-  engine: z.string(),   // e.g. "whisper.cpp", "assemblyai"
+  engine: z.string(), // e.g. "whisper.cpp", "assemblyai"
   model: z.string().optional(),
   words: z.array(WordSchema),
   speakers: z.record(z.string(), SpeakerSchema).default({}),
@@ -149,11 +149,11 @@ export const PluginDataSchema = z.record(z.string(), z.unknown())
 
 /** A single audio effect in a clip or track's processing chain. */
 export const EffectSchema = z.object({
-  id:      z.string(),
-  type:    z.enum(['gain', 'eq', 'compressor', 'noise-reduction']),
+  id: z.string(),
+  type: z.enum(['gain', 'eq', 'compressor', 'noise-reduction']),
   enabled: z.boolean().default(true),
   /** Arbitrary numeric parameters keyed by name, e.g. { gainDb: -6 }. */
-  params:  z.record(z.string(), z.number()).default({}),
+  params: z.record(z.string(), z.number()).default({}),
 })
 export type Effect = z.infer<typeof EffectSchema>
 
@@ -169,15 +169,15 @@ export type Effect = z.infer<typeof EffectSchema>
  *                              false → plays normally
  */
 export const ClipSchema = z.object({
-  id:           z.string(),
-  trackId:      z.string(),
+  id: z.string(),
+  trackId: z.string(),
   sourceFileId: z.string(),
-  sourceStart:  z.number(),
-  sourceEnd:    z.number(),
-  outputStart:  z.number(),
-  gain:         z.number().default(1),
-  muted:        z.boolean().default(false),
-  effects:      z.array(EffectSchema).default([]),
+  sourceStart: z.number(),
+  sourceEnd: z.number(),
+  outputStart: z.number(),
+  gain: z.number().default(1),
+  muted: z.boolean().default(false),
+  effects: z.array(EffectSchema).default([]),
 })
 export type Clip = z.infer<typeof ClipSchema>
 
@@ -186,20 +186,20 @@ export type Clip = z.infer<typeof ClipSchema>
  * files, plus track-level processing.
  */
 export const TrackSchema = z.object({
-  id:      z.string(),
-  name:    z.string(),
-  clips:   z.array(ClipSchema).default([]),
-  volume:  z.number().default(1),
-  muted:   z.boolean().default(false),
-  solo:    z.boolean().default(false),
-  color:   z.string().default('#4f46e5'),  // waveform colour for this track
+  id: z.string(),
+  name: z.string(),
+  clips: z.array(ClipSchema).default([]),
+  volume: z.number().default(1),
+  muted: z.boolean().default(false),
+  solo: z.boolean().default(false),
+  color: z.string().default('#4f46e5'), // waveform colour for this track
   effects: z.array(EffectSchema).default([]),
 })
 export type Track = z.infer<typeof TrackSchema>
 
 /** A source audio file registered in the project. */
 export const SourceFileSchema = z.object({
-  id:       z.string(),
+  id: z.string(),
   filePath: z.string(),
   duration: z.number(),
 })
@@ -208,7 +208,7 @@ export type SourceFile = z.infer<typeof SourceFileSchema>
 // ── Project file (root) ───────────────────────────────────────────────────────
 export const ProjectFileSchema = z.object({
   version: z.literal(1),
-  createdAt: z.string(),           // ISO 8601
+  createdAt: z.string(), // ISO 8601
   source: AudioSourceSchema,
   transcript: TranscriptSchema.optional(),
   edits: z.array(EditSchema).default([]),
@@ -219,7 +219,7 @@ export const ProjectFileSchema = z.object({
   pluginData: PluginDataSchema.optional().default({}),
   // ── Multi-track fields (added alongside v1; migration from edits[] on load) ─
   sourceFiles: z.array(SourceFileSchema).default([]),
-  tracks:      z.array(TrackSchema).default([]),
+  tracks: z.array(TrackSchema).default([]),
 })
 export type ProjectFile = z.infer<typeof ProjectFileSchema>
 
