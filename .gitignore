@@ -3,6 +3,7 @@ node_modules/
 
 # ── Brainstorm sessions ───────────────────────────────────────────────────────
 .superpowers/
+.worktrees/
 
 # ── Build output (electron-vite) ──────────────────────────────────────────────
 out/
