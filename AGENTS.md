@@ -1,5 +1,16 @@
 # PodCut Repository Instructions
 
+## Project Scope
+
+PodCut is a minimalist podcast and audio editor built with Electron, React, and TypeScript.
+It targets macOS first and Windows later, with future extensibility tracked in the product roadmap.
+
+## Documentation Policy
+
+This file is the entry point for repository instructions.
+The `dev-docs/` directory contains only durable project rules and standards that extend this file; do not place plans, progress logs, audits, verification reports, historical proposals, or superseded designs there.
+For every change, review this file and its linked `dev-docs/` standards for affected guidance, and update or remove anything that has become inaccurate or obsolete as part of the same change.
+
 ## Repository References
 
 Use the repository's authoritative files instead of duplicating their contents here:
@@ -8,6 +19,8 @@ Use the repository's authoritative files instead of duplicating their contents h
 | --- | --- |
 | Commands and verification | [`package.json`](package.json) |
 | Coding and review standards | [`dev-docs/coding-standards.md`](dev-docs/coding-standards.md) |
+| Architecture standards | [`dev-docs/architecture-standards.md`](dev-docs/architecture-standards.md) |
+| Keyboard interaction contract | [`dev-docs/key-mappings.md`](dev-docs/key-mappings.md) |
 | Product direction | [`ROADMAP.md`](ROADMAP.md) |
 | Shared project model and schemas | [`src/shared/project.types.ts`](src/shared/project.types.ts) |
 | IPC contract | [`src/shared/ipc.types.ts`](src/shared/ipc.types.ts) |
@@ -16,18 +29,6 @@ Use the repository's authoritative files instead of duplicating their contents h
 | App name and project extension | [`src/shared/constants.ts`](src/shared/constants.ts) |
 
 When an authoritative repository file defines a policy or contract, link to it instead of repeating it in an instruction file.
-
-## Architectural Invariants
-
-- Keep Electron main, preload, shared, and renderer responsibilities separate according to the coding standards.
-- Route renderer-to-main calls through the typed `window.electronAPI`; never import Electron or Node.js APIs into the renderer.
-- Treat WaveSurfer as waveform visualization only; UI playback depends on `IAudioPlayer`.
-- Preserve `WebCodecsPlayer` as the preferred player and `SimpleAudioPlayer` as an active fallback.
-- Keep speech-to-text behind `ITranscriber`.
-- Serve renderer audio through the `podcut://` protocol registered in `src/main/index.ts`; do not replace it with `file://`.
-- Treat `*.peaks.json` files as regenerable cache, never source data.
-- Keep edits non-destructive and never modify source audio.
-- Preserve loading of legacy project data unless a separately approved migration removes that compatibility.
 
 ## Working Agreement
 

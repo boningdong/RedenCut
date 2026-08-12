@@ -32,13 +32,13 @@
 - Consumes: Current contracts in `src/shared/project.types.ts`, `src/shared/ipc.types.ts`, `src/shared/player.types.ts`, and `src/shared/transcriber.types.ts`; current shortcut behavior in `src/renderer/src/hooks/useKeyboardShortcuts.ts`.
 - Produces: The repository instruction entry point and its complete set of focused standards extensions.
 
-- [ ] **Step 1: Add the documentation policy and project scope to `AGENTS.md`**
+- [x] **Step 1: Add the documentation policy and project scope to `AGENTS.md`**
 
 Add a concise project scope, link rows for `dev-docs/architecture-standards.md` and `dev-docs/key-mappings.md`, and the rule that `dev-docs/` contains only durable extensions of `AGENTS.md`.
 
 Add the maintenance requirement that every change checks affected instructions for drift and updates or removes obsolete guidance in the same change.
 
-- [ ] **Step 2: Create `dev-docs/architecture-standards.md`**
+- [x] **Step 2: Create `dev-docs/architecture-standards.md`**
 
 Document only current, enforceable invariants:
 
@@ -53,7 +53,7 @@ Document only current, enforceable invariants:
 
 Use links to source contracts and implementation files instead of copying interfaces or code.
 
-- [ ] **Step 3: Create `dev-docs/key-mappings.md`**
+- [x] **Step 3: Create `dev-docs/key-mappings.md`**
 
 Document the mappings implemented by `useKeyboardShortcuts.ts`, including:
 
@@ -63,12 +63,12 @@ Document the mappings implemented by `useKeyboardShortcuts.ts`, including:
 - input, textarea, and content-editable focus exclusions; and
 - the fact that transcript content-editable elements retain Space play/pause.
 
-- [ ] **Step 4: Verify the instruction links and shortcut contract**
+- [x] **Step 4: Verify the instruction links and shortcut contract**
 
 Run:
 
 ```bash
-for path in dev-docs/coding-standards.md dev-docs/architecture-standards.md dev-docs/key-mappings.md ROADMAP.md src/shared/project.types.ts src/shared/ipc.types.ts src/shared/player.types.ts src/shared/transcriber.types.ts src/shared/constants.ts; do test -e "$path"; done
+for doc_path in dev-docs/coding-standards.md dev-docs/architecture-standards.md dev-docs/key-mappings.md ROADMAP.md src/shared/project.types.ts src/shared/ipc.types.ts src/shared/player.types.ts src/shared/transcriber.types.ts src/shared/constants.ts; do test -e "$doc_path"; done
 rg -n "case 'Space'|case 'KeyS'|case 'KeyM'|case 'KeyU'|case 'Delete'|case 'Backspace'|case 'Escape'|case 'ArrowLeft'|case 'ArrowRight'|KeyZ|KeyS" src/renderer/src/hooks/useKeyboardShortcuts.ts
 ```
 
@@ -88,11 +88,11 @@ Expected: every linked path exists, and every implemented keyboard branch has a 
 - Consumes: The durable requirements extracted into Task 1 and current product direction retained in `ROADMAP.md`.
 - Produces: A `dev-docs/` directory containing only the three approved standards files.
 
-- [ ] **Step 1: Delete the six obsolete or misplaced documents**
+- [x] **Step 1: Delete the six obsolete or misplaced documents**
 
 Use `apply_patch` to delete the exact files listed above after Task 1 has preserved the approved durable rules.
 
-- [ ] **Step 2: Verify the `dev-docs/` boundary**
+- [x] **Step 2: Verify the `dev-docs/` boundary**
 
 Run:
 
@@ -117,19 +117,19 @@ dev-docs/key-mappings.md
 - Consumes: Current implementation under `src/`, current tests, and future product direction already represented in `ROADMAP.md`.
 - Produces: A concise roadmap that distinguishes completed capabilities, current gaps, and future milestones without acting as an architecture standard.
 
-- [ ] **Step 1: Replace stale implementation status**
+- [x] **Step 1: Replace stale implementation status**
 
 Remove the stale fixed test counts, `CLAUDE.md` reference, resolved Phase 3 prerequisites, and superseded `activeTrackFilter` terminology.
 
-Mark implemented Phase 3 capabilities as complete and retain current limitations as remaining work, including native export-path selection, export processing gaps, and user-facing export error handling.
+Mark implemented Phase 3 capabilities as complete and retain current limitations as remaining work, including track-scoped waveform shortcut routing, native export-path selection, export processing gaps, and user-facing export error handling.
 
-- [ ] **Step 2: Remove duplicated architecture rules**
+- [x] **Step 2: Remove duplicated architecture rules**
 
 Replace detailed architecture notes with links to `dev-docs/architecture-standards.md` and the relevant source contracts.
 
 Keep future audio polish, intelligence, and plugin milestones only where they still express intended product direction.
 
-- [ ] **Step 3: Cross-check roadmap claims against the repository**
+- [x] **Step 3: Cross-check roadmap claims against the repository**
 
 Run targeted searches for current Phase 3 features:
 
@@ -152,7 +152,7 @@ Expected: completed roadmap claims have reachable implementations, while absent 
 - Consumes: All outputs from Tasks 1–3.
 - Produces: A clean, committed documentation architecture with no known stale authoritative guidance.
 
-- [ ] **Step 1: Search for obsolete authoritative references**
+- [x] **Step 1: Search for obsolete authoritative references**
 
 Run:
 
@@ -162,7 +162,7 @@ rg -n "CLAUDE\.md|DEVLOG\.md|project-proposal|technical-roadmap|readability-clea
 
 Expected: no matches.
 
-- [ ] **Step 2: Review the documentation diff**
+- [x] **Step 2: Review the documentation diff**
 
 Run:
 
@@ -174,7 +174,7 @@ git diff -- AGENTS.md ROADMAP.md dev-docs
 
 Expected: no whitespace errors; all changes match the approved documentation roles; no application source files changed.
 
-- [ ] **Step 3: Run the complete repository gate**
+- [x] **Step 3: Run the complete repository gate**
 
 Run:
 
@@ -184,7 +184,7 @@ npm run check
 
 Expected: Prettier, ESLint, Knip, TypeScript, all Vitest suites, and the Electron build pass.
 
-- [ ] **Step 4: Commit the completed cleanup**
+- [x] **Step 4: Commit the completed cleanup**
 
 Run:
 
@@ -193,7 +193,7 @@ git add AGENTS.md ROADMAP.md dev-docs DEVLOG.md
 git commit -m "docs: establish authoritative repository standards"
 ```
 
-- [ ] **Step 5: Confirm the worktree is clean**
+- [x] **Step 5: Confirm the worktree is clean**
 
 Run:
 
