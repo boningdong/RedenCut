@@ -10,6 +10,7 @@
     "typecheck": "tsc --build --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "profile:waveform": "node --expose-gc ./node_modules/vitest/vitest.mjs run --config vitest.performance.config.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\" \"*.{ts,mjs,json}\" .prettierrc.json",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\" \"*.{ts,mjs,json}\" .prettierrc.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"*.config.ts\"",

@@ -2,6 +2,11 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // electron-vite and Vitest discover the real application, config, and test entries.
   "project": ["src/**/*.{ts,tsx,css}", "*.config.ts"],
+  // The dedicated runner selects this config with npm's dynamic --config argument.
+  "entry": [
+    "vitest.performance.config.ts",
+    "src/renderer/src/components/Waveform/waveform.performance.ts",
+  ],
   "ignoreDependencies": [
     // Apple Silicon fallbacks loaded by resolveFromStaticPackage(packageName)
     // through runtime require(packageName) in src/main/audio/binaries.ts.
