@@ -2,17 +2,17 @@
 // Peak Generator
 //
 // Generates waveform "peaks" — a downsampled representation of audio amplitude
-// over time. This is what wavesurfer.js displays as the waveform.
+// over time for range-based waveform providers.
 //
-// Why not let wavesurfer decode the audio itself?
-//   wavesurfer's default behaviour calls AudioContext.decodeAudioData() on the
-//   entire file. A 1-hour 48kHz stereo WAV = ~1.65 GB on disk, but ~3.3 GB in
-//   memory as Float32Array. This crashes the renderer for any real episode.
+// Why decode in the main process?
+//   Browser audio decoding loads the entire file. A 1-hour 48kHz stereo WAV is
+//   ~1.65 GB on disk but ~3.3 GB in memory as Float32Array, which can exhaust the
+//   renderer's memory for a normal episode.
 //
 //   Instead: we decode here in the main process via FFmpeg (which streams the
 //   file, never loading it all into memory), downsample to ~1 peak per 256
-//   samples, and cache the result. wavesurfer loads the tiny peaks JSON file
-//   (~200 KB for a 1-hour episode) and never touches the raw audio.
+//   samples, and cache the result. The renderer receives the compact PeakData and
+//   requests only the interval and resolution needed for its visible canvases.
 //
 // Cache strategy:
 //   Peaks are cached as <audio-basename>.peaks.json in the same directory.

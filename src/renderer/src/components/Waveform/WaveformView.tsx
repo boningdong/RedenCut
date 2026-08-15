@@ -13,29 +13,28 @@
 // Zoom:
 //   At zoomLevel=1 the content exactly fills the viewport (minWidth:100%).
 //   At zoomLevel>1 the content is zoomLevel× wider and the viewport scrolls.
-//   WaveSurfer on track-0 is called with ws.zoom(pxPerSec) on zoom changes so
-//   the TimelinePlugin ruler re-renders at the correct scale.
 //
 // Architecture:
-//   • One WaveSurfer instance per track, peaks-only (no media element).
-//   • WaveSurfer containers: opacity:0, pointerEvents:none — kept alive so
-//     track-0's TimelinePlugin renders into #waveform-timeline.
+//   • One shared waveform provider for each PeakData object identity.
+//   • Only the source interval intersecting the viewport is drawn to canvas.
 //   • Clip blocks: absolutely positioned % within lane (auto-scales with zoom).
 //   • Clip drag: pointer events → moveClip() on pointer up. Snap within 5px.
-//   • Per-clip SVG waveform rendered from the correct peaks subset.
+//   • The playhead overlay remains independent from static waveform pixels.
 //
 // Log prefix: [WaveformView]
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import WaveSurfer from 'wavesurfer.js'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PeakData, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
+import { CanvasWaveform } from './CanvasWaveform'
+import { PeakDataProviderRegistry } from './PeakDataProviderRegistry'
 import { TrackHeader } from './TrackHeader'
+import { calculateVisibleWaveformRange } from './waveformRange'
 
 interface WaveformViewProps {
   /** Primary track's peaks (loaded before WaveformView mounts). */
@@ -44,7 +43,7 @@ interface WaveformViewProps {
 
 // Layout constants
 const HEADER_WIDTH = 90 // px — header column width
-const RULER_HEIGHT = 28 // px — ruler row height (matches TimelinePlugin canvas)
+const RULER_HEIGHT = 28 // px — ruler row height
 const LANE_HEIGHT = 96 // px — clip lane height
 const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
@@ -82,6 +81,18 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     if (tracks.length > 0) m.set(tracks[0].id, peaks)
     return m
   })
+  const providerRegistryRef = useRef<PeakDataProviderRegistry | null>(null)
+  if (!providerRegistryRef.current) providerRegistryRef.current = new PeakDataProviderRegistry()
+  const providerRegistry = providerRegistryRef.current
+  const providersByTrack = useMemo(() => {
+    const providers = new Map<string, ReturnType<PeakDataProviderRegistry['forPeakData']>>()
+    for (const [trackId, peakState] of trackPeaks) {
+      if (peakState !== 'loading') {
+        providers.set(trackId, providerRegistry.forPeakData(peakState))
+      }
+    }
+    return providers
+  }, [providerRegistry, trackPeaks])
 
   // Sync primary peaks if they change (e.g. new file opened).
   // Only depend on `peaks` — track structure changes are irrelevant here;
@@ -96,22 +107,45 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(1.0)
-  const [viewportWidth, setViewportWidth] = useState(800)
+  const [viewport, setViewport] = useState({ scrollLeft: 0, width: 800 })
   const scrollViewportRef = useRef<HTMLDivElement>(null)
 
-  // Track scroll viewport width for basePxPerSec computation
+  // Keep waveform requests bounded to the scrolling viewport. Scroll events are
+  // coalesced so they can trigger at most one React update per browser frame.
   useEffect(() => {
     const el = scrollViewportRef.current
     if (!el) return
+    let scrollFrame: number | null = null
     const ro = new ResizeObserver((entries) => {
-      setViewportWidth(entries[0].contentRect.width)
+      const width = entries[0]?.contentRect.width ?? el.clientWidth
+      setViewport((current) => {
+        const next = { scrollLeft: el.scrollLeft, width }
+        return current.scrollLeft === next.scrollLeft && current.width === next.width
+          ? current
+          : next
+      })
     })
+    const onScroll = () => {
+      if (scrollFrame !== null) return
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = null
+        setViewport((current) => {
+          const next = { scrollLeft: el.scrollLeft, width: current.width }
+          return current.scrollLeft === next.scrollLeft ? current : next
+        })
+      })
+    }
     ro.observe(el)
-    return () => ro.disconnect()
+    el.addEventListener('scroll', onScroll)
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('scroll', onScroll)
+      if (scrollFrame !== null) cancelAnimationFrame(scrollFrame)
+    }
   }, [])
 
   // basePxPerSec: fills viewport at zoom=1. Falls back to 100 when duration unknown.
-  const basePxPerSec = duration > 0 && viewportWidth > 0 ? viewportWidth / duration : 100
+  const basePxPerSec = duration > 0 && viewport.width > 0 ? viewport.width / duration : 100
   const pxPerSec = basePxPerSec * zoomLevel
 
   const handleZoomIn = useCallback(() => setZoomLevel((z) => Math.min(32, z * 2)), [])
@@ -468,8 +502,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
             {/* Track lanes */}
             {tracks.map((track) => {
               const peakState = trackPeaks.get(track.id)
-              const trackPeakData =
-                peakState === 'loading' || peakState === undefined ? null : peakState
+              const waveformProvider = providersByTrack.get(track.id)
               return (
                 <div
                   key={track.id}
@@ -508,11 +541,6 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                     </div>
                   )}
 
-                  {/* WaveSurfer canvas for this track */}
-                  {trackPeakData && (
-                    <TrackWaveform key={track.id} peaks={trackPeakData} color={track.color} />
-                  )}
-
                   {/* Clip blocks */}
                   {track.clips.map((clip) => {
                     const clipDur = clip.sourceEnd - clip.sourceStart
@@ -520,6 +548,16 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                       duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
                     const widthPct = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
                     const isDragging = dragRef.current?.clipId === clip.id
+                    const visible = waveformProvider
+                      ? calculateVisibleWaveformRange({
+                          outputStart: clip.outputStart,
+                          sourceStart: clip.sourceStart,
+                          sourceEnd: clip.sourceEnd,
+                          pxPerSec,
+                          viewportStartPx: viewport.scrollLeft,
+                          viewportWidthPx: viewport.width,
+                        })
+                      : null
                     return (
                       <div
                         key={clip.id}
@@ -552,11 +590,14 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                           overflow: 'hidden',
                         }}
                       >
-                        {trackPeakData && (
-                          <ClipWaveform
-                            peaks={trackPeakData}
-                            sourceStart={clip.sourceStart}
-                            sourceEnd={clip.sourceEnd}
+                        {waveformProvider && visible && (
+                          <CanvasWaveform
+                            provider={waveformProvider}
+                            sourceStartSeconds={visible.sourceStartSeconds}
+                            sourceEndSeconds={visible.sourceEndSeconds}
+                            leftInClipPx={visible.leftInClipPx}
+                            widthPx={visible.widthPx}
+                            heightPx={LANE_HEIGHT - 8}
                             color={track.color}
                             muted={clip.muted}
                           />
@@ -682,60 +723,8 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   )
 }
 
-// ── TrackWaveform — per-track WaveSurfer instance ─────────────────────────────
-
-interface TrackWaveformProps {
-  peaks: PeakData
-  color: string
-}
-
-function TrackWaveform({ peaks, color }: TrackWaveformProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!containerRef.current) return
-
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: color,
-      progressColor: color + '99',
-      cursorWidth: 0,
-      barWidth: 2,
-      barGap: 1,
-      barRadius: 2,
-      height: LANE_HEIGHT - 8,
-      peaks: peaks.data,
-      duration: peaks.durationSeconds,
-    })
-
-    ws.on('interaction', (t: number) => {
-      getAudioPlayerInstance()?.seekTo(t)
-    })
-
-    return () => {
-      ws.destroy()
-    }
-  }, [peaks, color])
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        opacity: 0,
-        pointerEvents: 'none',
-      }}
-    />
-  )
-}
-
-// ── TimelineRuler — custom ruler replacing WaveSurfer's TimelinePlugin ────────
-//
-// WaveSurfer's TimelinePlugin renders ticks at absolute pixel offsets
-// (time × pxPerSec). At pxPerSec < ~1, ticks are sub-pixel and it renders
-// nothing. This component uses the same scaleFactor-based % positioning as clips,
-// so it works correctly at any zoom level.
+// ── TimelineRuler ─────────────────────────────────────────────────────────────
+// Uses the same scaleFactor-based positioning as clips so it works at any zoom.
 
 interface TimelineRulerProps {
   duration: number
@@ -790,56 +779,3 @@ function TimelineRuler({ duration, pxPerSec, scaleFactor }: TimelineRulerProps) 
     </>
   )
 }
-
-// ── ClipWaveform — per-clip waveform SVG ──────────────────────────────────────
-
-interface ClipWaveformProps {
-  peaks: PeakData
-  sourceStart: number
-  sourceEnd: number
-  color: string
-  muted: boolean
-}
-
-const ClipWaveform = React.memo(function ClipWaveform({
-  peaks,
-  sourceStart,
-  sourceEnd,
-  color,
-  muted,
-}: ClipWaveformProps) {
-  const channel = peaks.data[0]
-  if (!channel?.length) return null
-
-  const totalLen = channel.length
-  const dur = peaks.durationSeconds
-  const startIdx = Math.floor((sourceStart / dur) * totalLen)
-  const endIdx = Math.ceil((sourceEnd / dur) * totalLen)
-  const clipPeaks = channel.slice(startIdx, endIdx)
-  if (clipPeaks.length === 0) return null
-
-  const H = 80
-  const viewW = clipPeaks.length * 3
-
-  return (
-    <svg
-      style={{
-        position: 'absolute',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-      }}
-      viewBox={`0 0 ${viewW} ${H}`}
-      preserveAspectRatio="none"
-    >
-      <g fill={muted ? 'var(--waveform-color-muted)' : color + 'cc'}>
-        {clipPeaks.map((v, i) => {
-          const bh = Math.max(2, v * H)
-          const y = (H - bh) / 2
-          return <rect key={i} x={i * 3} y={y} width={2} height={bh} />
-        })}
-      </g>
-    </svg>
-  )
-})

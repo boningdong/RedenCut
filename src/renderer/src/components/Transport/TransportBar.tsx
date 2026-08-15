@@ -4,7 +4,7 @@
 // Play/pause controls, time display, and Preview Mode toggle.
 // Lives at the bottom of the app.
 //
-// All playback control goes through IAudioPlayer — never through WaveSurfer.
+// All playback control goes through IAudioPlayer.
 // Playback state (isPlaying, currentTime, duration) comes from playback.store
 // which is updated by App.tsx subscribing to the player's callbacks.
 // ─────────────────────────────────────────────────────────────────────────────

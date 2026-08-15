@@ -79,7 +79,7 @@ export default function App() {
   const setProject = useEditorStore((s) => s.setProject)
   const resetEditor = useEditorStore((s) => s.reset)
 
-  // Playback store setters (written from player callbacks, NOT from WaveSurfer)
+  // Playback store setters written from IAudioPlayer callbacks
   const setDuration = usePlaybackStore((s) => s.setDuration)
   const resetPlayback = usePlaybackStore((s) => s.reset)
 

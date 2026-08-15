@@ -26,7 +26,7 @@
 ## Playback
 
 - UI components depend on [`IAudioPlayer`](../src/shared/player.types.ts), not a concrete playback implementation.
-- Treat WaveSurfer as waveform visualization only; do not make it a second playback engine.
+- Waveform UI depends on `WaveformDataProvider`; playback remains owned by the preview player through `IAudioPlayer`; storage and decoding must not leak into the renderer.
 - Prefer [`WebCodecsPlayer`](../src/renderer/src/audio/WebCodecsPlayer.ts) and retain [`SimpleAudioPlayer`](../src/renderer/src/audio/SimpleAudioPlayer.ts) as the supported fallback when WebCodecs initialization or codec support fails.
 - Push current track and clip state through `IAudioPlayer.setTracks` after timeline changes rather than reading renderer stores from shared playback contracts.
 - Keep muted ranges and output gaps represented as silence in the WebCodecs queue so the AudioWorklet FIFO stays aligned with the output timeline.

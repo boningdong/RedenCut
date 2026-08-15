@@ -231,6 +231,6 @@ export interface PeakData {
   data: number[][]
   /** Total number of peak samples per channel. */
   length: number
-  /** Duration in seconds — used to tell wavesurfer the audio length without decoding. */
+  /** Duration in seconds for mapping requested waveform ranges to peak samples. */
   durationSeconds: number
 }
