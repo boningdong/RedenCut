@@ -10,18 +10,19 @@ interface FillRectCall {
 }
 
 function recordingContext() {
+  const clearRectCalls: FillRectCall[] = []
   const fillRectCalls: FillRectCall[] = []
   const context: WaveformDrawingContext = {
     fillStyle: '',
-    clearRect: () => undefined,
+    clearRect: (x, y, width, height) => clearRectCalls.push({ x, y, width, height }),
     fillRect: (x, y, width, height) => fillRectCalls.push({ x, y, width, height }),
   }
-  return { context, fillRectCalls }
+  return { context, clearRectCalls, fillRectCalls }
 }
 
 describe('drawWaveform', () => {
   it('draws one bounded waveform primitive for each bucket', () => {
-    const { context, fillRectCalls } = recordingContext()
+    const { context, clearRectCalls, fillRectCalls } = recordingContext()
     const buckets: WaveformBucket[] = [
       { min: -1, max: 0.5 },
       { min: -0.25, max: 0.25 },
@@ -30,6 +31,7 @@ describe('drawWaveform', () => {
 
     drawWaveform(context, buckets, 30, 80, '#abc')
 
+    expect(clearRectCalls).toEqual([{ x: 0, y: 0, width: 30, height: 80 }])
     expect(fillRectCalls).toHaveLength(3)
     expect(fillRectCalls).toEqual([
       { x: 0, y: 20, width: 10, height: 60 },

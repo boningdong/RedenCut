@@ -14,8 +14,8 @@ function deferred<T>() {
 
 describe('WaveformRequestController', () => {
   it('aborts and ignores an obsolete request while committing the latest result', async () => {
-    const first = deferred<{ buckets: [] }>()
-    const second = deferred<{ buckets: [] }>()
+    const first = deferred<{ buckets: [{ min: -0.5; max: 0.5 }] }>()
+    const second = deferred<{ buckets: [{ min: -0.25; max: 0.25 }] }>()
     const signals: AbortSignal[] = []
     const provider: WaveformDataProvider = {
       readRange: vi.fn((request: WaveformRangeRequest) => {
@@ -30,12 +30,12 @@ describe('WaveformRequestController', () => {
     const secondRun = controller.request(provider, 10, 20, 100, commit)
 
     expect(signals[0].aborted).toBe(true)
-    first.resolve({ buckets: [] })
-    second.resolve({ buckets: [] })
+    first.resolve({ buckets: [{ min: -0.5, max: 0.5 }] })
+    second.resolve({ buckets: [{ min: -0.25, max: 0.25 }] })
     await Promise.all([firstRun, secondRun])
 
     expect(commit).toHaveBeenCalledTimes(1)
-    expect(commit).toHaveBeenCalledWith({ buckets: [] })
+    expect(commit).toHaveBeenCalledWith({ buckets: [{ min: -0.25, max: 0.25 }] })
   })
 
   it('does not report a late rejection from an obsolete request', async () => {
