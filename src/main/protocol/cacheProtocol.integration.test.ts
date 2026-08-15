@@ -4,14 +4,64 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AudioSourceSchema, createEmptyProject } from '../../shared/project.types'
 import type { AudioSourceCacheDescriptor } from '../../shared/import.types'
-import { ContinuousPcmSampleProvider } from '../../renderer/src/audio/samples/ContinuousPcmSampleProvider'
-import { BinaryWaveformDataProvider } from '../../renderer/src/components/Waveform/BinaryWaveformDataProvider'
 import { createCacheProtocolHandler } from './cacheProtocol'
 import { createFileRangeResponse } from './fileRangeResponse'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001'
 const SOURCE_HASH = 'b'.repeat(64)
+const PCM_PROVIDER_MODULE_PATH = '../../renderer/src/audio/samples/ContinuousPcmSampleProvider'
+const WAVEFORM_PROVIDER_MODULE_PATH =
+  '../../renderer/src/components/Waveform/BinaryWaveformDataProvider'
 const temporaryRoots: string[] = []
+
+type PcmSampleChunk = {
+  startFrame: number
+  frameCount: number
+  channels: Float32Array[]
+}
+
+type PcmSampleProvider = {
+  readFrames(startFrame: number, frameCount: number, signal: AbortSignal): Promise<PcmSampleChunk>
+}
+
+type PcmSampleProviderConstructor = new (
+  descriptor: AudioSourceCacheDescriptor,
+) => PcmSampleProvider
+
+type WaveformRangeRequest = {
+  sourceStartSeconds: number
+  sourceEndSeconds: number
+  targetPixelWidth: number
+  signal: AbortSignal
+}
+
+type WaveformDataProvider = {
+  readRange(request: WaveformRangeRequest): Promise<{
+    buckets: Array<{ min: number; max: number }>
+  }>
+}
+
+type WaveformDataProviderConstructor = new (
+  descriptor: AudioSourceCacheDescriptor,
+) => WaveformDataProvider
+
+async function loadProviderConstructors(): Promise<{
+  ContinuousPcmSampleProvider: PcmSampleProviderConstructor
+  BinaryWaveformDataProvider: WaveformDataProviderConstructor
+}> {
+  const [pcmModule, waveformModule] = await Promise.all([
+    vi.importActual<{ ContinuousPcmSampleProvider: PcmSampleProviderConstructor }>(
+      PCM_PROVIDER_MODULE_PATH,
+    ),
+    vi.importActual<{ BinaryWaveformDataProvider: WaveformDataProviderConstructor }>(
+      WAVEFORM_PROVIDER_MODULE_PATH,
+    ),
+  ])
+  return {
+    ContinuousPcmSampleProvider: pcmModule.ContinuousPcmSampleProvider,
+    BinaryWaveformDataProvider: waveformModule.BinaryWaveformDataProvider,
+  }
+}
 
 afterEach(async () => {
   vi.unstubAllGlobals()
@@ -103,6 +153,8 @@ describe('managed cache provider integration', () => {
   it('traverses real bounded PCM and waveform cache responses', async () => {
     const { root, project, descriptor } = await createFixture()
     const handler = createCacheProtocolHandler(() => ({ root, project }), createFileRangeResponse)
+    const { ContinuousPcmSampleProvider, BinaryWaveformDataProvider } =
+      await loadProviderConstructors()
     const requests: Request[] = []
     vi.stubGlobal('fetch', (url: string | URL | Request, init?: RequestInit) => {
       const request = new Request(url, init)
