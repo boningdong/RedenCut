@@ -21,7 +21,7 @@ export const ProjectRelativePathSchema = z
   .brand<'ProjectRelativePath'>()
 export type ProjectRelativePath = z.infer<typeof ProjectRelativePathSchema>
 
-const AudioMetadataSchema = z
+export const AudioMetadataSchema = z
   .object({
     durationSeconds: z.number().nonnegative(),
     sampleRate: z.number().int().positive(),
@@ -179,6 +179,18 @@ export const ProjectFileSchema = z
         message: 'Duplicate AudioSourceId',
       })
     }
+    project.audioSources.forEach((source, sourceIndex) => {
+      if (
+        source.location.mode === 'copy' &&
+        !source.location.path.startsWith(`media/${source.id}/`)
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['audioSources', sourceIndex, 'location', 'path'],
+          message: 'Copied media must use its source-specific media directory',
+        })
+      }
+    })
     project.tracks.forEach((track, trackIndex) => {
       track.clips.forEach((clip, clipIndex) => {
         const path = ['tracks', trackIndex, 'clips', clipIndex]

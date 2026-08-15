@@ -24,6 +24,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
     this.ended = false
     this.maxFrames = options.processorOptions.maxFrames
     this.targetFrames = options.processorOptions.targetFrames
+    this.refillFrames = options.processorOptions.refillFrames ?? this.targetFrames
     this.requestOutstanding = false
     this.port.onmessage = ({ data }) => {
       if (data.type === 'pcm') {
@@ -46,6 +47,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
         this.requestOutstanding = false
       } else if (data.type === 'play') {
         this.playing = true
+        this.started = false
       } else if (data.type === 'pause') {
         this.playing = false
       } else if (data.type === 'end' && data.generation === this.generation) {
@@ -82,7 +84,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
       }
     }
     for (let channel = 0; channel < output.length; channel++) output[channel].fill(0, filled)
-    if (this.queuedFrames < this.targetFrames && !this.ended && !this.requestOutstanding) {
+    if (this.queuedFrames < this.refillFrames && !this.ended && !this.requestOutstanding) {
       this.requestOutstanding = true
       this.port.postMessage({ type: 'need-data', generation: this.generation, queuedFrames: this.queuedFrames })
     }

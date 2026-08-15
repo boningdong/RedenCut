@@ -19,7 +19,9 @@ async function fixture(pcmFile = `cache/${source.id}/audio.f32le`) {
   await mkdir(join(cacheRoot, 'waveform'), { recursive: true })
   await mkdir(join(root, 'media'), { recursive: true })
   await writeFile(join(cacheRoot, 'audio.f32le'), new Uint8Array(8))
-  await writeFile(join(cacheRoot, 'waveform', 'level-256.minmax-f32le'), new Uint8Array(8))
+  for (const level of [256, 4096, 65536]) {
+    await writeFile(join(cacheRoot, 'waveform', `level-${level}.minmax-f32le`), new Uint8Array(8))
+  }
   await writeFile(join(root, 'media', 'secret.bin'), new Uint8Array(8))
   await writeFile(
     join(cacheRoot, 'manifest.json'),
@@ -39,13 +41,11 @@ async function fixture(pcmFile = `cache/${source.id}/audio.f32le`) {
       },
       waveform: {
         representation: 'min-max-f32le',
-        levels: [
-          {
-            file: `cache/${source.id}/waveform/level-256.minmax-f32le`,
-            samplesPerBucket: 256,
-            bucketCount: 1,
-          },
-        ],
+        levels: [256, 4096, 65536].map((level) => ({
+          file: `cache/${source.id}/waveform/level-${level}.minmax-f32le`,
+          samplesPerBucket: level,
+          bucketCount: 1,
+        })),
       },
     }),
   )
@@ -62,13 +62,16 @@ describe('AudioSourceCacheStore', () => {
       sampleRate: 48_000,
       channels: 2,
       frameCount: 1,
-      waveformLevels: [{ samplesPerBucket: 256, bucketCount: 1 }],
+      waveformLevels: [256, 4096, 65536].map((samplesPerBucket) => ({
+        samplesPerBucket,
+        bucketCount: 1,
+      })),
     })
   })
 
   it('rejects manifest artifacts outside their source-specific cache directory', async () => {
     const store = new AudioSourceCacheStore(await fixture('media/secret.bin'))
-    await expect(store.resolvePcm(source.id)).rejects.toThrow('outside source cache')
+    await expect(store.resolvePcm(source)).rejects.toThrow('Invalid cache')
     await expect(store.validate(source)).resolves.toBeNull()
   })
 })

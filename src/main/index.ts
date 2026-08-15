@@ -41,7 +41,7 @@ void app.whenReady().then(async () => {
   protocol.handle(
     'podcut',
     createCacheProtocolHandler(
-      () => controller.workspace.root,
+      () => ({ root: controller.workspace.root, project: controller.workspace.project }),
       (path, request) =>
         net.fetch(pathToFileURL(path).href, {
           headers: Object.fromEntries(request.headers.entries()),

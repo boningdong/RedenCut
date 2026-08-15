@@ -7,7 +7,7 @@ interface WorkletPort {
   postMessage(message: Record<string, unknown>): void
 }
 
-function createProcessor(maxFrames = 8, targetFrames = 4) {
+function createProcessor(maxFrames = 8, targetFrames = 4, refillFrames = targetFrames) {
   let Processor: new (options: unknown) => {
     port: WorkletPort
     process(inputs: unknown[], outputs: Float32Array[][]): boolean
@@ -29,7 +29,7 @@ function createProcessor(maxFrames = 8, targetFrames = 4) {
     'registerProcessor',
     WORKLET_CODE,
   )(HostProcessor, registerProcessor)
-  return new Processor!({ processorOptions: { maxFrames, targetFrames } })
+  return new Processor!({ processorOptions: { maxFrames, targetFrames, refillFrames } })
 }
 
 function send(processor: ReturnType<typeof createProcessor>, data: Record<string, unknown>) {
@@ -86,5 +86,39 @@ describe('PodCut AudioWorklet queue', () => {
     expect(processor.port.messages.filter((message) => message.type === 'need-data')).toHaveLength(
       2,
     )
+  })
+
+  it('waits for the low watermark before requesting a refill toward the target', () => {
+    const processor = createProcessor(8, 6, 2)
+    send(processor, { type: 'flush', generation: 1 })
+    send(processor, { type: 'pcm', generation: 1, channels: [new Float32Array(6)], gain: 1 })
+    send(processor, { type: 'play' })
+    processor.process([], [[new Float32Array(2)]])
+    expect(processor.port.messages.filter((message) => message.type === 'need-data')).toHaveLength(
+      0,
+    )
+    processor.process([], [[new Float32Array(3)]])
+    expect(processor.port.messages).toContainEqual({
+      type: 'need-data',
+      generation: 1,
+      queuedFrames: 1,
+    })
+  })
+
+  it('reports a fresh start anchor after pause and resume', () => {
+    const processor = createProcessor(16, 4)
+    send(processor, { type: 'flush', generation: 1 })
+    send(processor, {
+      type: 'pcm',
+      generation: 1,
+      channels: [new Float32Array(8)],
+      gain: 1,
+    })
+    send(processor, { type: 'play' })
+    processor.process([], [[new Float32Array(2)]])
+    send(processor, { type: 'pause' })
+    send(processor, { type: 'play' })
+    processor.process([], [[new Float32Array(2)]])
+    expect(processor.port.messages.filter((message) => message.type === 'started')).toHaveLength(2)
   })
 })

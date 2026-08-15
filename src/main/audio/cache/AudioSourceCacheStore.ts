@@ -20,7 +20,8 @@ export class AudioSourceCacheStore {
       )
       if (
         manifest.audioSourceId !== source.id ||
-        manifest.sourceSha256 !== source.fingerprint.sha256
+        manifest.sourceSha256 !== source.fingerprint.sha256 ||
+        manifest.pcm.channels !== source.metadata.channels
       ) {
         return null
       }
@@ -51,27 +52,25 @@ export class AudioSourceCacheStore {
     }
   }
 
-  async resolvePcm(id: AudioSourceId): Promise<string> {
-    const manifest = await this.readManifest(id)
-    this.assertArtifactScope(id, manifest.pcm.file)
+  async resolvePcm(source: AudioSource): Promise<string> {
+    const manifest = await this.requireValid(source)
+    this.assertArtifactScope(source.id, manifest.pcm.file)
     return this.resolver.resolve(manifest.pcm.file)
   }
 
-  async resolveWaveform(id: AudioSourceId, samplesPerBucket: number): Promise<string> {
-    const manifest = await this.readManifest(id)
+  async resolveWaveform(source: AudioSource, samplesPerBucket: number): Promise<string> {
+    const manifest = await this.requireValid(source)
     const level = manifest.waveform.levels.find(
       (candidate) => candidate.samplesPerBucket === samplesPerBucket,
     )
     if (!level) throw new Error(`Unknown waveform level ${samplesPerBucket}`)
-    this.assertArtifactScope(id, level.file)
+    this.assertArtifactScope(source.id, level.file)
     return this.resolver.resolve(level.file)
   }
 
-  private async readManifest(id: AudioSourceId): Promise<AudioSourceCacheManifest> {
-    const manifest = AudioSourceCacheManifestSchema.parse(
-      JSON.parse(await readFile(join(this.projectRoot, 'cache', id, 'manifest.json'), 'utf8')),
-    )
-    if (manifest.audioSourceId !== id) throw new Error('Cache manifest identity mismatch')
+  private async requireValid(source: AudioSource): Promise<AudioSourceCacheManifest> {
+    const manifest = await this.validate(source)
+    if (!manifest) throw new Error(`Invalid cache for audio source ${source.id}`)
     return manifest
   }
 

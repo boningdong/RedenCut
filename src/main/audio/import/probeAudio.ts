@@ -10,12 +10,13 @@ interface FFprobeStream {
   codec_name: string
   sample_rate: string
   channels: number
-  duration: string
+  duration?: string
   bit_rate?: string
 }
 
 interface FFprobeOutput {
   streams: FFprobeStream[]
+  format?: { duration?: string; bit_rate?: string }
 }
 
 export async function probeAudio(filePath: string): Promise<AudioMetadata> {
@@ -28,6 +29,7 @@ export async function probeAudio(filePath: string): Promise<AudioMetadata> {
         '-print_format',
         'json',
         '-show_streams',
+        '-show_format',
         filePath,
       ])
     ).stdout
@@ -45,12 +47,13 @@ export async function probeAudio(filePath: string): Promise<AudioMetadata> {
   }
   const stream = output.streams.find((candidate) => candidate.codec_type === 'audio')
   if (!stream) throw new Error(`No audio stream found in "${filePath}"`)
-  const durationSeconds = Number.parseFloat(stream.duration)
+  const durationSeconds = Number.parseFloat(stream.duration || output.format?.duration || '')
+  const bitRate = stream.bit_rate || output.format?.bit_rate
   return {
     durationSeconds: Number.isNaN(durationSeconds) ? 0 : durationSeconds,
     sampleRate: Number.parseInt(stream.sample_rate, 10),
     channels: stream.channels,
     codec: stream.codec_name,
-    bitrateKbps: stream.bit_rate ? Math.round(Number.parseInt(stream.bit_rate, 10) / 1000) : 0,
+    bitrateKbps: bitRate ? Math.round(Number.parseInt(bitRate, 10) / 1000) : 0,
   }
 }

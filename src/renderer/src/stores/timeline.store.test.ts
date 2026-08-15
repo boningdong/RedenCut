@@ -329,6 +329,11 @@ describe('muteRange', () => {
     expect(tl().undoStack).toHaveLength(0)
   })
 
+  it('does not create history when the output range misses every clip', () => {
+    tl().muteRange(primaryTrackId(), 200, 210)
+    expect(tl().undoStack).toHaveLength(0)
+  })
+
   it('maps an output-time mute range back into a moved clip source range', () => {
     const clip = primaryClips()[0]
     tl().moveClip(clip.id, 10)

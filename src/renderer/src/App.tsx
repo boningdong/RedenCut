@@ -212,11 +212,17 @@ export default function App() {
           current,
         )
         if (!workspace) throw new Error('Workspace is not initialized')
+        const nextWorkspace = {
+          ...workspace,
+          portable: imported.project.audioSources.every(
+            (source) => source.location.mode === 'copy',
+          ),
+        }
         const sources = [
           ...descriptors.filter((item) => item.audioSourceId !== imported.source.id),
           imported.cache,
         ]
-        await loadSession({ project: imported.project, workspace, sources })
+        await loadSession({ project: imported.project, workspace: nextWorkspace, sources })
         setIsDirty(false)
       } catch (reason) {
         setError((reason as Error).message)

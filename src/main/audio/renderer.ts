@@ -103,6 +103,7 @@ export function buildRenderArgs(
   const encodeArgs = formatToEncodeArgs(fmt)
 
   return [
+    '-y',
     ...inputArgs,
     '-filter_complex',
     filterComplex,

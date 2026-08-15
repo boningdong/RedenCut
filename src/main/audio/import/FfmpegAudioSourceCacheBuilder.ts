@@ -154,6 +154,7 @@ export class FfmpegAudioSourceCacheBuilder {
     } finally {
       clearInterval(heartbeat)
       signal.removeEventListener('abort', abort)
+      await rm(request.stagingRoot, { recursive: true, force: true }).catch(() => {})
     }
   }
 }

@@ -95,6 +95,12 @@ describe('ProjectFileSchema', () => {
     expect(ProjectFileSchema.parse(project).audioSources[0].location.mode).toBe('reference')
   })
 
+  it('requires copied media to live under its source-specific managed directory', () => {
+    const project = managedProject()
+    project.audioSources[0].location.path = 'media/another-source/episode.mp3'
+    expect(() => ProjectFileSchema.parse(project)).toThrow('source-specific media directory')
+  })
+
   it('rejects dangling source identities and clip ranges outside source duration', () => {
     const dangling = managedProject()
     dangling.tracks[0].clips[0].audioSourceId = '00000000-0000-4000-8000-000000000099'

@@ -23,15 +23,15 @@ export function registerRenderIpc(controller: WorkspaceController): void {
     const paths = new Map<string, string>()
     for (const source of project.audioSources)
       paths.set(source.id, await controller.resolveOriginal(source.id))
-    const child = spawn(getFfmpegPath(), buildRenderArgs(project, paths, destination.filePath))
+    const child = spawn(getFfmpegPath(), buildRenderArgs(project, paths, destination.filePath), {
+      stdio: ['ignore', 'ignore', 'pipe'],
+    })
     await new Promise<void>((resolve, reject) => {
-      let stderr = ''
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString()
-        const match = stderr
-          .match(/time=(\d+):(\d+):(\d+\.\d+)/g)
-          ?.at(-1)
-          ?.match(/(\d+):(\d+):(\d+\.\d+)/)
+      let diagnosticTail = ''
+      let progressFragment = ''
+      const reportProgress = (text: string) => {
+        const matches = [...text.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)]
+        const match = matches.at(-1)
         if (match && !event.sender.isDestroyed()) {
           const currentSeconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
           const totalSeconds = project.tracks
@@ -47,11 +47,21 @@ export function registerRenderIpc(controller: WorkspaceController): void {
           }
           event.sender.send('render:progress', progress)
         }
+      }
+      child.stderr!.on('data', (chunk: Buffer) => {
+        const text = chunk.toString()
+        diagnosticTail = (diagnosticTail + text).slice(-4096)
+        progressFragment += text
+        const records = progressFragment.split(/[\r\n]/)
+        progressFragment = records.pop()!.slice(-256)
+        for (const record of records) reportProgress(record)
       })
       child.once('error', reject)
-      child.once('close', (code) =>
-        code === 0 ? resolve() : reject(new Error(`FFmpeg export failed: ${stderr.slice(-500)}`)),
-      )
+      child.once('close', (code) => {
+        reportProgress(progressFragment)
+        if (code === 0) resolve()
+        else reject(new Error(`FFmpeg export failed: ${diagnosticTail.slice(-500)}`))
+      })
     })
     return true
   })

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
+import { AudioSourceSchema, createEmptyProject } from '../../shared/project.types'
 import { createCacheProtocolHandler } from './cacheProtocol'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001'
@@ -11,7 +12,8 @@ async function projectRoot() {
   const cache = join(root, 'cache', SOURCE_ID)
   await mkdir(join(cache, 'waveform'), { recursive: true })
   await writeFile(join(cache, 'audio.f32le'), new Uint8Array(8))
-  await writeFile(join(cache, 'waveform', 'level-256.minmax-f32le'), new Uint8Array(8))
+  for (const level of [256, 4096, 65536])
+    await writeFile(join(cache, 'waveform', `level-${level}.minmax-f32le`), new Uint8Array(8))
   await writeFile(
     join(cache, 'manifest.json'),
     JSON.stringify({
@@ -30,22 +32,36 @@ async function projectRoot() {
       },
       waveform: {
         representation: 'min-max-f32le',
-        levels: [
-          {
-            file: `cache/${SOURCE_ID}/waveform/level-256.minmax-f32le`,
-            samplesPerBucket: 256,
-            bucketCount: 1,
-          },
-        ],
+        levels: [256, 4096, 65536].map((level) => ({
+          file: `cache/${SOURCE_ID}/waveform/level-${level}.minmax-f32le`,
+          samplesPerBucket: level,
+          bucketCount: 1,
+        })),
       },
     }),
   )
-  return root
+  const project = createEmptyProject()
+  project.audioSources = [
+    AudioSourceSchema.parse({
+      id: SOURCE_ID,
+      displayName: 'source.wav',
+      location: { mode: 'copy', path: `media/${SOURCE_ID}/source.wav` },
+      fingerprint: { byteLength: 1, modifiedTimeMs: 1, sha256: 'a'.repeat(64) },
+      metadata: {
+        durationSeconds: 1,
+        sampleRate: 48_000,
+        channels: 2,
+        codec: 'pcm_s16le',
+        bitrateKbps: 1536,
+      },
+    }),
+  ]
+  return { root, project }
 }
 
 describe('managed cache protocol', () => {
   it('forwards bounded Range requests for protected PCM artifacts', async () => {
-    const root = await projectRoot()
+    const active = await projectRoot()
     const fetchFile = vi.fn(
       async (_path: string, _request: Request) =>
         new Response(new Uint8Array(4), {
@@ -53,7 +69,7 @@ describe('managed cache protocol', () => {
           headers: { 'content-range': 'bytes 0-3/8' },
         }),
     )
-    const handler = createCacheProtocolHandler(() => root, fetchFile)
+    const handler = createCacheProtocolHandler(() => active, fetchFile)
     const response = await handler(
       new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
@@ -68,13 +84,19 @@ describe('managed cache protocol', () => {
     `podcut://cache/${SOURCE_ID}/waveform/512`,
     `podcut://cache/${SOURCE_ID}/../../project.json`,
   ])('returns 404 for an unprotected route: %s', async (url) => {
-    const handler = createCacheProtocolHandler(() => '/unused', vi.fn())
+    const handler = createCacheProtocolHandler(
+      () => ({ root: '/unused', project: createEmptyProject() }),
+      vi.fn(),
+    )
     expect((await handler(new Request(url))).status).toBe(404)
   })
 
   it('rejects missing and oversized byte ranges before touching the filesystem adapter', async () => {
     const fetchFile = vi.fn()
-    const handler = createCacheProtocolHandler(() => '/unused', fetchFile)
+    const handler = createCacheProtocolHandler(
+      () => ({ root: '/unused', project: createEmptyProject() }),
+      fetchFile,
+    )
     expect((await handler(new Request(`podcut://cache/${SOURCE_ID}/pcm`))).status).toBe(416)
     expect(
       (
@@ -86,5 +108,17 @@ describe('managed cache protocol', () => {
       ).status,
     ).toBe(416)
     expect(fetchFile).not.toHaveBeenCalled()
+  })
+
+  it('rejects a file adapter that ignores the bounded range request', async () => {
+    const active = await projectRoot()
+    const handler = createCacheProtocolHandler(
+      () => active,
+      vi.fn(async () => new Response(new Uint8Array(8), { status: 200 })),
+    )
+    const response = await handler(
+      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+    )
+    expect(response.status).toBe(502)
   })
 })

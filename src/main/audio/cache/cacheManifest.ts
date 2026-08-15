@@ -20,14 +20,14 @@ export const AudioSourceCacheManifestSchema = z
       file: ProjectRelativePathSchema,
       sampleFormat: z.literal('f32le'),
       layout: z.literal('interleaved'),
-      sampleRate: z.number().int().positive(),
+      sampleRate: z.literal(48_000),
       channels: z.number().int().positive(),
       frameCount: z.number().int().nonnegative(),
       byteLength: z.number().int().nonnegative(),
     }),
     waveform: z.object({
       representation: z.literal('min-max-f32le'),
-      levels: z.array(WaveformLevelSchema).min(1),
+      levels: z.array(WaveformLevelSchema).length(WAVEFORM_LEVELS.length),
     }),
   })
   .superRefine((manifest, context) => {
@@ -42,6 +42,22 @@ export const AudioSourceCacheManifestSchema = z
     if (new Set(levels).size !== levels.length) {
       context.addIssue({ code: 'custom', path: ['waveform', 'levels'], message: 'Duplicate level' })
     }
+    if (WAVEFORM_LEVELS.some((level) => !levels.includes(level))) {
+      context.addIssue({
+        code: 'custom',
+        path: ['waveform', 'levels'],
+        message: 'Missing required waveform level',
+      })
+    }
+    manifest.waveform.levels.forEach((level, index) => {
+      if (level.bucketCount !== Math.ceil(manifest.pcm.frameCount / level.samplesPerBucket)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['waveform', 'levels', index, 'bucketCount'],
+          message: 'Waveform bucket count does not cover PCM frame count',
+        })
+      }
+    })
   })
 
 export type AudioSourceCacheManifest = z.infer<typeof AudioSourceCacheManifestSchema>

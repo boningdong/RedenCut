@@ -164,13 +164,11 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           if (!trackId) break
           const wordIds = useTranscriptStore.getState().selectedWordIds
           // Mute overlapping clips
-          const hits = tracks
-            .flatMap((t) => t.clips)
-            .filter((c) => {
-              if (c.muted) return false
-              const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-              return c.outputStart < selection.end && outputEnd > selection.start
-            })
+          const hits = (tracks.find((track) => track.id === trackId)?.clips ?? []).filter((c) => {
+            if (c.muted) return false
+            const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
+            return c.outputStart < selection.end && outputEnd > selection.start
+          })
           if (hits.length > 0) {
             useTimelineStore
               .getState()

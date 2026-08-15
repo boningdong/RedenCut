@@ -4,7 +4,10 @@ import { ProjectRelativePathSchema, type ProjectRelativePath } from '../../share
 
 function isContained(root: string, candidate: string): boolean {
   const pathFromRoot = relative(root, candidate)
-  return pathFromRoot === '' || (!pathFromRoot.startsWith(`..${sep}`) && pathFromRoot !== '..')
+  return (
+    pathFromRoot === '' ||
+    (!isAbsolute(pathFromRoot) && !pathFromRoot.startsWith(`..${sep}`) && pathFromRoot !== '..')
+  )
 }
 
 async function nearestExistingPath(path: string): Promise<string> {

@@ -285,6 +285,12 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const before = cloneTracks(tracks)
 
     const newClips = splitAndMute(track.clips, startTime, endTime, track.id)
+    if (
+      newClips.length === track.clips.length &&
+      newClips.every((clip, index) => clip === track.clips[index])
+    ) {
+      return
+    }
 
     set((s) => ({
       tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),

@@ -6,6 +6,7 @@ import { basename, extname, join } from 'path'
 import type { ImportMode, ImportProgress, ImportResult } from '../../../shared/import.types'
 import {
   AudioSourceIdSchema,
+  AudioMetadataSchema,
   ProjectFileSchema,
   type AudioMetadata,
   type AudioSource,
@@ -51,6 +52,7 @@ export class ImportCoordinator {
     projectInput: ProjectFile,
     onProgress?: (progress: ImportProgress) => void,
   ): Promise<ImportResult> {
+    if (!AudioSourceIdSchema.safeParse(importId).success) throw new Error('Invalid import ID')
     if (this.active) throw new Error('Another audio import is already active')
     const controller = new AbortController()
     this.active = { id: importId, controller }
@@ -58,7 +60,7 @@ export class ImportCoordinator {
     const progress = (stage: ImportProgress['stage'], percent: number) =>
       onProgress?.({ importId, displayName, stage, percent })
     const id = AudioSourceIdSchema.parse(this.dependencies.createId())
-    const stageRoot = join(this.workspace.root, '.staging', importId)
+    const stageRoot = join(this.workspace.root, '.staging', randomUUID())
     const finalMediaRoot = join(this.workspace.root, 'media', id)
     let publishedMedia = false
     let publishedCache = false
@@ -66,7 +68,9 @@ export class ImportCoordinator {
     try {
       progress('validating', 0)
       const project = ProjectFileSchema.parse(projectInput)
-      const metadata = await this.dependencies.probe(sourcePath)
+      const metadata = AudioMetadataSchema.parse(await this.dependencies.probe(sourcePath))
+      if (metadata.durationSeconds <= 0)
+        throw new Error(`Audio duration is unavailable for ${displayName}`)
       const sourceInfo = await stat(sourcePath)
       const requiredBytes = estimateImportBytes(sourceInfo.size, metadata, mode)
       if ((await this.dependencies.availableBytes(this.workspace.root)) < requiredBytes) {
@@ -215,6 +219,10 @@ async function copyWithHash(
     output.end()
     await once(output, 'close')
     return { byteLength, sha256: hash.digest('hex') }
+  } catch (error) {
+    input.destroy()
+    output.destroy()
+    throw error
   } finally {
     signal.removeEventListener('abort', abort)
   }

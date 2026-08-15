@@ -20,13 +20,11 @@ function manifest() {
     },
     waveform: {
       representation: 'min-max-f32le',
-      levels: [
-        {
-          file: `cache/${SOURCE_ID}/waveform/level-256.minmax-f32le`,
-          samplesPerBucket: 256,
-          bucketCount: 1,
-        },
-      ],
+      levels: [256, 4096, 65536].map((level) => ({
+        file: `cache/${SOURCE_ID}/waveform/level-${level}.minmax-f32le`,
+        samplesPerBucket: level,
+        bucketCount: 1,
+      })),
     },
   }
 }
@@ -50,5 +48,20 @@ describe('AudioSourceCacheManifestSchema', () => {
     const badLevel = manifest()
     badLevel.waveform.levels[0].samplesPerBucket = 512
     expect(() => AudioSourceCacheManifestSchema.parse(badLevel)).toThrow()
+  })
+
+  it('requires the 48 kHz PCM format and every waveform level', () => {
+    const wrongRate = manifest()
+    wrongRate.pcm.sampleRate = 44_100
+    expect(() => AudioSourceCacheManifestSchema.parse(wrongRate)).toThrow()
+    const missingLevel = manifest()
+    missingLevel.waveform.levels.pop()
+    expect(() => AudioSourceCacheManifestSchema.parse(missingLevel)).toThrow()
+  })
+
+  it('rejects waveform bucket counts that do not cover the PCM frame count', () => {
+    const value = manifest()
+    value.waveform.levels[0].bucketCount = 0
+    expect(() => AudioSourceCacheManifestSchema.parse(value)).toThrow('bucket count')
   })
 })

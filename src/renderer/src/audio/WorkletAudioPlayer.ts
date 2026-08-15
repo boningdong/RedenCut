@@ -5,6 +5,7 @@ import { buildTrackPlaybackPlan, type PlaybackSegment } from './playbackPlan'
 
 const SAMPLE_RATE = 48_000
 const TARGET_FRAMES = SAMPLE_RATE * 2
+const REFILL_FRAMES = SAMPLE_RATE * 1.5
 const MAX_FRAMES = SAMPLE_RATE * 3
 const READ_FRAMES = 4096
 
@@ -31,6 +32,8 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   private startedAt: number | null = null
   private positionAtStart = 0
   private animationFrame: number | null = null
+  private rebuildToken = 0
+  private queueGeneration = 0
   private diagnostics: PlaybackDiagnostics = {
     underruns: 0,
     maximumQueuedFrames: 0,
@@ -68,22 +71,35 @@ export class WorkletAudioPlayer implements IAudioPlayer {
         if (queue) queue.gain.gain.value = track.volume
       }
     } else if (this.context) {
+      this.suspendForRebuild()
       void this.rebuildQueues(this.currentTime).catch((error) => this.emitError(error))
     }
   }
 
   async play(): Promise<void> {
     if (this.playing) return
-    await this.ensureContext()
-    if (this.queues.size === 0) await this.rebuildQueues(this.currentTime)
-    await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
-    if (this.context!.state === 'suspended') await this.context!.resume()
     this.playing = true
-    this.startedAt = null
-    this.positionAtStart = this.currentTime
-    for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
     this.stateCallbacks.forEach((callback) => callback(true))
-    this.startClock()
+    try {
+      await this.ensureContext()
+      if (this.queues.size === 0) {
+        await this.rebuildQueues(this.currentTime)
+        return
+      }
+      await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
+      if (!this.playing) return
+      if (this.context!.state === 'suspended') await this.context!.resume()
+      this.startedAt = null
+      this.positionAtStart = this.currentTime
+      for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
+      this.startClock()
+    } catch (error) {
+      if (this.playing) {
+        this.playing = false
+        this.stateCallbacks.forEach((callback) => callback(false))
+      }
+      throw error
+    }
   }
 
   pause(): void {
@@ -101,13 +117,10 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   seekTo(outputTime: number): void {
-    const wasPlaying = this.playing
-    this.pause()
+    this.suspendForRebuild()
     this.currentTime = Math.max(0, Math.min(this.duration, outputTime))
     this.timeCallbacks.forEach((callback) => callback(this.currentTime))
-    void this.rebuildQueues(this.currentTime)
-      .then(() => (wasPlaying ? this.play() : undefined))
-      .catch((error) => this.emitError(error))
+    void this.rebuildQueues(this.currentTime).catch((error) => this.emitError(error))
   }
 
   getCurrentTime(): number {
@@ -149,8 +162,10 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   destroy(): void {
+    this.rebuildToken++
     this.pause()
     for (const queue of this.queues.values()) {
+      queue.generation++
       queue.controller.abort()
       queue.node.disconnect()
       queue.gain.disconnect()
@@ -164,19 +179,31 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   private async ensureContext(): Promise<void> {
     if (this.context) return
     this.context = new AudioContext({ sampleRate: SAMPLE_RATE })
+    if (this.context.sampleRate !== SAMPLE_RATE) {
+      await this.context.close()
+      this.context = null
+      throw new Error('Audio device could not create the required 48000 Hz context')
+    }
     const blobUrl = URL.createObjectURL(
       new Blob([WORKLET_CODE], { type: 'application/javascript' }),
     )
     try {
       await this.context.audioWorklet.addModule(blobUrl)
+    } catch (error) {
+      await this.context.close()
+      this.context = null
+      throw error
     } finally {
       URL.revokeObjectURL(blobUrl)
     }
   }
 
   private async rebuildQueues(fromTime: number): Promise<void> {
+    const rebuildToken = ++this.rebuildToken
     await this.ensureContext()
+    if (rebuildToken !== this.rebuildToken) return
     for (const queue of this.queues.values()) {
+      queue.generation++
       queue.controller.abort()
       queue.node.disconnect()
       queue.gain.disconnect()
@@ -191,7 +218,11 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       const node = new AudioWorkletNode(this.context!, 'podcut-player', {
         numberOfOutputs: 1,
         outputChannelCount: [channelCount],
-        processorOptions: { maxFrames: MAX_FRAMES, targetFrames: TARGET_FRAMES },
+        processorOptions: {
+          maxFrames: MAX_FRAMES,
+          targetFrames: TARGET_FRAMES,
+          refillFrames: REFILL_FRAMES,
+        },
       })
       const gain = this.context!.createGain()
       gain.gain.value = track.volume
@@ -200,7 +231,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       const queue: TrackQueue = {
         node,
         gain,
-        generation: 1,
+        generation: ++this.queueGeneration,
         queuedFrames: 0,
         plan: buildTrackPlaybackPlan(track, fromTime, this.duration, SAMPLE_RATE, anySolo),
         segmentIndex: 0,
@@ -213,8 +244,13 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       this.queues.set(track.id, queue)
     }
     await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
-    if (this.playing) {
+    if (rebuildToken === this.rebuildToken && this.playing) {
+      if (this.context!.state === 'suspended') await this.context!.resume()
+      if (rebuildToken !== this.rebuildToken || !this.playing) return
       for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
+      this.positionAtStart = this.currentTime
+      this.startedAt = null
+      this.startClock()
     }
   }
 
@@ -264,7 +300,25 @@ export class WorkletAudioPlayer implements IAudioPlayer {
             queue.controller.signal,
           )
           if (generation !== queue.generation) return
-          channels = chunk.channels
+          if (
+            !Number.isInteger(chunk.frameCount) ||
+            chunk.frameCount < 0 ||
+            chunk.frameCount > count
+          )
+            throw new Error('PCM provider returned an invalid frame count')
+          if (
+            chunk.channels.length !== provider.channels ||
+            chunk.channels.some((channel) => channel.length !== chunk.frameCount)
+          )
+            throw new Error('PCM provider returned an invalid channel layout')
+          channels = Array.from({ length: provider.channels }, (_, channelIndex) => {
+            const source = chunk.channels[channelIndex]
+            if (chunk.frameCount === count && source?.length === count) return source
+            const padded = new Float32Array(count)
+            if (source)
+              padded.set(source.subarray(0, Math.min(source.length, chunk.frameCount, count)))
+            return padded
+          })
           gain = segment.gain
           this.diagnostics.maximumReadFrames = Math.max(this.diagnostics.maximumReadFrames, count)
         }
@@ -292,7 +346,16 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     )
   }
 
+  private suspendForRebuild(): void {
+    if (this.playing) this.updateTime()
+    for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'pause' })
+    this.positionAtStart = this.currentTime
+    this.startedAt = null
+    this.stopClock()
+  }
+
   private startClock(): void {
+    this.stopClock()
     const tick = () => {
       if (!this.playing) return
       this.updateTime()
@@ -314,6 +377,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   private emitError(error: unknown): void {
+    if (error instanceof Error && error.name === 'AbortError') return
     const resolved = error instanceof Error ? error : new Error(String(error))
     this.errorCallbacks.forEach((callback) => callback(resolved))
   }

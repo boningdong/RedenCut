@@ -29,7 +29,7 @@ describe('mergeTrackWords', () => {
     expect(result.map((x) => x.start)).toEqual([1, 3])
   })
 
-  it('preserves words with undefined trackId (legacy) when no legacySourceFileId given', () => {
+  it('preserves untracked words when no audio source identity is provided', () => {
     const existing = [w('legacy', 0, undefined, undefined)]
     const incoming = [w('new', 1, 'track1', 'sf1')]
     const result = mergeTrackWords(existing, incoming, 'track1')

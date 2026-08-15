@@ -27,6 +27,7 @@ class FakeNode {
 
 class FakeContext {
   currentTime = 0
+  sampleRate = 48_000
   state = 'running'
   destination = {}
   audioWorklet = { addModule: vi.fn(async () => undefined) }
@@ -117,6 +118,36 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     player.destroy()
   })
 
+  it('refills from a low watermark back toward the two-second target in useful chunks', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await player.play()
+    const node = FakeNode.instances[0]
+    const generation = node.port.messages.find(({ message }) => message.type === 'flush')!.message
+      .generation as number
+    const before = node.port.messages.length
+    node.port.onmessage?.({
+      data: { type: 'need-data', generation, queuedFrames: 71_999 },
+    } as MessageEvent)
+    await vi.waitFor(() =>
+      expect(
+        node.port.messages
+          .slice(before)
+          .filter(({ message }) => message.type === 'pcm')
+          .reduce(
+            (frames, { message }) => frames + (message.channels as Float32Array[])[0].length,
+            0,
+          ),
+      ).toBe(24_001),
+    )
+    const firstRefill = node.port.messages
+      .slice(before)
+      .find(({ message }) => message.type === 'pcm')!.message
+    expect((firstRefill.channels as Float32Array[])[0]).toHaveLength(4096)
+    player.destroy()
+  })
+
   it('starts replacement queues when tracks change during playback', async () => {
     const player = new WorkletAudioPlayer()
     await player.registerAudioSource(SOURCE_ID, provider())
@@ -151,6 +182,17 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     ).rejects.toThrow('48000')
   })
 
+  it('rejects an AudioContext that cannot honor the 48 kHz project rate', async () => {
+    class WrongRateContext extends FakeContext {
+      sampleRate = 44_100
+    }
+    vi.stubGlobal('AudioContext', WrongRateContext)
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await expect(player.play()).rejects.toThrow('48000 Hz')
+  })
+
   it('aborts old provider reads and replaces queues on seek', async () => {
     const player = new WorkletAudioPlayer()
     const samples = provider()
@@ -168,6 +210,44 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(2))
     expect(oldSignal.aborted).toBe(true)
     expect(player.getCurrentTime()).toBe(3)
+    player.destroy()
+  })
+
+  it('resumes only the newest queue after rapid seeks while playing', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await player.play()
+    player.seekTo(1)
+    player.seekTo(2)
+    await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(2))
+    const replacement = FakeNode.instances[FakeNode.instances.length - 1]
+    await vi.waitFor(() =>
+      expect(replacement.port.messages.some(({ message }) => message.type === 'play')).toBe(true),
+    )
+    expect(player.isPlaying()).toBe(true)
+    expect(player.getCurrentTime()).toBe(2)
+    player.destroy()
+  })
+
+  it('pads a short EOF provider read with silence to preserve output timing', async () => {
+    const player = new WorkletAudioPlayer()
+    const samples = provider()
+    samples.readFrames = vi.fn(async (startFrame, frameCount) => ({
+      startFrame,
+      frameCount: Math.floor(frameCount / 2),
+      channels: [new Float32Array(Math.floor(frameCount / 2)).fill(0.5)],
+    }))
+    await player.registerAudioSource(SOURCE_ID, samples)
+    player.setTracks([track('one')])
+    await player.play()
+    const firstPcm = FakeNode.instances[0].port.messages.find(
+      ({ message }) => message.type === 'pcm',
+    )!.message
+    const channel = (firstPcm.channels as Float32Array[])[0]
+    expect(channel).toHaveLength(4096)
+    expect(channel[0]).toBe(0.5)
+    expect(channel[4095]).toBe(0)
     player.destroy()
   })
 })

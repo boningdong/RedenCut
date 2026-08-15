@@ -63,10 +63,10 @@ export class WorkspaceController {
     const store = new AudioSourceCacheStore(workspace.root)
     const result: ProjectOpenResult['sources'] = []
     for (const source of workspace.project.audioSources) {
+      const original = await resolveOriginal(workspace, source)
+      await verifyFingerprint(original, source.fingerprint)
       let manifest = await store.validate(source)
       if (!manifest) {
-        const original = await resolveOriginal(workspace, source)
-        await verifyFingerprint(original, source.fingerprint)
         manifest = await this.cacheBuilder.build(
           {
             projectRoot: workspace.root,

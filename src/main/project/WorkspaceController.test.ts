@@ -1,14 +1,14 @@
 import { createHash } from 'crypto'
-import { mkdir, mkdtemp, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import { ProjectFileSchema } from '../../shared/project.types'
+import { ProjectFileSchema, type AudioSourceId } from '../../shared/project.types'
 import { AudioSourceCacheManifestSchema } from '../audio/cache/cacheManifest'
 import type { FfmpegAudioSourceCacheBuilder } from '../audio/import/FfmpegAudioSourceCacheBuilder'
 import { WorkspaceController } from './WorkspaceController'
 
-const SOURCE_ID = '00000000-0000-4000-8000-000000000001'
+const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 
 async function packageWithoutCache() {
   const root = await mkdtemp(join(tmpdir(), 'podcut-open-'))
@@ -64,6 +64,35 @@ async function packageWithoutCache() {
   return root
 }
 
+async function writeValidCache(root: string): Promise<void> {
+  const request = {
+    projectRoot: root,
+    stagingRoot: join(root, '.staging', 'unused'),
+    sourcePath: join(root, 'media', SOURCE_ID, 'source.wav'),
+    audioSourceId: SOURCE_ID,
+    sourceSha256: createHash('sha256')
+      .update(new Uint8Array([1, 2, 3, 4]))
+      .digest('hex'),
+    metadata: {
+      durationSeconds: 1,
+      sampleRate: 48_000,
+      channels: 1,
+      codec: 'pcm_s16le',
+      bitrateKbps: 768,
+    },
+    processingSampleRate: 48_000 as const,
+  }
+  const manifest = generatedManifest(request)
+  await mkdir(join(root, 'cache', SOURCE_ID, 'waveform'), { recursive: true })
+  await writeFile(join(root, manifest.pcm.file), new Uint8Array(manifest.pcm.byteLength))
+  for (const level of manifest.waveform.levels)
+    await writeFile(join(root, level.file), new Uint8Array(level.bucketCount * 8))
+  await writeFile(
+    join(root, 'cache', SOURCE_ID, 'manifest.json'),
+    JSON.stringify(manifest, null, 2),
+  )
+}
+
 function generatedManifest(request: Parameters<FfmpegAudioSourceCacheBuilder['build']>[0]) {
   const base = `cache/${request.audioSourceId}`
   return AudioSourceCacheManifestSchema.parse({
@@ -82,13 +111,11 @@ function generatedManifest(request: Parameters<FfmpegAudioSourceCacheBuilder['bu
     },
     waveform: {
       representation: 'min-max-f32le',
-      levels: [
-        {
-          file: `${base}/waveform/level-256.minmax-f32le`,
-          samplesPerBucket: 256,
-          bucketCount: 188,
-        },
-      ],
+      levels: [256, 4096, 65536].map((level) => ({
+        file: `${base}/waveform/level-${level}.minmax-f32le`,
+        samplesPerBucket: level,
+        bucketCount: Math.ceil(48_000 / level),
+      })),
     },
   })
 }
@@ -117,6 +144,20 @@ describe('WorkspaceController cache recovery', () => {
     await controller.initialize(tempParent)
     const previousRoot = controller.workspace.root
     await expect(controller.open(await packageWithoutCache())).rejects.toThrow('decode failed')
+    expect(controller.workspace.root).toBe(previousRoot)
+  })
+
+  it('rejects a package whose original is missing even when its cache is valid', async () => {
+    const controller = new WorkspaceController({
+      build: vi.fn(),
+    } as unknown as FfmpegAudioSourceCacheBuilder)
+    const tempParent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    await controller.initialize(tempParent)
+    const previousRoot = controller.workspace.root
+    const candidate = await packageWithoutCache()
+    await writeValidCache(candidate)
+    await rm(join(candidate, 'media', SOURCE_ID, 'source.wav'))
+    await expect(controller.open(candidate)).rejects.toThrow('Original audio is unavailable')
     expect(controller.workspace.root).toBe(previousRoot)
   })
 })

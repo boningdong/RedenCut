@@ -75,6 +75,7 @@ describe('buildRenderArgs', () => {
       { source: 1, sourceStart: 0, sourceEnd: 5, outputStart: 5 },
     ])
     const args = buildRenderArgs(project, paths, '/tmp/out.mp3')
+    expect(args[0]).toBe('-y')
     expect(args.filter((arg) => arg === '-i')).toHaveLength(2)
     expect(args).toContain('/bundle/media/a.mp3')
     expect(args).toContain('/tmp/b.mp3')
