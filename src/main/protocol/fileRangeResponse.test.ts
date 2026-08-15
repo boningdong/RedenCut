@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'fs/promises'
+import { mkdtemp, readFile, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -7,29 +7,46 @@ import { createFileRangeResponse } from './fileRangeResponse'
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'podcut-file-range-'))
   const path = join(root, 'artifact.bin')
-  await writeFile(path, Uint8Array.from({ length: 64 }, (_, index) => index))
+  await writeFile(
+    path,
+    Uint8Array.from({ length: 64 }, (_, index) => index),
+  )
   return path
 }
 
 describe('createFileRangeResponse', () => {
+  it('is the cache adapter composed by the Electron main entrypoint', async () => {
+    const mainSource = await readFile(join(__dirname, '../index.ts'), 'utf8')
+    expect(mainSource).toContain(
+      "import { createFileRangeResponse } from './protocol/fileRangeResponse'",
+    )
+    expect(mainSource).toContain('createCacheProtocolHandler(')
+    expect(mainSource).toContain('createFileRangeResponse,')
+    expect(mainSource).not.toContain('pathToFileURL')
+    expect(mainSource).not.toContain('net.fetch')
+  })
+
   it.each([
     [{ start: 0, end: 7 }, [0, 1, 2, 3, 4, 5, 6, 7]],
     [{ start: 24, end: 31 }, [24, 25, 26, 27, 28, 29, 30, 31]],
     [{ start: 60, end: 63 }, [60, 61, 62, 63]],
-  ] as const)('streams the inclusive range %# with exact partial headers', async (range, expected) => {
-    const response = await createFileRangeResponse(
-      await fixture(),
-      range,
-      new AbortController().signal,
-    )
+  ] as const)(
+    'streams the inclusive range %# with exact partial headers',
+    async (range, expected) => {
+      const response = await createFileRangeResponse(
+        await fixture(),
+        range,
+        new AbortController().signal,
+      )
 
-    expect(response.status).toBe(206)
-    expect(response.headers.get('content-range')).toBe(`bytes ${range.start}-${range.end}/64`)
-    expect(response.headers.get('content-length')).toBe(String(range.end - range.start + 1))
-    expect(response.headers.get('accept-ranges')).toBe('bytes')
-    expect(response.headers.get('content-type')).toBe('application/octet-stream')
-    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual(expected)
-  })
+      expect(response.status).toBe(206)
+      expect(response.headers.get('content-range')).toBe(`bytes ${range.start}-${range.end}/64`)
+      expect(response.headers.get('content-length')).toBe(String(range.end - range.start + 1))
+      expect(response.headers.get('accept-ranges')).toBe('bytes')
+      expect(response.headers.get('content-type')).toBe('application/octet-stream')
+      expect([...new Uint8Array(await response.arrayBuffer())]).toEqual(expected)
+    },
+  )
 
   it.each([
     { start: -1, end: 4 },

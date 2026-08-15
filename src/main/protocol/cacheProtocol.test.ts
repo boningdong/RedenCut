@@ -12,7 +12,10 @@ async function projectRoot() {
   const root = await mkdtemp(join(tmpdir(), 'podcut-protocol-'))
   const cache = join(root, 'cache', SOURCE_ID)
   await mkdir(join(cache, 'waveform'), { recursive: true })
-  await writeFile(join(cache, 'audio.f32le'), Uint8Array.from({ length: 8 }, (_, index) => index))
+  await writeFile(
+    join(cache, 'audio.f32le'),
+    Uint8Array.from({ length: 8 }, (_, index) => index),
+  )
   for (const level of [256, 4096, 65536])
     await writeFile(join(cache, 'waveform', `level-${level}.minmax-f32le`), new Uint8Array(8))
   await writeFile(
@@ -108,10 +111,7 @@ describe('managed cache protocol', () => {
   it('rejects a file adapter that ignores the bounded range request', async () => {
     const active = await projectRoot()
     const fetchFile = vi.fn(async () => new Response(new Uint8Array(8), { status: 200 }))
-    const handler = createCacheProtocolHandler(
-      () => active,
-      fetchFile,
-    )
+    const handler = createCacheProtocolHandler(() => active, fetchFile)
     const response = await handler(
       new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
@@ -140,29 +140,32 @@ describe('managed cache protocol', () => {
     ['missing content-length', 'bytes 0-3/8', null],
     ['wrong content-length', 'bytes 0-3/8', '3'],
     ['oversized content-length', 'bytes 0-3/8', '5'],
-  ])('rejects deceptive 206 metadata and cancels its body: %s', async (_name, contentRange, contentLength) => {
-    const active = await projectRoot()
-    let cancelled = false
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array([0, 1, 2, 3]))
-      },
-      cancel() {
-        cancelled = true
-      },
-    })
-    const headers = new Headers({ 'content-range': contentRange })
-    if (contentLength !== null) headers.set('content-length', contentLength)
-    const handler = createCacheProtocolHandler(
-      () => active,
-      vi.fn(async () => new Response(body, { status: 206, headers })),
-    )
-    const response = await handler(
-      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
-    )
-    expect(response.status).toBe(502)
-    expect(cancelled).toBe(true)
-  })
+  ])(
+    'rejects deceptive 206 metadata and cancels its body: %s',
+    async (_name, contentRange, contentLength) => {
+      const active = await projectRoot()
+      let cancelled = false
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([0, 1, 2, 3]))
+        },
+        cancel() {
+          cancelled = true
+        },
+      })
+      const headers = new Headers({ 'content-range': contentRange })
+      if (contentLength !== null) headers.set('content-length', contentLength)
+      const handler = createCacheProtocolHandler(
+        () => active,
+        vi.fn(async () => new Response(body, { status: 206, headers })),
+      )
+      const response = await handler(
+        new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+      )
+      expect(response.status).toBe(502)
+      expect(cancelled).toBe(true)
+    },
+  )
 
   it('rethrows an adapter AbortError', async () => {
     const active = await projectRoot()
