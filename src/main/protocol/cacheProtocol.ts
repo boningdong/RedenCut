@@ -54,13 +54,20 @@ export function createCacheProtocolHandler(
         return new Response('Unable to read cache resource', { status: 500 })
       }
       if (response.status === 416) return response
-      const contentRange = response.headers.get('content-range')?.match(/^bytes (\d+)-(\d+)\/\d+$/)
+      const contentRange = response.headers.get('content-range')?.match(/^bytes (\d+)-(\d+)\/(\d+)$/)
+      const contentLength = parseSafeInteger(response.headers.get('content-length'))
+      const expectedLength = range.end - range.start + 1
       if (
         response.status !== 206 ||
         !contentRange ||
+        !contentLength ||
         Number(contentRange[1]) !== range.start ||
-        Number(contentRange[2]) !== range.end
+        Number(contentRange[2]) !== range.end ||
+        !isSafePositiveInteger(Number(contentRange[3])) ||
+        Number(contentRange[3]) <= range.end ||
+        contentLength !== expectedLength
       ) {
+        await cancelResponseBody(response)
         return new Response('Cache resource did not honor the requested byte range', {
           status: 502,
         })
@@ -95,6 +102,24 @@ function parseBoundedRange(value: string | null): BoundedByteRange | null {
 
 function isAbortError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+}
+
+function parseSafeInteger(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value)) return null
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) ? parsed : null
+}
+
+function isSafePositiveInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0
+}
+
+async function cancelResponseBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel()
+  } catch {
+    // Ignore cancellation failures while rejecting malformed adapter metadata.
+  }
 }
 
 function notFound(): Response {

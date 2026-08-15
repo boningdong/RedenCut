@@ -135,6 +135,61 @@ describe('managed cache protocol', () => {
     expect(response.status).toBe(502)
   })
 
+  it.each([
+    ['zero total', 'bytes 0-3/0', '4'],
+    ['missing content-length', 'bytes 0-3/8', null],
+    ['wrong content-length', 'bytes 0-3/8', '3'],
+    ['oversized content-length', 'bytes 0-3/8', '5'],
+  ])('rejects deceptive 206 metadata and cancels its body: %s', async (_name, contentRange, contentLength) => {
+    const active = await projectRoot()
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([0, 1, 2, 3]))
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    const headers = new Headers({ 'content-range': contentRange })
+    if (contentLength !== null) headers.set('content-length', contentLength)
+    const handler = createCacheProtocolHandler(
+      () => active,
+      vi.fn(async () => new Response(body, { status: 206, headers })),
+    )
+    const response = await handler(
+      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+    )
+    expect(response.status).toBe(502)
+    expect(cancelled).toBe(true)
+  })
+
+  it('rethrows an adapter AbortError', async () => {
+    const active = await projectRoot()
+    const error = new DOMException('aborted', 'AbortError')
+    const handler = createCacheProtocolHandler(
+      () => active,
+      vi.fn(async () => {
+        throw error
+      }),
+    )
+    await expect(
+      handler(new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } })),
+    ).rejects.toBe(error)
+  })
+
+  it('preserves an adapter 416 response', async () => {
+    const active = await projectRoot()
+    const handler = createCacheProtocolHandler(
+      () => active,
+      vi.fn(async () => new Response(null, { status: 416 })),
+    )
+    const response = await handler(
+      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+    )
+    expect(response.status).toBe(416)
+  })
+
   it('reports 500 when an authorized cache artifact disappears before it can be opened', async () => {
     const active = await projectRoot()
     const handler = createCacheProtocolHandler(
