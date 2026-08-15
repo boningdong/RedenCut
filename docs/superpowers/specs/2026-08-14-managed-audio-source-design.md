@@ -367,6 +367,8 @@ A future `BlockedPcmSampleProvider` may implement the same interface without cha
 
 `WorkletAudioPlayer` replaces `WebCodecsPlayer` rather than evolving or retaining its compressed decoding path.
 
+The retired MP3 path submitted arbitrary 32,768-byte chunks to `AudioDecoder`, which could split compressed frames, while its seek index sampled only the first 256 KiB and extrapolated byte positions beyond that window. Those two assumptions caused decoder errors and closure, playback ending after roughly one second, and invalid late-file seeks. Managed playback therefore reads only FFmpeg-decoded PCM cache frames; compressed-byte playback is not retained as a fallback.
+
 `WebCodecsPlayer`, `FrameIndex`, arbitrary compressed-byte chunking, extrapolated compressed seek offsets, and the `SimpleAudioPlayer` media-element fallback are deleted after PCM-path parity tests pass.
 
 ```ts

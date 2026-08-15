@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'crypto'
 import { createReadStream } from 'fs'
 import { stat } from 'fs/promises'
 import type { ProjectOpenResult } from '../../shared/import.types'
-import type { ProjectFile } from '../../shared/project.types'
+import { ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
 import type { AudioSourceId } from '../../shared/project.types'
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 import { FfmpegAudioSourceCacheBuilder } from '../audio/import/FfmpegAudioSourceCacheBuilder'
@@ -34,15 +34,19 @@ export class WorkspaceController {
   }
 
   async save(project: ProjectFile): Promise<ProjectOpenResult> {
-    await this.workspace.save(project)
-    return this.describe()
+    const validated = ProjectFileSchema.parse(project)
+    const sources = await this.descriptors(this.workspace, validated, 'quick')
+    await this.workspace.save(validated)
+    return this.workspace.toOpenResult(sources)
   }
 
   async saveAs(destination: string, project: ProjectFile): Promise<ProjectOpenResult> {
+    let sources: ProjectOpenResult['sources'] | null = null
     await this.workspace.saveAs(destination, project, async (candidate) => {
-      await this.descriptors(candidate)
+      sources = await this.descriptors(candidate)
     })
-    return this.describe()
+    if (!sources) throw new Error('Save As candidate was not validated')
+    return this.workspace.toOpenResult(sources)
   }
 
   async describe(): Promise<ProjectOpenResult> {
@@ -59,14 +63,20 @@ export class WorkspaceController {
     return path
   }
 
-  private async descriptors(workspace: ProjectWorkspace): Promise<ProjectOpenResult['sources']> {
+  private async descriptors(
+    workspace: ProjectWorkspace,
+    project: ProjectFile = workspace.project,
+    originalValidation: 'full' | 'quick' = 'full',
+  ): Promise<ProjectOpenResult['sources']> {
     const store = new AudioSourceCacheStore(workspace.root)
     const result: ProjectOpenResult['sources'] = []
-    for (const source of workspace.project.audioSources) {
+    for (const source of project.audioSources) {
       const original = await resolveOriginal(workspace, source)
-      await verifyFingerprint(original, source.fingerprint)
+      await verifyFingerprint(original, source.fingerprint, originalValidation === 'full')
       let manifest = await store.validate(source)
       if (!manifest) {
+        if (originalValidation === 'quick')
+          await verifyFingerprint(original, source.fingerprint, true)
         manifest = await this.cacheBuilder.build(
           {
             projectRoot: workspace.root,
@@ -106,9 +116,11 @@ async function resolveOriginal(
 async function verifyFingerprint(
   path: string,
   expected: ProjectFile['audioSources'][number]['fingerprint'],
+  includeHash = true,
 ): Promise<void> {
   const info = await stat(path)
   if (info.size !== expected.byteLength) throw new Error('Original audio changed since import')
+  if (!includeHash) return
   const hash = createHash('sha256')
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer)
   if (hash.digest('hex') !== expected.sha256) throw new Error('Original audio changed since import')

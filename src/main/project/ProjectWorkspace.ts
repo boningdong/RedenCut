@@ -52,11 +52,8 @@ export class ProjectWorkspace {
     prepare?: (candidate: ProjectWorkspace) => Promise<void>,
   ): Promise<void> {
     const validated = ProjectFileSchema.parse(project)
-    if (destination === this.root) {
-      if (this.temporary) throw new Error('Cannot publish over the temporary workspace')
-      await this.save(validated)
-      return
-    }
+    if (destination === this.root && this.temporary)
+      throw new Error('Cannot publish over the temporary workspace')
     const stage = join(dirname(destination), `.${basename(destination)}-${randomUUID()}.staging`)
     const backup = join(dirname(destination), `.${basename(destination)}-${randomUUID()}.backup`)
     await rm(stage, { recursive: true, force: true })

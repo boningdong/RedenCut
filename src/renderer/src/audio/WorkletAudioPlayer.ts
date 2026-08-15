@@ -94,6 +94,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
       this.startClock()
     } catch (error) {
+      if (isAbortError(error)) return
       if (this.playing) {
         this.playing = false
         this.stateCallbacks.forEach((callback) => callback(false))
@@ -377,10 +378,16 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   private emitError(error: unknown): void {
-    if (error instanceof Error && error.name === 'AbortError') return
+    if (isAbortError(error)) return
     const resolved = error instanceof Error ? error : new Error(String(error))
     this.errorCallbacks.forEach((callback) => callback(resolved))
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+  )
 }
 
 function hasSamePlaybackStructure(previous: Track[], next: Track[]): boolean {

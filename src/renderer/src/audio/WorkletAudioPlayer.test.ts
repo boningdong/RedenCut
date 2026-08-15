@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AudioSampleProvider } from '@shared/player.types'
+import type { AudioSampleChunk, AudioSampleProvider } from '@shared/player.types'
 import type { AudioSourceId, Track } from '@shared/project.types'
 import { WorkletAudioPlayer } from './WorkletAudioPlayer'
 
@@ -227,6 +227,94 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     )
     expect(player.isPlaying()).toBe(true)
     expect(player.getCurrentTime()).toBe(2)
+    player.destroy()
+  })
+
+  it('keeps the latest seek playing when it aborts the initial play prefill', async () => {
+    const player = new WorkletAudioPlayer()
+    const samples = provider()
+    let reads = 0
+    samples.readFrames = vi.fn((startFrame, frameCount, signal) => {
+      reads++
+      if (reads === 1) {
+        return new Promise<never>((_resolve, reject) =>
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('aborted', 'AbortError')),
+            { once: true },
+          ),
+        )
+      }
+      return Promise.resolve({
+        startFrame,
+        frameCount,
+        channels: [new Float32Array(frameCount)],
+      })
+    })
+    await player.registerAudioSource(SOURCE_ID, samples)
+    player.setTracks([track('one')])
+    const initialPlay = player.play()
+    await vi.waitFor(() => expect(samples.readFrames).toHaveBeenCalledTimes(1))
+    player.seekTo(2)
+    await expect(initialPlay).resolves.toBeUndefined()
+    await vi.waitFor(() => {
+      const latest = FakeNode.instances[FakeNode.instances.length - 1]
+      expect(latest.port.messages.some(({ message }) => message.type === 'play')).toBe(true)
+    })
+    expect(player.isPlaying()).toBe(true)
+    expect(player.getCurrentTime()).toBe(2)
+    player.destroy()
+  })
+
+  it('discards delayed provider work across a rapid seek stress run', async () => {
+    const player = new WorkletAudioPlayer()
+    const samples = provider()
+    await player.registerAudioSource(SOURCE_ID, samples)
+    player.setTracks([track('one')])
+    await player.play()
+    const signals: AbortSignal[] = []
+    samples.readFrames = vi.fn(
+      (startFrame, frameCount, signal) =>
+        new Promise<AudioSampleChunk>((resolve, reject) => {
+          signals.push(signal)
+          const timer = setTimeout(
+            () =>
+              resolve({
+                startFrame,
+                frameCount,
+                channels: [new Float32Array(frameCount)],
+              }),
+            10,
+          )
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer)
+              reject(new DOMException('aborted', 'AbortError'))
+            },
+            { once: true },
+          )
+        }),
+    )
+    player.seekTo(0.25)
+    await vi.waitFor(() => expect(samples.readFrames).toHaveBeenCalled())
+    for (let time = 2; time <= 10; time++) player.seekTo(time / 4)
+    await vi.waitFor(
+      () => {
+        const latest = FakeNode.instances[FakeNode.instances.length - 1]
+        expect(latest.port.messages.some(({ message }) => message.type === 'play')).toBe(true)
+      },
+      { timeout: 1000 },
+    )
+    const replacements = FakeNode.instances.slice(1)
+    expect(
+      replacements
+        .slice(0, -1)
+        .every((node) => !node.port.messages.some(({ message }) => message.type === 'play')),
+    ).toBe(true)
+    expect(signals.some((signal) => signal.aborted)).toBe(true)
+    expect(player.getCurrentTime()).toBe(2.5)
+    expect(player.getDiagnostics().underruns).toBe(0)
     player.destroy()
   })
 

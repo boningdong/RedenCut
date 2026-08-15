@@ -105,6 +105,29 @@ describe('PodCut AudioWorklet queue', () => {
     })
   })
 
+  it('sustains playback without underruns when the host refills at the low watermark', () => {
+    const processor = createProcessor(8, 6, 2)
+    send(processor, { type: 'flush', generation: 1 })
+    send(processor, { type: 'pcm', generation: 1, channels: [new Float32Array(6)], gain: 1 })
+    send(processor, { type: 'play' })
+    let handledRequests = 0
+    for (let quantum = 0; quantum < 100; quantum++) {
+      processor.process([], [[new Float32Array(1)]])
+      const requests = processor.port.messages.filter((message) => message.type === 'need-data')
+      while (handledRequests < requests.length) {
+        send(processor, {
+          type: 'pcm',
+          generation: 1,
+          channels: [new Float32Array(5)],
+          gain: 1,
+        })
+        handledRequests++
+      }
+    }
+    expect(processor.port.messages.filter((message) => message.type === 'underrun')).toEqual([])
+    expect(handledRequests).toBeGreaterThan(10)
+  })
+
   it('reports a fresh start anchor after pause and resume', () => {
     const processor = createProcessor(16, 4)
     send(processor, { type: 'flush', generation: 1 })

@@ -137,4 +137,29 @@ describe('ImportCoordinator transaction', () => {
     expect(builder.build).not.toHaveBeenCalled()
     await expect(stat(join(workspace.root, 'media'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
+
+  it('prevents publication when a cache build completes after cancellation', async () => {
+    let finishBuild!: (value: ReturnType<typeof manifest>) => void
+    const builder = {
+      build: vi.fn(
+        (request: CacheBuildRequest) =>
+          new Promise<ReturnType<typeof manifest>>((resolve) => {
+            finishBuild = () => resolve(manifest(request))
+          }),
+      ),
+    }
+    const { coordinator, workspace, sourcePath } = await setup(builder)
+    const importing = coordinator.import(IMPORT_ID, sourcePath, 'copy', workspace.project)
+    await vi.waitFor(() => expect(builder.build).toHaveBeenCalled())
+    coordinator.cancel(IMPORT_ID)
+    finishBuild(manifest(builder.build.mock.calls[0][0]))
+    await expect(importing).rejects.toMatchObject({ name: 'AbortError' })
+    expect(workspace.project.audioSources).toEqual([])
+    await expect(stat(join(workspace.root, 'media', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    await expect(stat(join(workspace.root, 'cache', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+  })
 })

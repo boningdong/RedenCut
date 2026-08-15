@@ -6,6 +6,8 @@
 
 **Architecture:** Main owns a temporary or saved `.podcut` workspace, import transactions, FFmpeg, cache validation, source resolution, and protected resource routes. Renderer receives source/cache descriptors, reads bounded PCM and waveform ranges through `podcut://cache`, shares stateless providers by `AudioSourceId`, and feeds one bounded AudioWorklet queue per track.
 
+**MP3 regression anchor:** The replacement must make the old failure mode unreachable: `WebCodecsPlayer` split MP3 input into arbitrary 32,768-byte decoder chunks and extrapolated seeks beyond its first-256-KiB index sample, leading to decoder closure, roughly one-second playback, and broken late seeks. The real-FFmpeg cache test and PCM-only player retirement task jointly guard this requirement.
+
 **Tech Stack:** Electron 40, React 19, TypeScript 5.9, Zod 4, Zustand 5, Vitest 4, FFmpeg/FFprobe.
 
 ## Global Constraints

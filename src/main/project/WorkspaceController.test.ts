@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
@@ -159,5 +159,22 @@ describe('WorkspaceController cache recovery', () => {
     await rm(join(candidate, 'media', SOURCE_ID, 'source.wav'))
     await expect(controller.open(candidate)).rejects.toThrow('Original audio is unavailable')
     expect(controller.workspace.root).toBe(previousRoot)
+  })
+
+  it('validates originals before a normal save can commit project edits', async () => {
+    const controller = new WorkspaceController({
+      build: vi.fn(),
+    } as unknown as FfmpegAudioSourceCacheBuilder)
+    const root = await packageWithoutCache()
+    await writeValidCache(root)
+    await controller.open(root)
+    const originalProject = controller.workspace.project
+    await rm(join(root, 'media', SOURCE_ID, 'source.wav'))
+    await expect(
+      controller.save({ ...originalProject, pluginData: { shouldNotCommit: true } }),
+    ).rejects.toThrow('Original audio is unavailable')
+    const persisted = JSON.parse(await readFile(join(root, 'project.json'), 'utf8'))
+    expect(persisted.pluginData).toEqual({})
+    expect(controller.workspace.project.pluginData).toEqual({})
   })
 })
