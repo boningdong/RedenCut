@@ -110,12 +110,14 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         case 'KeyM': {
           if (!selection) break
           e.preventDefault()
-          const { sourceFiles } = useTimelineStore.getState()
-          const sfId = sourceFiles[0]?.id
-          if (!sfId) break
+          const timeline = useTimelineStore.getState()
+          const trackId = timeline.selectedTrackId ?? timeline.tracks[0]?.id
+          if (!trackId) break
           // Collect word IDs for transcript muting
           const wordIds = useTranscriptStore.getState().selectedWordIds
-          useTimelineStore.getState().muteRange(sfId, selection.start, selection.end, [...wordIds])
+          useTimelineStore
+            .getState()
+            .muteRange(trackId, selection.start, selection.end, [...wordIds])
           setSelection(null)
           break
         }
@@ -158,9 +160,8 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           }
           if (!selection) break
           e.preventDefault()
-          const { sourceFiles } = useTimelineStore.getState()
-          const sfId = sourceFiles[0]?.id
-          if (!sfId) break
+          const trackId = useTimelineStore.getState().selectedTrackId ?? tracks[0]?.id
+          if (!trackId) break
           const wordIds = useTranscriptStore.getState().selectedWordIds
           // Mute overlapping clips
           const hits = tracks
@@ -173,7 +174,7 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           if (hits.length > 0) {
             useTimelineStore
               .getState()
-              .muteRange(sfId, selection.start, selection.end, [...wordIds])
+              .muteRange(trackId, selection.start, selection.end, [...wordIds])
           }
           setSelection(null)
           break

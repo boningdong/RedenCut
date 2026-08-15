@@ -9,7 +9,7 @@ const mkWord = (overrides: Partial<Word> = {}): Word => ({
   end: 0.5,
   muted: false,
   trackId: 'track1',
-  sourceFileId: 'sf1',
+  audioSourceId: '00000000-0000-4000-8000-000000000001' as Word['audioSourceId'],
   ...overrides,
 })
 
@@ -27,7 +27,7 @@ const mkTrack = (clips: Track['clips']): Track => ({
 const mkClip = (overrides: Partial<Track['clips'][0]> = {}): Track['clips'][0] => ({
   id: 'c1',
   trackId: 'track1',
-  sourceFileId: 'sf1',
+  audioSourceId: '00000000-0000-4000-8000-000000000001' as Track['clips'][0]['audioSourceId'],
   sourceStart: 0,
   sourceEnd: 10,
   outputStart: 0,
@@ -75,23 +75,26 @@ describe('getWordOutputTime', () => {
     expect(getWordOutputTime(word, [track])).toBe(2) // 0 + (7 - 5)
   })
 
-  it('matches clip by sourceFileId when word has one', () => {
+  it('matches clip by audioSourceId when word has one', () => {
     const clipA = mkClip({
       id: 'cA',
-      sourceFileId: 'sf1',
+      audioSourceId: '00000000-0000-4000-8000-000000000001' as Track['clips'][0]['audioSourceId'],
       sourceStart: 0,
       sourceEnd: 5,
       outputStart: 0,
     })
     const clipB = mkClip({
       id: 'cB',
-      sourceFileId: 'sf2',
+      audioSourceId: '00000000-0000-4000-8000-000000000002' as Track['clips'][0]['audioSourceId'],
       sourceStart: 0,
       sourceEnd: 5,
       outputStart: 10,
     })
     const track = mkTrack([clipA, clipB])
-    const word = mkWord({ start: 2, sourceFileId: 'sf2' })
+    const word = mkWord({
+      start: 2,
+      audioSourceId: '00000000-0000-4000-8000-000000000002' as Word['audioSourceId'],
+    })
     expect(getWordOutputTime(word, [track])).toBe(12) // 10 + (2 - 0)
   })
 })

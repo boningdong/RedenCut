@@ -1,946 +1,453 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// App — root component
-//
-// Layout (left-to-right, top-to-bottom):
-//
-//   ┌──────────────────────────────────────────────────────────────────────┐
-//   │ TitleBar (40px): traffic lights | app name | Open | Save | Save As  │
-//   ├──────────────────────────────────────────────────────────────────────┤
-//   │ FileInfoPanel (shown when a file is open)                            │
-//   ├──────────────────────────────────┬───┬──────────────────────────────┤
-//   │                                  │   │                              │
-//   │  Waveform area (flex: 1)         │ ▌ │  Transcript panel            │
-//   │    Waveform + regions            │   │  (resizable, default 280px)  │
-//   │    Timeline                      │   │                              │
-//   │                                  │   │                              │
-//   ├──────────────────────────────────┴───┴──────────────────────────────┤
-//   │ TransportBar (48px): ⏮ ⏸ ⏭  time  ·  Preview                      │
-//   └──────────────────────────────────────────────────────────────────────┘
-//
-// Player lifecycle:
-//   1. User opens a file → loadAudio() creates a WebCodecsPlayer (or SimpleAudioPlayer fallback)
-//   2. Player loads source file, initialises timeline.store
-//   3. Player callbacks feed into playback.store (currentTime, isPlaying, duration)
-//   4. WaveformView reads playback.store for display; timeline.store for regions
-//   5. When file closes / new file opens → player.destroy(), new player created
-//
-// Player selection (runtime, inside loadAudio):
-//   WebCodecsPlayer  — AudioDecoder available + codec supported → frame-accurate skip
-//   SimpleAudioPlayer — fallback; linear playback with gain=0 for muted regions
-// ─────────────────────────────────────────────────────────────────────────────
-
-import React, { useState, useCallback, useEffect, useRef } from 'react'
-import type { AudioMetadata, PeakData, ProjectFile, Word } from '@shared/project.types'
-import { APP_NAME, APP_FILE_EXT } from '@shared/constants'
-import type { IAudioPlayer } from '@shared/player.types'
-import { setAudioPlayerInstance } from '@shared/player.types'
-import { SimpleAudioPlayer } from './audio/SimpleAudioPlayer'
-import { WebCodecsPlayer } from './audio/WebCodecsPlayer'
-import { Button } from './components/ui/Button'
-import { FileInfoPanel } from './components/FileInfoPanel'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { APP_NAME } from '@shared/constants'
+import type { AudioSourceId, ProjectFile, Word } from '@shared/project.types'
+import type {
+  AudioSourceCacheDescriptor,
+  ImportMode,
+  ImportProgress,
+  ProjectOpenResult,
+  WorkspaceDescriptor,
+} from '@shared/import.types'
+import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
+import { WorkletAudioPlayer } from './audio/WorkletAudioPlayer'
+import { ContinuousPcmSampleProvider } from './audio/samples/ContinuousPcmSampleProvider'
+import { BinaryWaveformDataProvider } from './components/Waveform/BinaryWaveformDataProvider'
+import type { WaveformDataProvider } from './components/Waveform/WaveformDataProvider'
 import { WaveformView } from './components/Waveform/WaveformView'
+import { FileInfoPanel } from './components/FileInfoPanel'
 import { TransportBar } from './components/Transport/TransportBar'
 import { TranscriptPanel } from './components/Transcript/TranscriptPanel'
+import { ExportModal } from './components/Export/ExportModal'
+import { Button } from './components/ui/Button'
 import { useEditorStore } from './stores/editor.store'
 import { usePlaybackStore } from './stores/playback.store'
-import { useTranscriptStore } from './stores/transcript.store'
 import { useTimelineStore } from './stores/timeline.store'
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useTranscriptStore } from './stores/transcript.store'
 import { mergeTrackWords } from './utils/transcript'
-import { ExportModal } from './components/Export/ExportModal'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
-// ── State shapes ──────────────────────────────────────────────────────────────
-interface OpenedFile {
-  filePath: string
-  metadata: AudioMetadata
+interface ImportState {
+  id: string
+  displayName: string
+  stage: string
+  percent: number
 }
 
-type LoadingState =
-  | { status: 'idle' }
-  | { status: 'opening' }
-  | { status: 'generating-peaks'; progress: number }
-  | { status: 'ready'; peaks: PeakData }
-  | { status: 'error'; message: string; prevPeaks?: PeakData }
-
-// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [openedFile, setOpenedFile] = useState<OpenedFile | null>(null)
-  const [loadingState, setLoadingState] = useState<LoadingState>({ status: 'idle' })
+  const [workspace, setWorkspaceState] = useState<WorkspaceDescriptor | null>(null)
+  const [descriptors, setDescriptors] = useState<AudioSourceCacheDescriptor[]>([])
+  const [waveforms, setWaveforms] = useState<ReadonlyMap<AudioSourceId, WaveformDataProvider>>(
+    new Map(),
+  )
+  const [importState, setImportState] = useState<ImportState | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [showExport, setShowExport] = useState(false)
-
-  // The active IAudioPlayer instance — created/destroyed as files open/close
+  const [transcriptWidth, setTranscriptWidth] = useState(280)
   const playerRef = useRef<IAudioPlayer | null>(null)
+  const playerSubscriptions = useRef<(() => void)[]>([])
+  const initialized = useRef(false)
+  const skipNextTimelineDirty = useRef(false)
 
-  // Editor store
-  const projectPath = useEditorStore((s) => s.projectPath)
-  const isDirty = useEditorStore((s) => s.isDirty)
-  const setProjectPath = useEditorStore((s) => s.setProjectPath)
-  const setIsDirty = useEditorStore((s) => s.setIsDirty)
-  const setProject = useEditorStore((s) => s.setProject)
-  const resetEditor = useEditorStore((s) => s.reset)
+  const project = useEditorStore((state) => state.project)
+  const isDirty = useEditorStore((state) => state.isDirty)
+  const setProject = useEditorStore((state) => state.setProject)
+  const setWorkspace = useEditorStore((state) => state.setWorkspace)
+  const setIsDirty = useEditorStore((state) => state.setIsDirty)
+  const tracks = useTimelineStore((state) => state.tracks)
+  const isGenerating = useTranscriptStore((state) => state.isGenerating)
+  const generatingStatus = useTranscriptStore((state) => state.generatingStatus)
 
-  // Playback store setters written from IAudioPlayer callbacks
-  const setDuration = usePlaybackStore((s) => s.setDuration)
-  const resetPlayback = usePlaybackStore((s) => s.reset)
+  const destroyPlayer = useCallback(() => {
+    playerSubscriptions.current.splice(0).forEach((unsubscribe) => unsubscribe())
+    playerRef.current?.destroy()
+    playerRef.current = null
+    setAudioPlayerInstance(null)
+  }, [])
 
-  // Transcript store
-  const words = useTranscriptStore((s) => s.words)
-  const isGeneratingTx = useTranscriptStore((s) => s.isGenerating)
-  const generatingTxStatus = useTranscriptStore((s) => s.generatingStatus)
-  const setWords = useTranscriptStore((s) => s.setWords)
-  const setIsGenerating = useTranscriptStore((s) => s.setIsGenerating)
-  const setGeneratingStatus = useTranscriptStore((s) => s.setGeneratingStatus)
-  const ensureTrackVisible = useTranscriptStore((s) => s.ensureTrackVisible)
-  const resetTranscript = useTranscriptStore((s) => s.reset)
+  const loadSession = useCallback(
+    async (result: ProjectOpenResult) => {
+      destroyPlayer()
+      usePlaybackStore.getState().reset()
+      skipNextTimelineDirty.current = true
+      useTimelineStore
+        .getState()
+        .loadFromProject(result.project.audioSources, result.project.tracks)
+      useTranscriptStore.getState().reset()
+      useTranscriptStore.getState().setWords(result.project.transcript?.words ?? [])
+      for (const track of result.project.tracks) {
+        if (result.project.transcript?.words.some((word) => word.trackId === track.id)) {
+          useTranscriptStore.getState().ensureTrackVisible(track.id)
+        }
+      }
 
-  // Timeline store
-  const tracks = useTimelineStore((s) => s.tracks)
-  const resetTimeline = useTimelineStore((s) => s.reset)
+      const player = new WorkletAudioPlayer()
+      const waveformProviders = new Map<AudioSourceId, WaveformDataProvider>()
+      for (const descriptor of result.sources) {
+        await player.registerAudioSource(
+          descriptor.audioSourceId,
+          new ContinuousPcmSampleProvider(descriptor),
+        )
+        waveformProviders.set(descriptor.audioSourceId, new BinaryWaveformDataProvider(descriptor))
+      }
+      player.setTracks(result.project.tracks)
+      playerSubscriptions.current = [
+        player.onTimeUpdate(usePlaybackStore.getState().setCurrentTime),
+        player.onPlayStateChange(usePlaybackStore.getState().setPlaying),
+        player.onDurationChange(usePlaybackStore.getState().setDuration),
+        player.onEnded(() => usePlaybackStore.getState().setPlaying(false)),
+        player.onError((playbackError) => setError(playbackError.message)),
+      ]
+      usePlaybackStore.getState().setDuration(player.getDuration())
+      playerRef.current = player
+      setAudioPlayerInstance(player)
+      setProject(result.project)
+      setWorkspace(result.workspace)
+      setWorkspaceState(result.workspace)
+      setDescriptors(result.sources)
+      setWaveforms(waveformProviders)
+      setIsDirty(false)
+      setError(null)
+    },
+    [destroyPlayer, setIsDirty, setProject, setWorkspace],
+  )
 
-  // ── Keep player in sync whenever the clip model changes ───────────────────
-  // When keyboard shortcuts mutate tracks (mute/unmute/split), the player
-  // needs updated gain info. setTracks() is cheap — just replaces the array ref.
+  useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+    void window.electronAPI.project
+      .initialize()
+      .then(loadSession)
+      .catch((reason: unknown) => {
+        setError((reason as Error).message)
+      })
+    return destroyPlayer
+  }, [destroyPlayer, loadSession])
+
+  useEffect(
+    () =>
+      window.electronAPI.on.importProgress((progress: ImportProgress) => {
+        setImportState((current) =>
+          current?.id === progress.importId
+            ? {
+                id: progress.importId,
+                displayName: progress.displayName,
+                stage: progress.stage,
+                percent: progress.percent,
+              }
+            : current,
+        )
+      }),
+    [],
+  )
+
+  useEffect(
+    () =>
+      window.electronAPI.on.transcriptProgress(useTranscriptStore.getState().setGeneratingStatus),
+    [],
+  )
+
   useEffect(() => {
     playerRef.current?.setTracks(tracks)
-  }, [tracks])
-
-  // ── Resizable transcript panel ────────────────────────────────────────────
-  const [transcriptWidth, setTranscriptWidth] = useState(280)
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
-
-  const handleDragStart = useCallback(
-    (e: React.MouseEvent) => {
-      dragRef.current = { startX: e.clientX, startWidth: transcriptWidth }
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    },
-    [transcriptWidth],
-  )
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!dragRef.current) return
-      const delta = dragRef.current.startX - e.clientX
-      const newW = Math.min(600, Math.max(160, dragRef.current.startWidth + delta))
-      setTranscriptWidth(newW)
+    if (skipNextTimelineDirty.current) {
+      skipNextTimelineDirty.current = false
+    } else if (useEditorStore.getState().project) {
+      setIsDirty(true)
     }
-    const onUp = () => {
-      if (!dragRef.current) return
-      dragRef.current = null
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-    return () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-  }, [])
+  }, [setIsDirty, tracks])
 
-  // ── Push event subscriptions ──────────────────────────────────────────────
-  useEffect(() => {
-    return window.electronAPI.on.peaksProgress((progress) => {
-      setLoadingState((prev) =>
-        prev.status === 'generating-peaks' ? { status: 'generating-peaks', progress } : prev,
-      )
-    })
-  }, [])
-
-  useEffect(() => {
-    return window.electronAPI.on.transcriptProgress((status) => {
-      setGeneratingStatus(status)
-    })
-  }, [setGeneratingStatus])
-
-  // ── Destroy player on unmount ─────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      playerRef.current?.destroy()
-      setAudioPlayerInstance(null)
-    }
-  }, [])
-
-  // ── Core loading helper ───────────────────────────────────────────────────
-  /**
-   * Given an already-probed file path + metadata:
-   *   1. Tear down any existing player
-   *   2. Init timeline.store (creates Track + Clip for the full duration)
-   *   3. Create the preferred player with fallback, load sources, wire callbacks → stores
-   *   4. Generate waveform peaks (may take a few seconds for large files)
-   *   5. Transition to 'ready' state → WaveformView mounts
-   */
-  const loadAudio = useCallback(
-    async (
-      filePath: string,
-      metadata: AudioMetadata,
-      /** Pass false when the timeline is already loaded (e.g. opening a saved project). */
-      shouldInitTimeline = true,
-    ) => {
-      setOpenedFile({ filePath, metadata })
-      setLoadingState({ status: 'generating-peaks', progress: 0 })
-
-      // ── 1. Destroy existing player ───────────────────────────────────────
-      if (playerRef.current) {
-        playerRef.current.destroy()
-        playerRef.current = null
-        setAudioPlayerInstance(null)
-      }
-      resetPlayback()
-
-      // ── 2. Initialise timeline (skipped when project was already loaded above) ─
-      if (shouldInitTimeline) {
-        useTimelineStore.getState().initFromFile(filePath, metadata.durationSeconds)
-      }
-      const { tracks: initTracks } = useTimelineStore.getState()
-
-      // ── 3. Create player and load all source files ────────────────────────
-      // Prefer WebCodecsPlayer (frame-accurate skip + multi-source mixing).
-      // Fall back to SimpleAudioPlayer if WebCodecs AudioDecoder is unavailable.
-      //
-      // Load every source file registered in the timeline store — this handles
-      // single-file projects (one source) and multi-track projects (N sources).
-      // The primary file is always loaded first so it sets the AudioContext rate.
-      const { sourceFiles } = useTimelineStore.getState()
-      const orderedSources = [
-        { id: filePath, filePath },
-        ...sourceFiles
-          .filter((sf) => sf.filePath !== filePath)
-          .map((sf) => ({ id: sf.id, filePath: sf.filePath })),
-      ]
-
-      let player: IAudioPlayer
-      if (typeof AudioDecoder !== 'undefined') {
-        const wcPlayer = new WebCodecsPlayer()
-        try {
-          for (const { id, filePath: fp } of orderedSources) {
-            await wcPlayer.loadSourceFile(id, fp)
-          }
-          player = wcPlayer
-        } catch (err) {
-          console.warn('[App] WebCodecsPlayer unavailable, falling back to SimpleAudioPlayer:', err)
-          wcPlayer.destroy()
-          const sPlayer = new SimpleAudioPlayer()
-          for (const { id, filePath: fp } of orderedSources) {
-            await sPlayer.loadSourceFile(id, fp).catch((e) => {
-              console.warn(`[App] SimpleAudioPlayer: could not load secondary source id=${id}:`, e)
-            })
-          }
-          player = sPlayer
-        }
-      } else {
-        const sPlayer = new SimpleAudioPlayer()
-        for (const { id, filePath: fp } of orderedSources) {
-          await sPlayer.loadSourceFile(id, fp).catch((e) => {
-            console.warn(`[App] SimpleAudioPlayer: could not load secondary source id=${id}:`, e)
-          })
-        }
-        player = sPlayer
-      }
-
-      playerRef.current = player
-
-      // Pass initial tracks so the player knows about any clips
-      player.setTracks(initTracks)
-
-      // Wire player callbacks → playback store (updates at 60fps)
-      player.onTimeUpdate((t) => usePlaybackStore.getState().setCurrentTime(t))
-      player.onPlayStateChange((p) => usePlaybackStore.getState().setPlaying(p))
-      player.onDurationChange((d) => {
-        usePlaybackStore.getState().setDuration(d)
-      })
-      player.onEnded(() => {
-        usePlaybackStore.getState().setPlaying(false)
-        usePlaybackStore.getState().setCurrentTime(0)
-      })
-
-      // Seed duration from metadata (player's onDurationChange fires async)
-      setDuration(metadata.durationSeconds)
-
-      // Expose to WaveformView, TransportBar, keyboard shortcuts
-      setAudioPlayerInstance(player)
-
-      // ── 4. Generate waveform peaks (main-process FFmpeg call) ─────────────
-      const peaks = await window.electronAPI.audio.generatePeaks(filePath)
-
-      // ── 5. Transition to ready — WaveformView mounts ──────────────────────
-      setLoadingState({ status: 'ready', peaks })
-    },
-    [resetPlayback, setDuration],
-  )
-
-  const handleError = useCallback((err: unknown) => {
-    const message = (err as Error).message ?? String(err)
-    console.error(err)
-    setLoadingState((prev) => ({
-      status: 'error',
-      message,
-      prevPeaks: prev.status === 'ready' ? prev.peaks : undefined,
-    }))
-  }, [])
-
-  // ── Open audio file (new project) ─────────────────────────────────────────
-  const handleOpenAudio = useCallback(async () => {
-    setLoadingState({ status: 'opening' })
-    try {
-      const result = await window.electronAPI.audio.openFile()
-      if (!result) {
-        setLoadingState({ status: 'idle' })
-        return
-      }
-      resetEditor()
-      resetTranscript()
-      resetTimeline()
-      await loadAudio(result.filePath, result.metadata)
-    } catch (err) {
-      handleError(err)
-    }
-  }, [loadAudio, handleError, resetEditor, resetTranscript, resetTimeline])
-
-  // ── Open project file ─────────────────────────────────────────────────────
-  const handleOpenProject = useCallback(async () => {
-    setLoadingState({ status: 'opening' })
-    try {
-      const result = await window.electronAPI.project.openDialog()
-      if (!result) {
-        setLoadingState({ status: 'idle' })
-        return
-      }
-
-      const { projectPath: pPath, project } = result
-      resetEditor()
-      resetTranscript()
-      resetTimeline()
-      setProjectPath(pPath)
-      setProject(project)
-      const rawWords = project.transcript?.words ?? null
-
-      // Backfill sourceFileId now — we know it from the saved project data.
-      // trackId backfill is deferred until after the timeline is initialised
-      // so we use the real track ID rather than a stale lookup on an empty array.
-      const backfilled = rawWords
-        ? (() => {
-            const primarySfId = project.sourceFiles[0]?.id ?? project.source.file
-            if (!project.sourceFiles[0]?.id) {
-              console.warn(
-                '[App] handleOpenProject: sourceFiles[] empty — backfilling words with relative path',
-                primarySfId,
-              )
-            }
-            return rawWords.map((w) => ({
-              ...w,
-              sourceFileId: w.sourceFileId ?? primarySfId,
-            }))
-          })()
-        : null
-
-      // Resolve audio metadata for the saved source file
-      const metadata = await window.electronAPI.audio.probeFile(project.source.file)
-
-      // Restore timeline from saved project (new format) or migrate from edits[]
-      if (project.sourceFiles.length > 0 && project.tracks.length > 0) {
-        // Project was saved with the new multi-track model — load directly
-        useTimelineStore.getState().loadFromProject(project.sourceFiles, project.tracks)
-      } else {
-        // Legacy project: create a single-file timeline from source + edits[]
-        useTimelineStore
-          .getState()
-          .initFromFile(project.source.file, project.source.durationSeconds)
-        // Legacy migration: single-file project — the one track is always tracks[0]
-        const legacyTrackId = useTimelineStore.getState().tracks[0]?.id
-        if (legacyTrackId) {
-          for (const edit of project.edits) {
-            if (edit.type === 'mute') {
-              useTimelineStore.getState().muteRange(legacyTrackId, edit.start, edit.end)
-            }
-          }
-        }
-      }
-
-      // Backfill trackId now that the timeline is initialised and we have the real track ID.
-      if (backfilled) {
-        const actualFirstTrackId = useTimelineStore.getState().tracks[0]?.id
-        const withTrackId = backfilled.map((w) => ({
-          ...w,
-          trackId: w.trackId ?? actualFirstTrackId,
-        }))
-        setWords(withTrackId)
-        // Make all tracks that have words visible immediately on open
-        const distinctTrackIds = [
-          ...new Set(withTrackId.map((w) => w.trackId).filter(Boolean) as string[]),
-        ]
-        for (const tId of distinctTrackIds) ensureTrackVisible(tId)
-      }
-
-      // false = don't call initFromFile — timeline is already set above
-      await loadAudio(project.source.file, metadata, false)
-      setIsDirty(false)
-    } catch (err) {
-      handleError(err)
-    }
-  }, [
-    loadAudio,
-    handleError,
-    resetEditor,
-    resetTranscript,
-    resetTimeline,
-    setProjectPath,
-    setProject,
-    setWords,
-    setIsDirty,
-    ensureTrackVisible,
-  ])
-
-  // ── Build project snapshot ────────────────────────────────────────────────
-  const buildProject = useCallback((): ProjectFile | null => {
-    if (!openedFile) return null
-    const { sourceFiles, tracks: currentTracks } = useTimelineStore.getState()
+  const snapshot = useCallback((): ProjectFile | null => {
+    const current = useEditorStore.getState().project
+    if (!current) return null
+    const currentWords = useTranscriptStore.getState().words
     return {
-      version: 1,
-      createdAt: new Date().toISOString(),
-      source: {
-        file: openedFile.filePath,
-        sampleRate: openedFile.metadata.sampleRate,
-        channels: openedFile.metadata.channels,
-        durationSeconds: openedFile.metadata.durationSeconds,
-      },
-      // Derive legacy edits[] from muted clips for backward compatibility
-      edits: currentTracks.flatMap((t) =>
-        t.clips
-          .filter((c) => c.muted)
-          .map((c) => ({
-            id: `edit-${c.id}`,
-            type: 'mute' as const,
-            start: c.sourceStart,
-            end: c.sourceEnd,
-            source: 'manual' as const,
-          })),
-      ),
-      transcript: words.length > 0 ? { engine: 'whisper.cpp', words, speakers: {} } : undefined,
-      adjustments: [],
-      markers: [],
-      export: { targetLUFS: -16, truePeakDbTP: -1.5, format: 'mp3', sampleRate: 48000 },
-      pluginData: {},
-      // New multi-track fields
-      sourceFiles,
-      tracks: currentTracks,
+      ...current,
+      audioSources: useTimelineStore.getState().audioSources,
+      tracks: useTimelineStore.getState().tracks,
+      transcript:
+        currentWords.length > 0 || current.transcript
+          ? {
+              engine: current.transcript?.engine ?? 'whisper',
+              model: current.transcript?.model,
+              speakers: current.transcript?.speakers ?? {},
+              words: currentWords,
+            }
+          : undefined,
     }
-  }, [openedFile, words])
+  }, [])
 
-  // ── Save / Save As ────────────────────────────────────────────────────────
-  const handleSave = useCallback(async () => {
-    const project = buildProject()
-    if (!project) return
-    try {
-      if (projectPath) {
-        await window.electronAPI.project.save(project, projectPath)
-        setIsDirty(false)
-      } else {
-        const newPath = await window.electronAPI.project.saveAs(project)
-        if (newPath) {
-          setProjectPath(newPath)
-          setIsDirty(false)
-        }
-      }
-    } catch (err) {
-      handleError(err)
-    }
-  }, [buildProject, projectPath, setProjectPath, setIsDirty, handleError])
-
-  const handleSaveAs = useCallback(async () => {
-    const project = buildProject()
-    if (!project) return
-    try {
-      const newPath = await window.electronAPI.project.saveAs(project)
-      if (newPath) {
-        setProjectPath(newPath)
-        setIsDirty(false)
-      }
-    } catch (err) {
-      handleError(err)
-    }
-  }, [buildProject, setProjectPath, setIsDirty, handleError])
-
-  const handleShortcutSave = useCallback(() => {
-    void handleSave().catch(handleError)
-  }, [handleSave, handleError])
-
-  // ── Generate transcript ────────────────────────────────────────────────────
-  const handleGenerateTranscript = useCallback(
-    async (trackId?: string) => {
-      const reason = await window.electronAPI.transcript.checkAvailability()
-      if (reason) {
-        handleError(new Error(reason))
-        return
-      }
-
-      const { tracks: currentTracks, sourceFiles: currentSFs } = useTimelineStore.getState()
-
-      // Collect which (track, sourceFile) pairs to transcribe.
-      // A track can reference multiple source files (one per clip group), so we
-      // collect all unique sourceFileIds per track.
-      const targets: { sf: (typeof currentSFs)[0]; trackId: string }[] = []
-      const addTargetsForTrack = (track: (typeof currentTracks)[0]) => {
-        const sfIds = [
-          ...new Set(track.clips.map((c) => c.sourceFileId).filter((id): id is string => !!id)),
-        ]
-        for (const sfId of sfIds) {
-          const sf = currentSFs.find((s) => s.id === sfId)
-          if (sf) targets.push({ sf, trackId: track.id })
-        }
-      }
-
-      if (trackId) {
-        const track = currentTracks.find((t) => t.id === trackId)
-        if (track) addTargetsForTrack(track)
-      } else {
-        // "All remaining" — skip tracks that already have a generated transcript
-        const existingWords = useTranscriptStore.getState().words
-        for (const track of currentTracks) {
-          if (!existingWords.some((w) => w.trackId === track.id)) addTargetsForTrack(track)
-        }
-      }
-      if (targets.length === 0) return
-
-      setIsGenerating(true)
-      setGeneratingStatus('Starting…')
-      try {
-        // Accumulate tagged words per trackId. We merge once per track at the end
-        // so multiple source files on the same track don't overwrite each other.
-        const taggedByTrack = new Map<string, Word[]>()
-
-        for (const { sf, trackId: tId } of targets) {
-          setGeneratingStatus(
-            targets.length > 1 ? `Transcribing ${sf.filePath.split('/').pop()}…` : 'Transcribing…',
-          )
-          const transcript = await window.electronAPI.transcript.generate(sf.filePath)
-          const taggedWords: Word[] = transcript.words.map((w) => ({
-            ...w,
-            // Include sfId so IDs remain unique across multiple source files
-            // (Whisper resets its internal counter per call).
-            id: `${tId}_${sf.id}_${w.id}`,
-            sourceFileId: sf.id,
-            trackId: tId,
-          }))
-          taggedByTrack.set(tId, [...(taggedByTrack.get(tId) ?? []), ...taggedWords])
-        }
-
-        let currentWords = useTranscriptStore.getState().words
-        for (const [tId, tagged] of taggedByTrack) {
-          const firstSf = targets.find((t) => t.trackId === tId)?.sf
-          currentWords = mergeTrackWords(currentWords, tagged, tId, firstSf?.id)
-        }
-        setWords(currentWords)
-        for (const tId of taggedByTrack.keys()) {
-          ensureTrackVisible(tId)
-        }
-        setIsDirty(true)
-      } catch (err) {
-        handleError(err)
-      } finally {
-        setIsGenerating(false)
-        setGeneratingStatus('')
-      }
+  const save = useCallback(
+    async (saveAs = false) => {
+      const current = snapshot()
+      if (!current) return
+      const nextWorkspace = await (saveAs
+        ? window.electronAPI.project.saveAs(current)
+        : window.electronAPI.project.save(current))
+      if (!nextWorkspace) return
+      setProject(current)
+      setWorkspace(nextWorkspace)
+      setWorkspaceState(nextWorkspace)
+      setIsDirty(false)
     },
-    [setIsGenerating, setGeneratingStatus, setWords, setIsDirty, handleError, ensureTrackVisible],
+    [setIsDirty, setProject, setWorkspace, snapshot],
   )
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
-  useKeyboardShortcuts({ onSave: handleShortcutSave })
+  useKeyboardShortcuts({
+    onSave: () => void save(false).catch((reason: unknown) => setError((reason as Error).message)),
+  })
 
-  // ── Derived ───────────────────────────────────────────────────────────────
-  const isLoading = loadingState.status === 'opening' || loadingState.status === 'generating-peaks'
+  const importAudio = useCallback(
+    async (mode: ImportMode) => {
+      const current = snapshot()
+      if (!current || importState) return
+      const selection = await window.electronAPI.audio.selectImportFile()
+      if (!selection) return
+      const id = crypto.randomUUID()
+      setImportState({ id, displayName: selection.displayName, stage: 'selected', percent: 0 })
+      setError(null)
+      try {
+        const imported = await window.electronAPI.audio.startImport(
+          id,
+          selection.token,
+          mode,
+          current,
+        )
+        if (!workspace) throw new Error('Workspace is not initialized')
+        const sources = [
+          ...descriptors.filter((item) => item.audioSourceId !== imported.source.id),
+          imported.cache,
+        ]
+        await loadSession({ project: imported.project, workspace, sources })
+        setIsDirty(false)
+      } catch (reason) {
+        setError((reason as Error).message)
+      } finally {
+        setImportState(null)
+      }
+    },
+    [descriptors, importState, loadSession, setIsDirty, snapshot, workspace],
+  )
 
-  const projectName = projectPath
-    ? (projectPath.split('/').pop() ?? 'Untitled').replace(APP_FILE_EXT, '')
-    : 'Untitled'
+  const cancelImport = useCallback(async () => {
+    if (!importState) return
+    await window.electronAPI.audio.cancelImport(importState.id)
+  }, [importState])
 
-  const titleLabel = isDirty ? `${projectName} ●` : projectName
+  const openProject = useCallback(async () => {
+    const result = await window.electronAPI.project.openDialog()
+    if (result) await loadSession(result)
+  }, [loadSession])
 
-  const showTranscriptPanel = loadingState.status === 'ready'
+  const generateTranscript = useCallback(
+    async (trackId?: string) => {
+      const track =
+        useTimelineStore.getState().tracks.find((candidate) => candidate.id === trackId) ??
+        useTimelineStore.getState().tracks[0]
+      const sourceId = track?.clips[0]?.audioSourceId
+      if (!track || !sourceId) return
+      const transcript = useTranscriptStore.getState()
+      transcript.setIsGenerating(true)
+      try {
+        const generated = await window.electronAPI.transcript.generate(sourceId)
+        const incoming: Word[] = generated.words.map((word) => ({
+          ...word,
+          audioSourceId: sourceId,
+          trackId: track.id,
+        }))
+        const merged = mergeTrackWords(transcript.words, incoming, track.id, sourceId)
+        transcript.setWords(merged)
+        const currentProject = useEditorStore.getState().project
+        if (currentProject)
+          setProject({ ...currentProject, transcript: { ...generated, words: merged } })
+        transcript.ensureTrackVisible(track.id)
+        setIsDirty(true)
+      } catch (reason) {
+        setError((reason as Error).message)
+      } finally {
+        transcript.setIsGenerating(false)
+        transcript.setGeneratingStatus('')
+      }
+    },
+    [setIsDirty, setProject],
+  )
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const primarySource = project?.audioSources[0]
+  const projectDuration = tracks
+    .flatMap((track) => track.clips)
+    .reduce(
+      (maximum, clip) => Math.max(maximum, clip.outputStart + clip.sourceEnd - clip.sourceStart),
+      0,
+    )
+  const exportProject = showExport ? snapshot() : null
+
   return (
     <div
       style={{
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
-        backgroundColor: 'var(--color-bg-primary)',
-        color: 'var(--color-text-primary)',
-        fontFamily: 'var(--font-sans)',
+        background: 'var(--color-bg-primary)',
       }}
     >
-      {/* ── Title bar ────────────────────────────────────────────────────── */}
-      <div
+      <header
         style={
           {
-            height: 40,
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderBottom: '1px solid var(--color-border)',
+            height: 42,
             display: 'flex',
             alignItems: 'center',
-            paddingLeft: 80,
-            paddingRight: 12,
+            gap: 8,
+            padding: '0 12px',
+            borderBottom: '1px solid var(--color-border)',
             WebkitAppRegion: 'drag',
-            flexShrink: 0,
-            gap: 'var(--space-3)',
           } as React.CSSProperties
         }
       >
-        <span
-          style={{
-            fontSize: 'var(--text-xs)',
-            color: 'var(--color-text-muted)',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            flex: 1,
-          }}
-        >
+        <strong style={{ marginRight: 'auto' }}>
           {APP_NAME}
-          {openedFile ? ` — ${titleLabel}` : ''}
-        </span>
-        <div
-          style={
-            {
-              display: 'flex',
-              gap: 'var(--space-2)',
-              WebkitAppRegion: 'no-drag',
-            } as React.CSSProperties
-          }
-        >
+          {workspace ? ` — ${workspace.displayName}` : ''}
+          {isDirty ? ' •' : ''}
+        </strong>
+        <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <Button
-            variant="ghost"
             size="sm"
-            onClick={() => {
-              void handleOpenProject()
-            }}
-            disabled={isLoading}
+            variant="ghost"
+            disabled={Boolean(importState)}
+            onClick={() =>
+              void openProject().catch((reason: unknown) => setError((reason as Error).message))
+            }
           >
             Open Project
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            onClick={() => {
-              void handleOpenAudio()
-            }}
-            disabled={isLoading}
+            variant="ghost"
+            disabled={Boolean(importState)}
+            onClick={() => void importAudio('copy')}
           >
-            {isLoading ? 'Loading…' : 'Open Audio'}
+            Import Audio
           </Button>
-          {openedFile && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  void handleSave()
-                }}
-                disabled={!isDirty && !!projectPath}
-              >
-                Save
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  void handleSaveAs()
-                }}
-              >
-                Save As…
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowExport(true)}>
-                Export
-              </Button>
-            </>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={Boolean(importState)}
+            onClick={() => void importAudio('reference')}
+          >
+            Import as Reference
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={Boolean(importState)}
+            onClick={() => void save(false)}
+          >
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={Boolean(importState)}
+            onClick={() => void save(true)}
+          >
+            Save As
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowExport(true)}
+            disabled={!project?.tracks.length}
+          >
+            Export
+          </Button>
         </div>
-      </div>
+      </header>
 
-      {/* ── File info ─────────────────────────────────────────────────────── */}
-      {openedFile && (
-        <FileInfoPanel filePath={openedFile.filePath} metadata={openedFile.metadata} />
-      )}
-
-      {/* ── Error banner ──────────────────────────────────────────────────── */}
-      {loadingState.status === 'error' && (
-        <ErrorBanner
-          message={loadingState.message}
-          onDismiss={() =>
-            setLoadingState(
-              loadingState.prevPeaks
-                ? { status: 'ready', peaks: loadingState.prevPeaks }
-                : { status: 'idle' },
-            )
-          }
-        />
-      )}
-
-      {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-        {/* Left: waveform / loading states */}
+      {error && (
         <div
+          role="alert"
           style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            minWidth: 0,
+            padding: '8px 12px',
+            color: 'var(--color-danger)',
+            borderBottom: '1px solid var(--color-border)',
           }}
         >
-          {loadingState.status === 'ready' ? (
-            <WaveformView peaks={loadingState.peaks} />
-          ) : loadingState.status === 'generating-peaks' ? (
-            <PeakGenerationProgress progress={loadingState.progress} />
-          ) : (
-            <EmptyState
-              onOpenAudio={() => {
-                void handleOpenAudio()
-              }}
-              onOpenProject={() => {
-                void handleOpenProject()
-              }}
-              isLoading={isLoading}
-            />
-          )}
+          {error}
         </div>
-
-        {/* Right: transcript panel (only when waveform is ready) */}
-        {showTranscriptPanel && (
-          <>
-            {/* Drag handle */}
-            <div
-              onMouseDown={handleDragStart}
-              style={{
-                width: 4,
-                flexShrink: 0,
-                backgroundColor: 'var(--color-border)',
-                cursor: 'col-resize',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-accent)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-border)'
-              }}
-            />
-            {/* Transcript panel */}
-            <div
-              style={{
-                width: transcriptWidth,
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
-            >
-              <TranscriptPanel
-                onGenerate={(trackId) => {
-                  void handleGenerateTranscript(trackId).catch(handleError)
-                }}
-                isGenerating={isGeneratingTx}
-                generatingStatus={generatingTxStatus}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Transport bar ─────────────────────────────────────────────────── */}
-      <TransportBar />
-
-      {/* ── Export modal ──────────────────────────────────────────────────── */}
-      {showExport && loadingState.status === 'ready' && (
-        <ExportModal project={buildProject()!} onClose={() => setShowExport(false)} />
       )}
-    </div>
-  )
-}
-
-// ── Error banner ───────────────────────────────────────────────────────────────
-function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(message)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }, [message])
-
-  return (
-    <div
-      style={{
-        padding: '7px 12px 7px 16px',
-        backgroundColor: 'var(--color-danger-muted)',
-        borderBottom: '1px solid var(--color-danger)',
-        color: 'var(--color-danger)',
-        fontSize: 'var(--text-sm)',
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 'var(--space-3)',
-      }}
-    >
-      <span
-        style={{
-          flex: 1,
-          userSelect: 'text',
-          wordBreak: 'break-all',
-          lineHeight: 1.5,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 'var(--text-xs)',
-        }}
-      >
-        {message}
-      </span>
-      <button
-        onClick={() => {
-          void handleCopy().catch((error: unknown) => {
-            console.error('[ErrorBanner] Failed to copy error details:', error)
-          })
-        }}
-        style={{
-          flexShrink: 0,
-          background: 'none',
-          border: '1px solid var(--color-danger)',
-          borderRadius: 4,
-          color: 'var(--color-danger)',
-          fontSize: 'var(--text-xs)',
-          padding: '2px 8px',
-          cursor: 'pointer',
-          opacity: copied ? 0.6 : 1,
-          fontFamily: 'var(--font-sans)',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-      <button
-        onClick={onDismiss}
-        style={{
-          flexShrink: 0,
-          background: 'none',
-          border: 'none',
-          color: 'var(--color-danger)',
-          fontSize: 'var(--text-base)',
-          cursor: 'pointer',
-          lineHeight: 1,
-          padding: '0 2px',
-        }}
-      >
-        ×
-      </button>
-    </div>
-  )
-}
-
-// ── Peak generation progress ───────────────────────────────────────────────────
-function PeakGenerationProgress({ progress }: { progress: number }) {
-  const pct = Math.round(progress * 100)
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'var(--space-4)',
-      }}
-    >
-      <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-        Generating waveform…
-      </p>
-      <div
-        style={{
-          width: 240,
-          height: 3,
-          backgroundColor: 'var(--color-bg-elevated)',
-          borderRadius: 2,
-          overflow: 'hidden',
-        }}
-      >
+      {importState && (
         <div
           style={{
-            width: `${pct}%`,
-            height: '100%',
-            backgroundColor: 'var(--color-accent)',
-            transition: 'width 0.2s ease',
+            padding: '8px 12px',
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            borderBottom: '1px solid var(--color-border)',
           }}
-        />
-      </div>
-      <p
-        style={{
-          color: 'var(--color-text-muted)',
-          fontSize: 'var(--text-xs)',
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        {pct}%
-      </p>
-    </div>
-  )
-}
+        >
+          <span style={{ flex: 1 }}>
+            Importing {importState.displayName}: {importState.stage} (
+            {Math.round(importState.percent * 100)}%)
+          </span>
+          <Button size="sm" variant="ghost" onClick={() => void cancelImport()}>
+            Cancel
+          </Button>
+        </div>
+      )}
 
-// ── Empty state ────────────────────────────────────────────────────────────────
-function EmptyState({
-  onOpenAudio,
-  onOpenProject,
-  isLoading,
-}: {
-  onOpenAudio: () => void
-  onOpenProject: () => void
-  isLoading: boolean
-}) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'var(--space-4)',
-      }}
-    >
-      <svg
-        width="48"
-        height="48"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="var(--color-text-muted)"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M9 18V5l12-2v13" />
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="16" r="3" />
-      </svg>
-      <div
-        style={{
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--space-2)',
-        }}
-      >
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-base)' }}>
-          No audio file open
-        </p>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-          Open a WAV, MP3, FLAC, or AAC file to get started
-        </p>
-      </div>
-      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-        <Button variant="ghost" onClick={onOpenProject} disabled={isLoading}>
-          Open Project
-        </Button>
-        <Button variant="primary" onClick={onOpenAudio} disabled={isLoading}>
-          {isLoading ? 'Loading…' : 'Open Audio'}
-        </Button>
-      </div>
+      {primarySource ? (
+        <FileInfoPanel displayName={primarySource.displayName} metadata={primarySource.metadata} />
+      ) : null}
+
+      <main style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <section style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+          {tracks.length > 0 ? (
+            <WaveformView
+              duration={projectDuration}
+              providersBySource={waveforms}
+              onAddTrack={() => void importAudio('copy')}
+            />
+          ) : (
+            <div
+              style={{
+                height: '100%',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              <Button variant="primary" onClick={() => void importAudio('copy')}>
+                Import your first audio file
+              </Button>
+            </div>
+          )}
+        </section>
+        <div
+          onPointerDown={(event) => {
+            const startX = event.clientX
+            const startWidth = transcriptWidth
+            const move = (moveEvent: PointerEvent) =>
+              setTranscriptWidth(
+                Math.min(600, Math.max(180, startWidth + startX - moveEvent.clientX)),
+              )
+            const up = () => {
+              window.removeEventListener('pointermove', move)
+              window.removeEventListener('pointerup', up)
+            }
+            window.addEventListener('pointermove', move)
+            window.addEventListener('pointerup', up)
+          }}
+          style={{ width: 4, cursor: 'col-resize', background: 'var(--color-border)' }}
+        />
+        <aside style={{ width: transcriptWidth, minWidth: 180, overflow: 'auto' }}>
+          <TranscriptPanel
+            onGenerate={(trackId) => void generateTranscript(trackId)}
+            isGenerating={isGenerating}
+            generatingStatus={generatingStatus}
+          />
+        </aside>
+      </main>
+      <TransportBar />
+      {showExport && exportProject ? (
+        <ExportModal project={exportProject} onClose={() => setShowExport(false)} />
+      ) : null}
     </div>
   )
 }

@@ -2,8 +2,8 @@
 // ExportModal
 //
 // Triggered from the "Export" button in the transport bar area.
-// Shows: format selector (MP3/WAV/AAC), output path picker, LUFS target (display
-// only — normalization deferred to Phase 4), and a progress bar.
+// Shows a format selector, LUFS target, and export progress. Destination
+// selection remains main-process owned.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useCallback, useEffect } from 'react'
@@ -22,8 +22,7 @@ type ExportState =
   | { status: 'error'; message: string }
 
 export function ExportModal({ project, onClose }: ExportModalProps) {
-  const [format, setFormat] = useState<'mp3' | 'wav' | 'aac'>('mp3')
-  const [outputPath, setOutputPath] = useState('')
+  const [format, setFormat] = useState<ProjectFile['export']['format']>('mp3')
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
 
   // Subscribe to render progress events
@@ -34,25 +33,19 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
     })
   }, [])
 
-  const handlePickPath = useCallback(() => {
-    const path = window.prompt('Export to path (e.g. /Users/you/output.mp3)')
-    if (path) setOutputPath(path)
-  }, [])
-
   const handleExport = useCallback(async () => {
-    if (!outputPath) return
     setExportState({
       status: 'exporting',
       progress: { percent: 0, currentSeconds: 0, totalSeconds: 0 },
     })
     try {
       const exportProject: ProjectFile = { ...project, export: { ...project.export, format } }
-      await window.electronAPI.render.export(exportProject, outputPath)
-      setExportState({ status: 'done' })
+      const exported = await window.electronAPI.render.export(exportProject, format)
+      setExportState(exported ? { status: 'done' } : { status: 'idle' })
     } catch (err) {
       setExportState({ status: 'error', message: (err as Error).message })
     }
-  }, [outputPath, format, project])
+  }, [format, project])
 
   const isExporting = exportState.status === 'exporting'
   const pct =
@@ -100,7 +93,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
           </span>
           <select
             value={format}
-            onChange={(e) => setFormat(e.target.value as 'mp3' | 'wav' | 'aac')}
+            onChange={(e) => setFormat(e.target.value as ProjectFile['export']['format'])}
             disabled={isExporting}
             style={{
               background: 'var(--color-bg-elevated)',
@@ -113,47 +106,9 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
           >
             <option value="mp3">MP3</option>
             <option value="wav">WAV</option>
+            <option value="flac">FLAC</option>
             <option value="aac">AAC</option>
           </select>
-        </label>
-
-        {/* Output path */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Output path
-          </span>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              value={outputPath}
-              onChange={(e) => setOutputPath(e.target.value)}
-              placeholder="/Users/you/output.mp3"
-              disabled={isExporting}
-              style={{
-                flex: 1,
-                background: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 4,
-                color: 'var(--color-text-primary)',
-                padding: '4px 8px',
-                fontSize: 'var(--text-xs)',
-              }}
-            />
-            <button
-              onClick={handlePickPath}
-              disabled={isExporting}
-              style={{
-                background: 'var(--color-bg-elevated)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 4,
-                color: 'var(--color-text-muted)',
-                fontSize: 'var(--text-xs)',
-                padding: '4px 8px',
-                cursor: 'pointer',
-              }}
-            >
-              Browse
-            </button>
-          </div>
         </label>
 
         {/* LUFS (display only) */}
@@ -234,7 +189,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
             onClick={() => {
               void handleExport()
             }}
-            disabled={!outputPath || isExporting || exportState.status === 'done'}
+            disabled={isExporting || exportState.status === 'done'}
             style={{
               background: 'var(--color-accent)',
               border: 'none',
@@ -243,7 +198,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
               fontSize: 'var(--text-xs)',
               padding: '6px 14px',
               cursor: 'pointer',
-              opacity: !outputPath || isExporting ? 0.5 : 1,
+              opacity: isExporting ? 0.5 : 1,
             }}
           >
             {isExporting ? 'Exporting…' : 'Export'}

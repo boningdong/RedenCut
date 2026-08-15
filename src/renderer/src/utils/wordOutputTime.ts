@@ -16,7 +16,7 @@ export function getWordOutputTime(word: Word, tracks: Track[]): number {
 
   const clip = track.clips.find(
     (c) =>
-      (!word.sourceFileId || c.sourceFileId === word.sourceFileId) &&
+      (!word.audioSourceId || c.audioSourceId === word.audioSourceId) &&
       c.sourceStart <= word.start &&
       word.start < c.sourceEnd,
   )

@@ -15,6 +15,7 @@
 
 import { create } from 'zustand'
 import type { ProjectFile } from '@shared/project.types'
+import type { WorkspaceDescriptor } from '@shared/import.types'
 
 interface TimeRange {
   start: number
@@ -23,8 +24,8 @@ interface TimeRange {
 
 interface EditorState {
   // ── Project ────────────────────────────────────────────────────────────────
-  /** Path where the project file is saved. null = unsaved new project. */
-  projectPath: string | null
+  /** Path-free description of the main-owned active workspace. */
+  workspace: WorkspaceDescriptor | null
   /** True when there are unsaved changes. */
   isDirty: boolean
   /** The full project data (null until a file is opened). */
@@ -43,7 +44,7 @@ interface EditorState {
   previewMode: boolean
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  setProjectPath: (path: string | null) => void
+  setWorkspace: (workspace: WorkspaceDescriptor | null) => void
   setIsDirty: (dirty: boolean) => void
   setProject: (project: ProjectFile | null) => void
 
@@ -56,7 +57,7 @@ interface EditorState {
 }
 
 const initialState = {
-  projectPath: null,
+  workspace: null,
   isDirty: false,
   project: null,
   selection: null,
@@ -66,7 +67,7 @@ const initialState = {
 export const useEditorStore = create<EditorState>()((set) => ({
   ...initialState,
 
-  setProjectPath: (path) => set({ projectPath: path }),
+  setWorkspace: (workspace) => set({ workspace }),
   setIsDirty: (dirty) => set({ isDirty: dirty }),
   setProject: (project) => set({ project }),
 

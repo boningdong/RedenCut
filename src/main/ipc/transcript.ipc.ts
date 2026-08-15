@@ -1,23 +1,14 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Transcript IPC Handlers
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { ipcMain } from 'electron'
+import { AudioSourceIdSchema } from '../../shared/project.types'
 import { whisperTranscriber } from '../transcriber/whisper'
+import type { WorkspaceController } from '../project/WorkspaceController'
 
-// ── Channel: transcript:check-availability ────────────────────────────────────
-// Returns null if whisper is ready, or an actionable error string if not.
-ipcMain.handle('transcript:check-availability', async () => {
-  return whisperTranscriber.unavailableReason()
-})
-
-// ── Channel: transcript:generate ─────────────────────────────────────────────
-// Transcribes the given audio file using whisper.cpp.
-// Pushes progress status strings on the 'transcript:progress' channel.
-ipcMain.handle('transcript:generate', async (event, filePath: string, language?: string) => {
-  return whisperTranscriber.transcribe(filePath, { language }, (status) => {
-    if (!event.sender.isDestroyed()) {
-      event.sender.send('transcript:progress', status)
-    }
+export function registerTranscriptIpc(controller: WorkspaceController): void {
+  ipcMain.handle('transcript:check-availability', () => whisperTranscriber.unavailableReason())
+  ipcMain.handle('transcript:generate', async (event, sourceId: unknown, language?: string) => {
+    const path = await controller.resolveOriginal(AudioSourceIdSchema.parse(sourceId))
+    return whisperTranscriber.transcribe(path, { language }, (status) => {
+      if (!event.sender.isDestroyed()) event.sender.send('transcript:progress', status)
+    })
   })
-})
+}

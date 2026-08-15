@@ -9,7 +9,7 @@ import React from 'react'
 import type { AudioMetadata } from '@shared/project.types'
 
 interface FileInfoPanelProps {
-  filePath: string
+  displayName: string
   metadata: AudioMetadata
 }
 
@@ -57,10 +57,7 @@ function Pill({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function FileInfoPanel({ filePath, metadata }: FileInfoPanelProps) {
-  // Show only the filename, not the full path
-  const filename = filePath.split('/').pop() ?? filePath
-
+export function FileInfoPanel({ displayName, metadata }: FileInfoPanelProps) {
   return (
     <div
       style={{
@@ -87,7 +84,7 @@ export function FileInfoPanel({ filePath, metadata }: FileInfoPanelProps) {
           whiteSpace: 'nowrap',
         }}
       >
-        {filename}
+        {displayName}
       </span>
 
       {/* Metadata pills */}

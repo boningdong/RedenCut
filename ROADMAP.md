@@ -10,30 +10,30 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 | Area | Status | Delivered capability |
 | --- | --- | --- |
 | Foundation | ✅ | Electron main, preload, shared, and renderer layers; typed IPC; project schemas; binary resolution; automated quality gate. |
-| Import and waveform | ✅ | FFprobe metadata, cached peak generation, local audio protocol, waveform display, selections, muted overlays, and split markers. |
-| Playback | ✅ | `IAudioPlayer` integration, preferred WebCodecs playback, `SimpleAudioPlayer` fallback, multi-source playback, seeking, mute/solo handling, and preview-mode skipping. |
-| Core editing | ✅ | Split, mute, unmute, clip removal, clip movement, selection, undo, redo, project save/load, and legacy project migration. |
+| Import and waveform | ✅ | Managed copy/reference import, portable project bundles, regenerable PCM and binary waveform caches, protected bounded-range access, selections, muted overlays, and split markers. |
+| Playback | ✅ | PCM-only `WorkletAudioPlayer`, shared source providers, bounded per-track queues, multi-source playback, seeking, mute/solo handling, diagnostics, and preview-mode skipping. |
+| Core editing | ✅ | Split, mute, unmute, clip removal, clip movement, selection, undo, redo, and atomic managed-package save/load. |
 | Transcript | ✅ | Local whisper.cpp generation, word-level timestamps, per-track visibility and generation, click-to-seek, active-word highlighting, text-driven muting, timestamp calibration, and muted-word display control. |
 | Multi-track timeline | 🚧 | Stacked tracks, track headers, browse-based track addition, track removal, clip repositioning, and synchronized playback are implemented; file-drop import and remaining polish are pending. |
-| Export | 🚧 | Typed IPC, FFmpeg invocation, basic MP3/WAV/AAC selection, clip trimming, track concatenation/mixing, and progress events are implemented; timeline accuracy, processing controls, destination UX, and error presentation remain incomplete. |
+| Export | 🚧 | Main-owned destination selection, MP3/WAV/FLAC/AAC encoding, output placement, clip/track gain, mute/solo routing, multi-track mixing, and progress events are implemented; loudness processing and richer error presentation remain incomplete. |
 
 ## Current Milestone — Complete Timeline and Export
 
 ### Timeline and Track UX
 
-- [x] Register multiple source files and persist them in projects.
+- [x] Register multiple managed audio sources and persist stable source identities.
 - [x] Render stacked track lanes with shared playback position.
 - [x] Move clips on the output timeline with snapping and overlap resolution.
 - [x] Edit track names and expose mute, solo, volume, and removal controls.
 - [x] Add tracks through the native audio-file browser.
 - [ ] Accept supported audio through file drop with the same validation and loading path as browse-based import.
-- [ ] Route waveform M and selection-based Delete through the selected track rather than passing a source-file ID to the track-scoped `muteRange` action.
+- [x] Route waveform M and selection-based Delete through the selected track.
 - [ ] Add focused shortcut tests for modifier, focus, selection, and track-routing behavior.
 - [ ] Complete interaction and accessibility polish for track controls and clip movement.
 
 ### Transcript
 
-- [x] Associate words with their source files and tracks while preserving legacy-project backfill.
+- [x] Associate words with managed audio sources and tracks.
 - [x] Generate transcripts for one track or all tracks without replacing unrelated words.
 - [x] Toggle multiple transcript tracks through `visibleTrackIds` and merge visible words by output time.
 - [x] Route text-driven muting using each selected word's track and source association.
@@ -43,9 +43,9 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 - [x] Validate project snapshots in the main process before rendering.
 - [x] Build an FFmpeg filter graph from unmuted clips and mix multiple tracks.
 - [x] Export MP3, WAV, and AAC and report progress to the renderer.
-- [ ] Replace the renderer `window.prompt` destination entry with a typed native save dialog.
-- [ ] Preserve output-timeline gaps and clip placement instead of concatenating every clip without regard to `outputStart`.
-- [ ] Apply track mute, solo, and volume state consistently during export.
+- [x] Use a main-owned native save dialog without exposing destination paths to the renderer.
+- [x] Preserve output-timeline gaps and clip placement.
+- [x] Apply clip gain and track mute, solo, and volume state consistently during export.
 - [ ] Surface concise, actionable export errors instead of raw FFmpeg stderr excerpts.
 - [ ] Add focused export coverage for gaps, moved clips, track controls, multiple sources, and failure reporting.
 

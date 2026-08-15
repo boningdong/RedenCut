@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useTimelineStore } from './timeline.store'
 import { useTranscriptStore } from './transcript.store'
+import { AudioSourceSchema, type AudioSource } from '@shared/project.types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,26 @@ function resetAll() {
 /** Shorthand to read the current timeline state. */
 const tl = () => useTimelineStore.getState()
 
+function managedSource(
+  seed: number,
+  duration: number,
+  path = `/audio/source-${seed}.mp3`,
+): AudioSource {
+  return AudioSourceSchema.parse({
+    id: `00000000-0000-4000-8000-${String(seed).padStart(12, '0')}`,
+    displayName: `Source ${seed}`,
+    location: { mode: 'reference', path },
+    fingerprint: { byteLength: 1, modifiedTimeMs: 1, sha256: 'a'.repeat(64) },
+    metadata: {
+      durationSeconds: duration,
+      sampleRate: 44_100,
+      channels: 2,
+      codec: 'mp3',
+      bitrateKbps: 192,
+    },
+  })
+}
+
 /** Returns the clips of the first (primary) track, sorted by sourceStart. */
 function primaryClips() {
   const { tracks } = tl()
@@ -33,26 +54,26 @@ function primaryClips() {
   return [...tracks[0].clips].sort((a, b) => a.sourceStart - b.sourceStart)
 }
 
-describe('addSourceFile', () => {
+describe('addAudioSource', () => {
   beforeEach(resetAll)
 
-  it('creates a new SourceFile and returns its id', () => {
-    const id = tl().addSourceFile('/tmp/a.mp3', 10)
-    expect(id).toBe('/tmp/a.mp3')
-    const { sourceFiles } = tl()
-    expect(sourceFiles).toHaveLength(1)
-    expect(sourceFiles[0]).toMatchObject({ id: '/tmp/a.mp3', filePath: '/tmp/a.mp3', duration: 10 })
+  it('registers a managed AudioSource and returns its id', () => {
+    const source = managedSource(1, 10)
+    const id = tl().addAudioSource(source)
+    expect(id).toBe(source.id)
+    expect(tl().audioSources).toEqual([source])
   })
 
   it('is idempotent — calling twice with the same path does not duplicate', () => {
-    tl().addSourceFile('/tmp/a.mp3', 10)
-    const id2 = tl().addSourceFile('/tmp/a.mp3', 10)
-    expect(id2).toBe('/tmp/a.mp3')
-    expect(tl().sourceFiles).toHaveLength(1)
+    const source = managedSource(1, 10)
+    tl().addAudioSource(source)
+    const id2 = tl().addAudioSource(source)
+    expect(id2).toBe(source.id)
+    expect(tl().audioSources).toHaveLength(1)
   })
 
   it('does not push to undoStack', () => {
-    tl().addSourceFile('/tmp/a.mp3', 10)
+    tl().addAudioSource(managedSource(1, 10))
     expect(tl().undoStack).toHaveLength(0)
   })
 })
@@ -61,7 +82,7 @@ describe('splitAt — after moveClip', () => {
   beforeEach(resetAll)
 
   function moveAndSelectPrimaryClip() {
-    tl().initFromFile('/tmp/a.mp3', 20)
+    tl().initFromAudioSource(managedSource(1, 20))
     const clip = tl().tracks[0].clips[0]
     tl().moveClip(clip.id, 10)
     tl().setSelectedClipId(clip.id)
@@ -98,13 +119,13 @@ describe('splitAt — after moveClip', () => {
   })
 })
 
-describe('addSourceFile — same path, different duration', () => {
+describe('addAudioSource — same id', () => {
   beforeEach(resetAll)
 
-  it('does not update duration when file already registered (returns existing id)', () => {
-    tl().addSourceFile('/tmp/a.mp3', 10)
-    tl().addSourceFile('/tmp/a.mp3', 99)
-    expect(tl().sourceFiles[0].duration).toBe(10)
+  it('does not replace metadata when the identity is already registered', () => {
+    tl().addAudioSource(managedSource(1, 10))
+    tl().addAudioSource(managedSource(1, 99))
+    expect(tl().audioSources[0].metadata.durationSeconds).toBe(10)
   })
 })
 
@@ -116,23 +137,20 @@ function makeWord(id: string, start: number, end: number, muted = false) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// initFromFile
+// initFromAudioSource
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('initFromFile', () => {
+describe('initFromAudioSource', () => {
   beforeEach(resetAll)
 
   it('creates one source file with the given path and duration', () => {
-    tl().initFromFile('/audio/test.mp3', 100)
-    const { sourceFiles } = tl()
-    expect(sourceFiles).toHaveLength(1)
-    expect(sourceFiles[0].filePath).toBe('/audio/test.mp3')
-    expect(sourceFiles[0].duration).toBe(100)
-    expect(sourceFiles[0].id).toBe('/audio/test.mp3') // id === filePath
+    const source = managedSource(1, 100)
+    tl().initFromAudioSource(source)
+    expect(tl().audioSources).toEqual([source])
   })
 
   it('creates one track with one clip spanning the full duration', () => {
-    tl().initFromFile('/audio/test.mp3', 120)
+    tl().initFromAudioSource(managedSource(1, 120))
     const { tracks } = tl()
     expect(tracks).toHaveLength(1)
     const clips = tracks[0].clips
@@ -144,19 +162,19 @@ describe('initFromFile', () => {
   })
 
   it('clears the undo stack on each call', () => {
-    tl().initFromFile('/audio/a.mp3', 60)
+    tl().initFromAudioSource(managedSource(1, 60))
     tl().setSelectedClipId(tl().tracks[0].clips[0].id)
     tl().splitAt(30)
     expect(tl().undoStack).toHaveLength(1)
 
-    tl().initFromFile('/audio/b.mp3', 60)
+    tl().initFromAudioSource(managedSource(2, 60))
     expect(tl().undoStack).toHaveLength(0)
   })
 
   it('clears selectedClipId', () => {
-    tl().initFromFile('/audio/test.mp3', 60)
+    tl().initFromAudioSource(managedSource(1, 60))
     tl().setSelectedClipId(tl().tracks[0].clips[0].id)
-    tl().initFromFile('/audio/test.mp3', 60)
+    tl().initFromAudioSource(managedSource(1, 60))
     expect(tl().selectedClipId).toBeNull()
   })
 })
@@ -168,7 +186,7 @@ describe('initFromFile', () => {
 describe('splitAt', () => {
   beforeEach(() => {
     resetAll()
-    tl().initFromFile('/audio/test.mp3', 100)
+    tl().initFromAudioSource(managedSource(1, 100))
   })
 
   it('splits the clip at the given time', () => {
@@ -251,7 +269,7 @@ describe('muteRange', () => {
 
   beforeEach(() => {
     resetAll()
-    tl().initFromFile(SF_ID, 100)
+    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
   })
 
   it('creates a muted clip in the middle of an unmuted clip', () => {
@@ -311,6 +329,14 @@ describe('muteRange', () => {
     expect(tl().undoStack).toHaveLength(0)
   })
 
+  it('maps an output-time mute range back into a moved clip source range', () => {
+    const clip = primaryClips()[0]
+    tl().moveClip(clip.id, 10)
+    tl().muteRange(primaryTrackId(), 12, 15)
+    const muted = primaryClips().find((candidate) => candidate.muted)
+    expect(muted).toMatchObject({ sourceStart: 2, sourceEnd: 5, outputStart: 12 })
+  })
+
   it('keeps all clips contiguous (no gaps) after muting', () => {
     tl().muteRange(primaryTrackId(), 30, 70)
     const clips = primaryClips().sort((a, b) => a.sourceStart - b.sourceStart)
@@ -329,7 +355,7 @@ describe('unmuteClip', () => {
 
   beforeEach(() => {
     resetAll()
-    tl().initFromFile(SF_ID, 100)
+    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
   })
 
   it('unmutes a muted clip by ID', () => {
@@ -386,7 +412,7 @@ describe('undo', () => {
 
   beforeEach(() => {
     resetAll()
-    tl().initFromFile(SF_ID, 100)
+    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
   })
 
   it('reverts a split operation', () => {
@@ -461,7 +487,7 @@ describe('redo', () => {
 
   beforeEach(() => {
     resetAll()
-    tl().initFromFile(SF_ID, 100)
+    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
   })
 
   it('re-applies a split that was undone', () => {
@@ -563,7 +589,7 @@ describe('loadFromProject', () => {
   beforeEach(resetAll)
 
   it('restores tracks and source files without affecting undo stack', () => {
-    const sourceFiles = [{ id: 'sf1', filePath: '/a.mp3', duration: 60 }]
+    const audioSources = [managedSource(1, 60, '/a.mp3')]
     const tracks = [
       {
         id: 't1',
@@ -572,7 +598,7 @@ describe('loadFromProject', () => {
           {
             id: 'c1',
             trackId: 't1',
-            sourceFileId: 'sf1',
+            audioSourceId: audioSources[0].id,
             sourceStart: 0,
             sourceEnd: 60,
             outputStart: 0,
@@ -588,8 +614,8 @@ describe('loadFromProject', () => {
         effects: [],
       },
     ]
-    tl().loadFromProject(sourceFiles, tracks)
-    expect(tl().sourceFiles).toEqual(sourceFiles)
+    tl().loadFromProject(audioSources, tracks)
+    expect(tl().audioSources).toEqual(audioSources)
     expect(tl().tracks).toEqual(tracks)
     expect(tl().undoStack).toHaveLength(0)
   })
@@ -604,7 +630,7 @@ describe('getAllClips', () => {
 
   beforeEach(() => {
     resetAll()
-    tl().initFromFile(SF_ID, 100)
+    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
   })
 
   it('returns clips sorted by outputStart', () => {
@@ -620,11 +646,11 @@ describe('getAllClips', () => {
   })
 
   it('includes clips from all tracks', () => {
-    const sfId2 = '/audio/bg.mp3'
-    const { sourceFiles, tracks } = tl()
+    const secondSource = managedSource(2, 60, '/audio/bg.mp3')
+    const { audioSources, tracks } = tl()
     // Manually add a second source + track for this test
     tl().loadFromProject(
-      [...sourceFiles, { id: sfId2, filePath: sfId2, duration: 60 }],
+      [...audioSources, secondSource],
       [
         ...tracks,
         {
@@ -634,7 +660,7 @@ describe('getAllClips', () => {
             {
               id: 'c-bg',
               trackId: 't2',
-              sourceFileId: sfId2,
+              audioSourceId: secondSource.id,
               sourceStart: 0,
               sourceEnd: 60,
               outputStart: 0,

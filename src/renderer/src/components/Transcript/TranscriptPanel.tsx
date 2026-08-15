@@ -195,7 +195,7 @@ export function TranscriptPanel({
 
     // Group by trackId — muteRange is track-scoped so each track gets its own call.
     // This correctly handles mixed-track selections and prevents a mute on track 2
-    // from landing on track 1 (which happened when routing by sourceFileId, since
+    // from landing on track 1 (which happened when routing by source identity, since
     // multiple tracks can share the same source file).
     const byTrack = new Map<string, typeof selected>()
     for (const w of selected) {

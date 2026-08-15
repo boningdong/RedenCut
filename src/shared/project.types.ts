@@ -1,117 +1,113 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Project Types & Zod Schemas
-//
-// This file is the single source of truth for the data model. Both the main
-// process (Node.js) and the renderer (React) import from here.
-//
-// Zod serves two purposes:
-//   1. Runtime validation when loading a .podcut.json file from disk
-//   2. TypeScript type inference — we derive types FROM schemas, not separately
-//
-// Migration note: when the schema evolves, bump `version` and add a migration
-// function in src/main/project/migrations.ts (to be created in Phase 2).
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { z } from 'zod'
 
-// ── Audio source ──────────────────────────────────────────────────────────────
-const AudioSourceSchema = z.object({
-  /** Relative path to the original audio file — always in the same directory. */
-  file: z.string(),
-  /** SHA-256 of the audio file at the time of import. Used to detect moved/replaced files. */
-  sha256: z.string().optional(),
-  sampleRate: z.number(),
-  channels: z.number(),
-  durationSeconds: z.number(),
-})
+const SHA256_PATTERN = /^[a-f0-9]{64}$/
 
-// ── Transcript ────────────────────────────────────────────────────────────────
-const WordSchema = z.object({
-  id: z.string(),
-  text: z.string(),
-  /** Start time in seconds within the original audio. */
-  start: z.number(),
-  /** End time in seconds within the original audio. */
-  end: z.number(),
-  /** Whisper confidence score 0–1. Optional — not all engines provide it. */
-  confidence: z.number().optional(),
-  /** Speaker label, e.g. "A", "B". Populated by diarization. */
-  speaker: z.string().optional(),
-  /**
-   * True when the user has deleted this word (muted its audio region).
-   * The word stays in the array — muted words are never removed — so undo/redo
-   * and boundary adjustments remain possible.
-   */
-  muted: z.boolean().default(false),
-  /**
-   * ID of the SourceFile this word came from.
-   * undefined on legacy words — backfilled to sourceFiles[0].id on project open.
-   */
-  sourceFileId: z.string().optional(),
-  /**
-   * ID of the Track this word belongs to.
-   * undefined on legacy words — backfilled to tracks[0].id on project open.
-   */
-  trackId: z.string().optional(),
-})
-export type Word = z.infer<typeof WordSchema>
+export const AudioSourceIdSchema = z.string().uuid().brand<'AudioSourceId'>()
+export type AudioSourceId = z.infer<typeof AudioSourceIdSchema>
 
-const SpeakerSchema = z.object({
-  label: z.string(), // display name, e.g. "Host", "Guest"
-})
+export const ProjectRelativePathSchema = z
+  .string()
+  .refine(
+    (value) =>
+      value.length > 0 &&
+      !value.startsWith('/') &&
+      !/^[A-Za-z]:/.test(value) &&
+      !value.includes('\\') &&
+      value
+        .split('/')
+        .every((segment) => segment.length > 0 && segment !== '.' && segment !== '..'),
+    'Expected a normalized project-relative path',
+  )
+  .brand<'ProjectRelativePath'>()
+export type ProjectRelativePath = z.infer<typeof ProjectRelativePathSchema>
 
-const TranscriptSchema = z.object({
-  engine: z.string(), // e.g. "whisper.cpp", "assemblyai"
-  model: z.string().optional(),
-  words: z.array(WordSchema),
-  speakers: z.record(z.string(), SpeakerSchema).default({}),
-})
-export type Transcript = z.infer<typeof TranscriptSchema>
+const AudioMetadataSchema = z
+  .object({
+    durationSeconds: z.number().nonnegative(),
+    sampleRate: z.number().int().positive(),
+    channels: z.number().int().positive(),
+    codec: z.string().min(1),
+    bitrateKbps: z.number().nonnegative(),
+  })
+  .strict()
+export type AudioMetadata = z.infer<typeof AudioMetadataSchema>
 
-// ── Edits ─────────────────────────────────────────────────────────────────────
-// An Edit is a non-destructive instruction applied during export. The source
-// audio is never modified; edits are metadata only.
+const AudioSourceFingerprintSchema = z
+  .object({
+    byteLength: z.number().int().nonnegative(),
+    modifiedTimeMs: z.number().nonnegative(),
+    sha256: z.string().regex(SHA256_PATTERN),
+  })
+  .strict()
 
-const EditTypeSchema = z.enum(['mute', 'cut'])
-
-const EditSchema = z.object({
-  id: z.string(),
-  type: EditTypeSchema,
-  /** Start of the edit in seconds on the original timeline. */
-  start: z.number(),
-  /** End of the edit in seconds on the original timeline. */
-  end: z.number(),
-  /** Human-readable description, e.g. "removed tangent", "um". */
-  label: z.string().optional(),
-  /** How this edit was created: manually by the user, via text selection, or by a detector. */
-  source: z.enum(['manual', 'text', 'filler_detect', 'plugin']).default('manual'),
-})
-
-// ── Adjustments ───────────────────────────────────────────────────────────────
-const GainAdjustmentSchema = z.object({
-  id: z.string(),
-  type: z.literal('gain'),
-  start: z.number(),
-  end: z.number(),
-  /** Gain in decibels. Negative = quieter, positive = louder. */
-  valueDb: z.number(),
-})
-
-const CrossfadeAdjustmentSchema = z.object({
-  id: z.string(),
-  type: z.literal('crossfade'),
-  /** Position of the edit boundary where this crossfade is applied. */
-  at: z.number(),
-  /** Duration in milliseconds. Default: 30ms. */
-  durationMs: z.number().default(30),
-})
-
-const AdjustmentSchema = z.discriminatedUnion('type', [
-  GainAdjustmentSchema,
-  CrossfadeAdjustmentSchema,
+const AudioSourceLocationSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('copy'), path: ProjectRelativePathSchema }).strict(),
+  z
+    .object({
+      mode: z.literal('reference'),
+      path: z
+        .string()
+        .refine(
+          (value) =>
+            value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\'),
+          'Expected an absolute external path',
+        ),
+    })
+    .strict(),
 ])
 
-// ── Markers ───────────────────────────────────────────────────────────────────
+export const AudioSourceSchema = z
+  .object({
+    id: AudioSourceIdSchema,
+    displayName: z.string().min(1),
+    location: AudioSourceLocationSchema,
+    fingerprint: AudioSourceFingerprintSchema,
+    metadata: AudioMetadataSchema,
+  })
+  .strict()
+export type AudioSource = z.infer<typeof AudioSourceSchema>
+
+const WordSchema = z
+  .object({
+    id: z.string(),
+    text: z.string(),
+    start: z.number(),
+    end: z.number(),
+    confidence: z.number().optional(),
+    speaker: z.string().optional(),
+    muted: z.boolean().default(false),
+    audioSourceId: AudioSourceIdSchema.optional(),
+    trackId: z.string().optional(),
+  })
+  .strict()
+export type Word = z.infer<typeof WordSchema>
+
+const TranscriptSchema = z
+  .object({
+    engine: z.string(),
+    model: z.string().optional(),
+    words: z.array(WordSchema),
+    speakers: z.record(z.string(), z.object({ label: z.string() })).default({}),
+  })
+  .strict()
+export type Transcript = z.infer<typeof TranscriptSchema>
+
+const AdjustmentSchema = z.discriminatedUnion('type', [
+  z.object({
+    id: z.string(),
+    type: z.literal('gain'),
+    start: z.number(),
+    end: z.number(),
+    valueDb: z.number(),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('crossfade'),
+    at: z.number(),
+    durationMs: z.number().default(30),
+  }),
+])
+
 const MarkerSchema = z.object({
   id: z.string(),
   time: z.number(),
@@ -121,63 +117,33 @@ const MarkerSchema = z.object({
   resolved: z.boolean().default(false),
 })
 
-// ── Export settings ───────────────────────────────────────────────────────────
 const ExportSettingsSchema = z.object({
-  /** Integrated loudness target in LUFS. Apple Podcasts / Spotify standard: -16. */
   targetLUFS: z.number().default(-16),
-  /** True peak ceiling in dBTP. */
   truePeakDbTP: z.number().default(-1.5),
   format: z.enum(['mp3', 'wav', 'flac', 'aac']).default('mp3'),
-  sampleRate: z.number().default(48000),
+  sampleRate: z.number().default(48_000),
 })
 
-// ── Plugin data ───────────────────────────────────────────────────────────────
-// Plugins store their project-scoped data here. The key is the plugin's ID
-// (e.g. "com.example.noise-reducer"). The host never inspects this data.
-const PluginDataSchema = z.record(z.string(), z.unknown())
-
-// ── Multi-track model ─────────────────────────────────────────────────────────
-// These types form the new clip/track abstraction layer. The older flat edits[]
-// model is preserved for backward-compat with saved v1 projects; on load, it is
-// migrated into the track model automatically.
-
-/** A single audio effect in a clip or track's processing chain. */
 const EffectSchema = z.object({
   id: z.string(),
   type: z.enum(['gain', 'eq', 'compressor', 'noise-reduction']),
   enabled: z.boolean().default(true),
-  /** Arbitrary numeric parameters keyed by name, e.g. { gainDb: -6 }. */
   params: z.record(z.string(), z.number()).default({}),
 })
 
-/**
- * A contiguous slice of a source file placed at a position on a track's
- * output timeline. This is the fundamental unit of non-destructive editing.
- *
- *   sourceStart / sourceEnd  — the window into the raw source file (seconds)
- *   outputStart              — where this clip plays in the mixed-down output
- *                              (seconds). For a simple single-file project,
- *                              outputStart === sourceStart until clips are moved.
- *   muted                    — true  → audio is silenced (region visible on waveform)
- *                              false → plays normally
- */
 const ClipSchema = z.object({
   id: z.string(),
   trackId: z.string(),
-  sourceFileId: z.string(),
-  sourceStart: z.number(),
-  sourceEnd: z.number(),
-  outputStart: z.number(),
+  audioSourceId: AudioSourceIdSchema,
+  sourceStart: z.number().nonnegative(),
+  sourceEnd: z.number().nonnegative(),
+  outputStart: z.number().nonnegative(),
   gain: z.number().default(1),
   muted: z.boolean().default(false),
   effects: z.array(EffectSchema).default([]),
 })
 export type Clip = z.infer<typeof ClipSchema>
 
-/**
- * A track holds an ordered sequence of clips drawn from one or more source
- * files, plus track-level processing.
- */
 const TrackSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -185,52 +151,81 @@ const TrackSchema = z.object({
   volume: z.number().default(1),
   muted: z.boolean().default(false),
   solo: z.boolean().default(false),
-  color: z.string().default('#4f46e5'), // waveform colour for this track
+  color: z.string().default('#4f46e5'),
   effects: z.array(EffectSchema).default([]),
 })
 export type Track = z.infer<typeof TrackSchema>
 
-/** A source audio file registered in the project. */
-const SourceFileSchema = z.object({
-  id: z.string(),
-  filePath: z.string(),
-  duration: z.number(),
-})
-export type SourceFile = z.infer<typeof SourceFileSchema>
-
-// ── Project file (root) ───────────────────────────────────────────────────────
-export const ProjectFileSchema = z.object({
-  version: z.literal(1),
-  createdAt: z.string(), // ISO 8601
-  source: AudioSourceSchema,
-  transcript: TranscriptSchema.optional(),
-  edits: z.array(EditSchema).default([]),
-  adjustments: z.array(AdjustmentSchema).default([]),
-  markers: z.array(MarkerSchema).default([]),
-  export: ExportSettingsSchema.prefault({}),
-  /** Plugin-contributed metadata. See addendum §3.3. */
-  pluginData: PluginDataSchema.optional().default({}),
-  // ── Multi-track fields (added alongside v1; migration from edits[] on load) ─
-  sourceFiles: z.array(SourceFileSchema).default([]),
-  tracks: z.array(TrackSchema).default([]),
-})
+export const ProjectFileSchema = z
+  .object({
+    version: z.literal(1),
+    createdAt: z.string(),
+    audioSettings: z.object({ processingSampleRate: z.literal(48_000) }).strict(),
+    audioSources: z.array(AudioSourceSchema),
+    transcript: TranscriptSchema.optional(),
+    adjustments: z.array(AdjustmentSchema).default([]),
+    markers: z.array(MarkerSchema).default([]),
+    export: ExportSettingsSchema.prefault({}),
+    pluginData: z.record(z.string(), z.unknown()).default({}),
+    tracks: z.array(TrackSchema).default([]),
+  })
+  .strict()
+  .superRefine((project, context) => {
+    const sources = new Map(project.audioSources.map((source) => [source.id, source]))
+    if (sources.size !== project.audioSources.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['audioSources'],
+        message: 'Duplicate AudioSourceId',
+      })
+    }
+    project.tracks.forEach((track, trackIndex) => {
+      track.clips.forEach((clip, clipIndex) => {
+        const path = ['tracks', trackIndex, 'clips', clipIndex]
+        const source = sources.get(clip.audioSourceId)
+        if (!source) {
+          context.addIssue({
+            code: 'custom',
+            path: [...path, 'audioSourceId'],
+            message: 'Clip references unknown AudioSource',
+          })
+        } else if (
+          clip.sourceEnd <= clip.sourceStart ||
+          clip.sourceEnd > source.metadata.durationSeconds
+        ) {
+          context.addIssue({
+            code: 'custom',
+            path,
+            message: 'Clip source range is outside AudioSource duration',
+          })
+        }
+        if (clip.trackId !== track.id) {
+          context.addIssue({
+            code: 'custom',
+            path: [...path, 'trackId'],
+            message: 'Clip trackId does not match its track',
+          })
+        }
+      })
+    })
+    project.transcript?.words.forEach((word, wordIndex) => {
+      if (word.audioSourceId && !sources.has(word.audioSourceId)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['transcript', 'words', wordIndex, 'audioSourceId'],
+          message: 'Word references unknown AudioSource',
+        })
+      }
+    })
+  })
 export type ProjectFile = z.infer<typeof ProjectFileSchema>
 
-// ── Audio metadata (returned by FFprobe, not persisted in project file) ───────
-export interface AudioMetadata {
-  durationSeconds: number
-  sampleRate: number
-  channels: number
-  codec: string
-  bitrateKbps: number
-}
-
-// ── Peak data (generated by FFmpeg, cached as .peaks.json) ───────────────────
-export interface PeakData {
-  /** Array of channel arrays. Mono: one inner array. Stereo: two. */
-  data: number[][]
-  /** Total number of peak samples per channel. */
-  length: number
-  /** Duration in seconds for mapping requested waveform ranges to peak samples. */
-  durationSeconds: number
+export function createEmptyProject(createdAt = new Date().toISOString()): ProjectFile {
+  return ProjectFileSchema.parse({
+    version: 1,
+    createdAt,
+    audioSettings: { processingSampleRate: 48_000 },
+    audioSources: [],
+    tracks: [],
+  })
 }

@@ -3,13 +3,13 @@ import { mergeTrackWords } from './transcript'
 import type { Word } from '@shared/project.types'
 
 // Minimal word factory
-const w = (id: string, start: number, trackId?: string, sourceFileId?: string): Word => ({
+const w = (id: string, start: number, trackId?: string, audioSourceId?: string): Word => ({
   id,
   text: id,
   start,
   end: start + 1,
   muted: false,
-  sourceFileId,
+  audioSourceId: audioSourceId as Word['audioSourceId'],
   trackId,
 })
 
@@ -36,7 +36,7 @@ describe('mergeTrackWords', () => {
     expect(result.some((x) => x.id === 'legacy')).toBe(true)
   })
 
-  it('removes legacy words by sourceFileId when legacySourceFileId is provided', () => {
+  it('removes untracked words by audioSourceId when a source id is provided', () => {
     const existing = [w('legacy', 0, undefined, 'sf1')]
     const incoming = [w('new', 1, 'track1', 'sf1')]
     const result = mergeTrackWords(existing, incoming, 'track1', 'sf1')

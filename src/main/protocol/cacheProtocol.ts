@@ -1,0 +1,67 @@
+import { AudioSourceIdSchema } from '../../shared/project.types'
+import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
+
+export type CacheResourceFetcher = (path: string, request: Request) => Promise<Response>
+const MAX_RANGE_BYTES = 32 * 1024 * 1024
+
+export function createCacheProtocolHandler(
+  getProjectRoot: () => string,
+  fetchFile: CacheResourceFetcher,
+): (request: Request) => Promise<Response> {
+  return async (request) => {
+    const url = new URL(request.url)
+    if (url.hostname !== 'cache') return notFound()
+    const segments = url.pathname.split('/').filter(Boolean)
+    if (segments.length < 2 || segments.length > 3) return notFound()
+    const [sourceValue, resource, levelValue] = segments
+    const parsedId = AudioSourceIdSchema.safeParse(sourceValue)
+    if (!parsedId.success) return notFound()
+    const validResource =
+      (resource === 'pcm' && segments.length === 2) ||
+      (resource === 'waveform' &&
+        segments.length === 3 &&
+        [256, 4096, 65536].includes(Number(levelValue)))
+    if (!validResource) return notFound()
+    if (!isBoundedRange(request.headers.get('Range'))) {
+      return new Response('A bounded byte range is required', { status: 416 })
+    }
+    try {
+      const store = new AudioSourceCacheStore(getProjectRoot())
+      const path =
+        resource === 'pcm' && segments.length === 2
+          ? await store.resolvePcm(parsedId.data)
+          : resource === 'waveform' && segments.length === 3 && levelValue
+            ? await store.resolveWaveform(parsedId.data, Number(levelValue))
+            : null
+      if (!path) return notFound()
+      const response = await fetchFile(path, request)
+      const headers = new Headers(response.headers)
+      headers.set('content-type', 'application/octet-stream')
+      headers.set('access-control-allow-origin', '*')
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      })
+    } catch {
+      return notFound()
+    }
+  }
+}
+
+function isBoundedRange(value: string | null): boolean {
+  const match = value?.match(/^bytes=(\d+)-(\d+)$/)
+  if (!match) return false
+  const start = Number(match[1])
+  const end = Number(match[2])
+  return (
+    Number.isSafeInteger(start) &&
+    Number.isSafeInteger(end) &&
+    end >= start &&
+    end - start + 1 <= MAX_RANGE_BYTES
+  )
+}
+
+function notFound(): Response {
+  return new Response('Not found', { status: 404 })
+}

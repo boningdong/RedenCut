@@ -1,74 +1,58 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Render IPC Handler
-//
-// Handles project:export — builds the FFmpeg filter graph from the project
-// snapshot, spawns FFmpeg, streams progress events to the renderer.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { ipcMain } from 'electron'
 import { spawn } from 'child_process'
-import type { ProjectFile } from '@shared/project.types'
-import { ProjectFileSchema } from '@shared/project.types'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { RenderProgress } from '@shared/ipc.types'
+import { ProjectFileSchema } from '@shared/project.types'
 import { buildRenderArgs } from '../audio/renderer'
 import { getFfmpegPath } from '../audio/binaries'
+import type { WorkspaceController } from '../project/WorkspaceController'
 
-ipcMain.handle('project:export', async (event, project: ProjectFile, outputPath: string) => {
-  const validated = ProjectFileSchema.parse(project)
-  const args = buildRenderArgs(validated, outputPath)
-  const ffmpeg = spawn(getFfmpegPath(), args)
-
-  await new Promise<void>((resolve, reject) => {
-    let stderr = ''
-
-    // Parse duration once from stderr header
-    let totalSeconds = 0
-
-    ffmpeg.stderr.on('data', (chunk: Buffer) => {
-      const text = chunk.toString()
-      stderr += text
-
-      // Extract total duration (appears once near the start)
-      if (totalSeconds === 0) {
-        const durationMatch = text.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/)
-        if (durationMatch) {
-          totalSeconds =
-            parseInt(durationMatch[1], 10) * 3600 +
-            parseInt(durationMatch[2], 10) * 60 +
-            parseFloat(durationMatch[3])
-        }
-      }
-
-      // Parse current progress: "time=HH:MM:SS.ss"
-      const timeMatch = text.match(/time=(\d+):(\d+):(\d+\.\d+)/)
-      if (timeMatch && totalSeconds > 0) {
-        const currentSeconds =
-          parseInt(timeMatch[1], 10) * 3600 +
-          parseInt(timeMatch[2], 10) * 60 +
-          parseFloat(timeMatch[3])
-        const percent = Math.min(1, currentSeconds / totalSeconds)
-        const progress: RenderProgress = { percent, currentSeconds, totalSeconds }
-        if (!event.sender.isDestroyed()) {
+export function registerRenderIpc(controller: WorkspaceController): void {
+  ipcMain.handle('project:export', async (event, projectInput: unknown, format: string) => {
+    const input = ProjectFileSchema.parse(projectInput)
+    const project = ProjectFileSchema.parse({
+      ...input,
+      export: { ...input.export, format },
+    })
+    const window = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
+    const destination = await dialog.showSaveDialog(window, {
+      title: 'Export Audio',
+      defaultPath: `export.${project.export.format}`,
+      filters: [{ name: project.export.format.toUpperCase(), extensions: [project.export.format] }],
+    })
+    if (destination.canceled || !destination.filePath) return false
+    const paths = new Map<string, string>()
+    for (const source of project.audioSources)
+      paths.set(source.id, await controller.resolveOriginal(source.id))
+    const child = spawn(getFfmpegPath(), buildRenderArgs(project, paths, destination.filePath))
+    await new Promise<void>((resolve, reject) => {
+      let stderr = ''
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString()
+        const match = stderr
+          .match(/time=(\d+):(\d+):(\d+\.\d+)/g)
+          ?.at(-1)
+          ?.match(/(\d+):(\d+):(\d+\.\d+)/)
+        if (match && !event.sender.isDestroyed()) {
+          const currentSeconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
+          const totalSeconds = project.tracks
+            .flatMap((track) => track.clips)
+            .reduce(
+              (max, clip) => Math.max(max, clip.outputStart + clip.sourceEnd - clip.sourceStart),
+              0,
+            )
+          const progress: RenderProgress = {
+            percent: totalSeconds ? Math.min(1, currentSeconds / totalSeconds) : 0,
+            currentSeconds,
+            totalSeconds,
+          }
           event.sender.send('render:progress', progress)
         }
-      }
+      })
+      child.once('error', reject)
+      child.once('close', (code) =>
+        code === 0 ? resolve() : reject(new Error(`FFmpeg export failed: ${stderr.slice(-500)}`)),
+      )
     })
-
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        if (!event.sender.isDestroyed()) {
-          event.sender.send('render:progress', {
-            percent: 1,
-            currentSeconds: totalSeconds,
-            totalSeconds,
-          })
-        }
-        resolve()
-      } else {
-        reject(new Error(`FFmpeg exited with code ${code}:\n${stderr.slice(-500)}`))
-      }
-    })
-
-    ffmpeg.on('error', reject)
+    return true
   })
-})
+}

@@ -28,7 +28,7 @@ export function getWordClipState(word: Word, tracks: Track[]): WordClipState {
   // Find a clip on this track that covers word.start in source-file time.
   const coveringClip = track.clips.find(
     (c) =>
-      (!word.sourceFileId || c.sourceFileId === word.sourceFileId) &&
+      (!word.audioSourceId || c.audioSourceId === word.audioSourceId) &&
       c.sourceStart <= word.start &&
       word.start < c.sourceEnd,
   )

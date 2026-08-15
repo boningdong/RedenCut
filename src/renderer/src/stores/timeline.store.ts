@@ -6,12 +6,12 @@
 // multi-track, clip-based representation.
 //
 // Core concepts:
-//   SourceFile  — a registered audio file on disk
+//   AudioSource — a stable managed source identity
 //   Track       — a named lane that holds an ordered list of Clips
-//   Clip        — a slice of a SourceFile placed at a position on the timeline
+//   Clip        — a slice of an AudioSource placed at a position on the timeline
 //
 // Single-file workflow (the initial common case):
-//   Open file → initFromFile() creates 1 SourceFile + 1 Track with 1 Clip
+//   Import → initFromAudioSource() creates 1 AudioSource + 1 Track with 1 Clip
 //   spanning [0, duration]. All editing operations split/mutate that initial
 //   clip. The WebCodecs player reads this list to know what to play and skip.
 //
@@ -28,7 +28,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand'
-import type { Clip, SourceFile, Track } from '@shared/project.types'
+import type { AudioSource, AudioSourceId, Clip, Track } from '@shared/project.types'
 import { useTranscriptStore } from './transcript.store'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ interface HistoryEntry {
 // ── Store shape ────────────────────────────────────────────────────────────────
 
 interface TimelineState {
-  sourceFiles: SourceFile[]
+  audioSources: AudioSource[]
   tracks: Track[]
   undoStack: HistoryEntry[]
   /**
@@ -80,25 +80,20 @@ interface TimelineState {
    * track with one clip spanning the full duration.
    * Called when the user opens a new audio file.
    */
-  initFromFile(filePath: string, duration: number): void
+  initFromAudioSource(audioSource: AudioSource): void
 
   /**
-   * Restore full state from a saved project (tracks + sourceFiles).
+   * Restore full state from a saved project.
    * Does NOT push to undo stack — loading is not an undoable action.
    */
-  loadFromProject(sourceFiles: SourceFile[], tracks: Track[]): void
+  loadFromProject(audioSources: AudioSource[], tracks: Track[]): void
 
-  /**
-   * Register a source file in the project. Idempotent — calling with the same
-   * filePath returns the existing id without creating a duplicate.
-   * id is always set to filePath (matches the convention in initFromFile).
-   * Not undoable.
-   */
-  addSourceFile(filePath: string, duration: number): string
+  /** Register a managed source by stable identity. Not undoable. */
+  addAudioSource(audioSource: AudioSource): AudioSourceId
 
   // ── Track operations ───────────────────────────────────────────────────────
 
-  addTrack(name?: string, sourceFileId?: string): string
+  addTrack(name?: string, audioSourceId?: AudioSourceId): string
   removeTrack(trackId: string): void
   updateTrack(trackId: string, patch: Partial<Omit<Track, 'id' | 'clips'>>): void
 
@@ -109,8 +104,7 @@ interface TimelineState {
    * Clips are split at the boundaries so the region can be independently
    * muted/unmuted.
    *
-   * Routes by trackId, NOT sourceFileId — a source file may be referenced
-   * by multiple tracks, so routing by sourceFileId would mute the wrong track.
+   * Routes by trackId because one source may be referenced by multiple tracks.
    *
    * @param wordIds  Transcript word IDs muted together with this operation.
    */
@@ -175,7 +169,7 @@ interface TimelineState {
 const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
 
 const initialState = {
-  sourceFiles: [] as SourceFile[],
+  audioSources: [] as AudioSource[],
   tracks: [] as Track[],
   undoStack: [] as HistoryEntry[],
   redoStack: [] as HistoryEntry[],
@@ -186,19 +180,17 @@ const initialState = {
 export const useTimelineStore = create<TimelineState>()((set, get) => ({
   ...initialState,
 
-  // ── initFromFile ────────────────────────────────────────────────────────────
-  initFromFile(filePath, duration) {
-    // Use the filePath as sourceFileId so App.tsx can pass the same ID
-    // to player.loadSourceFile() without a round-trip to read the store.
-    const sourceFileId = filePath
+  // ── initFromAudioSource ─────────────────────────────────────────────────────
+  initFromAudioSource(audioSource) {
+    const audioSourceId = audioSource.id
+    const duration = audioSource.metadata.durationSeconds
     const trackId = nextId('track')
     const clipId = nextId('clip')
 
-    const sourceFile: SourceFile = { id: sourceFileId, filePath, duration }
     const clip: Clip = {
       id: clipId,
       trackId,
-      sourceFileId,
+      audioSourceId,
       sourceStart: 0,
       sourceEnd: duration,
       outputStart: 0,
@@ -217,27 +209,26 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       effects: [],
     }
 
-    set({ sourceFiles: [sourceFile], tracks: [track], undoStack: [], selectedClipId: null })
+    set({ audioSources: [audioSource], tracks: [track], undoStack: [], selectedClipId: null })
   },
 
   // ── loadFromProject ─────────────────────────────────────────────────────────
-  loadFromProject(sourceFiles, tracks) {
-    set({ sourceFiles, tracks, undoStack: [], selectedClipId: null })
+  loadFromProject(audioSources, tracks) {
+    set({ audioSources, tracks, undoStack: [], selectedClipId: null })
   },
 
-  // ── addSourceFile ────────────────────────────────────────────────────────
-  addSourceFile(filePath, duration) {
-    const existing = get().sourceFiles.find((sf) => sf.filePath === filePath)
+  // ── addAudioSource ─────────────────────────────────────────────────────────
+  addAudioSource(audioSource) {
+    const existing = get().audioSources.find((source) => source.id === audioSource.id)
     if (existing) {
       return existing.id
     }
-    const sf: SourceFile = { id: filePath, filePath, duration }
-    set((s) => ({ sourceFiles: [...s.sourceFiles, sf] }))
-    return filePath
+    set((s) => ({ audioSources: [...s.audioSources, audioSource] }))
+    return audioSource.id
   },
 
   // ── addTrack ────────────────────────────────────────────────────────────────
-  addTrack(name, sourceFileId) {
+  addTrack(name, audioSourceId) {
     const trackId = nextId('track')
     const track: Track = {
       id: trackId,
@@ -249,15 +240,15 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       color: TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
       effects: [],
     }
-    if (sourceFileId) {
-      const sf = get().sourceFiles.find((s) => s.id === sourceFileId)
-      if (sf) {
+    if (audioSourceId) {
+      const source = get().audioSources.find((item) => item.id === audioSourceId)
+      if (source) {
         track.clips.push({
           id: nextId('clip'),
           trackId,
-          sourceFileId,
+          audioSourceId,
           sourceStart: 0,
-          sourceEnd: sf.duration,
+          sourceEnd: source.metadata.durationSeconds,
           outputStart: 0,
           gain: 1,
           muted: false,
@@ -577,15 +568,17 @@ function splitAndMute(clips: Clip[], startTime: number, endTime: number, trackId
   const result: Clip[] = []
 
   for (const clip of clips) {
+    const clipOutputEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
     // Clip entirely outside the mute range — keep as-is
-    if (clip.sourceEnd <= startTime || clip.sourceStart >= endTime) {
+    if (clipOutputEnd <= startTime || clip.outputStart >= endTime) {
       result.push(clip)
       continue
     }
 
-    // Clip partially or fully inside the mute range — split at boundaries
-    const effectiveMuteStart = Math.max(clip.sourceStart, startTime)
-    const effectiveMuteEnd = Math.min(clip.sourceEnd, endTime)
+    const muteOutputStart = Math.max(clip.outputStart, startTime)
+    const muteOutputEnd = Math.min(clipOutputEnd, endTime)
+    const effectiveMuteStart = clip.sourceStart + (muteOutputStart - clip.outputStart)
+    const effectiveMuteEnd = clip.sourceStart + (muteOutputEnd - clip.outputStart)
 
     // Left remainder (before the mute region)
     if (clip.sourceStart < effectiveMuteStart) {
@@ -593,18 +586,18 @@ function splitAndMute(clips: Clip[], startTime: number, endTime: number, trackId
         ...clip,
         id: nextId('clip'),
         sourceEnd: effectiveMuteStart,
-        outputStart: clip.sourceStart,
+        outputStart: clip.outputStart,
       })
     }
 
-    // The muted segment — trackId updated; sourceFileId inherited from ...clip
+    // The muted segment inherits audioSourceId from the source clip.
     result.push({
       ...clip,
       id: nextId('clip'),
       trackId,
       sourceStart: effectiveMuteStart,
       sourceEnd: effectiveMuteEnd,
-      outputStart: effectiveMuteStart,
+      outputStart: muteOutputStart,
       muted: true,
     })
 
@@ -614,7 +607,7 @@ function splitAndMute(clips: Clip[], startTime: number, endTime: number, trackId
         ...clip,
         id: nextId('clip'),
         sourceStart: effectiveMuteEnd,
-        outputStart: effectiveMuteEnd,
+        outputStart: muteOutputEnd,
       })
     }
   }
@@ -644,7 +637,7 @@ function mergeAdjacentUnmuted(clips: Clip[]): Clip[] {
     if (
       !prev.muted &&
       !curr.muted &&
-      prev.sourceFileId === curr.sourceFileId &&
+      prev.audioSourceId === curr.audioSourceId &&
       prev.trackId === curr.trackId &&
       Math.abs(prev.sourceEnd - curr.sourceStart) < 0.001 && // source adjacent
       Math.abs(prevOutputEnd - curr.outputStart) < 0.001 // output adjacent

@@ -15,7 +15,7 @@
 //   At zoomLevel>1 the content is zoomLevel× wider and the viewport scrolls.
 //
 // Architecture:
-//   • One shared waveform provider for each PeakData object identity.
+//   • One shared binary waveform provider for each AudioSourceId.
 //   • Only the source interval intersecting the viewport is drawn to canvas.
 //   • Clip blocks: absolutely positioned % within lane (auto-scales with zoom).
 //   • Clip drag: pointer events → moveClip() on pointer up. Snap within 5px.
@@ -24,21 +24,22 @@
 // Log prefix: [WaveformView]
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PeakData, Clip } from '@shared/project.types'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { AudioSourceId, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { CanvasWaveform } from './CanvasWaveform'
-import { PeakDataProviderRegistry } from './PeakDataProviderRegistry'
+import type { WaveformDataProvider } from './WaveformDataProvider'
 import { TrackHeader } from './TrackHeader'
 import { calculateVisibleWaveformRange } from './waveformRange'
 
 interface WaveformViewProps {
-  /** Primary track's peaks (loaded before WaveformView mounts). */
-  peaks: PeakData
+  duration: number
+  providersBySource: ReadonlyMap<AudioSourceId, WaveformDataProvider>
+  onAddTrack(): void
 }
 
 // Layout constants
@@ -47,13 +48,12 @@ const RULER_HEIGHT = 28 // px — ruler row height
 const LANE_HEIGHT = 96 // px — clip lane height
 const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
-// ── Track loading state ────────────────────────────────────────────────────────
-type TrackPeakState = 'loading' | PeakData
-
-export function WaveformView({ peaks }: WaveformViewProps) {
+export function WaveformView({
+  duration: sourceDuration,
+  providersBySource,
+  onAddTrack,
+}: WaveformViewProps) {
   const tracks = useTimelineStore((s) => s.tracks)
-  const addSourceFile = useTimelineStore((s) => s.addSourceFile)
-  const addTrack = useTimelineStore((s) => s.addTrack)
   const removeTrack = useTimelineStore((s) => s.removeTrack)
   const moveClip = useTimelineStore((s) => s.moveClip)
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
@@ -64,46 +64,16 @@ export function WaveformView({ peaks }: WaveformViewProps) {
   const currentTime = usePlaybackStore((s) => s.currentTime)
 
   // Duration = furthest output end across all clips on all tracks.
-  // Falls back to the primary peaks duration when there are no clips.
+  // Falls back to the source duration when there are no clips.
   // This ensures the ruler and seek mapping always cover the full timeline,
   // even after the original track is removed or a longer clip is added.
   const maxClipEnd = tracks
     .flatMap((t) => t.clips)
     .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
-  const duration = Math.max(peaks.durationSeconds, maxClipEnd)
+  const duration = Math.max(sourceDuration, maxClipEnd)
 
   const previewMode = useEditorStore((s) => s.previewMode)
   const setSelection = useEditorStore((s) => s.setSelection)
-
-  // Per-track peak loading state (secondary tracks only; primary uses `peaks` prop)
-  const [trackPeaks, setTrackPeaks] = useState<Map<string, TrackPeakState>>(() => {
-    const m = new Map<string, TrackPeakState>()
-    if (tracks.length > 0) m.set(tracks[0].id, peaks)
-    return m
-  })
-  const providerRegistryRef = useRef<PeakDataProviderRegistry | null>(null)
-  if (!providerRegistryRef.current) providerRegistryRef.current = new PeakDataProviderRegistry()
-  const providerRegistry = providerRegistryRef.current
-  const providersByTrack = useMemo(() => {
-    const providers = new Map<string, ReturnType<PeakDataProviderRegistry['forPeakData']>>()
-    for (const [trackId, peakState] of trackPeaks) {
-      if (peakState !== 'loading') {
-        providers.set(trackId, providerRegistry.forPeakData(peakState))
-      }
-    }
-    return providers
-  }, [providerRegistry, trackPeaks])
-
-  // Sync primary peaks if they change (e.g. new file opened).
-  // Only depend on `peaks` — track structure changes are irrelevant here;
-  // new tracks receive their peaks via the explicit setTrackPeaks call in handleAddTrack.
-  // Including `tracks` caused the old peaks to be stamped onto a newly-added track id.
-  useEffect(() => {
-    if (tracks.length > 0) {
-      setTrackPeaks((prev) => new Map(prev).set(tracks[0].id, peaks))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [peaks])
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(1.0)
@@ -230,58 +200,13 @@ export function WaveformView({ peaks }: WaveformViewProps) {
     [duration, scaleFactor, setSelectedTrackId],
   )
 
-  // ── Add Track ────────────────────────────────────────────────────────────
-  const handleAddTrack = useCallback(async () => {
-    const result = await window.electronAPI.audio.openFile()
-    if (!result) return
-    const sfId = addSourceFile(result.filePath, result.metadata.durationSeconds)
-    const trackId = addTrack(undefined, sfId)
-    try {
-      await getAudioPlayerInstance()?.loadSourceFile(sfId, result.filePath)
-    } catch (err) {
-      console.warn('[WaveformView] Could not register source with player:', err)
-    }
-    setTrackPeaks((prev) => new Map(prev).set(trackId, 'loading'))
-    try {
-      const pd = await window.electronAPI.audio.generatePeaks(result.filePath)
-      setTrackPeaks((prev) => new Map(prev).set(trackId, pd))
-    } catch (err) {
-      console.error('[WaveformView] Failed to generate peaks for new track:', err)
-      setTrackPeaks((prev) => {
-        const m = new Map(prev)
-        m.delete(trackId)
-        return m
-      })
-    }
-  }, [addSourceFile, addTrack])
-
   // ── Remove track ─────────────────────────────────────────────────────────
   const handleRemoveTrack = useCallback(
     (trackId: string) => {
-      // Snapshot sourceFileIds exclusively owned by this track before removing.
-      // A source shared with another track must NOT be unloaded from the player.
-      const track = tracks.find((t) => t.id === trackId)
-      const ownedSourceIds = track
-        ? [...new Set(track.clips.map((c) => c.sourceFileId))].filter(
-            (sfId) =>
-              !tracks.some((t) => t.id !== trackId && t.clips.some((c) => c.sourceFileId === sfId)),
-          )
-        : []
-
       removeTrack(trackId)
       useTranscriptStore.getState().removeWordsForTrack(trackId)
-      setTrackPeaks((prev) => {
-        const m = new Map(prev)
-        m.delete(trackId)
-        return m
-      })
-
-      const player = getAudioPlayerInstance()
-      for (const sfId of ownedSourceIds) {
-        player?.removeSourceFile(sfId)
-      }
     },
-    [removeTrack, tracks],
+    [removeTrack],
   )
 
   // ── Clip drag ─────────────────────────────────────────────────────────────
@@ -501,8 +426,6 @@ export function WaveformView({ peaks }: WaveformViewProps) {
 
             {/* Track lanes */}
             {tracks.map((track) => {
-              const peakState = trackPeaks.get(track.id)
-              const waveformProvider = providersByTrack.get(track.id)
               return (
                 <div
                   key={track.id}
@@ -523,26 +446,9 @@ export function WaveformView({ peaks }: WaveformViewProps) {
                   onPointerMove={handleClipPointerMove}
                   onPointerUp={handleClipPointerUp}
                 >
-                  {peakState === 'loading' && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <span
-                        style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}
-                      >
-                        Generating waveform…
-                      </span>
-                    </div>
-                  )}
-
                   {/* Clip blocks */}
                   {track.clips.map((clip) => {
+                    const waveformProvider = providersBySource.get(clip.audioSourceId)
                     const clipDur = clip.sourceEnd - clip.sourceStart
                     const leftPct =
                       duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
@@ -697,9 +603,7 @@ export function WaveformView({ peaks }: WaveformViewProps) {
       {/* + Add Track row */}
       <div
         onClick={() => {
-          void handleAddTrack().catch((error: unknown) => {
-            console.error('[WaveformView] Failed to add track:', error)
-          })
+          onAddTrack()
         }}
         style={{
           display: 'flex',

@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest'
+import { WORKLET_CODE } from './AudioPlayerWorklet'
+
+interface WorkletPort {
+  onmessage: ((event: { data: Record<string, unknown> }) => void) | null
+  messages: Record<string, unknown>[]
+  postMessage(message: Record<string, unknown>): void
+}
+
+function createProcessor(maxFrames = 8, targetFrames = 4) {
+  let Processor: new (options: unknown) => {
+    port: WorkletPort
+    process(inputs: unknown[], outputs: Float32Array[][]): boolean
+  }
+  class HostProcessor {
+    port: WorkletPort = {
+      onmessage: null,
+      messages: [],
+      postMessage(message) {
+        this.messages.push(message)
+      },
+    }
+  }
+  const registerProcessor = (_name: string, constructor: typeof Processor) => {
+    Processor = constructor
+  }
+  Function(
+    'AudioWorkletProcessor',
+    'registerProcessor',
+    WORKLET_CODE,
+  )(HostProcessor, registerProcessor)
+  return new Processor!({ processorOptions: { maxFrames, targetFrames } })
+}
+
+function send(processor: ReturnType<typeof createProcessor>, data: Record<string, unknown>) {
+  processor.port.onmessage?.({ data })
+}
+
+describe('PodCut AudioWorklet queue', () => {
+  it('applies gain, maps mono to every output channel, and reports acknowledged depth', () => {
+    const processor = createProcessor()
+    send(processor, { type: 'flush', generation: 2 })
+    send(processor, {
+      type: 'pcm',
+      generation: 2,
+      channels: [new Float32Array([1, -1, 0.5, -0.5])],
+      gain: 0.5,
+    })
+    send(processor, { type: 'play' })
+    const output = [[new Float32Array(4), new Float32Array(4)]]
+    expect(processor.process([], output)).toBe(true)
+    expect([...output[0][0]]).toEqual([0.5, -0.5, 0.25, -0.25])
+    expect([...output[0][1]]).toEqual([0.5, -0.5, 0.25, -0.25])
+    expect(processor.port.messages).toContainEqual({
+      type: 'depth',
+      generation: 2,
+      queuedFrames: 4,
+    })
+    expect(processor.port.messages).toContainEqual({ type: 'started', generation: 2 })
+  })
+
+  it('rejects overflow and ignores stale generations after a flush', () => {
+    const processor = createProcessor(4, 2)
+    send(processor, { type: 'flush', generation: 3 })
+    send(processor, { type: 'pcm', generation: 2, channels: [new Float32Array(4)], gain: 1 })
+    send(processor, { type: 'pcm', generation: 3, channels: [new Float32Array(5)], gain: 1 })
+    expect(processor.port.messages).toContainEqual({ type: 'overflow', generation: 3 })
+    expect(processor.port.messages).not.toContainEqual({
+      type: 'depth',
+      generation: 3,
+      queuedFrames: 4,
+    })
+  })
+
+  it('requests a refill once until more PCM is acknowledged', () => {
+    const processor = createProcessor(8, 4)
+    send(processor, { type: 'flush', generation: 1 })
+    const output = [[new Float32Array(2)]]
+    processor.process([], output)
+    processor.process([], output)
+    expect(processor.port.messages.filter((message) => message.type === 'need-data')).toHaveLength(
+      1,
+    )
+    send(processor, { type: 'pcm', generation: 1, channels: [new Float32Array(2)], gain: 1 })
+    processor.process([], output)
+    expect(processor.port.messages.filter((message) => message.type === 'need-data')).toHaveLength(
+      2,
+    )
+  })
+})
