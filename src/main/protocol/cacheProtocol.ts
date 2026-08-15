@@ -1,10 +1,14 @@
 import { AudioSourceIdSchema, type ProjectFile } from '../../shared/project.types'
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 
-export type CacheResourceFetcher = (path: string, request: Request) => Promise<Response>
+export type CacheResourceFetcher = (
+  path: string,
+  range: BoundedByteRange,
+  signal: AbortSignal,
+) => Promise<Response>
 export interface BoundedByteRange {
-  start: number
-  end: number
+  readonly start: number
+  readonly end: number
 }
 const MAX_RANGE_BYTES = 32 * 1024 * 1024
 
@@ -42,7 +46,14 @@ export function createCacheProtocolHandler(
             ? await store.resolveWaveform(source, Number(levelValue))
             : null
       if (!path) return notFound()
-      const response = await fetchFile(path, request)
+      let response: Response
+      try {
+        response = await fetchFile(path, range, request.signal)
+      } catch (error) {
+        if (isAbortError(error)) throw error
+        return new Response('Unable to read cache resource', { status: 500 })
+      }
+      if (response.status === 416) return response
       const contentRange = response.headers.get('content-range')?.match(/^bytes (\d+)-(\d+)\/\d+$/)
       if (
         response.status !== 206 ||
@@ -62,13 +73,14 @@ export function createCacheProtocolHandler(
         statusText: response.statusText,
         headers,
       })
-    } catch {
+    } catch (error) {
+      if (isAbortError(error)) throw error
       return notFound()
     }
   }
 }
 
-function parseBoundedRange(value: string | null): { start: number; end: number } | null {
+function parseBoundedRange(value: string | null): BoundedByteRange | null {
   const match = value?.match(/^bytes=(\d+)-(\d+)$/)
   if (!match) return null
   const start = Number(match[1])
@@ -79,6 +91,10 @@ function parseBoundedRange(value: string | null): { start: number; end: number }
     end - start + 1 <= MAX_RANGE_BYTES
     ? { start, end }
     : null
+}
+
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
 }
 
 function notFound(): Response {

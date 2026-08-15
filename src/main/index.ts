@@ -1,12 +1,12 @@
-import { app, BrowserWindow, net, protocol } from 'electron'
+import { app, BrowserWindow, protocol } from 'electron'
 import { join } from 'path'
-import { pathToFileURL } from 'url'
 import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
 import { registerRenderIpc } from './ipc/render.ipc'
 import { registerTranscriptIpc } from './ipc/transcript.ipc'
 import { WorkspaceController } from './project/WorkspaceController'
 import { createCacheProtocolHandler } from './protocol/cacheProtocol'
+import { createFileRangeResponse } from './protocol/fileRangeResponse'
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'podcut', privileges: { secure: true, supportFetchAPI: true, stream: true } },
@@ -42,10 +42,7 @@ void app.whenReady().then(async () => {
     'podcut',
     createCacheProtocolHandler(
       () => ({ root: controller.workspace.root, project: controller.workspace.project }),
-      (path, request) =>
-        net.fetch(pathToFileURL(path).href, {
-          headers: Object.fromEntries(request.headers.entries()),
-        }),
+      createFileRangeResponse,
     ),
   )
 
