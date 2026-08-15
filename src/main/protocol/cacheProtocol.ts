@@ -2,6 +2,10 @@ import { AudioSourceIdSchema, type ProjectFile } from '../../shared/project.type
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 
 export type CacheResourceFetcher = (path: string, request: Request) => Promise<Response>
+export interface BoundedByteRange {
+  start: number
+  end: number
+}
 const MAX_RANGE_BYTES = 32 * 1024 * 1024
 
 export function createCacheProtocolHandler(
