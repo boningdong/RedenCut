@@ -31,6 +31,7 @@ describe('drawWaveform', () => {
 
     drawWaveform(context, buckets, 30, 80, '#abc')
 
+    expect(context.fillStyle).toBe('#abc')
     expect(clearRectCalls).toEqual([{ x: 0, y: 0, width: 30, height: 80 }])
     expect(fillRectCalls).toHaveLength(3)
     expect(fillRectCalls).toEqual([

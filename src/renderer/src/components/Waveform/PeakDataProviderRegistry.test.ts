@@ -7,14 +7,14 @@ function peakData(): PeakData {
 }
 
 describe('PeakDataProviderRegistry', () => {
-  it('returns one shared provider when a clip and track use the same peak data object', () => {
+  it('returns exactly one shared provider identity for ten clips using the same peak data object', () => {
     const sharedPeaks = peakData()
     const registry = new PeakDataProviderRegistry()
 
-    const clipProvider = registry.forPeakData(sharedPeaks)
-    const trackProvider = registry.forPeakData(sharedPeaks)
+    const clipProviders = Array.from({ length: 10 }, () => registry.forPeakData(sharedPeaks))
 
-    expect(trackProvider).toBe(clipProvider)
+    expect(new Set(clipProviders).size).toBe(1)
+    for (const provider of clipProviders) expect(provider).toBe(clipProviders[0])
   })
 
   it('keeps providers separate for distinct peak data objects', () => {
