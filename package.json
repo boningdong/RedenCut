@@ -26,6 +26,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@tailwindcss/vite": "^4.2.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25.3.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -36,6 +37,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.9.0",
+    "jsdom": "^29.1.1",
     "knip": "6.32.1",
     "prettier": "3.9.6",
     "tailwindcss": "^4.2.1",
