@@ -46,7 +46,7 @@ Dependencies point toward domain contracts, and no renderer component receives a
 - An audio file selected or dropped by the user.
 - An import mode of `copy` or `reference`.
 - A temporary or saved project workspace.
-- Existing version-1 PodCut project files during migration.
+- New projects created with the first published managed-package schema.
 
 ### Outputs
 
@@ -185,7 +185,7 @@ Multiple clips may reference one `AudioSource`, and one project may contain mult
 
 ### Clip reference
 
-The version-2 clip schema uses `audioSourceId` instead of `sourceFileId`.
+The managed-package clip schema uses `audioSourceId` instead of the unpublished `sourceFileId` terminology.
 
 ```ts
 type Clip = {
@@ -223,7 +223,7 @@ The renderer never resolves project-relative paths.
 
 ### Project processing sample rate
 
-The version-2 project stores one processing sample rate that is distinct from export settings and original-source metadata.
+The project stores one processing sample rate that is distinct from export settings and original-source metadata.
 
 ```ts
 type ProjectAudioSettings = {
@@ -235,19 +235,17 @@ New projects use a 48 kHz processing sample rate by default.
 
 Every source cache is resampled to that rate during import so every provider feeds frames for the same AudioContext rate.
 
-Legacy migration uses the primary source rate when it is valid and falls back to 48 kHz.
-
 Changing the project processing sample rate is a future explicit operation that invalidates and rebuilds all source caches.
 
 ### Project schema versioning
 
-`ProjectFileSchema` becomes a discriminated version union with explicit version-1 and version-2 schemas.
+The managed package is PodCut's first published project format, so `ProjectFileSchema` uses version `1` and replaces the current unpublished JSON-file schema.
 
-The relevant version-2 root fields are:
+The relevant root fields are:
 
 ```ts
-type ProjectFileV2 = {
-  version: 2
+type ProjectFile = {
+  version: 1
   createdAt: string
   audioSettings: ProjectAudioSettings
   audioSources: AudioSource[]
@@ -256,11 +254,7 @@ type ProjectFileV2 = {
 }
 ```
 
-Version 1 remains readable.
-
-Opening version 1 migrates its source and `sourceFileId` relationships into the version-2 in-memory model without silently copying media.
-
-Converting a legacy file into a package occurs through an explicit Save As Package flow.
+The unpublished single-file project shape is rejected rather than migrated, and the implementation contains no compatibility adapter or dual-schema branch.
 
 ## Cache model
 
@@ -317,6 +311,8 @@ At 48 kHz stereo, two seconds of Float32 PCM is approximately 768 KiB.
 
 The cache stores minimum and maximum Float32 pairs at 256, 4,096, and 65,536 samples per bucket.
 
+Each bucket is exactly eight bytes: one little-endian Float32 minimum followed by one little-endian Float32 maximum, aggregated across every channel sample in the bucket.
+
 The cache builder creates PCM and all waveform levels during one FFmpeg decode pass.
 
 The renderer chooses the coarsest level that still provides approximately one or more buckets per device pixel and requests only the visible bucket range.
@@ -354,6 +350,8 @@ interface AudioSampleProvider {
   ): Promise<AudioSampleChunk>
 }
 
+type AudioSampleFormat = 'f32-planar'
+
 type AudioSampleChunk = {
   startFrame: number
   frameCount: number
@@ -367,7 +365,9 @@ A future `BlockedPcmSampleProvider` may implement the same interface without cha
 
 ### Player
 
-`WebCodecsPlayer` evolves into `WorkletAudioPlayer` after compressed decoding is removed from its primary path.
+`WorkletAudioPlayer` replaces `WebCodecsPlayer` rather than evolving or retaining its compressed decoding path.
+
+`WebCodecsPlayer`, `FrameIndex`, arbitrary compressed-byte chunking, extrapolated compressed seek offsets, and the `SimpleAudioPlayer` media-element fallback are deleted after PCM-path parity tests pass.
 
 ```ts
 interface IAudioPlayer {
@@ -390,7 +390,11 @@ Seeking performs these steps:
 5. Transfer planar channel arrays to the AudioWorklet.
 6. Continue reading until the bounded high-water mark is reached.
 
-The initial target is two seconds queued per currently audible or armed source, with a hard maximum of three seconds during refill and seeking.
+Providers are shared by `AudioSourceId`, but each track owns its own AudioWorklet queue so the same source can play concurrently on different tracks.
+
+The initial target is two seconds queued per active track, with a hard maximum of three seconds per track during refill and seeking.
+
+Queue depth comes from AudioWorklet acknowledgements rather than wall-clock estimates, and every seek or structural timeline change increments a generation token so stale reads cannot enqueue audio.
 
 The player records underruns, and the reference sustained-playback and seek-stress run permits none.
 
@@ -406,11 +410,13 @@ Effects remain outside the first managed-audio implementation unless required to
 
 `BinaryWaveformDataProvider` implements the waveform interface established by the earlier canvas project.
 
-The custom protocol or another main-owned resource adapter serves bounded binary ranges identified by project and `audioSourceId`, not arbitrary renderer-provided filesystem paths.
+The custom protocol serves bounded binary ranges as `podcut://cache/<audioSourceId>/pcm` and `podcut://cache/<audioSourceId>/waveform/<samplesPerBucket>`.
+
+The main process resolves those identifiers against the active workspace and a validated manifest; no route accepts a renderer-provided filesystem path.
 
 The renderer does not receive the full waveform pyramid through IPC.
 
-The temporary `LegacyPeakDataProvider` is removed after the binary provider reaches feature parity.
+The temporary `PeakDataProvider` is removed after the binary provider reaches feature parity.
 
 ## Import transaction
 
@@ -460,6 +466,8 @@ It consumes typed progress events and contains no FFmpeg, path, cache, or cleanu
 The editor remains stable during import, and the new track appears only after readiness.
 
 Initial scope supports one active import.
+
+The import prompt exposes both modes, defaults to `copy`, and presents `reference` as the secondary choice.
 
 Import queues, parallel imports, recovery UI, and a welcome page are deferred.
 
@@ -527,13 +535,13 @@ src/
     │   │   └── ContinuousPcmSampleProvider.test.ts
     │   ├── WorkletAudioPlayer.ts
     │   ├── AudioPlayerWorklet.ts
-    │   └── SimpleAudioPlayer.ts
+    │   └── playbackPlan.ts
     └── components/Waveform/
         ├── WaveformDataProvider.ts
         └── BinaryWaveformDataProvider.ts
 ```
 
-`src/main/audio/importer.ts`, `src/main/audio/peaks.ts`, `LegacyPeakDataProvider`, and the compressed-decoding responsibilities in `WebCodecsPlayer` are removed only after their replacements reach parity.
+`src/main/audio/importer.ts`, `src/main/audio/peaks.ts`, `PeakDataProvider`, `SimpleAudioPlayer`, `FrameIndex`, and `WebCodecsPlayer` are removed only after their replacements reach parity.
 
 The exact file list may shrink when an item lacks an independent responsibility, but it must not grow without an identified ownership boundary.
 
@@ -544,7 +552,7 @@ Implementation follows test-driven development, beginning each behavior with a f
 Hard CI requirements include:
 
 - Project-relative path normalization, absolute-path rejection, traversal rejection, and bundle containment.
-- Version-1 to version-2 migration and preservation of source relationships.
+- Rejection of the unpublished single-file schema and acceptance of the managed-package version-1 schema.
 - Multiple clips sharing one `AudioSourceId`, PCM cache, waveform cache, and provider state.
 - Temporary Save and Save As both using permanent-destination publication.
 - Copy, validate, publish, switch, and cleanup ordering.
@@ -552,7 +560,8 @@ Hard CI requirements include:
 - Import success, failure rollback, and cancellation rollback.
 - Manifest parsing, version rejection, source-fingerprint invalidation, and regeneration.
 - PCM frame-to-byte calculations and bounded range reads.
-- Two-second queue target and three-second hard maximum per active source.
+- Two-second queue target and three-second hard maximum per active track.
+- An MP3 larger than the old 256 KiB index window decoding through FFmpeg into PCM and reading non-silent late-file frames without WebCodecs.
 - No full PCM-file read and no full waveform-pyramid renderer transfer.
 - Pyramid correctness and visible-range selection.
 - Stale seek and viewport request cancellation.
@@ -597,4 +606,4 @@ Architectural boundedness, correctness, cache sharing, and cleanup remain hard C
 
 ## Completion criteria
 
-The managed-audio project is complete when every active project has a workspace root, copied projects are portable, imports publish atomically, playback and waveform access are range-bounded, legacy projects remain readable, approved CI and performance checks pass, and no cache file is required to preserve durable edits.
+The managed-audio project is complete when every active project has a workspace root, copied projects are portable, imports publish atomically, playback and waveform access are range-bounded, the fragile compressed WebCodecs path is unreachable and removed, approved CI and performance checks pass, and no cache file is required to preserve durable edits.
