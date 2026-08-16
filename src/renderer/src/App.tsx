@@ -66,12 +66,18 @@ export default function App() {
 
   const loadSession = useCallback(
     async (result: ProjectOpenResult) => {
+      const descriptorsBySourceId = new Map(
+        result.sources.map((descriptor) => [descriptor.audioSourceId, descriptor]),
+      )
+      const rendererSources = result.project.audioSources.map((source) => {
+        const cache = descriptorsBySourceId.get(source.id)
+        if (!cache) throw new Error(`Missing cache descriptor for audio source ${source.id}`)
+        return { id: source.id, displayName: source.displayName, metadata: source.metadata, cache }
+      })
       destroyPlayer()
       usePlaybackStore.getState().reset()
       skipNextTimelineDirty.current = true
-      useTimelineStore
-        .getState()
-        .loadFromProject(result.project.audioSources, result.project.tracks)
+      useTimelineStore.getState().loadFromProject(rendererSources, result.project.tracks)
       useTranscriptStore.getState().reset()
       useTranscriptStore.getState().setWords(result.project.transcript?.words ?? [])
       for (const track of result.project.tracks) {
@@ -161,7 +167,6 @@ export default function App() {
     const currentWords = useTranscriptStore.getState().words
     return {
       ...current,
-      audioSources: useTimelineStore.getState().audioSources,
       tracks: useTimelineStore.getState().tracks,
       transcript:
         currentWords.length > 0 || current.transcript

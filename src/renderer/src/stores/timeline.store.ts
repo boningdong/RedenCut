@@ -28,7 +28,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand'
-import type { AudioSource, AudioSourceId, Clip, Track } from '@shared/project.types'
+import type { AudioSourceId, Clip, Track } from '@shared/project.types'
+import type { RendererAudioSource } from '@shared/session.types'
 import { useTranscriptStore } from './transcript.store'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ interface HistoryEntry {
 // ── Store shape ────────────────────────────────────────────────────────────────
 
 interface TimelineState {
-  audioSources: AudioSource[]
+  audioSources: RendererAudioSource[]
   tracks: Track[]
   undoStack: HistoryEntry[]
   /**
@@ -80,16 +81,16 @@ interface TimelineState {
    * track with one clip spanning the full duration.
    * Called when the user opens a new audio file.
    */
-  initFromAudioSource(audioSource: AudioSource): void
+  initFromAudioSource(audioSource: RendererAudioSource): void
 
   /**
    * Restore full state from a saved project.
    * Does NOT push to undo stack — loading is not an undoable action.
    */
-  loadFromProject(audioSources: AudioSource[], tracks: Track[]): void
+  loadFromProject(audioSources: RendererAudioSource[], tracks: Track[]): void
 
   /** Register a managed source by stable identity. Not undoable. */
-  addAudioSource(audioSource: AudioSource): AudioSourceId
+  addAudioSource(audioSource: RendererAudioSource): AudioSourceId
 
   // ── Track operations ───────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ interface TimelineState {
 const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
 
 const initialState = {
-  audioSources: [] as AudioSource[],
+  audioSources: [] as RendererAudioSource[],
   tracks: [] as Track[],
   undoStack: [] as HistoryEntry[],
   redoStack: [] as HistoryEntry[],
@@ -209,12 +210,26 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       effects: [],
     }
 
-    set({ audioSources: [audioSource], tracks: [track], undoStack: [], selectedClipId: null })
+    set({
+      audioSources: [audioSource],
+      tracks: [track],
+      undoStack: [],
+      redoStack: [],
+      selectedTrackId: null,
+      selectedClipId: null,
+    })
   },
 
   // ── loadFromProject ─────────────────────────────────────────────────────────
   loadFromProject(audioSources, tracks) {
-    set({ audioSources, tracks, undoStack: [], selectedClipId: null })
+    set({
+      audioSources,
+      tracks,
+      undoStack: [],
+      redoStack: [],
+      selectedTrackId: null,
+      selectedClipId: null,
+    })
   },
 
   // ── addAudioSource ─────────────────────────────────────────────────────────

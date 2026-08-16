@@ -3,7 +3,7 @@
 import React from 'react'
 import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AudioSourceSchema } from '@shared/project.types'
+import type { RendererAudioSource } from '@shared/session.types'
 import { useTimelineStore } from '../../stores/timeline.store'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { WaveformView } from './WaveformView'
@@ -16,11 +16,9 @@ vi.mock('./CanvasWaveform', () => ({
   },
 }))
 
-const source = AudioSourceSchema.parse({
-  id: '00000000-0000-4000-8000-000000000001',
+const source: RendererAudioSource = {
+  id: '00000000-0000-4000-8000-000000000001' as RendererAudioSource['id'],
   displayName: 'shared.mp3',
-  location: { mode: 'copy', path: 'media/shared.mp3' },
-  fingerprint: { byteLength: 1, modifiedTimeMs: 1, sha256: 'a'.repeat(64) },
   metadata: {
     durationSeconds: 10,
     sampleRate: 48_000,
@@ -28,7 +26,14 @@ const source = AudioSourceSchema.parse({
     codec: 'mp3',
     bitrateKbps: 192,
   },
-})
+  cache: {
+    audioSourceId: '00000000-0000-4000-8000-000000000001' as RendererAudioSource['id'],
+    sampleRate: 48_000,
+    channels: 2,
+    frameCount: 480_000,
+    waveformLevels: [],
+  },
+}
 
 describe('WaveformView managed providers', () => {
   beforeEach(() => {

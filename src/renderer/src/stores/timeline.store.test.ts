@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useTimelineStore } from './timeline.store'
 import { useTranscriptStore } from './transcript.store'
-import { AudioSourceSchema, type AudioSource } from '@shared/project.types'
+import type { RendererAudioSource } from '@shared/session.types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -27,16 +27,12 @@ function resetAll() {
 /** Shorthand to read the current timeline state. */
 const tl = () => useTimelineStore.getState()
 
-function managedSource(
-  seed: number,
-  duration: number,
-  path = `/audio/source-${seed}.mp3`,
-): AudioSource {
-  return AudioSourceSchema.parse({
-    id: `00000000-0000-4000-8000-${String(seed).padStart(12, '0')}`,
+function managedSource(seed: number, duration: number): RendererAudioSource {
+  const id =
+    `00000000-0000-4000-8000-${String(seed).padStart(12, '0')}` as RendererAudioSource['id']
+  return {
+    id,
     displayName: `Source ${seed}`,
-    location: { mode: 'reference', path },
-    fingerprint: { byteLength: 1, modifiedTimeMs: 1, sha256: 'a'.repeat(64) },
     metadata: {
       durationSeconds: duration,
       sampleRate: 44_100,
@@ -44,7 +40,14 @@ function managedSource(
       codec: 'mp3',
       bitrateKbps: 192,
     },
-  })
+    cache: {
+      audioSourceId: id,
+      sampleRate: 48_000,
+      channels: 2,
+      frameCount: duration * 48_000,
+      waveformLevels: [],
+    },
+  }
 }
 
 /** Returns the clips of the first (primary) track, sorted by sourceStart. */
@@ -177,6 +180,23 @@ describe('initFromAudioSource', () => {
     tl().initFromAudioSource(managedSource(1, 60))
     expect(tl().selectedClipId).toBeNull()
   })
+
+  it('clears history and both selections when starting a new source session', () => {
+    const staleHistory = { before: [], wordIds: [], label: 'stale edit' }
+    useTimelineStore.setState({
+      undoStack: [staleHistory],
+      redoStack: [staleHistory],
+      selectedTrackId: 'stale-track',
+      selectedClipId: 'stale-clip',
+    })
+
+    tl().initFromAudioSource(managedSource(1, 60))
+
+    expect(tl().undoStack).toEqual([])
+    expect(tl().redoStack).toEqual([])
+    expect(tl().selectedTrackId).toBeNull()
+    expect(tl().selectedClipId).toBeNull()
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -265,11 +285,9 @@ function primaryTrackId() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('muteRange', () => {
-  const SF_ID = '/audio/test.mp3'
-
   beforeEach(() => {
     resetAll()
-    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
+    tl().initFromAudioSource(managedSource(1, 100))
   })
 
   it('creates a muted clip in the middle of an unmuted clip', () => {
@@ -356,11 +374,9 @@ describe('muteRange', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('unmuteClip', () => {
-  const SF_ID = '/audio/test.mp3'
-
   beforeEach(() => {
     resetAll()
-    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
+    tl().initFromAudioSource(managedSource(1, 100))
   })
 
   it('unmutes a muted clip by ID', () => {
@@ -413,11 +429,9 @@ describe('unmuteClip', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('undo', () => {
-  const SF_ID = '/audio/test.mp3'
-
   beforeEach(() => {
     resetAll()
-    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
+    tl().initFromAudioSource(managedSource(1, 100))
   })
 
   it('reverts a split operation', () => {
@@ -488,11 +502,9 @@ describe('undo', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('redo', () => {
-  const SF_ID = '/audio/test.mp3'
-
   beforeEach(() => {
     resetAll()
-    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
+    tl().initFromAudioSource(managedSource(1, 100))
   })
 
   it('re-applies a split that was undone', () => {
@@ -594,7 +606,7 @@ describe('loadFromProject', () => {
   beforeEach(resetAll)
 
   it('restores tracks and source files without affecting undo stack', () => {
-    const audioSources = [managedSource(1, 60, '/a.mp3')]
+    const audioSources = [managedSource(1, 60)]
     const tracks = [
       {
         id: 't1',
@@ -624,6 +636,23 @@ describe('loadFromProject', () => {
     expect(tl().tracks).toEqual(tracks)
     expect(tl().undoStack).toHaveLength(0)
   })
+
+  it('clears history and both selections when loading another project', () => {
+    const staleHistory = { before: [], wordIds: [], label: 'stale edit' }
+    useTimelineStore.setState({
+      undoStack: [staleHistory],
+      redoStack: [staleHistory],
+      selectedTrackId: 'stale-track',
+      selectedClipId: 'stale-clip',
+    })
+
+    tl().loadFromProject([managedSource(1, 60)], [])
+
+    expect(tl().undoStack).toEqual([])
+    expect(tl().redoStack).toEqual([])
+    expect(tl().selectedTrackId).toBeNull()
+    expect(tl().selectedClipId).toBeNull()
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -631,11 +660,9 @@ describe('loadFromProject', () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('getAllClips', () => {
-  const SF_ID = '/audio/test.mp3'
-
   beforeEach(() => {
     resetAll()
-    tl().initFromAudioSource(managedSource(1, 100, SF_ID))
+    tl().initFromAudioSource(managedSource(1, 100))
   })
 
   it('returns clips sorted by outputStart', () => {
@@ -651,7 +678,7 @@ describe('getAllClips', () => {
   })
 
   it('includes clips from all tracks', () => {
-    const secondSource = managedSource(2, 60, '/audio/bg.mp3')
+    const secondSource = managedSource(2, 60)
     const { audioSources, tracks } = tl()
     // Manually add a second source + track for this test
     tl().loadFromProject(
