@@ -239,6 +239,8 @@ export interface ProjectMutationRequest extends SessionPrecondition {
 
 ### Task 15: Serialized workspace authority and revisions
 
+**Execution note:** Tasks 15 and 16 are one compile-atomic integration unit because the controller's `RendererSession` and `ProjectMutationRequest` signatures cannot typecheck until their direct IPC, preload, and renderer consumers migrate. Implement and review both tasks together without a temporary `ProjectFile` overload or compatibility shim.
+
 **Files:** Create `src/main/project/AsyncMutex.ts`, `src/main/project/AsyncMutex.test.ts`; modify `src/main/project/WorkspaceController.ts`, `src/main/project/WorkspaceController.test.ts`, `src/main/project/ProjectWorkspace.ts`, and `src/main/project/ProjectWorkspace.test.ts`.
 
 **Interfaces:** `WorkspaceController` owns one `AsyncMutex`, one active `ProjectWorkspace`, one opaque token, and a controller-wide monotonic revision. Produce:
