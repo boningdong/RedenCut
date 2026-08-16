@@ -21,6 +21,7 @@ import { useTranscriptStore } from './stores/transcript.store'
 import { mergeTrackWords } from './utils/transcript'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { createSessionLoadCoordinator, type SessionLoadCoordinator } from './sessionLoadCoordinator'
+import { reconcileImportedSession } from './importSessionReconciler'
 
 interface ImportState {
   id: string
@@ -37,6 +38,33 @@ interface PreparedRendererSession {
   waveforms: ReadonlyMap<AudioSourceId, WaveformDataProvider>
 }
 
+interface RendererSessionLoad {
+  session: RendererSession
+  importLedger?: {
+    submittedDraft: ProjectDraft
+    submittedLocalEditRevision: number
+  }
+}
+
+function snapshotDraft(): ProjectDraft | null {
+  const current = useEditorStore.getState().session
+  if (!current) return null
+  const currentWords = useTranscriptStore.getState().words
+  return {
+    tracks: useTimelineStore.getState().tracks,
+    transcript:
+      currentWords.length > 0 || current.draft.transcript
+        ? {
+            engine: current.draft.transcript?.engine ?? 'whisper',
+            model: current.draft.transcript?.model,
+            speakers: current.draft.transcript?.speakers ?? {},
+            words: currentWords,
+          }
+        : undefined,
+    export: current.draft.export,
+  }
+}
+
 export default function App() {
   const [waveforms, setWaveforms] = useState<ReadonlyMap<AudioSourceId, WaveformDataProvider>>(
     new Map(),
@@ -50,7 +78,7 @@ export default function App() {
   const initialized = useRef(false)
   const skipNextTimelineDirty = useRef(false)
   const transcriptJobId = useRef<string | null>(null)
-  const loadCoordinator = useRef<SessionLoadCoordinator<RendererSession> | null>(null)
+  const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
 
   const session = useEditorStore((state) => state.session)
   const isDirty = useEditorStore((state) => state.isDirty)
@@ -70,7 +98,7 @@ export default function App() {
 
   if (!loadCoordinator.current) {
     loadCoordinator.current = createSessionLoadCoordinator(
-      async (result: RendererSession): Promise<PreparedRendererSession> => {
+      async ({ session: result }: RendererSessionLoad): Promise<PreparedRendererSession> => {
         const player = new WorkletAudioPlayer()
         try {
           const waveformProviders = new Map<AudioSourceId, WaveformDataProvider>()
@@ -98,7 +126,22 @@ export default function App() {
           throw error
         }
       },
-      (result, prepared) => {
+      (request, prepared) => {
+        let result = request.session
+        let preserveDirty = false
+        const latestDraft = request.importLedger ? snapshotDraft() : null
+        if (request.importLedger && latestDraft) {
+          const reconciled = reconcileImportedSession(
+            result,
+            request.importLedger.submittedDraft,
+            latestDraft,
+            request.importLedger.submittedLocalEditRevision,
+            useEditorStore.getState().localEditRevision,
+          )
+          result = reconciled.session
+          preserveDirty = reconciled.preserveDirty
+          prepared.player.setTracks(result.draft.tracks)
+        }
         destroyPlayer()
         usePlaybackStore.getState().reset()
         skipNextTimelineDirty.current = true
@@ -113,7 +156,7 @@ export default function App() {
         usePlaybackStore.getState().setDuration(prepared.player.getDuration())
         playerRef.current = prepared.player
         setAudioPlayerInstance(prepared.player)
-        loadEditorSession(result)
+        loadEditorSession(result, preserveDirty)
         setWaveforms(prepared.waveforms)
         setError(null)
       },
@@ -125,7 +168,8 @@ export default function App() {
   }
 
   const loadSession = useCallback(
-    (result: RendererSession) => loadCoordinator.current!.load(result),
+    (result: RendererSession, importLedger?: RendererSessionLoad['importLedger']) =>
+      loadCoordinator.current!.load({ session: result, importLedger }),
     [],
   )
 
@@ -186,24 +230,7 @@ export default function App() {
     }
   }, [markEdited, tracks])
 
-  const snapshot = useCallback((): ProjectDraft | null => {
-    const current = useEditorStore.getState().session
-    if (!current) return null
-    const currentWords = useTranscriptStore.getState().words
-    return {
-      tracks: useTimelineStore.getState().tracks,
-      transcript:
-        currentWords.length > 0 || current.draft.transcript
-          ? {
-              engine: current.draft.transcript?.engine ?? 'whisper',
-              model: current.draft.transcript?.model,
-              speakers: current.draft.transcript?.speakers ?? {},
-              words: currentWords,
-            }
-          : undefined,
-      export: current.draft.export,
-    }
-  }, [])
+  const snapshot = useCallback(snapshotDraft, [])
 
   const save = useCallback(
     async (saveAs = false) => {
@@ -239,16 +266,25 @@ export default function App() {
 
   const importAudio = useCallback(
     async (mode: ImportMode) => {
-      const current = snapshot()
-      const currentSession = useEditorStore.getState().session
-      if (!current || !currentSession || importState) return
-      const selection = await window.electronAPI.audio.selectImportFile()
+      const selectionSession = useEditorStore.getState().session
+      if (!selectionSession || importState) return
+      const selection = await window.electronAPI.audio.selectImportFile(selectionSession)
       if (!selection) return
+      const submittedDraft = snapshot()
+      const submittedSession = useEditorStore.getState().session
+      if (
+        !submittedDraft ||
+        !submittedSession ||
+        submittedSession.workspaceToken !== selectionSession.workspaceToken ||
+        submittedSession.revision !== selectionSession.revision
+      )
+        return
+      const submittedLocalEditRevision = useEditorStore.getState().localEditRevision
       const id = crypto.randomUUID()
       setImportState({
         id,
-        workspaceToken: currentSession.workspaceToken,
-        revision: currentSession.revision,
+        workspaceToken: submittedSession.workspaceToken,
+        revision: submittedSession.revision,
         displayName: selection.displayName,
         stage: 'selected',
         percent: 0,
@@ -256,19 +292,26 @@ export default function App() {
       setError(null)
       try {
         const imported = await window.electronAPI.audio.startImport({
-          workspaceToken: currentSession.workspaceToken,
-          revision: currentSession.revision,
+          workspaceToken: submittedSession.workspaceToken,
+          revision: submittedSession.revision,
           jobId: id,
           selectionToken: selection.token,
           mode,
-          draft: current,
+          draft: submittedDraft,
         })
+        const latestSession = useEditorStore.getState().session
         if (
           imported.jobId === id &&
-          imported.workspaceToken === currentSession.workspaceToken &&
-          imported.revision === currentSession.revision
-        )
-          await loadSession(imported.value)
+          imported.workspaceToken === submittedSession.workspaceToken &&
+          imported.revision === submittedSession.revision &&
+          latestSession?.workspaceToken === imported.workspaceToken &&
+          latestSession.revision === imported.revision
+        ) {
+          await loadSession(imported.value, {
+            submittedDraft,
+            submittedLocalEditRevision,
+          })
+        }
       } catch (reason) {
         setError((reason as Error).message)
       } finally {

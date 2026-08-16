@@ -3,7 +3,13 @@ import { once } from 'events'
 import { createReadStream, createWriteStream } from 'fs'
 import { mkdir, rename, rm, stat, statfs } from 'fs/promises'
 import { basename, extname, join } from 'path'
-import type { ImportMode, ImportProgress, ImportResult } from '../../../shared/import.types'
+import type {
+  ImportCancellationResult,
+  ImportJobState,
+  ImportMode,
+  ImportProgress,
+  ImportResult,
+} from '../../../shared/import.types'
 import {
   AudioSourceIdSchema,
   AudioMetadataSchema,
@@ -21,7 +27,11 @@ import { FfmpegAudioSourceCacheBuilder } from './FfmpegAudioSourceCacheBuilder'
 const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
 
 export class ImportCoordinator {
-  private active: { id: string; controller: AbortController } | null = null
+  private active: {
+    id: string
+    controller: AbortController
+    state: ImportJobState
+  } | null = null
 
   constructor(
     private readonly workspace: ProjectWorkspace,
@@ -41,27 +51,46 @@ export class ImportCoordinator {
     },
   ) {}
 
-  cancel(importId: string): void {
-    if (this.active?.id === importId) this.active.controller.abort()
+  cancel(importId: string): ImportCancellationResult {
+    const active = this.active
+    if (!active || active.id !== importId) return 'not-found'
+    if (active.state === 'committing' || active.state === 'committed') return 'commit-won'
+    if (active.state === 'cancelled') return 'cancelled'
+    if (active.state !== 'preparing') return 'not-found'
+    active.state = 'cancelled'
+    active.controller.abort()
+    return 'cancelled'
   }
 
-  async import(
+  async import<CommitValue>(
     importId: string,
     sourcePath: string,
     mode: ImportMode,
     projectInput: ProjectFile,
+    runCommitBoundary: (
+      operation: (
+        commitProject: (project: ProjectFile) => Promise<CommitValue>,
+      ) => Promise<CommitValue>,
+    ) => Promise<CommitValue>,
     onProgress?: (progress: ImportProgress) => void,
-  ): Promise<ImportResult> {
+  ): Promise<ImportResult<CommitValue>> {
     if (!AudioSourceIdSchema.safeParse(importId).success) throw new Error('Invalid import ID')
     if (this.active) throw new Error('Another audio import is already active')
     const controller = new AbortController()
-    this.active = { id: importId, controller }
+    const active = { id: importId, controller, state: 'preparing' as ImportJobState }
+    this.active = active
     const displayName = basename(sourcePath)
-    const progress = (stage: ImportProgress['stage'], percent: number) =>
-      onProgress?.({ importId, displayName, stage, percent })
+    const progress = (stage: ImportProgress['stage'], percent: number) => {
+      try {
+        onProgress?.({ importId, displayName, stage, percent })
+      } catch {
+        // Progress is advisory and cannot reverse a committed import.
+      }
+    }
     const id = AudioSourceIdSchema.parse(this.dependencies.createId())
     const stageRoot = join(this.workspace.root, '.staging', randomUUID())
     const finalMediaRoot = join(this.workspace.root, 'media', id)
+    const finalCacheRoot = join(this.workspace.root, 'cache', id)
     let publishedMedia = false
     let publishedCache = false
 
@@ -112,7 +141,7 @@ export class ImportCoordinator {
       progress('building-cache', 0)
       const manifest = await this.dependencies.builder.build(
         {
-          projectRoot: this.workspace.root,
+          projectRoot: stageRoot,
           stagingRoot: join(stageRoot, 'cache-stage'),
           sourcePath: durablePath,
           audioSourceId: id,
@@ -123,33 +152,42 @@ export class ImportCoordinator {
         controller.signal,
         (value) => progress('building-cache', value),
       )
-      publishedCache = true
       this.throwIfAborted(controller.signal)
-      progress('publishing', 0.99)
-      if (mode === 'copy') {
-        await mkdir(join(this.workspace.root, 'media'), { recursive: true })
-        await rename(join(stageRoot, 'media', id), finalMediaRoot)
-        publishedMedia = true
-        durablePath = join(finalMediaRoot, safeMediaName(displayName))
-        source.fingerprint.modifiedTimeMs = (await stat(durablePath)).mtimeMs
-      }
-
-      this.throwIfAborted(controller.signal)
-      const updated = appendImportedSource(project, source)
-      await this.workspace.save(updated)
-      if (controller.signal.aborted) {
-        await this.workspace.save(project)
+      let committedProject: ProjectFile | null = null
+      const value = await runCommitBoundary(async (commitProject) => {
         this.throwIfAborted(controller.signal)
-      }
+        active.state = 'committing'
+        progress('publishing', 0.99)
+        await mkdir(join(this.workspace.root, 'cache'), { recursive: true })
+        await rename(join(stageRoot, 'cache', id), finalCacheRoot)
+        publishedCache = true
+        if (mode === 'copy') {
+          await mkdir(join(this.workspace.root, 'media'), { recursive: true })
+          await rename(join(stageRoot, 'media', id), finalMediaRoot)
+          publishedMedia = true
+          durablePath = join(finalMediaRoot, safeMediaName(displayName))
+          source.fingerprint.modifiedTimeMs = (await stat(durablePath)).mtimeMs
+        }
+        committedProject = appendImportedSource(project, source)
+        const committedValue = await commitProject(committedProject)
+        active.state = 'committed'
+        return committedValue
+      })
       const cache = new AudioSourceCacheStore(this.workspace.root).descriptor(manifest)
       progress('ready', 1)
-      return { project: updated, source, cache }
+      if (!committedProject) throw new Error('Import commit boundary did not publish a project')
+      return { project: committedProject, source, cache, value }
     } catch (error) {
-      if (publishedMedia) await rm(finalMediaRoot, { recursive: true, force: true }).catch(() => {})
-      if (publishedCache)
-        await rm(join(this.workspace.root, 'cache', id), { recursive: true, force: true }).catch(
-          () => {},
-        )
+      if (active.state !== 'committed') {
+        active.state =
+          controller.signal.aborted && error instanceof DOMException && error.name === 'AbortError'
+            ? 'cancelled'
+            : 'failed'
+        if (publishedMedia)
+          await rm(finalMediaRoot, { recursive: true, force: true }).catch(() => {})
+        if (publishedCache)
+          await rm(finalCacheRoot, { recursive: true, force: true }).catch(() => {})
+      }
       throw error
     } finally {
       await rm(stageRoot, { recursive: true, force: true }).catch(() => {})

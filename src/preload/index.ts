@@ -12,6 +12,7 @@ import type {
   TranscriptionJobRequest,
 } from '../shared/ipc.types'
 import type { ImportSelection } from '../shared/import.types'
+import type { ImportCancellationResult } from '../shared/import.types'
 import type { Transcript } from '../shared/project.types'
 import type {
   ProjectMutationRequest,
@@ -24,11 +25,12 @@ const invoke = (channel: string, ...args: unknown[]) => ipcRenderer.invoke(chann
 
 const api = {
   audio: {
-    selectImportFile: () => invokeSafe<ImportSelection | null>(invoke, 'audio:select-import-file'),
+    selectImportFile: (expected: SessionPrecondition) =>
+      invokeSafe<ImportSelection | null>(invoke, 'audio:select-import-file', expected),
     startImport: (request: ImportJobRequest) =>
       invokeSafe<SessionJobResult<RendererSession>>(invoke, 'audio:start-import', request),
     cancelImport: (request: CancelSessionJobRequest) =>
-      invokeSafe<void>(invoke, 'audio:cancel-import', request),
+      invokeSafe<ImportCancellationResult>(invoke, 'audio:cancel-import', request),
   },
   project: {
     initialize: () => invokeSafe<RendererSession>(invoke, 'project:initialize'),

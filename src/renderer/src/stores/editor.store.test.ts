@@ -56,4 +56,18 @@ describe('editor session state', () => {
     expect(useEditorStore.getState().isDirty).toBe(true)
     expect(useEditorStore.getState().localEditRevision).toBe(captured + 1)
   })
+
+  it('can install an imported session without clearing dirty raced edits', () => {
+    useEditorStore.getState().loadSession(session(1))
+    useEditorStore.getState().markEdited()
+    const localEditRevision = useEditorStore.getState().localEditRevision
+
+    useEditorStore.getState().loadSession(session(2), true)
+
+    expect(useEditorStore.getState()).toMatchObject({
+      session: session(2),
+      isDirty: true,
+      localEditRevision,
+    })
+  })
 })

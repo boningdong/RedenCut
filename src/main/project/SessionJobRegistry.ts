@@ -85,6 +85,7 @@ export class SessionJobRegistry {
       const errors = results
         .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
         .map((result) => result.reason)
+        .filter((reason) => !isAbortError(reason))
       if (errors.length) throw new AggregateError(errors, 'Session job cancellation failed')
     })
     return job.completion
@@ -105,4 +106,8 @@ export class SessionJobRegistry {
 
 function jobKey(identity: SessionJobIdentity): string {
   return JSON.stringify([identity.kind, identity.jobId, identity.senderId, identity.workspaceToken])
+}
+
+function isAbortError(reason: unknown): boolean {
+  return reason instanceof DOMException && reason.name === 'AbortError'
 }

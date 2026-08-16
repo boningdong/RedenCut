@@ -78,6 +78,23 @@ describe('SessionJobRegistry', () => {
     await expect(Promise.all([first, second])).resolves.toEqual([true, true])
   })
 
+  it('treats an AbortError settlement as successful cancellation', async () => {
+    const registry = new SessionJobRegistry()
+    const settled = deferred()
+    const identity = {
+      kind: 'import' as const,
+      jobId: 'job-1',
+      senderId: 1,
+      workspaceToken: TOKEN_A,
+    }
+    registry.register(identity, () => ({ cancel: vi.fn(), settled: settled.promise }))
+
+    const cancellation = registry.cancelAndSettleJob(identity)
+    settled.reject(new DOMException('cancelled', 'AbortError'))
+
+    await expect(cancellation).resolves.toBe(true)
+  })
+
   it('awaits every matched job before aggregating settlement failures', async () => {
     const registry = new SessionJobRegistry()
     const first = deferred()

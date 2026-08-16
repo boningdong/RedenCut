@@ -12,7 +12,7 @@ interface EditorState {
   localEditRevision: number
   selection: TimeRange | null
   previewMode: boolean
-  loadSession: (session: RendererSession) => void
+  loadSession: (session: RendererSession, preserveDirty?: boolean) => void
   markEdited: () => void
   acknowledgeSave: (session: RendererSession, capturedLocalEditRevision: number) => boolean
   setSelection: (selection: TimeRange | null) => void
@@ -31,10 +31,10 @@ const initialState = {
 export const useEditorStore = create<EditorState>()((set, get) => ({
   ...initialState,
 
-  loadSession: (session) =>
+  loadSession: (session, preserveDirty = false) =>
     set((state) => ({
       session,
-      isDirty: false,
+      isDirty: preserveDirty ? state.isDirty : false,
       localEditRevision: state.localEditRevision,
     })),
 

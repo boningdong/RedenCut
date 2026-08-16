@@ -1,4 +1,9 @@
-import type { ImportMode, ImportProgress, ImportSelection } from './import.types'
+import type {
+  ImportCancellationResult,
+  ImportMode,
+  ImportProgress,
+  ImportSelection,
+} from './import.types'
 import type { AudioSourceId, Transcript } from './project.types'
 import type {
   ProjectDraft,
@@ -60,9 +65,9 @@ export interface RenderProgressEvent extends SessionJobRequest, RenderProgress {
 
 export interface IElectronAPI {
   audio: {
-    selectImportFile(): Promise<ImportSelection | null>
+    selectImportFile(expected: SessionPrecondition): Promise<ImportSelection | null>
     startImport(request: ImportJobRequest): Promise<SessionJobResult<RendererSession>>
-    cancelImport(request: CancelSessionJobRequest): Promise<void>
+    cancelImport(request: CancelSessionJobRequest): Promise<ImportCancellationResult>
   }
   project: {
     initialize(): Promise<RendererSession>

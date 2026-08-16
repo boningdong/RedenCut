@@ -1,8 +1,10 @@
 import { spawn } from 'child_process'
 import { once } from 'events'
+import type { EventEmitter } from 'events'
 import { createWriteStream } from 'fs'
 import { mkdir, rename, rm, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
+import type { Readable } from 'stream'
 import type {
   AudioSourceId,
   AudioMetadata,
@@ -17,6 +19,23 @@ import {
 } from '../cache/cacheManifest'
 import { PcmWaveformAccumulator } from './PcmWaveformAccumulator'
 
+const MAX_DIAGNOSTIC_BYTES = 4096
+
+interface FfmpegChild extends EventEmitter {
+  stdout: Readable
+  stderr: Readable
+  kill(signal?: NodeJS.Signals | number): boolean
+}
+
+interface CacheBuilderDependencies {
+  spawn: (
+    command: string,
+    arguments_: string[],
+    options: { stdio: ['ignore', 'pipe', 'pipe'] },
+  ) => FfmpegChild
+  createWriteStream: typeof createWriteStream
+}
+
 export interface CacheBuildRequest {
   projectRoot: string
   stagingRoot: string
@@ -28,6 +47,13 @@ export interface CacheBuildRequest {
 }
 
 export class FfmpegAudioSourceCacheBuilder {
+  constructor(
+    private readonly dependencies: CacheBuilderDependencies = {
+      spawn: (command, arguments_, options) => spawn(command, arguments_, options) as FfmpegChild,
+      createWriteStream,
+    },
+  ) {}
+
   async build(
     request: CacheBuildRequest,
     signal: AbortSignal,
@@ -39,11 +65,11 @@ export class FfmpegAudioSourceCacheBuilder {
     await mkdir(waveformRoot, { recursive: true })
 
     const pcmPath = join(stageRoot, 'audio.f32le')
-    const pcm = createWriteStream(pcmPath)
+    const pcm = this.dependencies.createWriteStream(pcmPath)
     const waveformWriters = new Map(
       WAVEFORM_LEVELS.map((level) => [
         level,
-        createWriteStream(join(waveformRoot, `level-${level}.minmax-f32le`)),
+        this.dependencies.createWriteStream(join(waveformRoot, `level-${level}.minmax-f32le`)),
       ]),
     )
     const bucketCounts = new Map(WAVEFORM_LEVELS.map((level) => [level, 0]))
@@ -61,7 +87,7 @@ export class FfmpegAudioSourceCacheBuilder {
       },
     )
 
-    const child = spawn(
+    const child = this.dependencies.spawn(
       getFfmpegPath(),
       [
         '-v',
@@ -80,9 +106,24 @@ export class FfmpegAudioSourceCacheBuilder {
       ],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     )
-    let stderr = ''
-    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
-    const abort = () => child.kill('SIGKILL')
+    let diagnosticTail: Buffer<ArrayBufferLike> = Buffer.alloc(0)
+    child.stderr.on('data', (chunk: Buffer | string) => {
+      diagnosticTail = appendDiagnosticTail(diagnosticTail, chunk)
+    })
+    let childClosed = false
+    const childClose = new Promise<[number | null, NodeJS.Signals | null]>((resolve) => {
+      child.once('close', (code: number | null, childSignal: NodeJS.Signals | null) => {
+        childClosed = true
+        resolve([code, childSignal])
+      })
+    })
+    let killed = false
+    const killOnce = () => {
+      if (killed || childClosed) return
+      killed = true
+      child.kill('SIGKILL')
+    }
+    const abort = () => killOnce()
     signal.addEventListener('abort', abort, { once: true })
     const heartbeat = setInterval(() => {
       const expected = request.metadata.durationSeconds * request.processingSampleRate
@@ -100,9 +141,10 @@ export class FfmpegAudioSourceCacheBuilder {
           drains.clear()
         }
       }
-      const [code] = (await once(child, 'close')) as [number]
+      const [code] = await childClose
       if (signal.aborted) throw new DOMException('Cache build aborted', 'AbortError')
-      if (code !== 0) throw new Error(`FFmpeg cache decode failed: ${stderr.trim()}`)
+      if (code !== 0)
+        throw new Error(`FFmpeg cache decode failed: ${diagnosticTail.toString().trim()}`)
       accumulator.finish()
       pcm.end()
       for (const writer of waveformWriters.values()) writer.end()
@@ -142,10 +184,19 @@ export class FfmpegAudioSourceCacheBuilder {
       onProgress?.(1)
       return manifest
     } catch (error) {
-      pcm.destroy()
-      for (const writer of waveformWriters.values()) writer.destroy()
-      await rm(request.stagingRoot, { recursive: true, force: true }).catch(() => {})
-      if ((error as NodeJS.ErrnoException).code === 'ENOSPC' || stderr.includes('No space left')) {
+      killOnce()
+      await childClose
+      await Promise.all([
+        destroyAndClose(child.stdout),
+        destroyAndClose(child.stderr),
+        destroyAndClose(pcm),
+        ...[...waveformWriters.values()].map(destroyAndClose),
+      ])
+      const diagnostic = diagnosticTail.toString()
+      if (
+        (error as NodeJS.ErrnoException).code === 'ENOSPC' ||
+        diagnostic.includes('No space left')
+      ) {
         throw new Error(`Not enough disk space while caching ${basename(request.sourcePath)}`, {
           cause: error,
         })
@@ -157,4 +208,28 @@ export class FfmpegAudioSourceCacheBuilder {
       await rm(request.stagingRoot, { recursive: true, force: true }).catch(() => {})
     }
   }
+}
+
+function appendDiagnosticTail(
+  current: Buffer<ArrayBufferLike>,
+  chunk: Buffer | string,
+): Buffer<ArrayBufferLike> {
+  const incoming = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+  if (incoming.byteLength >= MAX_DIAGNOSTIC_BYTES)
+    return incoming.subarray(incoming.byteLength - MAX_DIAGNOSTIC_BYTES)
+  const excess = current.byteLength + incoming.byteLength - MAX_DIAGNOSTIC_BYTES
+  return Buffer.concat([excess > 0 ? current.subarray(excess) : current, incoming])
+}
+
+async function destroyAndClose(
+  stream: NodeJS.ReadableStream | NodeJS.WritableStream,
+): Promise<void> {
+  const target = stream as unknown as EventEmitter & {
+    closed?: boolean
+    destroyed?: boolean
+    destroy: (error?: Error) => void
+  }
+  if (!target.destroyed) target.destroy()
+  if (target.closed) return
+  await once(target, 'close').catch(() => {})
 }

@@ -1,0 +1,103 @@
+import { describe, expect, it } from 'vitest'
+import type { AudioSourceId, Track, Transcript } from '@shared/project.types'
+import type {
+  ProjectDraft,
+  RendererAudioSource,
+  RendererSession,
+  WorkspaceToken,
+} from '@shared/session.types'
+import { reconcileImportedSession } from './importSessionReconciler'
+
+const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
+
+function track(id: string, name: string): Track {
+  return {
+    id,
+    name,
+    clips: [],
+    volume: 1,
+    muted: false,
+    solo: false,
+    color: '#6366f1',
+    effects: [],
+  }
+}
+
+function draft(tracks: Track[], transcript?: Transcript): ProjectDraft {
+  return {
+    tracks,
+    transcript,
+    export: { format: 'wav', targetLUFS: -14, truePeakDbTP: -2, sampleRate: 48_000 },
+  }
+}
+
+function importedSession(importedTrack: Track): RendererSession {
+  const source: RendererAudioSource = {
+    id: SOURCE_ID,
+    displayName: 'episode.wav',
+    metadata: {
+      durationSeconds: 1,
+      sampleRate: 48_000,
+      channels: 1,
+      codec: 'pcm_s16le',
+      bitrateKbps: 768,
+    },
+    cache: {
+      audioSourceId: SOURCE_ID,
+      sampleRate: 48_000,
+      channels: 1,
+      frameCount: 48_000,
+      waveformLevels: [],
+    },
+  }
+  return {
+    workspaceToken: 'token-a' as WorkspaceToken,
+    revision: 2,
+    workspace: { kind: 'temporary', displayName: 'Untitled', portable: true },
+    sources: [source],
+    draft: draft([track('submitted', 'Submitted snapshot'), importedTrack]),
+  }
+}
+
+describe('import session reconciliation', () => {
+  it('accepts the authoritative returned session when no local edits raced', () => {
+    const submitted = draft([track('submitted', 'Submitted')])
+    const imported = importedSession(track('imported', 'Imported'))
+
+    expect(reconcileImportedSession(imported, submitted, submitted, 4, 4)).toEqual({
+      session: imported,
+      preserveDirty: false,
+    })
+  })
+
+  it('merges only new imported tracks into the latest draft and preserves raced edits', () => {
+    const submitted = draft([track('submitted', 'Before edit')])
+    const transcript: Transcript = {
+      engine: 'whisper',
+      speakers: {},
+      words: [
+        {
+          id: 'word-1',
+          trackId: 'submitted',
+          text: 'latest',
+          start: 0,
+          end: 0.5,
+          confidence: 1,
+          muted: false,
+        },
+      ],
+    }
+    const latest = draft([track('submitted', 'Edited while importing')], transcript)
+    latest.export.format = 'flac'
+    const importedTrack = track('imported', 'Imported')
+    const imported = importedSession(importedTrack)
+
+    const result = reconcileImportedSession(imported, submitted, latest, 4, 5)
+
+    expect(result.session.sources).toEqual(imported.sources)
+    expect(result.session.draft.tracks).toEqual([...latest.tracks, importedTrack])
+    expect(result.session.draft.transcript).toEqual(transcript)
+    expect(result.session.draft.export).toEqual(latest.export)
+    expect(result.preserveDirty).toBe(true)
+  })
+})

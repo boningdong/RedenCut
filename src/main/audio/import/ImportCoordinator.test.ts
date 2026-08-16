@@ -1,9 +1,10 @@
-import { mkdtemp, readFile, readdir, stat, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { ProjectWorkspace } from '../../project/ProjectWorkspace'
 import { AudioSourceCacheManifestSchema } from '../cache/cacheManifest'
+import type { ProjectFile } from '../../../shared/project.types'
 import type { CacheBuildRequest } from './FfmpegAudioSourceCacheBuilder'
 import { ImportCoordinator } from './ImportCoordinator'
 
@@ -60,11 +61,46 @@ async function setup(builder: {
   return { coordinator, workspace, sourcePath }
 }
 
+async function buildStagedCache(request: CacheBuildRequest) {
+  const result = manifest(request)
+  const root = join(request.projectRoot, 'cache', request.audioSourceId)
+  await mkdir(join(root, 'waveform'), { recursive: true })
+  await writeFile(join(root, 'audio.f32le'), new Uint8Array())
+  await writeFile(join(root, 'manifest.json'), JSON.stringify(result))
+  return result
+}
+
+function commitToWorkspace(workspace: ProjectWorkspace) {
+  return async <T>(
+    operation: (commit: (project: ProjectFile) => Promise<T>) => Promise<T>,
+  ): Promise<T> =>
+    operation(async (project) => {
+      await workspace.save(project)
+      return 'committed' as T
+    })
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 describe('ImportCoordinator transaction', () => {
   it('publishes copied media and project state only after cache completion', async () => {
-    const builder = { build: vi.fn(async (request: CacheBuildRequest) => manifest(request)) }
+    const builder = { build: vi.fn(buildStagedCache) }
     const { coordinator, workspace, sourcePath } = await setup(builder)
-    const result = await coordinator.import(IMPORT_ID, sourcePath, 'copy', workspace.project)
+    const result = await coordinator.import(
+      IMPORT_ID,
+      sourcePath,
+      'copy',
+      workspace.project,
+      commitToWorkspace(workspace),
+    )
     expect(result.source.location.mode).toBe('copy')
     expect(result.project.audioSources).toEqual([result.source])
     expect(result.project.tracks[0].clips[0].audioSourceId).toBe(result.source.id)
@@ -88,7 +124,13 @@ describe('ImportCoordinator transaction', () => {
       availableBytes: vi.fn(async () => 1),
     })
     await expect(
-      coordinator.import(IMPORT_ID, sourcePath, 'copy', workspace.project),
+      coordinator.import(
+        IMPORT_ID,
+        sourcePath,
+        'copy',
+        workspace.project,
+        commitToWorkspace(workspace),
+      ),
     ).rejects.toThrow('Not enough disk space')
     expect(build).not.toHaveBeenCalled()
     expect(workspace.project.audioSources).toEqual([])
@@ -113,7 +155,13 @@ describe('ImportCoordinator transaction', () => {
       }),
     }
     const { coordinator, workspace, sourcePath } = await setup(builder)
-    const first = coordinator.import(IMPORT_ID, sourcePath, 'reference', workspace.project)
+    const first = coordinator.import(
+      IMPORT_ID,
+      sourcePath,
+      'reference',
+      workspace.project,
+      commitToWorkspace(workspace),
+    )
     await didStart
     await expect(
       coordinator.import(
@@ -121,38 +169,61 @@ describe('ImportCoordinator transaction', () => {
         sourcePath,
         'copy',
         workspace.project,
+        commitToWorkspace(workspace),
       ),
     ).rejects.toThrow('already active')
-    coordinator.cancel(IMPORT_ID)
+    expect(coordinator.cancel(IMPORT_ID)).toBe('cancelled')
     await expect(first).rejects.toMatchObject({ name: 'AbortError' })
     expect(await readdir(join(workspace.root, '.staging'))).toEqual([])
   })
 
   it('rejects renderer-controlled import IDs that are not UUID path segments', async () => {
-    const builder = { build: vi.fn(async (request: CacheBuildRequest) => manifest(request)) }
+    const builder = { build: vi.fn(buildStagedCache) }
     const { coordinator, workspace, sourcePath } = await setup(builder)
     await expect(
-      coordinator.import('../outside', sourcePath, 'copy', workspace.project),
+      coordinator.import(
+        '../outside',
+        sourcePath,
+        'copy',
+        workspace.project,
+        commitToWorkspace(workspace),
+      ),
     ).rejects.toThrow('Invalid import ID')
     expect(builder.build).not.toHaveBeenCalled()
     await expect(stat(join(workspace.root, 'media'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('prevents publication when a cache build completes after cancellation', async () => {
-    let finishBuild!: (value: ReturnType<typeof manifest>) => void
+  it('keeps prepared artifacts unpublished until the commit boundary and cancels before entry', async () => {
+    const boundaryRequested = deferred()
+    const enterBoundary = deferred()
     const builder = {
-      build: vi.fn(
-        (request: CacheBuildRequest) =>
-          new Promise<ReturnType<typeof manifest>>((resolve) => {
-            finishBuild = () => resolve(manifest(request))
-          }),
-      ),
+      build: vi.fn(buildStagedCache),
     }
     const { coordinator, workspace, sourcePath } = await setup(builder)
-    const importing = coordinator.import(IMPORT_ID, sourcePath, 'copy', workspace.project)
-    await vi.waitFor(() => expect(builder.build).toHaveBeenCalled())
-    coordinator.cancel(IMPORT_ID)
-    finishBuild(manifest(builder.build.mock.calls[0][0]))
+    const importing = coordinator.import(
+      IMPORT_ID,
+      sourcePath,
+      'copy',
+      workspace.project,
+      async (operation) => {
+        boundaryRequested.resolve()
+        await enterBoundary.promise
+        return operation(async (project) => {
+          await workspace.save(project)
+          return 'committed'
+        })
+      },
+    )
+    await boundaryRequested.promise
+    await expect(stat(join(workspace.root, 'media', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    await expect(stat(join(workspace.root, 'cache', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+
+    expect(coordinator.cancel(IMPORT_ID)).toBe('cancelled')
+    enterBoundary.resolve()
     await expect(importing).rejects.toMatchObject({ name: 'AbortError' })
     expect(workspace.project.audioSources).toEqual([])
     await expect(stat(join(workspace.root, 'media', SOURCE_ID))).rejects.toMatchObject({
@@ -161,5 +232,78 @@ describe('ImportCoordinator transaction', () => {
     await expect(stat(join(workspace.root, 'cache', SOURCE_ID))).rejects.toMatchObject({
       code: 'ENOENT',
     })
+    expect(await readdir(join(workspace.root, '.staging'))).toEqual([])
+  })
+
+  it('reports commit-won once publication starts and preserves the committed result', async () => {
+    const commitStarted = deferred()
+    const finishCommit = deferred()
+    const builder = { build: vi.fn(buildStagedCache) }
+    const { coordinator, workspace, sourcePath } = await setup(builder)
+    const importing = coordinator.import(
+      IMPORT_ID,
+      sourcePath,
+      'copy',
+      workspace.project,
+      async (operation) =>
+        operation(async (project) => {
+          commitStarted.resolve()
+          await finishCommit.promise
+          await workspace.save(project)
+          return 'committed'
+        }),
+    )
+    await commitStarted.promise
+
+    expect(coordinator.cancel(IMPORT_ID)).toBe('commit-won')
+    finishCommit.resolve()
+    await expect(importing).resolves.toMatchObject({ value: 'committed' })
+    expect(workspace.project.audioSources).toHaveLength(1)
+    await expect(stat(join(workspace.root, 'media', SOURCE_ID))).resolves.toBeDefined()
+    await expect(stat(join(workspace.root, 'cache', SOURCE_ID))).resolves.toBeDefined()
+  })
+
+  it('does not roll back a committed import when a ready progress listener fails', async () => {
+    const builder = { build: vi.fn(buildStagedCache) }
+    const { coordinator, workspace, sourcePath } = await setup(builder)
+
+    await expect(
+      coordinator.import(
+        IMPORT_ID,
+        sourcePath,
+        'copy',
+        workspace.project,
+        commitToWorkspace(workspace),
+        (progress) => {
+          if (progress.stage === 'ready') throw new Error('renderer disappeared')
+        },
+      ),
+    ).resolves.toMatchObject({ value: 'committed' })
+    expect(workspace.project.audioSources).toHaveLength(1)
+    await expect(stat(join(workspace.root, 'media', SOURCE_ID))).resolves.toBeDefined()
+    await expect(stat(join(workspace.root, 'cache', SOURCE_ID))).resolves.toBeDefined()
+  })
+
+  it('removes only unpublished import artifacts when commit fails', async () => {
+    const builder = { build: vi.fn(buildStagedCache) }
+    const { coordinator, workspace, sourcePath } = await setup(builder)
+    const prior = workspace.project
+
+    await expect(
+      coordinator.import(IMPORT_ID, sourcePath, 'copy', workspace.project, async (operation) =>
+        operation(async () => {
+          throw new Error('commit failed')
+        }),
+      ),
+    ).rejects.toThrow('commit failed')
+
+    expect(workspace.project).toEqual(prior)
+    await expect(stat(join(workspace.root, 'media', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    await expect(stat(join(workspace.root, 'cache', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    expect(coordinator.cancel(IMPORT_ID)).toBe('not-found')
   })
 })

@@ -1,6 +1,8 @@
 import type { AudioSource, AudioSourceId, ProjectFile } from './project.types'
 
 export type ImportMode = 'copy' | 'reference'
+export type ImportJobState = 'preparing' | 'committing' | 'committed' | 'cancelled' | 'failed'
+export type ImportCancellationResult = 'cancelled' | 'commit-won' | 'not-found'
 type ImportStage =
   'selected' | 'validating' | 'copying' | 'referencing' | 'building-cache' | 'publishing' | 'ready'
 
@@ -29,10 +31,11 @@ export interface AudioSourceCacheDescriptor {
   waveformLevels: WaveformLevelDescriptor[]
 }
 
-export interface ImportResult {
+export interface ImportResult<CommitValue = void> {
   project: ProjectFile
   source: AudioSource
   cache: AudioSourceCacheDescriptor
+  value: CommitValue
 }
 
 export interface WorkspaceDescriptor {

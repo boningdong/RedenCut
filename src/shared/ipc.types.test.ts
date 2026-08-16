@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from 'vitest'
-import type { ImportMode, ImportSelection } from './import.types'
+import type { ImportCancellationResult, ImportMode, ImportSelection } from './import.types'
 import type { AudioSourceId, ProjectFile, Transcript } from './project.types'
 import type { ProjectDraft, RendererSession, SessionPrecondition } from './session.types'
 import type {
@@ -34,13 +34,13 @@ test('preload methods use path-free session requests and results', () => {
     }) => Promise<RendererSession | null>
   >()
   expectTypeOf<IElectronAPI['audio']['selectImportFile']>().toEqualTypeOf<
-    () => Promise<ImportSelection | null>
+    (expected: SessionPrecondition) => Promise<ImportSelection | null>
   >()
   expectTypeOf<IElectronAPI['audio']['startImport']>().toEqualTypeOf<
     (request: ImportJobRequest) => Promise<SessionJobResult<RendererSession>>
   >()
   expectTypeOf<IElectronAPI['audio']['cancelImport']>().toEqualTypeOf<
-    (request: CancelSessionJobRequest) => Promise<void>
+    (request: CancelSessionJobRequest) => Promise<ImportCancellationResult>
   >()
   expectTypeOf<IElectronAPI['transcript']['generate']>().toEqualTypeOf<
     (request: TranscriptionJobRequest) => Promise<SessionJobResult<Transcript>>

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import { basename } from 'path'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { ImportJobRequest, SessionJobResult } from '../../shared/ipc.types'
-import type { ImportMode } from '../../shared/import.types'
+import type { ImportCancellationResult, ImportMode } from '../../shared/import.types'
 import type { RendererSession } from '../../shared/session.types'
 import { ImportCoordinator } from '../audio/import/ImportCoordinator'
 import { mergeProjectDraft } from '../project/sessionProjection'
@@ -17,13 +17,26 @@ export function registerAudioIpc(
   jobs: SessionJobRegistry,
   diagnosticSink: DiagnosticSink = console.error,
 ): void {
-  const selections = new Map<string, { senderId: number; path: string; expiresAt: number }>()
+  const selections = new Map<
+    string,
+    {
+      senderId: number
+      path: string
+      workspaceToken: RendererSession['workspaceToken']
+      revision: number
+      expiresAt: number
+    }
+  >()
   const senderSelections = new Map<number, string>()
+  const cancellationOutcomes = new Map<string, ImportCancellationResult>()
+  const cancellationWaiters = new Set<string>()
   let coordinator = new ImportCoordinator(controller.workspace)
   let coordinatorRoot = controller.workspace.root
 
-  ipcMain.handle('audio:select-import-file', (event) =>
+  ipcMain.handle('audio:select-import-file', (event, input: unknown) =>
     toIpcResult(async () => {
+      const expected = requireSessionPrecondition(input)
+      controller.assertCurrent(expected)
       const window =
         BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
       const result = await dialog.showOpenDialog(window, {
@@ -40,6 +53,7 @@ export function registerAudioIpc(
       selections.set(token, {
         senderId: event.sender.id,
         path: result.filePaths[0],
+        ...expected,
         expiresAt: Date.now() + 10 * 60 * 1000,
       })
       senderSelections.set(event.sender.id, token)
@@ -60,7 +74,13 @@ export function registerAudioIpc(
       selections.delete(request.selectionToken)
       if (senderSelections.get(event.sender.id) === request.selectionToken)
         senderSelections.delete(event.sender.id)
-      if (!selection || selection.senderId !== event.sender.id || selection.expiresAt < Date.now())
+      if (
+        !selection ||
+        selection.senderId !== event.sender.id ||
+        selection.workspaceToken !== request.workspaceToken ||
+        selection.revision !== request.revision ||
+        selection.expiresAt < Date.now()
+      )
         throw new PublicIpcError('invalid-request')
       if (controller.workspace.root !== coordinatorRoot) {
         coordinator = new ImportCoordinator(controller.workspace)
@@ -68,43 +88,51 @@ export function registerAudioIpc(
       }
       const jobCoordinator = coordinator
       let operation!: Promise<SessionJobResult<RendererSession>>
-      const unregister = jobs.register(
-        {
-          kind: 'import',
-          ...requestEnvelope(request),
-          senderId: event.sender.id,
-        },
-        () => {
-          operation = (async () => {
-            const project = mergeProjectDraft(controller.workspace.project, request.draft)
-            const imported = await jobCoordinator.import(
-              request.jobId,
-              selection.path,
-              request.mode,
-              project,
-              (progress) => {
-                if (!event.sender.isDestroyed())
-                  event.sender.send('audio:import-progress', {
-                    workspaceToken: request.workspaceToken,
-                    revision: request.revision,
-                    jobId: request.jobId,
-                    displayName: progress.displayName,
-                    stage: progress.stage,
-                    percent: progress.percent,
-                  })
-              },
-            )
-            const session = await controller.runTransition(request, (transaction) =>
-              transaction.commitImport(imported.project),
-            )
-            return { ...requestEnvelope(request), value: session }
-          })()
-          return {
-            cancel: () => jobCoordinator.cancel(request.jobId),
-            settled: operation,
-          }
-        },
-      )
+      const identity = {
+        kind: 'import' as const,
+        ...requestEnvelope(request),
+        senderId: event.sender.id,
+      }
+      const cancellationKey = importIdentityKey(identity)
+      cancellationOutcomes.delete(cancellationKey)
+      const unregister = jobs.register(identity, () => {
+        operation = (async () => {
+          const project = mergeProjectDraft(controller.workspace.project, request.draft)
+          const imported = await jobCoordinator.import<RendererSession>(
+            request.jobId,
+            selection.path,
+            request.mode,
+            project,
+            (commit) =>
+              controller.runTransition(request, (transaction) =>
+                commit((preparedProject) => transaction.commitImport(preparedProject)),
+              ),
+            (progress) => {
+              if (event.sender.isDestroyed()) return
+              try {
+                controller.assertCurrent(request)
+              } catch {
+                return
+              }
+              event.sender.send('audio:import-progress', {
+                workspaceToken: request.workspaceToken,
+                revision: request.revision,
+                jobId: request.jobId,
+                displayName: progress.displayName,
+                stage: progress.stage,
+                percent: progress.percent,
+              })
+            },
+          )
+          return { ...requestEnvelope(request), value: imported.value }
+        })()
+        return {
+          cancel: () => {
+            cancellationOutcomes.set(cancellationKey, jobCoordinator.cancel(request.jobId))
+          },
+          settled: operation,
+        }
+      })
       event.sender.once('destroyed', () => {
         void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
       })
@@ -112,6 +140,7 @@ export function registerAudioIpc(
         return await operation
       } finally {
         unregister()
+        if (!cancellationWaiters.has(cancellationKey)) cancellationOutcomes.delete(cancellationKey)
       }
     }, diagnosticSink),
   )
@@ -120,11 +149,21 @@ export function registerAudioIpc(
     toIpcResult(async () => {
       const request = importCancelRequest(input)
       controller.assertCurrent(request)
-      await jobs.cancelAndSettleJob({
+      const identity = {
         kind: 'import',
         ...request,
         senderId: event.sender.id,
-      })
+      } as const
+      const key = importIdentityKey(identity)
+      cancellationWaiters.add(key)
+      try {
+        const found = await jobs.cancelAndSettleJob(identity)
+        if (!found) return 'not-found'
+        return cancellationOutcomes.get(key) ?? 'not-found'
+      } finally {
+        cancellationWaiters.delete(key)
+        cancellationOutcomes.delete(key)
+      }
     }, diagnosticSink),
   )
 }
@@ -162,4 +201,12 @@ function requestEnvelope(request: ImportJobRequest) {
     revision: request.revision,
     jobId: request.jobId,
   }
+}
+
+function importIdentityKey(identity: {
+  jobId: string
+  senderId: number
+  workspaceToken: RendererSession['workspaceToken']
+}): string {
+  return JSON.stringify([identity.jobId, identity.senderId, identity.workspaceToken])
 }
