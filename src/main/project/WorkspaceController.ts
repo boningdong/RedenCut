@@ -283,16 +283,22 @@ async function assertSafeSwitchRoot(
   candidateRoot: string,
 ): Promise<void> {
   if (oldWorkspace.descriptor.kind !== 'temporary') return
+  const oldLexicalRoot = resolve(oldWorkspace.root)
+  const candidateLexicalRoot = resolve(candidateRoot)
   const [oldRoot, candidate] = await Promise.all([
     canonicalRoot(oldWorkspace.root),
     canonicalRoot(candidateRoot),
   ])
-  const fromOld = relative(oldRoot, candidate)
-  if (
-    fromOld === '' ||
-    (fromOld !== '..' && !fromOld.startsWith(`..${sep}`) && !isAbsolute(fromOld))
-  )
+  if (containsRoot(oldLexicalRoot, candidateLexicalRoot) || containsRoot(oldRoot, candidate))
     throw new Error('Candidate root overlaps the temporary workspace')
+}
+
+function containsRoot(root: string, candidate: string): boolean {
+  const fromRoot = relative(root, candidate)
+  return (
+    fromRoot === '' ||
+    (fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot))
+  )
 }
 
 async function canonicalRoot(path: string): Promise<string> {

@@ -294,6 +294,50 @@ describe('WorkspaceController session authority', () => {
     expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
   })
 
+  it('rejects an Open alias lexically below the temporary root even when it targets an external project', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    const session = await controller.initialize(parent)
+    const temporaryRoot = controller.workspace.root
+    const externalRoot = await emptyPackage(parent, 'External.podcut')
+    const alias = join(temporaryRoot, 'ExternalAlias.podcut')
+    await symlink(externalRoot, alias, 'dir')
+    const candidate = await controller.prepareOpen(alias)
+
+    const outcome = await controller
+      .commitPreparedOpen(candidate, session)
+      .then(() => ({ status: 'installed' as const }))
+      .catch((error: unknown) => ({
+        status: 'rejected' as const,
+        message: error instanceof Error ? error.message : 'non-error rejection',
+      }))
+    const aliasExists = await stat(alias).then(
+      () => true,
+      () => false,
+    )
+    let originalSessionIsCurrent = true
+    try {
+      controller.assertCurrent(session)
+    } catch {
+      originalSessionIsCurrent = false
+    }
+
+    expect({
+      outcome,
+      aliasExists,
+      currentRoot: controller.workspace.root,
+      originalSessionIsCurrent,
+    }).toEqual({
+      outcome: {
+        status: 'rejected',
+        message: 'Candidate root overlaps the temporary workspace',
+      },
+      aliasExists: true,
+      currentRoot: temporaryRoot,
+      originalSessionIsCurrent: true,
+    })
+  })
+
   it('rejects Open of a descendant of the temporary root without changing the session', async () => {
     const controller = new WorkspaceController()
     const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
