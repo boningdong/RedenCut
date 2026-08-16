@@ -22,7 +22,7 @@ It does not introduce Audacity-style physical PCM blocks or SQLite.
 
 The main process owns project-package lifecycle, filesystem access, import transactions, FFmpeg, cache generation, validation, and resource serving.
 
-The renderer owns interaction, progress presentation, timeline orchestration, waveform canvas presentation, and buffered playback control.
+The renderer owns interaction, progress presentation, path-free editor drafts, timeline orchestration, waveform canvas presentation, and buffered playback control.
 
 The AudioWorklet owns real-time consumption of already prepared sample chunks.
 
@@ -39,7 +39,7 @@ WorkletAudioPlayer
     → effects graph and device output
 ```
 
-Dependencies point toward domain contracts, and no renderer component receives arbitrary filesystem authority.
+Dependencies point toward domain contracts. No renderer component receives a persisted source location, source fingerprint, selected project path, export destination, or other filesystem authority.
 
 ### Inputs
 
@@ -136,6 +136,40 @@ The workflow is:
 Failure leaves the temporary project usable.
 
 For a saved workspace, Save atomically replaces `project.json`, while Save As uses the same copy, validate, publish, and switch transaction to create another package.
+
+Save, Save As, open, and import commit transitions run through one main-process operation mutex. Each operation captures one workspace object and never re-reads a mutable active-workspace pointer after an `await`.
+
+Compound transitions such as dirty-project Open acquire that mutex once and use controller-owned transaction methods for Save, candidate preparation, job settlement, and commit. They never recursively call another public mutex-acquiring operation.
+
+Long import preparation remains a registered session job outside the mutex. It acquires the controller transaction only for its single publish/commit boundary, where token and revision are revalidated, so Open can validate a candidate and cancel a still-preparing import without deadlock.
+
+The main process owns an opaque workspace token and a controller-wide monotonic revision. Initialize creates the first token. Normal Save and successful import retain the token and advance the revision. Save As and opening another project switch roots, issue a new token, and advance the same monotonic revision sequence.
+
+Every renderer mutation supplies the current token, expected revision, and a path-free draft. Main rejects a mismatched token or revision before mutation and merges only permitted editor fields into the authoritative `ProjectFile`.
+
+### Transactional project switching
+
+Opening another project is a transaction:
+
+1. If the renderer reports unsaved edits, main presents Save, Don't Save, and Cancel.
+2. Cancel leaves the current workspace and renderer session active.
+3. Save merges and validates the supplied draft; cancellation or failure stops the open transaction without changing the active session. A successful Save becomes the new current-session rollback point for every later Open step.
+4. Main selects or resolves the candidate package and fully validates its project, originals, and caches while the current session remains active.
+5. Main marks the old session as closing, rejects new mutations for it, cancels or settles its import, transcription, and export jobs, and obtains renderer acknowledgement that playback has stopped.
+6. Main atomically installs the prepared workspace, rotates the token, advances the revision, and returns one complete path-free renderer session.
+7. Only after the switch succeeds does main release old resources and delete an old temporary workspace. Closing a saved workspace never deletes its `.podcut` package.
+
+Candidate selection paths stay in main. A second application instance or macOS open-file event is represented to the renderer by an opaque pending-open ID and display name, never by a filesystem path.
+
+The renderer switch acknowledgement is bounded to five seconds and is rejected immediately if its sender is destroyed. Timeout, sender loss outside application shutdown, or acknowledgement failure reopens the old session for mutations, releases the mutex, and leaves the current rollback-point workspace active; already settled jobs remain settled and the visible project is not cleared.
+
+### Application instance ownership
+
+PodCut uses `app.requestSingleInstanceLock()` before readiness. A process that does not obtain the lock exits without initializing a workspace.
+
+The primary instance owns one active project session per window. A second launch forwards a requested `.podcut` package into the primary instance's pending-open registry, restores and focuses the existing window, and routes the request through the same dirty-check, candidate-validation, job-settlement, and atomic-switch transaction as the Open Project command.
+
+Requests received before the controller and window are ready remain queued until the renderer can acknowledge them.
 
 ### Future welcome page
 
@@ -256,6 +290,63 @@ type ProjectFile = {
 
 The unpublished single-file project shape is rejected rather than migrated, and the implementation contains no compatibility adapter or dual-schema branch.
 
+### Path-free renderer session
+
+`ProjectFile` and `project.json` remain unchanged and main-owned. Reference-mode paths and source fingerprints stay in that persisted object and never cross preload.
+
+The renderer receives a separate session DTO:
+
+```ts
+type WorkspaceToken = string & { readonly __brand: 'WorkspaceToken' }
+
+type SessionPrecondition = {
+  workspaceToken: WorkspaceToken
+  revision: number
+}
+
+type RendererAudioSource = {
+  id: AudioSourceId
+  displayName: string
+  metadata: AudioMetadata
+  cache: AudioSourceCacheDescriptor
+}
+
+type ProjectDraft = {
+  tracks: Track[]
+  transcript?: Transcript
+  export: ProjectFile['export']
+}
+
+type RendererSession = SessionPrecondition & {
+  workspace: WorkspaceDescriptor
+  sources: RendererAudioSource[]
+  draft: ProjectDraft
+}
+
+type OpenProjectResult =
+  | { outcome: 'switched'; session: RendererSession }
+  | {
+      outcome: 'stayed'
+      session: RendererSession
+      reason:
+        | 'cancelled'
+        | 'save-failed'
+        | 'candidate-invalid'
+        | 'job-settlement-failed'
+        | 'switch-unacknowledged'
+    }
+```
+
+The DTO excludes `AudioSource.location`, `AudioSource.fingerprint`, `createdAt`, package paths, and main-owned plugin or package metadata. Main projects authoritative sources plus validated cache descriptors into `RendererAudioSource` and merges only `tracks`, `transcript`, and path-free export settings from `ProjectDraft`.
+
+IPC errors are mapped to path-free error codes and user-facing messages at the main/preload boundary; raw filesystem errors and absolute paths are retained only in main-process diagnostics.
+
+Every Open attempt returns the authoritative current session, even when it stays on the same project. If a dirty-project Save succeeds and a later picker, validation, settlement, or acknowledgement step fails, the newly saved token, revision, and possibly Save As root remain current and are returned with `outcome: 'stayed'`.
+
+The renderer also keeps a local monotonic edit revision. A successful Save clears dirty state only if the local edit revision still equals the revision captured when that Save began. Import merges its newly published source and track into the current local draft rather than replacing edits made while the cache was building. Session loading uses an epoch so an older async provider setup cannot overwrite a newer session.
+
+All import, transcription, export, progress, and result messages carry the workspace token, main revision, and a job ID where applicable. Renderer and main both discard or abort messages whose session envelope is stale.
+
 ## Cache model
 
 ### Manifest
@@ -343,11 +434,7 @@ interface AudioSampleProvider {
   readonly channels: number
   readonly frameCount: number
 
-  readFrames(
-    startFrame: number,
-    frameCount: number,
-    signal: AbortSignal,
-  ): Promise<AudioSampleChunk>
+  readFrames(startFrame: number, frameCount: number, signal: AbortSignal): Promise<AudioSampleChunk>
 }
 
 type AudioSampleFormat = 'f32-planar'
@@ -373,10 +460,7 @@ The retired MP3 path submitted arbitrary 32,768-byte chunks to `AudioDecoder`, w
 
 ```ts
 interface IAudioPlayer {
-  registerAudioSource(
-    id: AudioSourceId,
-    samples: AudioSampleProvider,
-  ): Promise<void>
+  registerAudioSource(id: AudioSourceId, samples: AudioSampleProvider): Promise<void>
 
   removeAudioSource(id: AudioSourceId): void
   // Existing transport, track, event, and lifecycle methods remain.
@@ -396,7 +480,7 @@ Providers are shared by `AudioSourceId`, but each track owns its own AudioWorkle
 
 The initial target is two seconds queued per active track, with a hard maximum of three seconds per track during refill and seeking.
 
-Queue depth comes from AudioWorklet acknowledgements rather than wall-clock estimates, and every seek or structural timeline change increments a generation token so stale reads cannot enqueue audio.
+Queue depth comes from AudioWorklet acknowledgements rather than wall-clock estimates. The host tracks sent frames separately from acknowledged frames, and it sends `play` only after every active current-generation queue acknowledges its required prefill depth. Every seek or structural timeline change increments a generation token so stale reads and stale acknowledgements cannot enqueue or start audio.
 
 The player records underruns, and the reference sustained-playback and seek-stress run permits none.
 
@@ -455,7 +539,11 @@ Import writes only into source-specific staging directories.
 
 Failure or cancellation terminates copying and FFmpeg, closes resources, removes staging data, reports one actionable result, and leaves the project model unchanged.
 
-Cancellation must never publish a completed cache after acknowledgement.
+Import has explicit `preparing`, `committing`, `committed`, `cancelled`, and `failed` states. Cancellation acknowledged during `preparing` aborts FFmpeg/copying, waits for process settlement and cleanup, and prevents publication. Once the single commit boundary has begun, cancel reports that commit won and retains the consistent published result rather than acknowledging cancellation and attempting rollback.
+
+FFmpeg diagnostic output is retained as a fixed-size tail. Abort and error paths kill the child once, await `close`, close streams, and only then remove staging data.
+
+Cancellation must never publish a completed cache after a cancellation acknowledgement.
 
 Low-disk failures identify the required operation and preserve the active project.
 
@@ -472,6 +560,16 @@ Initial scope supports one active import.
 The import prompt exposes both modes, defaults to `copy`, and presents `reference` as the secondary choice.
 
 Import queues, parallel imports, recovery UI, and a welcome page are deferred.
+
+## Session-scoped asynchronous jobs
+
+The main process maintains a registry of import, transcription, and export jobs keyed by job ID, sender, and workspace token. Project switching marks the old session closing, prevents new jobs, signals all active jobs, and waits for their settlement before installing the prepared workspace.
+
+Transcription accepts an abort signal and emits progress and results tagged with transcription job ID, token, and revision. Sender destruction or session replacement aborts the transcriber and its child process. The renderer applies only the latest transcription request for its current session.
+
+Export uses an export job ID and one active job per sender. Progress is scoped by job ID and session. Cancel, sender destruction, session replacement, FFmpeg failure, and stale completion all kill and reap the child and remove only that job's temporary output.
+
+FFmpeg renders to a unique sibling temporary output. Main validates that the originating session is still current, then atomically replaces the selected destination. Failure or cancellation preserves any existing destination bytes. The visible Cancel action awaits the main cancellation acknowledgement before closing the modal.
 
 ## Dependency direction
 
@@ -568,8 +666,16 @@ Hard CI requirements include:
 - Pyramid correctness and visible-range selection.
 - Stale seek and viewport request cancellation.
 - Controlled slow-import progress gaps no greater than 250 ms using deterministic clocks or event-controlled test doubles.
-- Cancellation acknowledgement within 100 ms, cleanup within 500 ms, and no later publication using deterministic clocks or event-controlled test doubles.
+- Cancellation signal dispatch within 100 ms, settled cancellation acknowledgement and cleanup within 500 ms, and no later publication using deterministic clocks or event-controlled test doubles.
 - Low-disk and missing-reference errors preserving existing project state.
+- Path-free renderer sessions and mutation drafts that cannot change source locations or fingerprints.
+- Stale token/revision rejection and deterministic serialization of overlapping Save, Save As, open, and import transitions.
+- Dirty-open Save, Don't Save, Cancel, save-failure, candidate-failure, job-settlement, switch, and old-workspace cleanup ordering.
+- One-instance forwarding through the same transactional open path without exposing the requested path to the renderer.
+- Save dirty clearing only for the submitted local edit revision and rejection of stale import/transcription/session-load results.
+- Worklet playback waiting for current-generation acknowledged prefill on every active track.
+- Bounded import diagnostics and child-process reaping on abort and failure.
+- Export job scoping, cancellation, sender destruction, temporary output, and atomic destination replacement.
 
 ## Performance fixture
 
@@ -608,4 +714,4 @@ Architectural boundedness, correctness, cache sharing, and cleanup remain hard C
 
 ## Completion criteria
 
-The managed-audio project is complete when every active project has a workspace root, copied projects are portable, imports publish atomically, playback and waveform access are range-bounded, the fragile compressed WebCodecs path is unreachable and removed, approved CI and performance checks pass, and no cache file is required to preserve durable edits.
+The managed-audio project is complete when every active project has a serialized main-owned workspace session, renderer IPC is path-free and revision-checked, project switching is transactional, copied projects are portable, jobs settle before session replacement, imports and exports publish atomically, playback starts only after acknowledged PCM prefill, playback and waveform access are range-bounded, the fragile compressed WebCodecs path is unreachable and removed, approved CI and performance checks pass, and no cache file is required to preserve durable edits.
