@@ -6,12 +6,13 @@
 // selection remains main-process owned.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useCallback, useEffect } from 'react'
-import type { ProjectFile } from '@shared/project.types'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import type { RenderProgress } from '@shared/ipc.types'
+import type { ProjectDraft, RendererSession } from '@shared/session.types'
 
 interface ExportModalProps {
-  project: ProjectFile
+  session: RendererSession
+  draft: ProjectDraft
   onClose: () => void
 }
 
@@ -21,17 +22,24 @@ type ExportState =
   | { status: 'done' }
   | { status: 'error'; message: string }
 
-export function ExportModal({ project, onClose }: ExportModalProps) {
-  const [format, setFormat] = useState<ProjectFile['export']['format']>('mp3')
+export function ExportModal({ session, draft, onClose }: ExportModalProps) {
+  const [format, setFormat] = useState<ProjectDraft['export']['format']>('mp3')
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
+  const activeJob = useRef<string | null>(null)
 
   // Subscribe to render progress events
   useEffect(() => {
-    return window.electronAPI.on.renderProgress((p) => {
-      setExportState({ status: 'exporting', progress: p })
-      if (p.percent >= 1) setExportState({ status: 'done' })
+    return window.electronAPI.on.renderProgress((progress) => {
+      if (
+        progress.jobId !== activeJob.current ||
+        progress.workspaceToken !== session.workspaceToken ||
+        progress.revision !== session.revision
+      )
+        return
+      setExportState({ status: 'exporting', progress })
+      if (progress.percent >= 1) setExportState({ status: 'done' })
     })
-  }, [])
+  }, [session.revision, session.workspaceToken])
 
   const handleExport = useCallback(async () => {
     setExportState({
@@ -39,13 +47,22 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
       progress: { percent: 0, currentSeconds: 0, totalSeconds: 0 },
     })
     try {
-      const exportProject: ProjectFile = { ...project, export: { ...project.export, format } }
-      const exported = await window.electronAPI.render.export(exportProject, format)
-      setExportState(exported ? { status: 'done' } : { status: 'idle' })
+      const jobId = crypto.randomUUID()
+      activeJob.current = jobId
+      const exported = await window.electronAPI.render.export({
+        workspaceToken: session.workspaceToken,
+        revision: session.revision,
+        jobId,
+        draft: { ...draft, export: { ...draft.export, format } },
+        format,
+      })
+      setExportState(exported.value ? { status: 'done' } : { status: 'idle' })
     } catch (err) {
       setExportState({ status: 'error', message: (err as Error).message })
+    } finally {
+      activeJob.current = null
     }
-  }, [format, project])
+  }, [draft, format, session.revision, session.workspaceToken])
 
   const isExporting = exportState.status === 'exporting'
   const pct =
@@ -93,7 +110,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
           </span>
           <select
             value={format}
-            onChange={(e) => setFormat(e.target.value as ProjectFile['export']['format'])}
+            onChange={(e) => setFormat(e.target.value as ProjectDraft['export']['format'])}
             disabled={isExporting}
             style={{
               background: 'var(--color-bg-elevated)',
@@ -114,7 +131,7 @@ export function ExportModal({ project, onClose }: ExportModalProps) {
         {/* LUFS (display only) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Loudness target: {project.export?.targetLUFS ?? -16} LUFS
+            Loudness target: {draft.export?.targetLUFS ?? -16} LUFS
           </span>
           <span style={{ fontSize: 10, color: 'var(--color-text-muted)', opacity: 0.6 }}>
             (Phase 4)

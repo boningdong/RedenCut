@@ -64,10 +64,13 @@ describe('ProjectWorkspace', () => {
       ],
     })
 
-    await workspace.saveAs(destination, project)
+    const saved = await workspace.saveAs(destination, project)
 
-    expect(workspace.root).toBe(destination)
-    expect(workspace.descriptor.kind).toBe('saved')
+    expect(workspace.root).not.toBe(destination)
+    expect(workspace.descriptor.kind).toBe('temporary')
+    expect(saved.root).toBe(destination)
+    expect(saved.descriptor.kind).toBe('saved')
+    expect(saved.project.pluginData).toEqual({ savedAs: true })
     expect(await readFile(join(destination, 'media', sourceId, 'kept.wav'), 'utf8')).toBe(
       'managed artifact',
     )
@@ -115,10 +118,34 @@ describe('ProjectWorkspace', () => {
     const workspace = await ProjectWorkspace.initialize(parent)
     const first = join(parent, 'First.podcut')
     const second = join(parent, 'Second.podcut')
-    await workspace.saveAs(first, workspace.project)
-    await workspace.saveAs(second, workspace.project)
+    const firstWorkspace = await workspace.saveAs(first, workspace.project)
+    const secondWorkspace = await firstWorkspace.saveAs(second, firstWorkspace.project)
     expect(await readFile(join(first, 'project.json'), 'utf8')).toContain('"version": 1')
     expect(await readFile(join(second, 'project.json'), 'utf8')).toContain('"version": 1')
-    expect(workspace.root).toBe(second)
+    expect(firstWorkspace.root).toBe(first)
+    expect(secondWorkspace.root).toBe(second)
+  })
+
+  it('close deletes its exact temporary root without deleting its parent', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
+    const workspace = await ProjectWorkspace.initialize(parent)
+    const temporaryRoot = workspace.root
+    await writeFile(join(parent, 'keep.txt'), 'keep parent contents')
+
+    await workspace.close()
+
+    await expect(stat(temporaryRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(await readFile(join(parent, 'keep.txt'), 'utf8')).toBe('keep parent contents')
+  })
+
+  it('close never deletes a saved workspace root', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
+    const workspace = await ProjectWorkspace.initialize(parent)
+    const destination = join(parent, 'Saved.podcut')
+    const saved = await workspace.saveAs(destination, workspace.project)
+
+    await saved.close()
+
+    expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 1')
   })
 })

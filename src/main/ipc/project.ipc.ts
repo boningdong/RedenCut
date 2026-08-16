@@ -1,35 +1,58 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { APP_FILE_EXT, APP_NAME } from '../../shared/constants'
-import { ProjectFileSchema } from '../../shared/project.types'
+import type { ProjectMutationRequest } from '../../shared/session.types'
 import type { WorkspaceController } from '../project/WorkspaceController'
+import { PublicIpcError, requireSessionPrecondition, toIpcResult } from './ipcResult'
 
-export function registerProjectIpc(controller: WorkspaceController): void {
-  ipcMain.handle('project:initialize', () => controller.describe())
-  ipcMain.handle('project:open-dialog', async (event) => {
-    const window = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
-    const result = await dialog.showOpenDialog(window, {
-      title: `Open ${APP_NAME} Project`,
-      properties: ['openDirectory'],
-    })
-    if (result.canceled || !result.filePaths[0]) return null
-    return controller.open(result.filePaths[0])
-  })
-  ipcMain.handle('project:save', async (event, project: unknown) => {
-    const validated = ProjectFileSchema.parse(project)
-    if (controller.workspace.descriptor.kind === 'saved') {
-      return (await controller.save(validated)).workspace
-    }
-    return chooseAndSaveAs(event.sender.id, controller, validated)
-  })
-  ipcMain.handle('project:save-as', async (event, project: unknown) =>
-    chooseAndSaveAs(event.sender.id, controller, ProjectFileSchema.parse(project)),
+type DiagnosticSink = (error: unknown) => void
+
+export function registerProjectIpc(
+  controller: WorkspaceController,
+  diagnosticSink: DiagnosticSink = console.error,
+): void {
+  ipcMain.handle('project:initialize', () =>
+    toIpcResult(() => controller.describe(), diagnosticSink),
   )
+  ipcMain.handle('project:open-dialog', (event, input: unknown) =>
+    toIpcResult(async () => {
+      const expected = requireSessionPrecondition(input)
+      const window =
+        BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
+      const result = await dialog.showOpenDialog(window, {
+        title: `Open ${APP_NAME} Project`,
+        properties: ['openDirectory'],
+      })
+      if (result.canceled || !result.filePaths[0]) return null
+      const candidate = await controller.prepareOpen(result.filePaths[0])
+      return controller.commitPreparedOpen(candidate, expected)
+    }, diagnosticSink),
+  )
+  ipcMain.handle('project:save', (event, input: unknown) =>
+    toIpcResult(async () => {
+      const request = mutationRequest(input)
+      if (controller.workspace.descriptor.kind === 'saved') return controller.save(request)
+      return chooseAndSaveAs(event.sender.id, controller, request)
+    }, diagnosticSink),
+  )
+  ipcMain.handle('project:save-as', (event, input: unknown) =>
+    toIpcResult(
+      () => chooseAndSaveAs(event.sender.id, controller, mutationRequest(input)),
+      diagnosticSink,
+    ),
+  )
+}
+
+function mutationRequest(input: unknown): ProjectMutationRequest {
+  const precondition = requireSessionPrecondition(input)
+  if (!input || typeof input !== 'object' || !('draft' in input))
+    throw new PublicIpcError('invalid-request')
+  return { ...precondition, draft: (input as ProjectMutationRequest).draft }
 }
 
 async function chooseAndSaveAs(
   senderId: number,
   controller: WorkspaceController,
-  project: ReturnType<typeof ProjectFileSchema.parse>,
+  request: ProjectMutationRequest,
 ) {
   const window = BrowserWindow.getAllWindows().find(
     (candidate) => candidate.webContents.id === senderId,
@@ -42,5 +65,5 @@ async function chooseAndSaveAs(
   const destination = result.filePath.endsWith(APP_FILE_EXT)
     ? result.filePath
     : `${result.filePath}${APP_FILE_EXT}`
-  return (await controller.saveAs(destination, project)).workspace
+  return controller.saveAs(destination, request)
 }

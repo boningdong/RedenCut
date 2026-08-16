@@ -40,9 +40,3 @@ export interface WorkspaceDescriptor {
   displayName: string
   portable: boolean
 }
-
-export interface ProjectOpenResult {
-  project: ProjectFile
-  workspace: WorkspaceDescriptor
-  sources: AudioSourceCacheDescriptor[]
-}

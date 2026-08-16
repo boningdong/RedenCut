@@ -1,13 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { APP_NAME } from '@shared/constants'
-import type { AudioSourceId, ProjectFile, Word } from '@shared/project.types'
-import type {
-  AudioSourceCacheDescriptor,
-  ImportMode,
-  ImportProgress,
-  ProjectOpenResult,
-  WorkspaceDescriptor,
-} from '@shared/import.types'
+import type { AudioSourceId, Word } from '@shared/project.types'
+import type { ImportMode } from '@shared/import.types'
+import type { ProjectDraft, RendererSession, WorkspaceToken } from '@shared/session.types'
 import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
 import { WorkletAudioPlayer } from './audio/WorkletAudioPlayer'
 import { ContinuousPcmSampleProvider } from './audio/samples/ContinuousPcmSampleProvider'
@@ -25,17 +20,24 @@ import { useTimelineStore } from './stores/timeline.store'
 import { useTranscriptStore } from './stores/transcript.store'
 import { mergeTrackWords } from './utils/transcript'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { createSessionLoadCoordinator, type SessionLoadCoordinator } from './sessionLoadCoordinator'
 
 interface ImportState {
   id: string
+  workspaceToken: WorkspaceToken
+  revision: number
   displayName: string
   stage: string
   percent: number
 }
 
+interface PreparedRendererSession {
+  player: IAudioPlayer
+  subscriptions: (() => void)[]
+  waveforms: ReadonlyMap<AudioSourceId, WaveformDataProvider>
+}
+
 export default function App() {
-  const [workspace, setWorkspaceState] = useState<WorkspaceDescriptor | null>(null)
-  const [descriptors, setDescriptors] = useState<AudioSourceCacheDescriptor[]>([])
   const [waveforms, setWaveforms] = useState<ReadonlyMap<AudioSourceId, WaveformDataProvider>>(
     new Map(),
   )
@@ -47,12 +49,14 @@ export default function App() {
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
   const skipNextTimelineDirty = useRef(false)
+  const transcriptJobId = useRef<string | null>(null)
+  const loadCoordinator = useRef<SessionLoadCoordinator<RendererSession> | null>(null)
 
-  const project = useEditorStore((state) => state.project)
+  const session = useEditorStore((state) => state.session)
   const isDirty = useEditorStore((state) => state.isDirty)
-  const setProject = useEditorStore((state) => state.setProject)
-  const setWorkspace = useEditorStore((state) => state.setWorkspace)
-  const setIsDirty = useEditorStore((state) => state.setIsDirty)
+  const loadEditorSession = useEditorStore((state) => state.loadSession)
+  const markEdited = useEditorStore((state) => state.markEdited)
+  const acknowledgeSave = useEditorStore((state) => state.acknowledgeSave)
   const tracks = useTimelineStore((state) => state.tracks)
   const isGenerating = useTranscriptStore((state) => state.isGenerating)
   const generatingStatus = useTranscriptStore((state) => state.generatingStatus)
@@ -64,57 +68,65 @@ export default function App() {
     setAudioPlayerInstance(null)
   }, [])
 
-  const loadSession = useCallback(
-    async (result: ProjectOpenResult) => {
-      const descriptorsBySourceId = new Map(
-        result.sources.map((descriptor) => [descriptor.audioSourceId, descriptor]),
-      )
-      const rendererSources = result.project.audioSources.map((source) => {
-        const cache = descriptorsBySourceId.get(source.id)
-        if (!cache) throw new Error(`Missing cache descriptor for audio source ${source.id}`)
-        return { id: source.id, displayName: source.displayName, metadata: source.metadata, cache }
-      })
-      destroyPlayer()
-      usePlaybackStore.getState().reset()
-      skipNextTimelineDirty.current = true
-      useTimelineStore.getState().loadFromProject(rendererSources, result.project.tracks)
-      useTranscriptStore.getState().reset()
-      useTranscriptStore.getState().setWords(result.project.transcript?.words ?? [])
-      for (const track of result.project.tracks) {
-        if (result.project.transcript?.words.some((word) => word.trackId === track.id)) {
-          useTranscriptStore.getState().ensureTrackVisible(track.id)
+  if (!loadCoordinator.current) {
+    loadCoordinator.current = createSessionLoadCoordinator(
+      async (result: RendererSession): Promise<PreparedRendererSession> => {
+        const player = new WorkletAudioPlayer()
+        try {
+          const waveformProviders = new Map<AudioSourceId, WaveformDataProvider>()
+          for (const source of result.sources) {
+            await player.registerAudioSource(
+              source.id,
+              new ContinuousPcmSampleProvider(source.cache),
+            )
+            waveformProviders.set(source.id, new BinaryWaveformDataProvider(source.cache))
+          }
+          player.setTracks(result.draft.tracks)
+          return {
+            player,
+            waveforms: waveformProviders,
+            subscriptions: [
+              player.onTimeUpdate(usePlaybackStore.getState().setCurrentTime),
+              player.onPlayStateChange(usePlaybackStore.getState().setPlaying),
+              player.onDurationChange(usePlaybackStore.getState().setDuration),
+              player.onEnded(() => usePlaybackStore.getState().setPlaying(false)),
+              player.onError((playbackError) => setError(playbackError.message)),
+            ],
+          }
+        } catch (error) {
+          player.destroy()
+          throw error
         }
-      }
+      },
+      (result, prepared) => {
+        destroyPlayer()
+        usePlaybackStore.getState().reset()
+        skipNextTimelineDirty.current = true
+        useTimelineStore.getState().loadFromProject(result.sources, result.draft.tracks)
+        useTranscriptStore.getState().reset()
+        useTranscriptStore.getState().setWords(result.draft.transcript?.words ?? [])
+        for (const track of result.draft.tracks) {
+          if (result.draft.transcript?.words.some((word) => word.trackId === track.id))
+            useTranscriptStore.getState().ensureTrackVisible(track.id)
+        }
+        playerSubscriptions.current = prepared.subscriptions
+        usePlaybackStore.getState().setDuration(prepared.player.getDuration())
+        playerRef.current = prepared.player
+        setAudioPlayerInstance(prepared.player)
+        loadEditorSession(result)
+        setWaveforms(prepared.waveforms)
+        setError(null)
+      },
+      (prepared) => {
+        prepared.subscriptions.forEach((unsubscribe) => unsubscribe())
+        prepared.player.destroy()
+      },
+    )
+  }
 
-      const player = new WorkletAudioPlayer()
-      const waveformProviders = new Map<AudioSourceId, WaveformDataProvider>()
-      for (const descriptor of result.sources) {
-        await player.registerAudioSource(
-          descriptor.audioSourceId,
-          new ContinuousPcmSampleProvider(descriptor),
-        )
-        waveformProviders.set(descriptor.audioSourceId, new BinaryWaveformDataProvider(descriptor))
-      }
-      player.setTracks(result.project.tracks)
-      playerSubscriptions.current = [
-        player.onTimeUpdate(usePlaybackStore.getState().setCurrentTime),
-        player.onPlayStateChange(usePlaybackStore.getState().setPlaying),
-        player.onDurationChange(usePlaybackStore.getState().setDuration),
-        player.onEnded(() => usePlaybackStore.getState().setPlaying(false)),
-        player.onError((playbackError) => setError(playbackError.message)),
-      ]
-      usePlaybackStore.getState().setDuration(player.getDuration())
-      playerRef.current = player
-      setAudioPlayerInstance(player)
-      setProject(result.project)
-      setWorkspace(result.workspace)
-      setWorkspaceState(result.workspace)
-      setDescriptors(result.sources)
-      setWaveforms(waveformProviders)
-      setIsDirty(false)
-      setError(null)
-    },
-    [destroyPlayer, setIsDirty, setProject, setWorkspace],
+  const loadSession = useCallback(
+    (result: RendererSession) => loadCoordinator.current!.load(result),
+    [],
   )
 
   useEffect(() => {
@@ -126,16 +138,21 @@ export default function App() {
       .catch((reason: unknown) => {
         setError((reason as Error).message)
       })
-    return destroyPlayer
+    return () => {
+      loadCoordinator.current?.invalidate()
+      destroyPlayer()
+    }
   }, [destroyPlayer, loadSession])
 
   useEffect(
     () =>
-      window.electronAPI.on.importProgress((progress: ImportProgress) => {
+      window.electronAPI.on.importProgress((progress) => {
         setImportState((current) =>
-          current?.id === progress.importId
+          current?.id === progress.jobId &&
+          current.workspaceToken === progress.workspaceToken &&
+          current.revision === progress.revision
             ? {
-                id: progress.importId,
+                ...current,
                 displayName: progress.displayName,
                 stage: progress.stage,
                 percent: progress.percent,
@@ -148,7 +165,15 @@ export default function App() {
 
   useEffect(
     () =>
-      window.electronAPI.on.transcriptProgress(useTranscriptStore.getState().setGeneratingStatus),
+      window.electronAPI.on.transcriptProgress((progress) => {
+        const current = useEditorStore.getState().session
+        if (
+          current?.workspaceToken === progress.workspaceToken &&
+          current.revision === progress.revision &&
+          transcriptJobId.current === progress.jobId
+        )
+          useTranscriptStore.getState().setGeneratingStatus(progress.status)
+      }),
     [],
   )
 
@@ -156,95 +181,116 @@ export default function App() {
     playerRef.current?.setTracks(tracks)
     if (skipNextTimelineDirty.current) {
       skipNextTimelineDirty.current = false
-    } else if (useEditorStore.getState().project) {
-      setIsDirty(true)
+    } else if (useEditorStore.getState().session) {
+      markEdited()
     }
-  }, [setIsDirty, tracks])
+  }, [markEdited, tracks])
 
-  const snapshot = useCallback((): ProjectFile | null => {
-    const current = useEditorStore.getState().project
+  const snapshot = useCallback((): ProjectDraft | null => {
+    const current = useEditorStore.getState().session
     if (!current) return null
     const currentWords = useTranscriptStore.getState().words
     return {
-      ...current,
       tracks: useTimelineStore.getState().tracks,
       transcript:
-        currentWords.length > 0 || current.transcript
+        currentWords.length > 0 || current.draft.transcript
           ? {
-              engine: current.transcript?.engine ?? 'whisper',
-              model: current.transcript?.model,
-              speakers: current.transcript?.speakers ?? {},
+              engine: current.draft.transcript?.engine ?? 'whisper',
+              model: current.draft.transcript?.model,
+              speakers: current.draft.transcript?.speakers ?? {},
               words: currentWords,
             }
           : undefined,
+      export: current.draft.export,
     }
   }, [])
 
   const save = useCallback(
     async (saveAs = false) => {
       const current = snapshot()
-      if (!current) return
-      const nextWorkspace = await (saveAs
-        ? window.electronAPI.project.saveAs(current)
-        : window.electronAPI.project.save(current))
-      if (!nextWorkspace) return
-      setProject(current)
-      setWorkspace(nextWorkspace)
-      setWorkspaceState(nextWorkspace)
-      setIsDirty(false)
+      const currentSession = useEditorStore.getState().session
+      if (!current || !currentSession) return
+      const capturedLocalEditRevision = useEditorStore.getState().localEditRevision
+      try {
+        const saved = await (saveAs
+          ? window.electronAPI.project.saveAs({
+              workspaceToken: currentSession.workspaceToken,
+              revision: currentSession.revision,
+              draft: current,
+            })
+          : window.electronAPI.project.save({
+              workspaceToken: currentSession.workspaceToken,
+              revision: currentSession.revision,
+              draft: current,
+            }))
+        if (!saved) return
+        acknowledgeSave(saved, capturedLocalEditRevision)
+        setError(null)
+      } catch (reason) {
+        setError((reason as Error).message)
+      }
     },
-    [setIsDirty, setProject, setWorkspace, snapshot],
+    [acknowledgeSave, snapshot],
   )
 
   useKeyboardShortcuts({
-    onSave: () => void save(false).catch((reason: unknown) => setError((reason as Error).message)),
+    onSave: () => void save(false),
   })
 
   const importAudio = useCallback(
     async (mode: ImportMode) => {
       const current = snapshot()
-      if (!current || importState) return
+      const currentSession = useEditorStore.getState().session
+      if (!current || !currentSession || importState) return
       const selection = await window.electronAPI.audio.selectImportFile()
       if (!selection) return
       const id = crypto.randomUUID()
-      setImportState({ id, displayName: selection.displayName, stage: 'selected', percent: 0 })
+      setImportState({
+        id,
+        workspaceToken: currentSession.workspaceToken,
+        revision: currentSession.revision,
+        displayName: selection.displayName,
+        stage: 'selected',
+        percent: 0,
+      })
       setError(null)
       try {
-        const imported = await window.electronAPI.audio.startImport(
-          id,
-          selection.token,
+        const imported = await window.electronAPI.audio.startImport({
+          workspaceToken: currentSession.workspaceToken,
+          revision: currentSession.revision,
+          jobId: id,
+          selectionToken: selection.token,
           mode,
-          current,
+          draft: current,
+        })
+        if (
+          imported.jobId === id &&
+          imported.workspaceToken === currentSession.workspaceToken &&
+          imported.revision === currentSession.revision
         )
-        if (!workspace) throw new Error('Workspace is not initialized')
-        const nextWorkspace = {
-          ...workspace,
-          portable: imported.project.audioSources.every(
-            (source) => source.location.mode === 'copy',
-          ),
-        }
-        const sources = [
-          ...descriptors.filter((item) => item.audioSourceId !== imported.source.id),
-          imported.cache,
-        ]
-        await loadSession({ project: imported.project, workspace: nextWorkspace, sources })
-        setIsDirty(false)
+          await loadSession(imported.value)
       } catch (reason) {
         setError((reason as Error).message)
       } finally {
         setImportState(null)
       }
     },
-    [descriptors, importState, loadSession, setIsDirty, snapshot, workspace],
+    [importState, loadSession, snapshot],
   )
 
   const cancelImport = useCallback(async () => {
     if (!importState) return
-    await window.electronAPI.audio.cancelImport(importState.id)
+    await window.electronAPI.audio.cancelImport({
+      workspaceToken: importState.workspaceToken,
+      revision: importState.revision,
+      jobId: importState.id,
+    })
   }, [importState])
 
   const openProject = useCallback(async () => {
-    const result = await window.electronAPI.project.openDialog()
+    const current = useEditorStore.getState().session
+    if (!current) return
+    const result = await window.electronAPI.project.openDialog(current)
     if (result) await loadSession(result)
   }, [loadSession])
 
@@ -254,41 +300,56 @@ export default function App() {
         useTimelineStore.getState().tracks.find((candidate) => candidate.id === trackId) ??
         useTimelineStore.getState().tracks[0]
       const sourceId = track?.clips[0]?.audioSourceId
-      if (!track || !sourceId) return
+      const currentSession = useEditorStore.getState().session
+      if (!track || !sourceId || !currentSession) return
       const transcript = useTranscriptStore.getState()
+      const jobId = crypto.randomUUID()
+      transcriptJobId.current = jobId
       transcript.setIsGenerating(true)
       try {
-        const generated = await window.electronAPI.transcript.generate(sourceId)
-        const incoming: Word[] = generated.words.map((word) => ({
+        const generated = await window.electronAPI.transcript.generate({
+          workspaceToken: currentSession.workspaceToken,
+          revision: currentSession.revision,
+          jobId,
+          audioSourceId: sourceId,
+        })
+        const latest = useEditorStore.getState().session
+        if (
+          generated.jobId !== jobId ||
+          latest?.workspaceToken !== generated.workspaceToken ||
+          latest.revision !== generated.revision
+        )
+          return
+        const incoming: Word[] = generated.value.words.map((word) => ({
           ...word,
           audioSourceId: sourceId,
           trackId: track.id,
         }))
         const merged = mergeTrackWords(transcript.words, incoming, track.id, sourceId)
         transcript.setWords(merged)
-        const currentProject = useEditorStore.getState().project
-        if (currentProject)
-          setProject({ ...currentProject, transcript: { ...generated, words: merged } })
         transcript.ensureTrackVisible(track.id)
-        setIsDirty(true)
+        markEdited()
       } catch (reason) {
-        setError((reason as Error).message)
+        if (transcriptJobId.current === jobId) setError((reason as Error).message)
       } finally {
-        transcript.setIsGenerating(false)
-        transcript.setGeneratingStatus('')
+        if (transcriptJobId.current === jobId) {
+          transcriptJobId.current = null
+          transcript.setIsGenerating(false)
+          transcript.setGeneratingStatus('')
+        }
       }
     },
-    [setIsDirty, setProject],
+    [markEdited],
   )
 
-  const primarySource = project?.audioSources[0]
+  const primarySource = session?.sources[0]
   const projectDuration = tracks
     .flatMap((track) => track.clips)
     .reduce(
       (maximum, clip) => Math.max(maximum, clip.outputStart + clip.sourceEnd - clip.sourceStart),
       0,
     )
-  const exportProject = showExport ? snapshot() : null
+  const exportDraft = showExport ? snapshot() : null
 
   return (
     <div
@@ -314,7 +375,7 @@ export default function App() {
       >
         <strong style={{ marginRight: 'auto' }}>
           {APP_NAME}
-          {workspace ? ` — ${workspace.displayName}` : ''}
+          {session ? ` — ${session.workspace.displayName}` : ''}
           {isDirty ? ' •' : ''}
         </strong>
         <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -364,7 +425,7 @@ export default function App() {
             size="sm"
             variant="ghost"
             onClick={() => setShowExport(true)}
-            disabled={!project?.tracks.length}
+            disabled={!tracks.length}
           >
             Export
           </Button>
@@ -456,8 +517,8 @@ export default function App() {
         </aside>
       </main>
       <TransportBar />
-      {showExport && exportProject ? (
-        <ExportModal project={exportProject} onClose={() => setShowExport(false)} />
+      {showExport && exportDraft && session ? (
+        <ExportModal session={session} draft={exportDraft} onClose={() => setShowExport(false)} />
       ) : null}
     </div>
   )

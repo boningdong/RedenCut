@@ -1,44 +1,69 @@
 import type { IpcRendererEvent } from 'electron'
 import { contextBridge, ipcRenderer } from 'electron'
-import type { IElectronAPI, RenderProgress } from '../shared/ipc.types'
-import type { ImportMode, ImportProgress } from '../shared/import.types'
-import type { AudioSourceId, ProjectFile } from '../shared/project.types'
+import type {
+  CancelSessionJobRequest,
+  ExportJobRequest,
+  IElectronAPI,
+  ImportJobRequest,
+  ImportProgressEvent,
+  RenderProgressEvent,
+  SessionJobResult,
+  TranscriptProgressEvent,
+  TranscriptionJobRequest,
+} from '../shared/ipc.types'
+import type { ImportSelection } from '../shared/import.types'
+import type { Transcript } from '../shared/project.types'
+import type {
+  ProjectMutationRequest,
+  RendererSession,
+  SessionPrecondition,
+} from '../shared/session.types'
+import { invokeSafe } from './invokeSafe'
+
+const invoke = (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args)
 
 const api = {
   audio: {
-    selectImportFile: () => ipcRenderer.invoke('audio:select-import-file'),
-    startImport: (importId: string, token: string, mode: ImportMode, project: ProjectFile) =>
-      ipcRenderer.invoke('audio:start-import', importId, token, mode, project),
-    cancelImport: (importId: string) => ipcRenderer.invoke('audio:cancel-import', importId),
+    selectImportFile: () => invokeSafe<ImportSelection | null>(invoke, 'audio:select-import-file'),
+    startImport: (request: ImportJobRequest) =>
+      invokeSafe<SessionJobResult<RendererSession>>(invoke, 'audio:start-import', request),
+    cancelImport: (request: CancelSessionJobRequest) =>
+      invokeSafe<void>(invoke, 'audio:cancel-import', request),
   },
   project: {
-    initialize: () => ipcRenderer.invoke('project:initialize'),
-    openDialog: () => ipcRenderer.invoke('project:open-dialog'),
-    save: (project: ProjectFile) => ipcRenderer.invoke('project:save', project),
-    saveAs: (project: ProjectFile) => ipcRenderer.invoke('project:save-as', project),
+    initialize: () => invokeSafe<RendererSession>(invoke, 'project:initialize'),
+    openDialog: (expected: SessionPrecondition) =>
+      invokeSafe<RendererSession | null>(invoke, 'project:open-dialog', expected),
+    save: (request: ProjectMutationRequest) =>
+      invokeSafe<RendererSession | null>(invoke, 'project:save', request),
+    saveAs: (request: ProjectMutationRequest) =>
+      invokeSafe<RendererSession | null>(invoke, 'project:save-as', request),
   },
   transcript: {
-    checkAvailability: () => ipcRenderer.invoke('transcript:check-availability'),
-    generate: (audioSourceId: AudioSourceId, language?: string) =>
-      ipcRenderer.invoke('transcript:generate', audioSourceId, language),
+    checkAvailability: () => invokeSafe<string | null>(invoke, 'transcript:check-availability'),
+    generate: (request: TranscriptionJobRequest) =>
+      invokeSafe<SessionJobResult<Transcript>>(invoke, 'transcript:generate', request),
   },
   render: {
-    export: (project: ProjectFile, format: ProjectFile['export']['format']) =>
-      ipcRenderer.invoke('project:export', project, format),
+    export: (request: ExportJobRequest) =>
+      invokeSafe<SessionJobResult<boolean>>(invoke, 'project:export', request),
   },
   on: {
-    importProgress: (callback: (progress: ImportProgress) => void) => {
-      const handler = (_event: IpcRendererEvent, progress: ImportProgress) => callback(progress)
+    importProgress: (callback: (progress: ImportProgressEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: ImportProgressEvent) =>
+        callback(progress)
       ipcRenderer.on('audio:import-progress', handler)
       return () => ipcRenderer.off('audio:import-progress', handler)
     },
-    transcriptProgress: (callback: (status: string) => void) => {
-      const handler = (_event: IpcRendererEvent, status: string) => callback(status)
+    transcriptProgress: (callback: (progress: TranscriptProgressEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: TranscriptProgressEvent) =>
+        callback(progress)
       ipcRenderer.on('transcript:progress', handler)
       return () => ipcRenderer.off('transcript:progress', handler)
     },
-    renderProgress: (callback: (progress: RenderProgress) => void) => {
-      const handler = (_event: IpcRendererEvent, progress: RenderProgress) => callback(progress)
+    renderProgress: (callback: (progress: RenderProgressEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: RenderProgressEvent) =>
+        callback(progress)
       ipcRenderer.on('render:progress', handler)
       return () => ipcRenderer.off('render:progress', handler)
     },

@@ -1,21 +1,5 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Editor Store (Zustand)
-//
-// Owns project-level state and ephemeral UI state that doesn't belong in the
-// playback or timeline stores:
-//   • The current project file + its save path
-//   • The active waveform time-range selection (drag-selection)
-//   • Preview Mode toggle (skip muted regions during playback)
-//
-// What moved OUT of this store:
-//   • edits[] / undoStack → timeline.store (clip/track model)
-//   • selectedEditId → timeline.store.selectedClipId
-//   • Playback state → playback.store
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { create } from 'zustand'
-import type { ProjectFile } from '@shared/project.types'
-import type { WorkspaceDescriptor } from '@shared/import.types'
+import type { RendererSession } from '@shared/session.types'
 
 interface TimeRange {
   start: number
@@ -23,57 +7,57 @@ interface TimeRange {
 }
 
 interface EditorState {
-  // ── Project ────────────────────────────────────────────────────────────────
-  /** Path-free description of the main-owned active workspace. */
-  workspace: WorkspaceDescriptor | null
-  /** True when there are unsaved changes. */
+  session: RendererSession | null
   isDirty: boolean
-  /** The full project data (null until a file is opened). */
-  project: ProjectFile | null
-
-  // ── Selection ──────────────────────────────────────────────────────────────
-  /** The active time-range selection on the waveform (null = nothing selected). */
+  localEditRevision: number
   selection: TimeRange | null
-
-  // ── Preview Mode ───────────────────────────────────────────────────────────
-  /**
-   * When true, playback automatically skips muted regions — simulating
-   * the final export. If the playhead is inside a muted region when Play
-   * is pressed, it jumps to the end of that region immediately.
-   */
   previewMode: boolean
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-  setWorkspace: (workspace: WorkspaceDescriptor | null) => void
-  setIsDirty: (dirty: boolean) => void
-  setProject: (project: ProjectFile | null) => void
-
-  setSelection: (sel: TimeRange | null) => void
-
+  loadSession: (session: RendererSession) => void
+  markEdited: () => void
+  acknowledgeSave: (session: RendererSession, capturedLocalEditRevision: number) => boolean
+  setSelection: (selection: TimeRange | null) => void
   togglePreviewMode: () => void
-
-  /** Reset to initial state (called when opening a new file). */
   reset: () => void
 }
 
 const initialState = {
-  workspace: null,
+  session: null as RendererSession | null,
   isDirty: false,
-  project: null,
-  selection: null,
+  localEditRevision: 0,
+  selection: null as TimeRange | null,
   previewMode: false,
 }
 
-export const useEditorStore = create<EditorState>()((set) => ({
+export const useEditorStore = create<EditorState>()((set, get) => ({
   ...initialState,
 
-  setWorkspace: (workspace) => set({ workspace }),
-  setIsDirty: (dirty) => set({ isDirty: dirty }),
-  setProject: (project) => set({ project }),
+  loadSession: (session) =>
+    set((state) => ({
+      session,
+      isDirty: false,
+      localEditRevision: state.localEditRevision,
+    })),
 
-  setSelection: (sel) => set({ selection: sel }),
+  markEdited: () =>
+    set((state) => ({ isDirty: true, localEditRevision: state.localEditRevision + 1 })),
 
-  togglePreviewMode: () => set((s) => ({ previewMode: !s.previewMode })),
+  acknowledgeSave: (session, capturedLocalEditRevision) => {
+    const state = get()
+    const unchanged = state.localEditRevision === capturedLocalEditRevision
+    set({
+      session:
+        unchanged || !state.session
+          ? session
+          : {
+              ...session,
+              draft: state.session.draft,
+            },
+      isDirty: unchanged ? false : state.isDirty,
+    })
+    return unchanged
+  },
 
+  setSelection: (selection) => set({ selection }),
+  togglePreviewMode: () => set((state) => ({ previewMode: !state.previewMode })),
   reset: () => set({ ...initialState }),
 }))

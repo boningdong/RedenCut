@@ -1,0 +1,67 @@
+import type { IpcError, IpcResult } from '../../shared/ipc.types'
+import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
+import { ZodError } from 'zod'
+
+type IpcErrorCode = IpcError['code']
+
+const SAFE_MESSAGES: Record<IpcErrorCode, string> = {
+  'stale-session': 'This project session is no longer current.',
+  cancelled: 'The operation was cancelled.',
+  'invalid-request': 'The request was invalid.',
+  'operation-failed': 'The operation could not be completed.',
+}
+
+export class PublicIpcError extends Error {
+  constructor(readonly code: Exclude<IpcErrorCode, 'operation-failed'>) {
+    super(SAFE_MESSAGES[code])
+    this.name = 'PublicIpcError'
+  }
+}
+
+export async function toIpcResult<T>(
+  operation: () => Promise<T> | T,
+  diagnosticSink: (error: unknown) => void = console.error,
+): Promise<IpcResult<T>> {
+  try {
+    return { ok: true, value: await operation() }
+  } catch (error) {
+    diagnosticSink(error)
+    const mapped = mapError(error)
+    return { ok: false, error: mapped }
+  }
+}
+
+function mapError(error: unknown): IpcError {
+  if (error instanceof PublicIpcError)
+    return { code: error.code, message: SAFE_MESSAGES[error.code] }
+  if (error instanceof DOMException && error.name === 'AbortError')
+    return { code: 'cancelled', message: SAFE_MESSAGES.cancelled }
+  if (error instanceof ZodError)
+    return { code: 'invalid-request', message: SAFE_MESSAGES['invalid-request'] }
+  if (
+    error instanceof Error &&
+    (error.message === 'Stale workspace token' || error.message === 'Stale workspace revision')
+  )
+    return { code: 'stale-session', message: SAFE_MESSAGES['stale-session'] }
+  return { code: 'operation-failed', message: SAFE_MESSAGES['operation-failed'] }
+}
+
+export function requireSessionPrecondition(value: unknown): SessionPrecondition {
+  if (!value || typeof value !== 'object') throw new PublicIpcError('invalid-request')
+  const candidate = value as Record<string, unknown>
+  if (
+    typeof candidate.workspaceToken !== 'string' ||
+    !Number.isSafeInteger(candidate.revision) ||
+    (candidate.revision as number) < 1
+  )
+    throw new PublicIpcError('invalid-request')
+  return {
+    workspaceToken: candidate.workspaceToken as WorkspaceToken,
+    revision: candidate.revision as number,
+  }
+}
+
+export function requireJobId(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0) throw new PublicIpcError('invalid-request')
+  return value
+}

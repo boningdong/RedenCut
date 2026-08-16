@@ -5,6 +5,7 @@ import { registerProjectIpc } from './ipc/project.ipc'
 import { registerRenderIpc } from './ipc/render.ipc'
 import { registerTranscriptIpc } from './ipc/transcript.ipc'
 import { WorkspaceController } from './project/WorkspaceController'
+import { SessionJobRegistry } from './project/SessionJobRegistry'
 import { createCacheProtocolHandler } from './protocol/cacheProtocol'
 import { createFileRangeResponse } from './protocol/fileRangeResponse'
 
@@ -33,10 +34,11 @@ function createWindow(): void {
 void app.whenReady().then(async () => {
   const controller = new WorkspaceController()
   await controller.initialize(app.getPath('temp'))
+  const jobs = new SessionJobRegistry()
   registerProjectIpc(controller)
-  registerAudioIpc(controller)
-  registerTranscriptIpc(controller)
-  registerRenderIpc(controller)
+  registerAudioIpc(controller, jobs)
+  registerTranscriptIpc(controller, jobs)
+  registerRenderIpc(controller, jobs)
 
   protocol.handle(
     'podcut',

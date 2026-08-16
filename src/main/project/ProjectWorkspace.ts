@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
-import type { ProjectOpenResult, WorkspaceDescriptor } from '../../shared/import.types'
+import type { WorkspaceDescriptor } from '../../shared/import.types'
 import { createEmptyProject, ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
 
 export class ProjectWorkspace {
@@ -50,7 +50,7 @@ export class ProjectWorkspace {
     destination: string,
     project: ProjectFile,
     prepare?: (candidate: ProjectWorkspace) => Promise<void>,
-  ): Promise<void> {
+  ): Promise<ProjectWorkspace> {
     const validated = ProjectFileSchema.parse(project)
     if (destination === this.root && this.temporary)
       throw new Error('Cannot publish over the temporary workspace')
@@ -86,22 +86,18 @@ export class ProjectWorkspace {
         if (destinationBackedUp) await rename(backup, destination)
         throw error
       }
-      const oldRoot = this.root
-      const oldWasTemporary = this.temporary
-      this.root = destination
-      this.project = validated
-      this.temporary = false
-      if (oldWasTemporary && oldRoot !== destination)
-        await rm(oldRoot, { recursive: true, force: true }).catch(() => {})
+      candidate.root = destination
       if (destinationBackedUp) await rm(backup, { recursive: true, force: true }).catch(() => {})
+      return candidate
     } catch (error) {
       await rm(stage, { recursive: true, force: true }).catch(() => {})
       throw error
     }
   }
 
-  toOpenResult(sources: ProjectOpenResult['sources']): ProjectOpenResult {
-    return { project: this.project, workspace: this.descriptor, sources }
+  async close(): Promise<void> {
+    if (!this.temporary) return
+    await rm(this.root, { recursive: true, force: true })
   }
 }
 
