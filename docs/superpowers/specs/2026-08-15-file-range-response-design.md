@@ -85,6 +85,12 @@ The filename uses lower camel case because the module exports a function, not a 
 
 `index.ts` replaces the `net.fetch(file://...)` callback with the file range response function. It remains composition-only and does not parse ranges or access manifests.
 
+### Renderer connection policy
+
+The renderer Content Security Policy explicitly permits cache fetches with `connect-src 'self' podcut:`. The `podcut` scheme remains registered with `secure`, `supportFetchAPI`, and `stream` privileges, but it must not use Electron's `bypassCSP` privilege.
+
+This keeps Chromium's policy enforcement active while authorizing only the connection scheme required by the managed PCM and waveform providers. Main-process route, source, manifest, range, and artifact validation remain the authorization boundary behind that scheme.
+
 ### Renderer providers
 
 `ContinuousPcmSampleProvider` and `BinaryWaveformDataProvider` remain unchanged. Their existing requirement for status `206` and exact body length is the desired consumer contract.
@@ -174,6 +180,8 @@ Re-import the supplied `long-sample.mp3`, then verify:
 - no AudioWorklet underruns attributable to cache transport;
 - reopening the generated project and repeating a late seek.
 
+The workflow must also confirm that renderer-originated `podcut://cache/...` requests reach the registered handler without CSP violations. A successful main-process diagnostic alone is insufficient because it bypasses the renderer policy boundary.
+
 ## Completion criteria
 
-The repair is complete when the real file adapter returns exact standards-compliant `206` responses, PCM and waveform providers succeed through the protected protocol, the supplied MP3 plays and seeks at late positions without cache transport errors, the repository quality gate passes, and no project-format or renderer-authority expansion has been introduced.
+The repair is complete when the real file adapter returns exact standards-compliant `206` responses, PCM and waveform providers succeed through the protected protocol, the renderer CSP permits `podcut:` without `bypassCSP`, the supplied MP3 plays and seeks at late positions without cache transport errors, the repository quality gate passes, and no project-format or renderer-authority expansion has been introduced.

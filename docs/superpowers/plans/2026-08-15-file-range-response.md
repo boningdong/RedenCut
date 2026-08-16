@@ -618,6 +618,125 @@ Invoke `superpowers:requesting-code-review` over the complete repair range. Requ
 
 Address every Critical or Important finding with a new failing test before changing implementation.
 
+### Task 5: Narrow renderer policy and complete workflow validation
+
+**Files:**
+- Modify: `src/renderer/index.html:6-15`
+- Create: `src/main/protocol/cacheProtocolSecurity.test.ts`
+- Verify: `src/main/index.ts:11-13`
+
+**Interfaces:**
+- Produces: renderer CSP directive `connect-src 'self' podcut:`.
+- Preserves: `{ secure: true, supportFetchAPI: true, stream: true }` protocol privileges without `bypassCSP`.
+- Consumes: the unchanged renderer-facing `podcut://cache/...` URLs and protected main-process handler.
+
+- [ ] **Step 1: Add a failing semantic policy regression test**
+
+Create `cacheProtocolSecurity.test.ts`:
+
+```ts
+import { readFile } from 'fs/promises'
+import { join } from 'path'
+import { describe, expect, it } from 'vitest'
+
+function parseDirectives(policy: string): Map<string, string[]> {
+  return new Map(
+    policy
+      .split(';')
+      .map((directive) => directive.trim().split(/\s+/))
+      .filter(([name]) => name)
+      .map(([name, ...sources]) => [name, sources]),
+  )
+}
+
+describe('managed cache renderer security policy', () => {
+  it('allows only the required renderer connection schemes without bypassing CSP', async () => {
+    const rendererHtml = await readFile(
+      join(__dirname, '../../renderer/index.html'),
+      'utf8',
+    )
+    const mainSource = await readFile(join(__dirname, '../index.ts'), 'utf8')
+    const policy = rendererHtml.match(
+      /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/,
+    )?.[1]
+
+    expect(policy).toBeDefined()
+    expect(parseDirectives(policy!).get('connect-src')).toEqual(["'self'", 'podcut:'])
+    expect(mainSource).not.toContain('bypassCSP')
+  })
+})
+```
+
+- [ ] **Step 2: Run the regression test and confirm the missing directive**
+
+Run:
+
+```bash
+npx vitest run src/main/protocol/cacheProtocolSecurity.test.ts
+```
+
+Expected: FAIL because `connect-src` is absent, while the no-`bypassCSP` assertion already passes.
+
+- [ ] **Step 3: Add only the narrow CSP connection directive**
+
+Change the renderer CSP to:
+
+```html
+content="default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' podcut:; media-src 'self' blob: file:; img-src 'self' data: blob:"
+```
+
+Update the adjacent CSP comment to state that `connect-src 'self' podcut:` permits managed cache fetches. Do not add `bypassCSP` or any wildcard source.
+
+- [ ] **Step 4: Run the policy and cache integration tests**
+
+Run:
+
+```bash
+npx vitest run src/main/protocol/cacheProtocolSecurity.test.ts src/main/protocol/fileRangeResponse.test.ts src/main/protocol/cacheProtocol.test.ts src/main/protocol/cacheProtocol.integration.test.ts
+```
+
+Expected: all focused tests PASS.
+
+- [ ] **Step 5: Run the complete automated verification**
+
+Run in this order:
+
+```bash
+npm run format
+npm run check
+npm run profile:waveform
+git diff --check
+```
+
+Expected: formatting, ESLint, Knip, typecheck, all tests, production build, and waveform performance PASS; `git diff --check` prints no output.
+
+- [ ] **Step 6: Repeat the complete supplied-MP3 workflow**
+
+Run `npm run dev` and import `/Users/boning/Documents/自来野/long-sample.mp3` in Reference mode. If macOS Accessibility still blocks native-picker automation, substitute only `dialog.showOpenDialog`'s Import Audio result as in Task 4 and record that limitation.
+
+Verify all of these checkpoints:
+
+1. The renderer reports no CSP violation for `podcut://cache/...`.
+2. Waveforms render at the beginning, around 2,400 seconds, and near 4,800 seconds.
+3. Playback runs from zero for at least 15 seconds.
+4. Playback runs for at least 10 seconds after seeks near 60, 2,400, and 4,800 seconds.
+5. Renderer cache requests return exact `206` responses with no `4xx` or `5xx` responses or cache-transport errors.
+6. The AudioWorklet queue does not report transport-attributable underruns during those intervals.
+7. Save the project, close it, reopen it, seek near 4,800 seconds, and play for at least 10 seconds.
+
+Stop at the first failure and return to `superpowers:systematic-debugging`; do not stack another speculative fix. Shut down Electron and remove only the temporary diagnostic workspace created by this run after evidence is recorded.
+
+- [ ] **Step 7: Commit the policy repair**
+
+```bash
+git add src/renderer/index.html src/main/protocol/cacheProtocolSecurity.test.ts
+git commit -m "fix: allow managed cache protocol connections"
+```
+
+- [ ] **Step 8: Request final whole-branch review**
+
+Invoke `superpowers:requesting-code-review` over the complete managed-audio repair range. Require the reviewer to verify the exact CSP directive, absence of `bypassCSP`, protected range behavior, cancellation, provider integration, and complete supplied-MP3 workflow evidence.
+
 ## Final acceptance
 
 - Electron no longer serves cache files through `net.fetch(file://...)`.
@@ -626,5 +745,6 @@ Address every Critical or Important finding with a new failing test before chang
 - Authorized file failures return `500`; authorization and manifest failures remain `404`.
 - Cancellation aborts in-flight file delivery without producing a playback error.
 - Renderer providers require no code or contract changes.
+- Renderer CSP contains exactly `connect-src 'self' podcut:` and the protocol registration does not use `bypassCSP`.
 - The supplied MP3 imports, renders waveforms, plays from zero, and seeks near 60, 2,400, and 4,800 seconds without cache transport errors.
 - `npm run check`, `npm run profile:waveform`, and `git diff --check` pass.
