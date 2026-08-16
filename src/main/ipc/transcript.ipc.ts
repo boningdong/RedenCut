@@ -20,25 +20,29 @@ export function registerTranscriptIpc(
     toIpcResult(async (): Promise<SessionJobResult<Transcript>> => {
       const request = transcriptionRequest(input)
       controller.assertCurrent(request)
-      const operation = (async () => {
-        const path = await controller.resolveOriginal(request.audioSourceId)
-        const value = await whisperTranscriber.transcribe(
-          path,
-          { language: request.language },
-          (status) => {
-            if (!event.sender.isDestroyed())
-              event.sender.send('transcript:progress', { ...requestEnvelope(request), status })
-          },
-        )
-        return { ...requestEnvelope(request), value }
-      })()
-      const unregister = jobs.register({
-        kind: 'transcription',
-        ...requestEnvelope(request),
-        senderId: event.sender.id,
-        cancel: () => {},
-        settled: operation,
-      })
+      let operation!: Promise<SessionJobResult<Transcript>>
+      const unregister = jobs.register(
+        {
+          kind: 'transcription',
+          ...requestEnvelope(request),
+          senderId: event.sender.id,
+        },
+        () => {
+          operation = (async () => {
+            const path = await controller.resolveOriginal(request.audioSourceId)
+            const value = await whisperTranscriber.transcribe(
+              path,
+              { language: request.language },
+              (status) => {
+                if (!event.sender.isDestroyed())
+                  event.sender.send('transcript:progress', { ...requestEnvelope(request), status })
+              },
+            )
+            return { ...requestEnvelope(request), value }
+          })()
+          return { cancel: () => {}, settled: operation }
+        },
+      )
       event.sender.once('destroyed', () => {
         void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
       })

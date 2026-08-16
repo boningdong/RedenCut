@@ -66,37 +66,45 @@ export function registerAudioIpc(
         coordinator = new ImportCoordinator(controller.workspace)
         coordinatorRoot = controller.workspace.root
       }
-      const project = mergeProjectDraft(controller.workspace.project, request.draft)
-      const operation = (async () => {
-        const imported = await coordinator.import(
-          request.jobId,
-          selection.path,
-          request.mode,
-          project,
-          (progress) => {
-            if (!event.sender.isDestroyed())
-              event.sender.send('audio:import-progress', {
-                workspaceToken: request.workspaceToken,
-                revision: request.revision,
-                jobId: request.jobId,
-                displayName: progress.displayName,
-                stage: progress.stage,
-                percent: progress.percent,
-              })
-          },
-        )
-        const session = await controller.runTransition(request, (transaction) =>
-          transaction.commitImport(imported.project),
-        )
-        return { ...requestEnvelope(request), value: session }
-      })()
-      const unregister = jobs.register({
-        kind: 'import',
-        ...requestEnvelope(request),
-        senderId: event.sender.id,
-        cancel: () => coordinator.cancel(request.jobId),
-        settled: operation,
-      })
+      const jobCoordinator = coordinator
+      let operation!: Promise<SessionJobResult<RendererSession>>
+      const unregister = jobs.register(
+        {
+          kind: 'import',
+          ...requestEnvelope(request),
+          senderId: event.sender.id,
+        },
+        () => {
+          operation = (async () => {
+            const project = mergeProjectDraft(controller.workspace.project, request.draft)
+            const imported = await jobCoordinator.import(
+              request.jobId,
+              selection.path,
+              request.mode,
+              project,
+              (progress) => {
+                if (!event.sender.isDestroyed())
+                  event.sender.send('audio:import-progress', {
+                    workspaceToken: request.workspaceToken,
+                    revision: request.revision,
+                    jobId: request.jobId,
+                    displayName: progress.displayName,
+                    stage: progress.stage,
+                    percent: progress.percent,
+                  })
+              },
+            )
+            const session = await controller.runTransition(request, (transaction) =>
+              transaction.commitImport(imported.project),
+            )
+            return { ...requestEnvelope(request), value: session }
+          })()
+          return {
+            cancel: () => jobCoordinator.cancel(request.jobId),
+            settled: operation,
+          }
+        },
+      )
       event.sender.once('destroyed', () => {
         void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
       })

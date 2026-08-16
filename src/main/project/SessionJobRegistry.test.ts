@@ -19,55 +19,49 @@ describe('SessionJobRegistry', () => {
   it('rejects registrations for a closing token until it is reopened', () => {
     const registry = new SessionJobRegistry()
     registry.beginClosing(TOKEN_A)
-    const registration = {
+    const identity = {
       kind: 'import' as const,
       jobId: 'job-1',
       senderId: 1,
       workspaceToken: TOKEN_A,
-      cancel: vi.fn(),
-      settled: Promise.resolve(),
     }
+    const start = vi.fn(() => ({ cancel: vi.fn(), settled: Promise.resolve() }))
 
-    expect(() => registry.register(registration)).toThrow('Session is closing')
+    expect(() => registry.register(identity, start)).toThrow('Session is closing')
+    expect(start).not.toHaveBeenCalled()
     registry.reopen(TOKEN_A)
-    const unregister = registry.register(registration)
+    const unregister = registry.register(identity, start)
+    expect(start).toHaveBeenCalledTimes(1)
     expect(() => unregister()).not.toThrow()
     expect(() => unregister()).not.toThrow()
   })
 
   it('rejects duplicate job identities', () => {
     const registry = new SessionJobRegistry()
-    const registration = {
+    const identity = {
       kind: 'export' as const,
       jobId: 'job-1',
       senderId: 7,
       workspaceToken: TOKEN_A,
-      cancel: vi.fn(),
-      settled: Promise.resolve(),
     }
-    registry.register(registration)
+    registry.register(identity, () => ({ cancel: vi.fn(), settled: Promise.resolve() }))
+    const duplicateStart = vi.fn(() => ({ cancel: vi.fn(), settled: Promise.resolve() }))
 
-    expect(() => registry.register(registration)).toThrow('Job is already registered')
+    expect(() => registry.register(identity, duplicateStart)).toThrow('Job is already registered')
+    expect(duplicateStart).not.toHaveBeenCalled()
   })
 
   it('cancels a job once across concurrent calls and awaits settlement', async () => {
     const registry = new SessionJobRegistry()
     const settled = deferred()
     const cancel = vi.fn()
-    registry.register({
-      kind: 'transcription',
-      jobId: 'job-1',
-      senderId: 1,
-      workspaceToken: TOKEN_A,
-      cancel,
-      settled: settled.promise,
-    })
     const identity = {
       kind: 'transcription' as const,
       jobId: 'job-1',
       senderId: 1,
       workspaceToken: TOKEN_A,
     }
+    registry.register(identity, () => ({ cancel, settled: settled.promise }))
 
     const first = registry.cancelAndSettleJob(identity)
     const second = registry.cancelAndSettleJob(identity)
@@ -90,22 +84,14 @@ describe('SessionJobRegistry', () => {
     const second = deferred()
     const firstCancel = vi.fn()
     const secondCancel = vi.fn()
-    registry.register({
-      kind: 'import',
-      jobId: 'first',
-      senderId: 1,
-      workspaceToken: TOKEN_A,
-      cancel: firstCancel,
-      settled: first.promise,
-    })
-    registry.register({
-      kind: 'export',
-      jobId: 'second',
-      senderId: 2,
-      workspaceToken: TOKEN_A,
-      cancel: secondCancel,
-      settled: second.promise,
-    })
+    registry.register(
+      { kind: 'import', jobId: 'first', senderId: 1, workspaceToken: TOKEN_A },
+      () => ({ cancel: firstCancel, settled: first.promise }),
+    )
+    registry.register(
+      { kind: 'export', jobId: 'second', senderId: 2, workspaceToken: TOKEN_A },
+      () => ({ cancel: secondCancel, settled: second.promise }),
+    )
 
     const settlement = registry.cancelAndSettleToken(TOKEN_A)
     first.reject(new Error('first failed'))
@@ -128,30 +114,18 @@ describe('SessionJobRegistry', () => {
     const matchingCancel = vi.fn()
     const otherSenderCancel = vi.fn()
     const otherTokenCancel = vi.fn()
-    registry.register({
-      kind: 'import',
-      jobId: 'matching',
-      senderId: 1,
-      workspaceToken: TOKEN_A,
-      cancel: matchingCancel,
-      settled: Promise.resolve(),
-    })
-    registry.register({
-      kind: 'transcription',
-      jobId: 'other-sender',
-      senderId: 2,
-      workspaceToken: TOKEN_A,
-      cancel: otherSenderCancel,
-      settled: Promise.resolve(),
-    })
-    registry.register({
-      kind: 'export',
-      jobId: 'other-token',
-      senderId: 1,
-      workspaceToken: TOKEN_B,
-      cancel: otherTokenCancel,
-      settled: Promise.resolve(),
-    })
+    registry.register(
+      { kind: 'import', jobId: 'matching', senderId: 1, workspaceToken: TOKEN_A },
+      () => ({ cancel: matchingCancel, settled: Promise.resolve() }),
+    )
+    registry.register(
+      { kind: 'transcription', jobId: 'other-sender', senderId: 2, workspaceToken: TOKEN_A },
+      () => ({ cancel: otherSenderCancel, settled: Promise.resolve() }),
+    )
+    registry.register(
+      { kind: 'export', jobId: 'other-token', senderId: 1, workspaceToken: TOKEN_B },
+      () => ({ cancel: otherTokenCancel, settled: Promise.resolve() }),
+    )
 
     await registry.cancelAndSettleSender(1)
 

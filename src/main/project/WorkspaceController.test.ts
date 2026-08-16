@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
@@ -274,6 +274,92 @@ describe('WorkspaceController session authority', () => {
     expect(second.revision).toBe(3)
     expect(second.workspaceToken).not.toBe(first.workspaceToken)
     expect(await readFile(join(firstRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+  })
+
+  it('rejects Open through a symlink to the same temporary root without changing the session', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    const session = await controller.initialize(parent)
+    const temporaryRoot = controller.workspace.root
+    const alias = join(parent, 'Alias.podcut')
+    await symlink(temporaryRoot, alias, 'dir')
+    const candidate = await controller.prepareOpen(alias)
+
+    await expect(controller.commitPreparedOpen(candidate, session)).rejects.toThrow(
+      'overlaps the temporary workspace',
+    )
+
+    expect(controller.workspace.root).toBe(temporaryRoot)
+    expect(() => controller.assertCurrent(session)).not.toThrow()
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+  })
+
+  it('rejects Open of a descendant of the temporary root without changing the session', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    const session = await controller.initialize(parent)
+    const temporaryRoot = controller.workspace.root
+    const candidate = await controller.prepareOpen(
+      await emptyPackage(temporaryRoot, 'Nested.podcut'),
+    )
+
+    await expect(controller.commitPreparedOpen(candidate, session)).rejects.toThrow(
+      'overlaps the temporary workspace',
+    )
+
+    expect(controller.workspace.root).toBe(temporaryRoot)
+    expect(() => controller.assertCurrent(session)).not.toThrow()
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+  })
+
+  it('rejects Save As through a symlink to the same temporary root before publication', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    const session = await controller.initialize(parent)
+    const temporaryRoot = controller.workspace.root
+    const alias = join(parent, 'Alias.podcut')
+    await symlink(temporaryRoot, alias, 'dir')
+
+    await expect(controller.saveAs(alias, request(session))).rejects.toThrow(
+      'overlaps the temporary workspace',
+    )
+
+    expect(controller.workspace.root).toBe(temporaryRoot)
+    expect(() => controller.assertCurrent(session)).not.toThrow()
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+  })
+
+  it('rejects Save As below the temporary root before publication', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    const session = await controller.initialize(parent)
+    const temporaryRoot = controller.workspace.root
+    const destination = join(temporaryRoot, 'Nested.podcut')
+
+    await expect(controller.saveAs(destination, request(session))).rejects.toThrow(
+      'overlaps the temporary workspace',
+    )
+
+    expect(controller.workspace.root).toBe(temporaryRoot)
+    expect(() => controller.assertCurrent(session)).not.toThrow()
+    await expect(stat(destination)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('keeps a captured original resolver bound to its validated workspace after a switch', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    await controller.initialize(parent)
+    const firstRoot = await packageWithoutCache()
+    const secondRoot = await packageWithoutCache()
+    await Promise.all([writeValidCache(firstRoot), writeValidCache(secondRoot)])
+    const first = await controller.open(firstRoot)
+    const resolveCapturedOriginal = controller.captureOriginalResolver(first)
+
+    await controller.open(secondRoot)
+
+    await expect(resolveCapturedOriginal(SOURCE_ID)).resolves.toBe(
+      join(await realpath(firstRoot), 'media', SOURCE_ID, 'source.wav'),
+    )
   })
 })
 

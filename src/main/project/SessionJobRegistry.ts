@@ -9,12 +9,12 @@ export interface SessionJobIdentity {
   workspaceToken: WorkspaceToken
 }
 
-export interface SessionJobRegistration extends SessionJobIdentity {
+export interface SessionJobExecution {
   cancel: () => void | Promise<void>
   settled: Promise<unknown>
 }
 
-interface RegisteredJob extends SessionJobRegistration {
+interface RegisteredJob extends SessionJobIdentity, SessionJobExecution {
   cancellation: Promise<void> | null
   completion: Promise<void> | null
 }
@@ -23,12 +23,26 @@ export class SessionJobRegistry {
   private readonly closingTokens = new Set<WorkspaceToken>()
   private readonly jobs = new Map<string, RegisteredJob>()
 
-  register(registration: SessionJobRegistration): () => void {
-    if (this.closingTokens.has(registration.workspaceToken)) throw new Error('Session is closing')
-    const key = jobKey(registration)
+  register(identity: SessionJobIdentity, start: () => SessionJobExecution): () => void {
+    if (this.closingTokens.has(identity.workspaceToken)) throw new Error('Session is closing')
+    const key = jobKey(identity)
     if (this.jobs.has(key)) throw new Error('Job is already registered')
-    const job: RegisteredJob = { ...registration, cancellation: null, completion: null }
+    const job: RegisteredJob = {
+      ...identity,
+      cancel: () => {},
+      settled: Promise.resolve(),
+      cancellation: null,
+      completion: null,
+    }
     this.jobs.set(key, job)
+    try {
+      const execution = start()
+      job.cancel = execution.cancel
+      job.settled = execution.settled
+    } catch (error) {
+      this.jobs.delete(key)
+      throw error
+    }
     let unregistered = false
     return () => {
       if (unregistered) return

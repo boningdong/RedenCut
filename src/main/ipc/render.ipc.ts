@@ -20,42 +20,53 @@ export function registerRenderIpc(
     toIpcResult(async (): Promise<SessionJobResult<boolean>> => {
       const request = exportRequest(input)
       controller.assertCurrent(request)
-      const authoritative = mergeProjectDraft(controller.workspace.project, request.draft)
-      const project = ProjectFileSchema.parse({
-        ...authoritative,
-        export: { ...authoritative.export, format: request.format },
-      })
-      const window =
-        BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
-      const destination = await dialog.showSaveDialog(window, {
-        title: 'Export Audio',
-        defaultPath: `export.${project.export.format}`,
-        filters: [
-          { name: project.export.format.toUpperCase(), extensions: [project.export.format] },
-        ],
-      })
-      if (destination.canceled || !destination.filePath)
-        return { ...requestEnvelope(request), value: false }
       let child: ChildProcess | null = null
-      const operation = (async () => {
-        const paths = new Map<string, string>()
-        for (const source of project.audioSources)
-          paths.set(source.id, await controller.resolveOriginal(source.id))
-        child = spawn(getFfmpegPath(), buildRenderArgs(project, paths, destination.filePath), {
-          stdio: ['ignore', 'ignore', 'pipe'],
-        })
-        await waitForExport(child, project, request, event.sender)
-        return { ...requestEnvelope(request), value: true }
-      })()
-      const unregister = jobs.register({
-        kind: 'export',
-        ...requestEnvelope(request),
-        senderId: event.sender.id,
-        cancel: () => {
-          child?.kill()
+      let operation!: Promise<SessionJobResult<boolean>>
+      const unregister = jobs.register(
+        {
+          kind: 'export',
+          ...requestEnvelope(request),
+          senderId: event.sender.id,
         },
-        settled: operation,
-      })
+        () => {
+          operation = (async () => {
+            const resolveOriginal = controller.captureOriginalResolver(request)
+            const authoritative = mergeProjectDraft(controller.workspace.project, request.draft)
+            const project = ProjectFileSchema.parse({
+              ...authoritative,
+              export: { ...authoritative.export, format: request.format },
+            })
+            const window =
+              BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
+            const destination = await dialog.showSaveDialog(window, {
+              title: 'Export Audio',
+              defaultPath: `export.${project.export.format}`,
+              filters: [
+                {
+                  name: project.export.format.toUpperCase(),
+                  extensions: [project.export.format],
+                },
+              ],
+            })
+            if (destination.canceled || !destination.filePath)
+              return { ...requestEnvelope(request), value: false }
+            const paths = new Map<string, string>()
+            for (const source of project.audioSources)
+              paths.set(source.id, await resolveOriginal(source.id))
+            child = spawn(getFfmpegPath(), buildRenderArgs(project, paths, destination.filePath), {
+              stdio: ['ignore', 'ignore', 'pipe'],
+            })
+            await waitForExport(child, project, request, event.sender)
+            return { ...requestEnvelope(request), value: true }
+          })()
+          return {
+            cancel: () => {
+              child?.kill()
+            },
+            settled: operation,
+          }
+        },
+      )
       event.sender.once('destroyed', () => {
         void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
       })

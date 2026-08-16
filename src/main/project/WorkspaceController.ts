@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto'
 import { createReadStream } from 'fs'
-import { stat } from 'fs/promises'
-import { join } from 'path'
+import { realpath, stat } from 'fs/promises'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { AudioSourceCacheDescriptor } from '../../shared/import.types'
 import { ProjectFileSchema, type AudioSourceId, type ProjectFile } from '../../shared/project.types'
 import type {
@@ -142,6 +142,21 @@ export class WorkspaceController {
     return path
   }
 
+  captureOriginalResolver(
+    expected: SessionPrecondition,
+  ): (audioSourceId: AudioSourceId) => Promise<string> {
+    this.assertCurrent(expected)
+    const workspace = this.workspace
+    const sources = new Map(workspace.project.audioSources.map((source) => [source.id, source]))
+    return async (audioSourceId) => {
+      const source = sources.get(audioSourceId)
+      if (!source) throw new Error(`Unknown audio source: ${audioSourceId}`)
+      const path = await resolveOriginal(workspace, source)
+      await verifyFingerprint(path, source.fingerprint)
+      return path
+    }
+  }
+
   private captureState(): TransactionState {
     if (!this.current || !this.workspaceToken)
       throw new Error('Project workspace has not been initialized')
@@ -174,6 +189,7 @@ export class WorkspaceController {
   ): Promise<RendererSession> {
     const workspace = state.workspace
     const project = mergeProjectDraft(workspace.project, draft)
+    await assertSafeSwitchRoot(workspace, destination)
     let descriptors: AudioSourceCacheDescriptor[] | null = null
     const candidate = await workspace.saveAs(destination, project, async (prepared) => {
       descriptors = await this.descriptors(prepared)
@@ -189,6 +205,7 @@ export class WorkspaceController {
     candidate: PreparedWorkspace,
   ): Promise<RendererSession> {
     const oldWorkspace = state.workspace
+    await assertSafeSwitchRoot(oldWorkspace, candidate.workspace.root)
     this.installWorkspace(state, candidate.workspace)
     await oldWorkspace.close().catch(() => {})
     return toRendererSession(
@@ -258,6 +275,32 @@ export class WorkspaceController {
       result.push(store.descriptor(manifest))
     }
     return result
+  }
+}
+
+async function assertSafeSwitchRoot(
+  oldWorkspace: ProjectWorkspace,
+  candidateRoot: string,
+): Promise<void> {
+  if (oldWorkspace.descriptor.kind !== 'temporary') return
+  const [oldRoot, candidate] = await Promise.all([
+    canonicalRoot(oldWorkspace.root),
+    canonicalRoot(candidateRoot),
+  ])
+  const fromOld = relative(oldRoot, candidate)
+  if (
+    fromOld === '' ||
+    (fromOld !== '..' && !fromOld.startsWith(`..${sep}`) && !isAbsolute(fromOld))
+  )
+    throw new Error('Candidate root overlaps the temporary workspace')
+}
+
+async function canonicalRoot(path: string): Promise<string> {
+  try {
+    return await realpath(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    return resolve(await realpath(dirname(path)), basename(path))
   }
 }
 
