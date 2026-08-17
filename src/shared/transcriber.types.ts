@@ -12,6 +12,9 @@
 
 import type { Transcript } from './project.types'
 
+export type TranscriptionJobId = string & { readonly __brand: 'TranscriptionJobId' }
+export type TranscriptionCancellationResult = 'cancelled' | 'not-found'
+
 export interface TranscribeOptions {
   /**
    * BCP-47 language code, e.g. "en", "zh", "es".
@@ -50,5 +53,10 @@ export interface ITranscriber {
    * Returns a Transcript with word-level timestamps.
    * May take minutes for long files — callers should show a progress indicator.
    */
-  transcribe(audioFilePath: string, options?: TranscribeOptions): Promise<Transcript>
+  transcribe(
+    audioFilePath: string,
+    options: TranscribeOptions,
+    signal: AbortSignal,
+    onProgress?: (status: string) => void,
+  ): Promise<Transcript>
 }

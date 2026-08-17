@@ -5,6 +5,7 @@ import type {
   ImportSelection,
 } from './import.types'
 import type { AudioSourceId, Transcript } from './project.types'
+import type { TranscriptionCancellationResult, TranscriptionJobId } from './transcriber.types'
 import type {
   ProjectDraft,
   ProjectMutationRequest,
@@ -19,11 +20,11 @@ export interface IpcError {
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: IpcError }
 
-interface SessionJobRequest extends SessionPrecondition {
-  jobId: string
+interface SessionJobRequest<JobId extends string = string> extends SessionPrecondition {
+  jobId: JobId
 }
 
-export type CancelSessionJobRequest = SessionJobRequest
+export type CancelSessionJobRequest<JobId extends string = string> = SessionJobRequest<JobId>
 
 export interface ImportJobRequest extends SessionJobRequest {
   selectionToken: string
@@ -31,7 +32,7 @@ export interface ImportJobRequest extends SessionJobRequest {
   draft: ProjectDraft
 }
 
-export interface TranscriptionJobRequest extends SessionJobRequest {
+export interface TranscriptionJobRequest extends SessionJobRequest<TranscriptionJobId> {
   audioSourceId: AudioSourceId
   language?: string
 }
@@ -41,7 +42,10 @@ export interface ExportJobRequest extends SessionJobRequest {
   format: ProjectDraft['export']['format']
 }
 
-export interface SessionJobResult<T> extends SessionJobRequest {
+export interface SessionJobResult<
+  T,
+  JobId extends string = string,
+> extends SessionJobRequest<JobId> {
   value: T
 }
 
@@ -51,7 +55,7 @@ export interface ImportProgressEvent extends SessionJobRequest {
   percent: number
 }
 
-export interface TranscriptProgressEvent extends SessionJobRequest {
+export interface TranscriptProgressEvent extends SessionJobRequest<TranscriptionJobId> {
   status: string
 }
 
@@ -77,7 +81,12 @@ export interface IElectronAPI {
   }
   transcript: {
     checkAvailability(): Promise<string | null>
-    generate(request: TranscriptionJobRequest): Promise<SessionJobResult<Transcript>>
+    generate(
+      request: TranscriptionJobRequest,
+    ): Promise<SessionJobResult<Transcript, TranscriptionJobId>>
+    cancel(
+      request: CancelSessionJobRequest<TranscriptionJobId>,
+    ): Promise<TranscriptionCancellationResult>
   }
   render: {
     export(request: ExportJobRequest): Promise<SessionJobResult<boolean>>

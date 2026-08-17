@@ -2,6 +2,7 @@ import { expectTypeOf, test } from 'vitest'
 import type { ImportCancellationResult, ImportMode, ImportSelection } from './import.types'
 import type { AudioSourceId, ProjectFile, Transcript } from './project.types'
 import type { ProjectDraft, RendererSession, SessionPrecondition } from './session.types'
+import type { TranscriptionCancellationResult, TranscriptionJobId } from './transcriber.types'
 import type {
   CancelSessionJobRequest,
   ExportJobRequest,
@@ -43,7 +44,12 @@ test('preload methods use path-free session requests and results', () => {
     (request: CancelSessionJobRequest) => Promise<ImportCancellationResult>
   >()
   expectTypeOf<IElectronAPI['transcript']['generate']>().toEqualTypeOf<
-    (request: TranscriptionJobRequest) => Promise<SessionJobResult<Transcript>>
+    (request: TranscriptionJobRequest) => Promise<SessionJobResult<Transcript, TranscriptionJobId>>
+  >()
+  expectTypeOf<IElectronAPI['transcript']['cancel']>().toEqualTypeOf<
+    (
+      request: CancelSessionJobRequest<TranscriptionJobId>,
+    ) => Promise<TranscriptionCancellationResult>
   >()
   expectTypeOf<IElectronAPI['render']['export']>().toEqualTypeOf<
     (request: ExportJobRequest) => Promise<SessionJobResult<boolean>>
@@ -57,6 +63,7 @@ test('preload methods use path-free session requests and results', () => {
     draft: ProjectDraft
   }>()
   expectTypeOf<TranscriptionJobRequest>().toMatchTypeOf<{
+    jobId: TranscriptionJobId
     audioSourceId: AudioSourceId
   }>()
   expectTypeOf<ImportProgressEvent>().toMatchTypeOf<SessionPrecondition & { jobId: string }>()

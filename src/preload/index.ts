@@ -15,6 +15,10 @@ import type { ImportSelection } from '../shared/import.types'
 import type { ImportCancellationResult } from '../shared/import.types'
 import type { Transcript } from '../shared/project.types'
 import type {
+  TranscriptionCancellationResult,
+  TranscriptionJobId,
+} from '../shared/transcriber.types'
+import type {
   ProjectMutationRequest,
   RendererSession,
   SessionPrecondition,
@@ -44,7 +48,13 @@ const api = {
   transcript: {
     checkAvailability: () => invokeSafe<string | null>(invoke, 'transcript:check-availability'),
     generate: (request: TranscriptionJobRequest) =>
-      invokeSafe<SessionJobResult<Transcript>>(invoke, 'transcript:generate', request),
+      invokeSafe<SessionJobResult<Transcript, TranscriptionJobId>>(
+        invoke,
+        'transcript:generate',
+        request,
+      ),
+    cancel: (request: CancelSessionJobRequest<TranscriptionJobId>) =>
+      invokeSafe<TranscriptionCancellationResult>(invoke, 'transcript:cancel', request),
   },
   render: {
     export: (request: ExportJobRequest) =>

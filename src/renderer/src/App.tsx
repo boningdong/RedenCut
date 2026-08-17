@@ -3,6 +3,7 @@ import { APP_NAME } from '@shared/constants'
 import type { AudioSourceId, Word } from '@shared/project.types'
 import type { ImportMode } from '@shared/import.types'
 import type { ProjectDraft, RendererSession, WorkspaceToken } from '@shared/session.types'
+import type { TranscriptionJobId } from '@shared/transcriber.types'
 import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
 import { WorkletAudioPlayer } from './audio/WorkletAudioPlayer'
 import { ContinuousPcmSampleProvider } from './audio/samples/ContinuousPcmSampleProvider'
@@ -76,7 +77,7 @@ export default function App() {
   const playerRef = useRef<IAudioPlayer | null>(null)
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
-  const transcriptJobId = useRef<string | null>(null)
+  const transcriptJobId = useRef<TranscriptionJobId | null>(null)
   const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
 
   const session = useEditorStore((state) => state.session)
@@ -166,8 +167,12 @@ export default function App() {
   }
 
   const loadSession = useCallback(
-    (result: RendererSession, importLedger?: RendererSessionLoad['importLedger']) =>
-      loadCoordinator.current!.load({ session: result, importLedger }),
+    (result: RendererSession, importLedger?: RendererSessionLoad['importLedger']) => {
+      transcriptJobId.current = null
+      useTranscriptStore.getState().setIsGenerating(false)
+      useTranscriptStore.getState().setGeneratingStatus('')
+      return loadCoordinator.current!.load({ session: result, importLedger })
+    },
     [],
   )
 
@@ -338,10 +343,11 @@ export default function App() {
       const sourceId = track?.clips[0]?.audioSourceId
       const currentSession = useEditorStore.getState().session
       if (!track || !sourceId || !currentSession) return
-      const transcript = useTranscriptStore.getState()
-      const jobId = crypto.randomUUID()
+      const jobId = crypto.randomUUID() as TranscriptionJobId
       transcriptJobId.current = jobId
-      transcript.setIsGenerating(true)
+      useTranscriptStore.getState().setIsGenerating(true)
+      useTranscriptStore.getState().setGeneratingStatus('')
+      setError(null)
       try {
         const generated = await window.electronAPI.transcript.generate({
           workspaceToken: currentSession.workspaceToken,
@@ -352,26 +358,34 @@ export default function App() {
         const latest = useEditorStore.getState().session
         if (
           generated.jobId !== jobId ||
+          transcriptJobId.current !== generated.jobId ||
+          generated.workspaceToken !== currentSession.workspaceToken ||
+          generated.revision !== currentSession.revision ||
           latest?.workspaceToken !== generated.workspaceToken ||
           latest.revision !== generated.revision
         )
           return
+        const currentTrack = useTimelineStore
+          .getState()
+          .tracks.find((candidate) => candidate.id === track.id)
+        if (!currentTrack?.clips.some((clip) => clip.audioSourceId === sourceId)) return
         const incoming: Word[] = generated.value.words.map((word) => ({
           ...word,
           audioSourceId: sourceId,
           trackId: track.id,
         }))
-        const merged = mergeTrackWords(transcript.words, incoming, track.id, sourceId)
-        transcript.setWords(merged)
-        transcript.ensureTrackVisible(track.id)
+        const latestTranscript = useTranscriptStore.getState()
+        const merged = mergeTrackWords(latestTranscript.words, incoming, track.id, sourceId)
+        latestTranscript.setWords(merged)
+        latestTranscript.ensureTrackVisible(track.id)
         markEdited()
       } catch (reason) {
         if (transcriptJobId.current === jobId) setError((reason as Error).message)
       } finally {
         if (transcriptJobId.current === jobId) {
           transcriptJobId.current = null
-          transcript.setIsGenerating(false)
-          transcript.setGeneratingStatus('')
+          useTranscriptStore.getState().setIsGenerating(false)
+          useTranscriptStore.getState().setGeneratingStatus('')
         }
       }
     },

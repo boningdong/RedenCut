@@ -29,7 +29,7 @@
 // individual characters — each with its own proportional timestamp slice.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { spawn } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import { mkdtemp, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir, homedir } from 'os'
@@ -245,52 +245,36 @@ function extractWords(segment: WhisperSegment): Word[] {
  * internal timestamp coordinate system starts at the real speech onset rather
  * than at position 0 of the file.
  */
-async function detectLeadingSilence(audioFilePath: string): Promise<number> {
-  return new Promise((resolve) => {
-    let ffmpegPath: string
-    try {
-      ffmpegPath = getFfmpegPath()
-    } catch {
-      return resolve(0)
-    } // ffmpeg not available — not fatal here
+async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal): Promise<number> {
+  throwIfAborted(signal)
+  let ffmpegPath: string
+  try {
+    ffmpegPath = getFfmpegPath()
+  } catch {
+    return 0
+  }
 
-    const proc = spawn(
-      ffmpegPath,
-      [
-        '-i',
-        audioFilePath,
-        '-af',
-        'silencedetect=n=-40dB:d=0.1', // silence < -40 dB for >= 0.1 s
-        '-f',
-        'null',
-        '-',
-      ],
-      { stdio: ['ignore', 'ignore', 'pipe'] },
-    )
-
-    let stderr = ''
-    proc.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
-    })
-
-    proc.on('close', () => {
-      // FFmpeg prints: "[silencedetect] silence_end: 5.023 | silence_duration: 5.023"
-      // We want only the FIRST silence_end — that's the end of the leading silence.
-      const match = stderr.match(/silence_end:\s*([\d.]+)/)
-      if (match) {
-        const endSeconds = parseFloat(match[1])
-        resolve(Math.round(endSeconds * 1000)) // convert to integer ms
-      } else {
-        resolve(0) // audio starts immediately — no offset needed
-      }
-    })
-
-    proc.on('error', () => resolve(0)) // non-fatal: proceed without offset
+  const proc = spawn(
+    ffmpegPath,
+    ['-i', audioFilePath, '-af', 'silencedetect=n=-40dB:d=0.1', '-f', 'null', '-'],
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+  )
+  let stderr = ''
+  proc.stderr!.on('data', (chunk: Buffer) => {
+    stderr += chunk.toString()
   })
+  try {
+    await waitForProcess(proc, signal, { allowNonZero: true })
+  } catch (error) {
+    if (isAbortError(error)) throw error
+    return 0
+  }
+  const match = stderr.match(/silence_end:\s*([\d.]+)/)
+  return match ? Math.round(parseFloat(match[1]) * 1000) : 0
 }
 
 // ── WhisperTranscriber ────────────────────────────────────────────────────────
-class WhisperTranscriber implements ITranscriber {
+export class WhisperTranscriber implements ITranscriber {
   readonly name = 'Whisper.cpp (local)'
 
   async isAvailable(): Promise<boolean> {
@@ -327,8 +311,10 @@ class WhisperTranscriber implements ITranscriber {
   async transcribe(
     audioFilePath: string,
     options: TranscribeOptions = {},
+    signal: AbortSignal,
     onProgress?: (status: string) => void,
   ): Promise<Transcript> {
+    throwIfAborted(signal)
     const binary = getWhisperPath()
     if (!binary) throw new Error((await this.unavailableReason()) ?? 'whisper-cli not found')
 
@@ -339,15 +325,19 @@ class WhisperTranscriber implements ITranscriber {
     const tmpDir = await mkdtemp(join(tmpdir(), 'podcut-whisper-'))
     const outputPrefix = join(tmpDir, 'out')
 
+    let result: Transcript | undefined
+    let operationError: unknown
     try {
+      throwIfAborted(signal)
       onProgress?.('Detecting silence…')
 
       // Detect leading silence so whisper's timestamps are correctly anchored.
       // whisper always starts its first timestamp at 0 (the chunk window start),
       // so without this offset the first words appear to start at 0 s even when
       // there is several seconds of silence before any speech.
-      const leadingSilenceMs = await detectLeadingSilence(audioFilePath)
+      const leadingSilenceMs = await detectLeadingSilence(audioFilePath, signal)
 
+      throwIfAborted(signal)
       onProgress?.('Starting transcription…')
 
       const args = [
@@ -377,45 +367,24 @@ class WhisperTranscriber implements ITranscriber {
       // ── Spawn with streaming stderr for real-time progress ──────────────
       // execFileAsync collects output only at the end; spawn lets us read
       // stderr line-by-line so we can forward percentage updates to the UI.
-      await new Promise<void>((resolve, reject) => {
-        const proc = spawn(binary, args)
-        let lastPct = -1
-
-        proc.stderr.on('data', (chunk: Buffer) => {
-          const text = chunk.toString()
-          // whisper.cpp emits lines like:
-          //   "whisper_print_progress_callback: progress = 20%"
-          const match = text.match(/progress\s*=\s*(\d+)\s*%/i)
-          if (match) {
-            const pct = parseInt(match[1], 10)
-            if (pct !== lastPct) {
-              lastPct = pct
-              onProgress?.(`Transcribing… ${pct}%`)
-            }
-          }
-        })
-
-        // Kill the process after 20 minutes to avoid hanging indefinitely
-        const timeout = setTimeout(
-          () => {
-            proc.kill()
-            reject(new Error('Transcription timed out after 20 minutes'))
-          },
-          20 * 60 * 1000,
-        )
-
-        proc.on('close', (code) => {
-          clearTimeout(timeout)
-          if (code === 0 || code === null) resolve()
-          else reject(new Error(`whisper-cli exited with code ${code}`))
-        })
-
-        proc.on('error', (err) => {
-          clearTimeout(timeout)
-          reject(err)
-        })
+      const proc = spawn(binary, args)
+      let lastPct = -1
+      proc.stderr!.on('data', (chunk: Buffer) => {
+        if (signal.aborted) return
+        const match = chunk.toString().match(/progress\s*=\s*(\d+)\s*%/i)
+        if (!match) return
+        const pct = parseInt(match[1], 10)
+        if (pct !== lastPct) {
+          lastPct = pct
+          onProgress?.(`Transcribing… ${pct}%`)
+        }
+      })
+      await waitForProcess(proc, signal, {
+        timeoutMs: 20 * 60 * 1000,
+        timeoutMessage: 'Transcription timed out after 20 minutes',
       })
 
+      throwIfAborted(signal)
       onProgress?.('Parsing transcript…')
 
       const jsonPath = `${outputPrefix}.json`
@@ -428,18 +397,95 @@ class WhisperTranscriber implements ITranscriber {
       const words: Word[] = parsed.transcription.flatMap(extractWords)
       const language = parsed.result?.language ?? options.language ?? 'unknown'
 
-      return {
+      result = {
         engine: 'whisper.cpp',
         model: model.split('/').pop() ?? model,
         words,
         speakers: {},
         ...({ language } as object),
       } as Transcript
-    } finally {
-      // Clean up temp directory
-      await rm(tmpDir, { recursive: true, force: true })
+    } catch (error) {
+      operationError = error
     }
+
+    let cleanupError: unknown
+    try {
+      await rm(tmpDir, { recursive: true, force: true })
+    } catch (error) {
+      cleanupError = error
+    }
+
+    if (operationError === undefined && signal.aborted) operationError = abortError()
+    if (operationError !== undefined && cleanupError !== undefined)
+      throw new AggregateError(
+        [operationError, cleanupError],
+        'Transcription and temporary-directory cleanup failed',
+      )
+    if (operationError !== undefined) throw operationError
+    if (cleanupError !== undefined) throw cleanupError
+    return result!
   }
+}
+
+interface ProcessWaitOptions {
+  allowNonZero?: boolean
+  timeoutMs?: number
+  timeoutMessage?: string
+}
+
+function waitForProcess(
+  child: ChildProcess,
+  signal: AbortSignal,
+  options: ProcessWaitOptions = {},
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let killed = false
+    let processError: unknown
+    let aborted = signal.aborted
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const killOnce = () => {
+      if (killed) return
+      killed = true
+      child.kill()
+    }
+    const onAbort = () => {
+      aborted = true
+      killOnce()
+    }
+    const finish = (code: number | null) => {
+      if (timeout) clearTimeout(timeout)
+      signal.removeEventListener('abort', onAbort)
+      if (aborted) reject(abortError())
+      else if (processError !== undefined) reject(processError)
+      else if (code === 0 || options.allowNonZero) resolve()
+      else reject(new Error(`whisper-cli exited with code ${code}`))
+    }
+
+    child.once('error', (error) => {
+      processError = error
+    })
+    child.once('close', finish)
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (options.timeoutMs !== undefined) {
+      timeout = setTimeout(() => {
+        processError = new Error(options.timeoutMessage ?? 'Process timed out')
+        killOnce()
+      }, options.timeoutMs)
+    }
+    if (signal.aborted) onAbort()
+  })
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw abortError()
+}
+
+function abortError(): DOMException {
+  return new DOMException('Transcription cancelled', 'AbortError')
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 export const whisperTranscriber = new WhisperTranscriber()
