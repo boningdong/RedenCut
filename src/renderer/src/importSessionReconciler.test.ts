@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { AudioSourceId, Track, Transcript } from '@shared/project.types'
 import type {
   ProjectDraft,
@@ -7,6 +7,8 @@ import type {
   WorkspaceToken,
 } from '@shared/session.types'
 import { reconcileImportedSession } from './importSessionReconciler'
+import { useEditorStore } from './stores/editor.store'
+import { useTimelineStore } from './stores/timeline.store'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 
@@ -60,6 +62,11 @@ function importedSession(importedTrack: Track): RendererSession {
 }
 
 describe('import session reconciliation', () => {
+  beforeEach(() => {
+    useEditorStore.getState().reset()
+    useTimelineStore.getState().reset()
+  })
+
   it('accepts the authoritative returned session when no local edits raced', () => {
     const submitted = draft([track('submitted', 'Submitted')])
     const imported = importedSession(track('imported', 'Imported'))
@@ -99,5 +106,42 @@ describe('import session reconciliation', () => {
     expect(result.session.draft.transcript).toEqual(transcript)
     expect(result.session.draft.export).toEqual(latest.export)
     expect(result.preserveDirty).toBe(true)
+  })
+
+  it('observes a timeline mutation synchronously before provider preparation completes', () => {
+    const submitted = draft([track('submitted', 'Before edit')])
+    const initial = {
+      ...importedSession(track('unused', 'Unused')),
+      revision: 1,
+      sources: [],
+      draft: submitted,
+    }
+    useEditorStore.getState().loadSession(initial)
+    useTimelineStore.getState().loadFromProject([], submitted.tracks)
+    const submittedLocalEditRevision = useEditorStore.getState().localEditRevision
+
+    // This mutation happens synchronously, before React can run the tracks effect.
+    useTimelineStore.getState().updateTrack('submitted', { name: 'Edited before effect' })
+
+    const editorAfterMutation = useEditorStore.getState()
+    expect(editorAfterMutation.localEditRevision).toBe(submittedLocalEditRevision + 1)
+    expect(editorAfterMutation.isDirty).toBe(true)
+
+    // Import completion/provider preparation samples the stores in the same turn.
+    const latest = draft(useTimelineStore.getState().tracks)
+    const importedTrack = track('imported', 'Imported')
+    const reconciled = reconcileImportedSession(
+      importedSession(importedTrack),
+      submitted,
+      latest,
+      submittedLocalEditRevision,
+      editorAfterMutation.localEditRevision,
+    )
+
+    expect(reconciled.session.draft.tracks).toEqual([
+      track('submitted', 'Edited before effect'),
+      importedTrack,
+    ])
+    expect(reconciled.preserveDirty).toBe(true)
   })
 })

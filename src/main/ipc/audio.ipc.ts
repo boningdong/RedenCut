@@ -29,7 +29,7 @@ export function registerAudioIpc(
   >()
   const senderSelections = new Map<number, string>()
   const cancellationOutcomes = new Map<string, ImportCancellationResult>()
-  const cancellationWaiters = new Set<string>()
+  const cancellationWaiters = new Map<string, number>()
   let coordinator = new ImportCoordinator(controller.workspace)
   let coordinatorRoot = controller.workspace.root
 
@@ -103,9 +103,12 @@ export function registerAudioIpc(
             selection.path,
             request.mode,
             project,
-            (commit) =>
-              controller.runTransition(request, (transaction) =>
-                commit((preparedProject) => transaction.commitImport(preparedProject)),
+            (commit, signal) =>
+              controller.runTransition(
+                request,
+                (transaction) =>
+                  commit((preparedProject) => transaction.commitImport(preparedProject)),
+                signal,
               ),
             (progress) => {
               if (event.sender.isDestroyed()) return
@@ -155,14 +158,18 @@ export function registerAudioIpc(
         senderId: event.sender.id,
       } as const
       const key = importIdentityKey(identity)
-      cancellationWaiters.add(key)
+      cancellationWaiters.set(key, (cancellationWaiters.get(key) ?? 0) + 1)
       try {
         const found = await jobs.cancelAndSettleJob(identity)
         if (!found) return 'not-found'
         return cancellationOutcomes.get(key) ?? 'not-found'
       } finally {
-        cancellationWaiters.delete(key)
-        cancellationOutcomes.delete(key)
+        const remaining = (cancellationWaiters.get(key) ?? 1) - 1
+        if (remaining > 0) cancellationWaiters.set(key, remaining)
+        else {
+          cancellationWaiters.delete(key)
+          cancellationOutcomes.delete(key)
+        }
       }
     }, diagnosticSink),
   )

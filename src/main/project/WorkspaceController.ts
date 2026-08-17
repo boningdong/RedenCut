@@ -109,6 +109,7 @@ export class WorkspaceController {
   async runTransition<T>(
     expected: SessionPrecondition,
     operation: (transaction: WorkspaceTransaction) => Promise<T>,
+    signal?: AbortSignal,
   ): Promise<T> {
     return this.mutex.runExclusive(async () => {
       this.assertCurrent(expected)
@@ -128,7 +129,7 @@ export class WorkspaceController {
         commitImport: (authoritativeProject) => this.commitImportState(state, authoritativeProject),
       }
       return operation(transaction)
-    })
+    }, signal)
   }
 
   async resolveOriginal(audioSourceId: AudioSourceId): Promise<string> {

@@ -40,6 +40,7 @@ export class ImportCoordinator {
       probe: typeof probeAudio
       createId: () => string
       availableBytes: (path: string) => Promise<number>
+      remove?: typeof rm
     } = {
       builder: new FfmpegAudioSourceCacheBuilder(),
       probe: probeAudio,
@@ -48,6 +49,7 @@ export class ImportCoordinator {
         const info = await statfs(path)
         return info.bavail * info.bsize
       },
+      remove: rm,
     },
   ) {}
 
@@ -71,6 +73,7 @@ export class ImportCoordinator {
       operation: (
         commitProject: (project: ProjectFile) => Promise<CommitValue>,
       ) => Promise<CommitValue>,
+      signal: AbortSignal,
     ) => Promise<CommitValue>,
     onProgress?: (progress: ImportProgress) => void,
   ): Promise<ImportResult<CommitValue>> {
@@ -93,11 +96,15 @@ export class ImportCoordinator {
     const finalCacheRoot = join(this.workspace.root, 'cache', id)
     let publishedMedia = false
     let publishedCache = false
+    let result: ImportResult<CommitValue> | null = null
+    let failure: unknown = null
 
     try {
       progress('validating', 0)
       const project = ProjectFileSchema.parse(projectInput)
-      const metadata = AudioMetadataSchema.parse(await this.dependencies.probe(sourcePath))
+      const metadata = AudioMetadataSchema.parse(
+        await this.dependencies.probe(sourcePath, controller.signal),
+      )
       if (metadata.durationSeconds <= 0)
         throw new Error(`Audio duration is unavailable for ${displayName}`)
       const sourceInfo = await stat(sourcePath)
@@ -172,27 +179,43 @@ export class ImportCoordinator {
         const committedValue = await commitProject(committedProject)
         active.state = 'committed'
         return committedValue
-      })
+      }, controller.signal)
       const cache = new AudioSourceCacheStore(this.workspace.root).descriptor(manifest)
       progress('ready', 1)
       if (!committedProject) throw new Error('Import commit boundary did not publish a project')
-      return { project: committedProject, source, cache, value }
+      result = { project: committedProject, source, cache, value }
     } catch (error) {
+      failure = error
       if (active.state !== 'committed') {
         active.state =
           controller.signal.aborted && error instanceof DOMException && error.name === 'AbortError'
             ? 'cancelled'
             : 'failed'
-        if (publishedMedia)
-          await rm(finalMediaRoot, { recursive: true, force: true }).catch(() => {})
-        if (publishedCache)
-          await rm(finalCacheRoot, { recursive: true, force: true }).catch(() => {})
       }
-      throw error
-    } finally {
-      await rm(stageRoot, { recursive: true, force: true }).catch(() => {})
-      this.active = null
     }
+    const remove = this.dependencies.remove ?? rm
+    const cleanupTargets = [
+      ...(failure && active.state !== 'committed' && publishedMedia ? [finalMediaRoot] : []),
+      ...(failure && active.state !== 'committed' && publishedCache ? [finalCacheRoot] : []),
+      stageRoot,
+    ]
+    const cleanupErrors: unknown[] = []
+    for (const target of cleanupTargets) {
+      try {
+        await remove(target, { recursive: true, force: true })
+      } catch (error) {
+        cleanupErrors.push(error)
+      }
+    }
+    this.active = null
+    if (cleanupErrors.length)
+      throw new AggregateError(
+        failure ? [failure, ...cleanupErrors] : cleanupErrors,
+        'Import cleanup failed',
+      )
+    if (failure) throw failure
+    if (!result) throw new Error('Import completed without a result')
+    return result
   }
 
   private throwIfAborted(signal: AbortSignal): void {
@@ -238,6 +261,7 @@ async function copyWithHash(
   signal: AbortSignal,
   onBytes?: (byteLength: number) => void,
 ): Promise<{ byteLength: number; sha256: string }> {
+  if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
   const input = createReadStream(source)
   const output = createWriteStream(destination, { flags: 'wx' })
   const hash = createHash('sha256')
@@ -247,6 +271,7 @@ async function copyWithHash(
     output.destroy()
   }
   signal.addEventListener('abort', abort, { once: true })
+  if (signal.aborted) abort()
   try {
     for await (const chunk of input) {
       hash.update(chunk as Buffer)
@@ -254,6 +279,7 @@ async function copyWithHash(
       onBytes?.(byteLength)
       if (!output.write(chunk)) await once(output, 'drain')
     }
+    if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
     output.end()
     await once(output, 'close')
     return { byteLength, sha256: hash.digest('hex') }
@@ -285,11 +311,13 @@ async function fingerprintFile(
   path: string,
   signal: AbortSignal,
 ): Promise<AudioSource['fingerprint']> {
+  if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
   const hash = createHash('sha256')
   for await (const chunk of createReadStream(path)) {
     if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
     hash.update(chunk as Buffer)
   }
+  if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
   const info = await stat(path)
   return { byteLength: info.size, modifiedTimeMs: info.mtimeMs, sha256: hash.digest('hex') }
 }

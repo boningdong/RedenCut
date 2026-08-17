@@ -346,6 +346,46 @@ describe('IPC job admission', () => {
     await importing
   })
 
+  it('returns one immutable terminal outcome to overlapping cancel callers', async () => {
+    const controller = controllerStub()
+    const jobs = new SessionJobRegistry()
+    registerAudioIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
+    mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+    const event = { sender: sender() }
+    const selection = (await mocks.handlers.get('audio:select-import-file')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })) as { value: { token: string } }
+    const pending = deferred<{ project: ProjectFile }>()
+    mocks.nextImportResult = pending.promise
+    mocks.importInstances[0].cancel.mockReturnValue('cancelled')
+    const importing = mocks.handlers.get('audio:start-import')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      jobId: 'job-1',
+      selectionToken: selection.value.token,
+      mode: 'copy',
+      draft: emptyDraft(),
+    })
+    await vi.waitFor(() => expect(mocks.importInstances[0].import).toHaveBeenCalled())
+
+    const cancellationRequest = {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      jobId: 'job-1',
+    }
+    const first = mocks.handlers.get('audio:cancel-import')!(event, cancellationRequest)
+    const second = mocks.handlers.get('audio:cancel-import')!(event, cancellationRequest)
+    pending.reject(new DOMException('cancelled', 'AbortError'))
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { ok: true, value: 'cancelled' },
+      { ok: true, value: 'cancelled' },
+    ])
+    expect(mocks.importInstances[0].cancel).toHaveBeenCalledTimes(1)
+    await importing
+  })
+
   it('returns not-found for an unknown or expired import identity', async () => {
     const controller = controllerStub()
     registerAudioIpc(

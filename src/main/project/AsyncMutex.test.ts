@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AsyncMutex } from './AsyncMutex'
 
 function deferred<T = void>() {
@@ -12,6 +12,63 @@ function deferred<T = void>() {
 }
 
 describe('AsyncMutex', () => {
+  it('rejects an already-aborted caller without entering its body', async () => {
+    const mutex = new AsyncMutex()
+    const controller = new AbortController()
+    const operation = vi.fn()
+    controller.abort()
+
+    await expect(mutex.runExclusive(operation, controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    expect(operation).not.toHaveBeenCalled()
+  })
+
+  it('removes an aborted queued caller without disturbing FIFO ownership', async () => {
+    const mutex = new AsyncMutex()
+    const releaseFirst = deferred()
+    const firstEntered = deferred()
+    const events: string[] = []
+    const first = mutex.runExclusive(async () => {
+      events.push('first')
+      firstEntered.resolve()
+      await releaseFirst.promise
+    })
+    await firstEntered.promise
+    const controller = new AbortController()
+    const aborted = mutex.runExclusive(() => events.push('aborted'), controller.signal)
+    const third = mutex.runExclusive(() => events.push('third'))
+
+    controller.abort()
+    await expect(aborted).rejects.toMatchObject({ name: 'AbortError' })
+    expect(events).toEqual(['first'])
+    releaseFirst.resolve()
+    await Promise.all([first, third])
+    expect(events).toEqual(['first', 'third'])
+  })
+
+  it('does not release a caller that aborts after entering', async () => {
+    const mutex = new AsyncMutex()
+    const controller = new AbortController()
+    const releaseFirst = deferred()
+    const firstEntered = deferred()
+    const events: string[] = []
+    const first = mutex.runExclusive(async () => {
+      events.push('first')
+      firstEntered.resolve()
+      await releaseFirst.promise
+    }, controller.signal)
+    await firstEntered.promise
+    const second = mutex.runExclusive(() => events.push('second'))
+
+    controller.abort()
+    await Promise.resolve()
+    expect(events).toEqual(['first'])
+    releaseFirst.resolve()
+    await Promise.all([first, second])
+    expect(events).toEqual(['first', 'second'])
+  })
+
   it('does not enter a second body until the first body exits', async () => {
     const mutex = new AsyncMutex()
     const releaseFirst = deferred()

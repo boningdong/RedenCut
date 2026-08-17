@@ -34,6 +34,7 @@ interface CacheBuilderDependencies {
     options: { stdio: ['ignore', 'pipe', 'pipe'] },
   ) => FfmpegChild
   createWriteStream: typeof createWriteStream
+  remove?: typeof rm
 }
 
 export interface CacheBuildRequest {
@@ -51,6 +52,7 @@ export class FfmpegAudioSourceCacheBuilder {
     private readonly dependencies: CacheBuilderDependencies = {
       spawn: (command, arguments_, options) => spawn(command, arguments_, options) as FfmpegChild,
       createWriteStream,
+      remove: rm,
     },
   ) {}
 
@@ -59,19 +61,40 @@ export class FfmpegAudioSourceCacheBuilder {
     signal: AbortSignal,
     onProgress?: (progress: number) => void,
   ): Promise<AudioSourceCacheManifest> {
+    if (signal.aborted) throw new DOMException('Cache build aborted', 'AbortError')
     const finalRoot = join(request.projectRoot, 'cache', request.audioSourceId)
     const stageRoot = join(request.stagingRoot, 'cache')
     const waveformRoot = join(stageRoot, 'waveform')
     await mkdir(waveformRoot, { recursive: true })
 
+    let child: FfmpegChild | null = null
+    let childClosed = false
+    let killed = false
+    let firstFailure: unknown = null
+    let resolveChildClose!: (result: [number | null, NodeJS.Signals | null]) => void
+    const childClose = new Promise<[number | null, NodeJS.Signals | null]>((resolve) => {
+      resolveChildClose = resolve
+    })
+    const killOnce = () => {
+      if (killed || childClosed || !child) return
+      killed = true
+      child.kill('SIGKILL')
+    }
+    const recordFailure = (error: unknown) => {
+      if (firstFailure) return
+      firstFailure = error
+      killOnce()
+    }
     const pcmPath = join(stageRoot, 'audio.f32le')
     const pcm = this.dependencies.createWriteStream(pcmPath)
+    pcm.once('error', recordFailure)
     const waveformWriters = new Map(
       WAVEFORM_LEVELS.map((level) => [
         level,
         this.dependencies.createWriteStream(join(waveformRoot, `level-${level}.minmax-f32le`)),
       ]),
     )
+    for (const writer of waveformWriters.values()) writer.once('error', recordFailure)
     const bucketCounts = new Map(WAVEFORM_LEVELS.map((level) => [level, 0]))
     const drains = new Set<NodeJS.WritableStream>()
     const accumulator = new PcmWaveformAccumulator(
@@ -87,52 +110,56 @@ export class FfmpegAudioSourceCacheBuilder {
       },
     )
 
-    const child = this.dependencies.spawn(
-      getFfmpegPath(),
-      [
-        '-v',
-        'error',
-        '-i',
-        request.sourcePath,
-        '-f',
-        'f32le',
-        '-acodec',
-        'pcm_f32le',
-        '-ar',
-        String(request.processingSampleRate),
-        '-ac',
-        String(request.metadata.channels),
-        'pipe:1',
-      ],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
-    )
     let diagnosticTail: Buffer<ArrayBufferLike> = Buffer.alloc(0)
-    child.stderr.on('data', (chunk: Buffer | string) => {
-      diagnosticTail = appendDiagnosticTail(diagnosticTail, chunk)
-    })
-    let childClosed = false
-    const childClose = new Promise<[number | null, NodeJS.Signals | null]>((resolve) => {
+    try {
+      child = this.dependencies.spawn(
+        getFfmpegPath(),
+        [
+          '-v',
+          'error',
+          '-i',
+          request.sourcePath,
+          '-f',
+          'f32le',
+          '-acodec',
+          'pcm_f32le',
+          '-ar',
+          String(request.processingSampleRate),
+          '-ac',
+          String(request.metadata.channels),
+          'pipe:1',
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'] },
+      )
+      child.once('error', recordFailure)
+      child.stdout.once('error', recordFailure)
+      child.stderr.once('error', recordFailure)
+      child.stderr.on('data', (chunk: Buffer | string) => {
+        diagnosticTail = appendDiagnosticTail(diagnosticTail, chunk)
+      })
       child.once('close', (code: number | null, childSignal: NodeJS.Signals | null) => {
         childClosed = true
-        resolve([code, childSignal])
+        resolveChildClose([code, childSignal])
       })
-    })
-    let killed = false
-    const killOnce = () => {
-      if (killed || childClosed) return
-      killed = true
-      child.kill('SIGKILL')
+    } catch (error) {
+      recordFailure(error)
+      childClosed = true
+      resolveChildClose([null, null])
     }
-    const abort = () => killOnce()
+    const abort = () => recordFailure(new DOMException('Cache build aborted', 'AbortError'))
+    if (signal.aborted) abort()
     signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) abort()
     const heartbeat = setInterval(() => {
       const expected = request.metadata.durationSeconds * request.processingSampleRate
       onProgress?.(expected > 0 ? Math.min(0.99, accumulator.frameCount / expected) : 0)
     }, 200)
+    let stagingCleanupAttempted = false
 
     try {
+      if (!child) throw firstFailure
       for await (const value of child.stdout) {
-        if (signal.aborted) throw new DOMException('Cache build aborted', 'AbortError')
+        if (firstFailure) throw firstFailure
         const chunk = value as Buffer
         if (!pcm.write(chunk)) drains.add(pcm)
         accumulator.push(chunk)
@@ -142,9 +169,11 @@ export class FfmpegAudioSourceCacheBuilder {
         }
       }
       const [code] = await childClose
-      if (signal.aborted) throw new DOMException('Cache build aborted', 'AbortError')
+      if (firstFailure) throw firstFailure
       if (code !== 0)
-        throw new Error(`FFmpeg cache decode failed: ${diagnosticTail.toString().trim()}`)
+        throw new Error(
+          `FFmpeg cache decode failed: ${decodeDiagnosticTail(diagnosticTail).trim()}`,
+        )
       accumulator.finish()
       pcm.end()
       for (const writer of waveformWriters.values()) writer.end()
@@ -186,26 +215,50 @@ export class FfmpegAudioSourceCacheBuilder {
     } catch (error) {
       killOnce()
       await childClose
-      await Promise.all([
-        destroyAndClose(child.stdout),
-        destroyAndClose(child.stderr),
+      const teardownResults = await Promise.allSettled([
+        ...(child ? [destroyAndClose(child.stdout), destroyAndClose(child.stderr)] : []),
         destroyAndClose(pcm),
         ...[...waveformWriters.values()].map(destroyAndClose),
       ])
       const diagnostic = diagnosticTail.toString()
+      const initiatingError = firstFailure ?? error
+      let primaryError = initiatingError
       if (
-        (error as NodeJS.ErrnoException).code === 'ENOSPC' ||
+        (initiatingError as NodeJS.ErrnoException).code === 'ENOSPC' ||
         diagnostic.includes('No space left')
       ) {
-        throw new Error(`Not enough disk space while caching ${basename(request.sourcePath)}`, {
+        primaryError = new Error(
+          `Not enough disk space while caching ${basename(request.sourcePath)}`,
+          {
+            cause: initiatingError,
+          },
+        )
+      }
+      const cleanupErrors = teardownResults.flatMap((result) =>
+        result.status === 'rejected' ? [result.reason] : [],
+      )
+      stagingCleanupAttempted = true
+      try {
+        await (this.dependencies.remove ?? rm)(request.stagingRoot, {
+          recursive: true,
+          force: true,
+        })
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError)
+      }
+      if (cleanupErrors.length)
+        throw new AggregateError([primaryError, ...cleanupErrors], 'Cache build cleanup failed', {
           cause: error,
         })
-      }
-      throw error
+      throw primaryError
     } finally {
       clearInterval(heartbeat)
       signal.removeEventListener('abort', abort)
-      await rm(request.stagingRoot, { recursive: true, force: true }).catch(() => {})
+      if (!stagingCleanupAttempted)
+        await (this.dependencies.remove ?? rm)(request.stagingRoot, {
+          recursive: true,
+          force: true,
+        })
     }
   }
 }
@@ -221,6 +274,26 @@ function appendDiagnosticTail(
   return Buffer.concat([excess > 0 ? current.subarray(excess) : current, incoming])
 }
 
+function decodeDiagnosticTail(tail: Buffer<ArrayBufferLike>): string {
+  const decoded = tail.toString('utf8')
+  let byteLength = 0
+  let start = decoded.length
+  for (let index = decoded.length; index > 0;) {
+    let next = index - 1
+    const trailing = decoded.charCodeAt(next)
+    if (trailing >= 0xdc00 && trailing <= 0xdfff && next > 0) {
+      const leading = decoded.charCodeAt(next - 1)
+      if (leading >= 0xd800 && leading <= 0xdbff) next -= 1
+    }
+    const characterBytes = Buffer.byteLength(decoded.slice(next, index), 'utf8')
+    if (byteLength + characterBytes > MAX_DIAGNOSTIC_BYTES) break
+    byteLength += characterBytes
+    start = next
+    index = next
+  }
+  return decoded.slice(start)
+}
+
 async function destroyAndClose(
   stream: NodeJS.ReadableStream | NodeJS.WritableStream,
 ): Promise<void> {
@@ -231,5 +304,5 @@ async function destroyAndClose(
   }
   if (!target.destroyed) target.destroy()
   if (target.closed) return
-  await once(target, 'close').catch(() => {})
+  await once(target, 'close')
 }

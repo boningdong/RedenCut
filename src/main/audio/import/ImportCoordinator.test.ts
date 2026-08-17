@@ -177,6 +177,28 @@ describe('ImportCoordinator transaction', () => {
     expect(await readdir(join(workspace.root, '.staging'))).toEqual([])
   })
 
+  it('does not start a pre-aborted copy or continue into cache construction', async () => {
+    const builder = { build: vi.fn(buildStagedCache) }
+    const { coordinator, workspace, sourcePath } = await setup(builder)
+
+    const importing = coordinator.import(
+      IMPORT_ID,
+      sourcePath,
+      'copy',
+      workspace.project,
+      commitToWorkspace(workspace),
+      (progress) => {
+        if (progress.stage === 'copying' && progress.percent === 0) {
+          expect(coordinator.cancel(IMPORT_ID)).toBe('cancelled')
+        }
+      },
+    )
+
+    await expect(importing).rejects.toMatchObject({ name: 'AbortError' })
+    expect(builder.build).not.toHaveBeenCalled()
+    expect(await readdir(join(workspace.root, '.staging'))).toEqual([])
+  })
+
   it('rejects renderer-controlled import IDs that are not UUID path segments', async () => {
     const builder = { build: vi.fn(buildStagedCache) }
     const { coordinator, workspace, sourcePath } = await setup(builder)
@@ -305,5 +327,41 @@ describe('ImportCoordinator transaction', () => {
       code: 'ENOENT',
     })
     expect(coordinator.cancel(IMPORT_ID)).toBe('not-found')
+  })
+
+  it('attempts every rollback cleanup and aggregates failures with the commit error', async () => {
+    const builder = { build: vi.fn(buildStagedCache) }
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-import-cleanup-'))
+    const workspace = await ProjectWorkspace.initialize(parent)
+    const sourcePath = join(parent, 'episode.mp3')
+    await writeFile(sourcePath, new Uint8Array([1, 2, 3, 4]))
+    const commitError = new Error('commit failed')
+    const cleanupErrors = [
+      new Error('media cleanup failed'),
+      new Error('cache cleanup failed'),
+      new Error('staging cleanup failed'),
+    ]
+    const remove = vi.fn(async () => {
+      throw cleanupErrors[remove.mock.calls.length - 1]
+    })
+    const coordinator = new ImportCoordinator(workspace, {
+      builder,
+      probe: vi.fn(async () => metadata),
+      createId: () => SOURCE_ID,
+      availableBytes: vi.fn(async () => Number.MAX_SAFE_INTEGER),
+      remove,
+    } as never)
+
+    const error = (await coordinator
+      .import(IMPORT_ID, sourcePath, 'copy', workspace.project, async (operation) =>
+        operation(async () => {
+          throw commitError
+        }),
+      )
+      .catch((reason: AggregateError) => reason)) as AggregateError
+
+    expect(error).toBeInstanceOf(AggregateError)
+    expect(error.errors).toEqual([commitError, ...cleanupErrors])
+    expect(remove).toHaveBeenCalledTimes(3)
   })
 })

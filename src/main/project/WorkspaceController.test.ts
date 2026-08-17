@@ -536,6 +536,41 @@ describe('WorkspaceController serialization', () => {
     expect(controller.workspace.project.pluginData).toEqual({ imported: true })
   })
 
+  it('removes an aborted queued transition before it can enter the workspace', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))
+    const session = await controller.initialize(parent)
+    const firstEntered = deferred()
+    const releaseFirst = deferred()
+    const events: string[] = []
+    const first = controller.runTransition(session, async (transaction) => {
+      events.push('first')
+      firstEntered.resolve()
+      await releaseFirst.promise
+      return transaction.describe()
+    })
+    await firstEntered.promise
+    const abortController = new AbortController()
+    const aborted = controller.runTransition(
+      session,
+      (transaction) => {
+        events.push('aborted')
+        return transaction.describe()
+      },
+      abortController.signal,
+    )
+    const third = controller.runTransition(session, (transaction) => {
+      events.push('third')
+      return transaction.describe()
+    })
+
+    abortController.abort()
+    await expect(aborted).rejects.toMatchObject({ name: 'AbortError' })
+    releaseFirst.resolve()
+    await Promise.all([first, third])
+    expect(events).toEqual(['first', 'third'])
+  })
+
   it('holds one lock across dirty Save, candidate preparation, and switch without deadlock', async () => {
     const controller = new WorkspaceController()
     const parent = await mkdtemp(join(tmpdir(), 'podcut-controller-'))

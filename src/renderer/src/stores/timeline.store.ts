@@ -30,6 +30,7 @@
 import { create } from 'zustand'
 import type { AudioSourceId, Clip, Track } from '@shared/project.types'
 import type { RendererAudioSource } from '@shared/session.types'
+import { useEditorStore } from './editor.store'
 import { useTranscriptStore } from './transcript.store'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,6 +49,12 @@ function cloneTracks(tracks: Track[]): Track[] {
     clips: t.clips.map((c) => ({ ...c, effects: [...c.effects] })),
     effects: [...t.effects],
   }))
+}
+
+function markTimelineEdited(): void {
+  if (useEditorStore.getState().session) {
+    useEditorStore.getState().markEdited()
+  }
 }
 
 // ── History entry ──────────────────────────────────────────────────────────────
@@ -272,19 +279,24 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       }
     }
     set((s) => ({ tracks: [...s.tracks, track] }))
+    markTimelineEdited()
     return trackId
   },
 
   // ── removeTrack ─────────────────────────────────────────────────────────────
   removeTrack(trackId) {
+    if (!get().tracks.some((track) => track.id === trackId)) return
     set((s) => ({ tracks: s.tracks.filter((t) => t.id !== trackId) }))
+    markTimelineEdited()
   },
 
   // ── updateTrack ─────────────────────────────────────────────────────────────
   updateTrack(trackId, patch) {
+    if (!get().tracks.some((track) => track.id === trackId)) return
     set((s) => ({
       tracks: s.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)),
     }))
+    markTimelineEdited()
   },
 
   // ── muteRange ───────────────────────────────────────────────────────────────
@@ -315,6 +327,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       ],
       redoStack: [], // any new mutation invalidates the redo future
     }))
+    markTimelineEdited()
 
     if (wordIds.length > 0) {
       useTranscriptStore.getState().muteWords(wordIds)
@@ -340,6 +353,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: [],
       selectedClipId: s.selectedClipId === clipId ? null : s.selectedClipId,
     }))
+    markTimelineEdited()
   },
 
   // ── unmuteClip ──────────────────────────────────────────────────────────────
@@ -367,6 +381,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: [], // new mutation invalidates the redo future
       selectedClipId: null,
     }))
+    markTimelineEdited()
 
     if (resolvedWordIds.length > 0) {
       useTranscriptStore.getState().unmuteWords(resolvedWordIds)
@@ -421,6 +436,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       undoStack: [...s.undoStack, { before, wordIds: [], label: `split at ${time.toFixed(1)}` }],
       redoStack: [], // new mutation invalidates the redo future
     }))
+    markTimelineEdited()
   },
 
   // ── moveClip ────────────────────────────────────────────────────────────────
@@ -498,6 +514,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         redoStack: [], // new mutation invalidates the redo future
       }
     })
+    markTimelineEdited()
   },
 
   // ── selectedClipId ──────────────────────────────────────────────────────────
@@ -531,6 +548,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: [...s.redoStack, redoEntry],
       selectedClipId: null,
     }))
+    markTimelineEdited()
     if (entry.wordIds.length > 0) {
       useTranscriptStore.getState().unmuteWords(entry.wordIds)
     }
@@ -555,6 +573,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       undoStack: [...s.undoStack, undoEntry],
       selectedClipId: null,
     }))
+    markTimelineEdited()
     if (entry.wordIds.length > 0) {
       useTranscriptStore.getState().muteWords(entry.wordIds)
     }

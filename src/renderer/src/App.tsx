@@ -76,7 +76,6 @@ export default function App() {
   const playerRef = useRef<IAudioPlayer | null>(null)
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
-  const skipNextTimelineDirty = useRef(false)
   const transcriptJobId = useRef<string | null>(null)
   const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
 
@@ -144,7 +143,6 @@ export default function App() {
         }
         destroyPlayer()
         usePlaybackStore.getState().reset()
-        skipNextTimelineDirty.current = true
         useTimelineStore.getState().loadFromProject(result.sources, result.draft.tracks)
         useTranscriptStore.getState().reset()
         useTranscriptStore.getState().setWords(result.draft.transcript?.words ?? [])
@@ -223,12 +221,7 @@ export default function App() {
 
   useEffect(() => {
     playerRef.current?.setTracks(tracks)
-    if (skipNextTimelineDirty.current) {
-      skipNextTimelineDirty.current = false
-    } else if (useEditorStore.getState().session) {
-      markEdited()
-    }
-  }, [markEdited, tracks])
+  }, [tracks])
 
   const snapshot = useCallback(snapshotDraft, [])
 
