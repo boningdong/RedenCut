@@ -3,13 +3,15 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 
 function parseDirectives(policy: string): Map<string, string[]> {
-  return new Map(
-    policy
-      .split(';')
-      .map((directive) => directive.trim().split(/\s+/))
-      .filter(([name]) => name)
-      .map(([name, ...sources]) => [name, sources]),
-  )
+  const directives = new Map<string, string[]>()
+  for (const [name, ...sources] of policy
+    .split(';')
+    .map((directive) => directive.trim().split(/\s+/))
+    .filter(([name]) => name)) {
+    if (directives.has(name)) throw new Error(`Duplicate CSP directive: ${name}`)
+    directives.set(name, sources)
+  }
+  return directives
 }
 
 describe('managed cache renderer security policy', () => {
@@ -21,7 +23,16 @@ describe('managed cache renderer security policy', () => {
     )?.[1]
 
     expect(policy).toBeDefined()
-    expect(parseDirectives(policy!).get('connect-src')).toEqual(["'self'", 'podcut:'])
+    const directives = parseDirectives(policy!)
+    expect([...directives].filter(([name]) => name === 'connect-src')).toEqual([
+      ['connect-src', ["'self'", 'podcut:']],
+    ])
     expect(mainSource).not.toContain('bypassCSP')
+  })
+
+  it('rejects duplicate directive names instead of silently accepting the last one', () => {
+    expect(() =>
+      parseDirectives("default-src 'self'; connect-src 'self'; connect-src podcut:"),
+    ).toThrow('Duplicate CSP directive: connect-src')
   })
 })

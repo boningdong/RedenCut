@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ProjectFileSchema } from '../../shared/project.types'
 import { ProjectWorkspace } from './ProjectWorkspace'
 
@@ -35,7 +35,8 @@ describe('ProjectWorkspace', () => {
 
   it('publishes Save As through a validated sibling and replaces an existing destination', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
-    const workspace = await ProjectWorkspace.initialize(parent)
+    const warningSink = { record: vi.fn() }
+    const workspace = await ProjectWorkspace.initialize(parent, { cleanupWarningSink: warningSink })
     const sourceId = '00000000-0000-4000-8000-000000000001'
     await mkdir(join(workspace.root, 'media', sourceId), { recursive: true })
     await writeFile(join(workspace.root, 'media', sourceId, 'kept.wav'), 'managed artifact')
@@ -83,11 +84,50 @@ describe('ProjectWorkspace', () => {
     expect(
       (await readdir(parent)).some((name) => name.endsWith('.staging') || name.endsWith('.backup')),
     ).toBe(false)
+    expect(warningSink.record).not.toHaveBeenCalled()
+  })
+
+  it('keeps a committed Save As result and records only its exact leftover destination backup', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
+    const warningSink = {
+      record: vi.fn(async () => {
+        throw new Error('warning sink unavailable')
+      }),
+    }
+    const remove = vi.fn(
+      async (path: string, options?: { recursive?: boolean; force?: boolean }) => {
+        if (path.endsWith('.backup')) throw new Error('backup is busy')
+        await rm(path, options)
+      },
+    )
+    const workspace = await ProjectWorkspace.initialize(parent, {
+      cleanupWarningSink: warningSink,
+      remove,
+    })
+    const destination = join(parent, 'Episode.podcut')
+    await mkdir(destination)
+    await writeFile(join(destination, 'old.txt'), 'old destination')
+
+    const saved = await workspace.saveAs(destination, workspace.project)
+
+    expect(saved.root).toBe(destination)
+    expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 1')
+    const backupName = (await readdir(parent)).find((name) => name.endsWith('.backup'))
+    expect(backupName).toBeDefined()
+    const backup = join(parent, backupName!)
+    expect(await readFile(join(backup, 'old.txt'), 'utf8')).toBe('old destination')
+    expect(warningSink.record).toHaveBeenCalledWith({
+      path: backup,
+      operation: 'save-as-publication',
+      kind: 'destination-backup',
+      cause: expect.objectContaining({ message: 'backup is busy' }),
+    })
   })
 
   it('preserves both the active root and existing destination when stage preparation fails', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
-    const workspace = await ProjectWorkspace.initialize(parent)
+    const warningSink = { record: vi.fn() }
+    const workspace = await ProjectWorkspace.initialize(parent, { cleanupWarningSink: warningSink })
     const originalRoot = workspace.root
     const destination = join(parent, 'Existing.podcut')
     await mkdir(destination)
@@ -102,6 +142,7 @@ describe('ProjectWorkspace', () => {
     expect(workspace.root).toBe(originalRoot)
     expect(workspace.descriptor.kind).toBe('temporary')
     expect(await readFile(join(destination, 'sentinel.txt'), 'utf8')).toBe('keep me')
+    expect(warningSink.record).not.toHaveBeenCalled()
   })
 
   it('does not allow Save As to publish in place over a temporary workspace', async () => {
@@ -138,14 +179,50 @@ describe('ProjectWorkspace', () => {
     expect(await readFile(join(parent, 'keep.txt'), 'utf8')).toBe('keep parent contents')
   })
 
+  it('records a failed exact temporary-root retirement without rejecting the committed transition', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
+    const warningSink = { record: vi.fn() }
+    let temporaryRoot = ''
+    const remove = vi.fn(
+      async (path: string, options?: { recursive?: boolean; force?: boolean }) => {
+        if (path === temporaryRoot) throw new Error('temporary root is busy')
+        await rm(path, options)
+      },
+    )
+    const workspace = await ProjectWorkspace.initialize(parent, {
+      cleanupWarningSink: warningSink,
+      remove,
+    })
+    temporaryRoot = workspace.root
+
+    await expect(workspace.close('workspace-switch')).resolves.toBeUndefined()
+
+    await expect(stat(temporaryRoot)).resolves.toBeTruthy()
+    expect(warningSink.record).toHaveBeenCalledWith({
+      path: temporaryRoot,
+      operation: 'workspace-switch',
+      kind: 'temporary-workspace',
+      cause: expect.objectContaining({ message: 'temporary root is busy' }),
+    })
+  })
+
   it('close never deletes a saved workspace root', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
-    const workspace = await ProjectWorkspace.initialize(parent)
+    const warningSink = { record: vi.fn() }
+    const remove = vi.fn(async (path: string, options?: { recursive?: boolean; force?: boolean }) =>
+      rm(path, options),
+    )
+    const workspace = await ProjectWorkspace.initialize(parent, {
+      cleanupWarningSink: warningSink,
+      remove,
+    })
     const destination = join(parent, 'Saved.podcut')
     const saved = await workspace.saveAs(destination, workspace.project)
 
     await saved.close()
 
     expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(remove).not.toHaveBeenCalledWith(destination, expect.anything())
+    expect(warningSink.record).not.toHaveBeenCalled()
   })
 })

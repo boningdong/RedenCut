@@ -1,11 +1,14 @@
-import { mkdtemp, readFile, writeFile } from 'fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createFileRangeResponse } from './fileRangeResponse'
+
+const temporaryRoots: string[] = []
 
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'podcut-file-range-'))
+  temporaryRoots.push(root)
   const path = join(root, 'artifact.bin')
   await writeFile(
     path,
@@ -13,6 +16,14 @@ async function fixture(): Promise<string> {
   )
   return path
 }
+
+afterEach(async () => {
+  const roots = temporaryRoots.splice(0)
+  await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(
+    roots.map((root) => expect(stat(root)).rejects.toMatchObject({ code: 'ENOENT' })),
+  )
+})
 
 describe('createFileRangeResponse', () => {
   it('is the cache adapter composed by the Electron main entrypoint', async () => {
@@ -82,6 +93,7 @@ describe('createFileRangeResponse', () => {
 
   it('aborts an in-flight file stream', async () => {
     const root = await mkdtemp(join(tmpdir(), 'podcut-file-range-abort-'))
+    temporaryRoots.push(root)
     const path = join(root, 'large.bin')
     await writeFile(path, new Uint8Array(1024 * 1024))
     const controller = new AbortController()

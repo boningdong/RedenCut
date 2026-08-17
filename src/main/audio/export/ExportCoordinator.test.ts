@@ -350,6 +350,11 @@ describe('ExportCoordinator', () => {
       if (remove.mock.calls.length === 1) throw new Error('backup cleanup failed')
       await rm(path, { force: true })
     })
+    const warningSink = {
+      record: vi.fn(async () => {
+        throw new Error('warning sink unavailable')
+      }),
+    }
     const coordinator = new ExportCoordinator({
       spawn: (_command, arguments_) => {
         void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
@@ -357,6 +362,7 @@ describe('ExportCoordinator', () => {
       },
       createId: () => 'unique-a',
       remove,
+      cleanupWarningSink: warningSink,
     })
     const execution = coordinator.start({
       identity: identity(),
@@ -372,6 +378,12 @@ describe('ExportCoordinator', () => {
     expect(await readFile(backup, 'utf8')).toBe('original')
     expect(remove).toHaveBeenCalledTimes(1)
     expect(remove).toHaveBeenCalledWith(backup)
+    expect(warningSink.record).toHaveBeenCalledWith({
+      path: backup,
+      operation: 'export-publication',
+      kind: 'destination-backup',
+      cause: expect.objectContaining({ message: 'backup cleanup failed' }),
+    })
   })
 
   it('removes an existing-destination backup after ordinary successful publication', async () => {
@@ -379,12 +391,14 @@ describe('ExportCoordinator', () => {
     const destination = join(root, 'episode.mp3')
     await writeFile(destination, 'original')
     const child = new FakeChild()
+    const warningSink = { record: vi.fn() }
     const coordinator = new ExportCoordinator({
       spawn: (_command, arguments_) => {
         void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
         return child
       },
       createId: () => 'unique-a',
+      cleanupWarningSink: warningSink,
     })
     const execution = coordinator.start({
       identity: identity(),
@@ -398,6 +412,7 @@ describe('ExportCoordinator', () => {
     await expect(execution.settled).resolves.toMatchObject({ value: true })
     expect(await readFile(destination, 'utf8')).toBe('new-export')
     expect(await readdir(root)).toEqual(['episode.mp3'])
+    expect(warningSink.record).not.toHaveBeenCalled()
   })
 
   it('revalidates after code zero and preserves an existing destination when the session is stale', async () => {
@@ -629,6 +644,7 @@ describe('ExportCoordinator', () => {
   it('aggregates cleanup failure after a render failure without masking the render cause', async () => {
     const root = await temporaryRoot()
     const child = new FakeChild()
+    const warningSink = { record: vi.fn() }
     const coordinator = new ExportCoordinator({
       spawn: () => {
         queueMicrotask(() => child.emit('close', 9, null))
@@ -638,6 +654,7 @@ describe('ExportCoordinator', () => {
       remove: async () => {
         throw new Error('temporary cleanup failed')
       },
+      cleanupWarningSink: warningSink,
     })
     const execution = coordinator.start({
       identity: identity(),
@@ -654,5 +671,6 @@ describe('ExportCoordinator', () => {
       'FFmpeg export failed with exit code 9',
       'temporary cleanup failed',
     ])
+    expect(warningSink.record).not.toHaveBeenCalled()
   })
 })

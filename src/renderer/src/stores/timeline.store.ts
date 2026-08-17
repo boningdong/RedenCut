@@ -13,7 +13,7 @@
 // Single-file workflow (the initial common case):
 //   Import → initFromAudioSource() creates 1 AudioSource + 1 Track with 1 Clip
 //   spanning [0, duration]. All editing operations split/mutate that initial
-//   clip. The WebCodecs player reads this list to know what to play and skip.
+//   clip. The managed PCM player reads this list to build its playback plan.
 //
 // Undo model:
 //   Each mutating operation saves a full snapshot of tracks[] before the
@@ -22,7 +22,7 @@
 //   transcript strikethroughs.
 //
 // Relationship to other stores:
-//   editor.store   — project file path, isDirty, waveform selection, preview mode
+//   editor.store   — path-free session, isDirty, waveform selection, preview mode
 //   playback.store — currentTime, duration, isPlaying (ephemeral, 60fps)
 //   transcript.store — word list and mute state
 // ─────────────────────────────────────────────────────────────────────────────

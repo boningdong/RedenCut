@@ -479,11 +479,13 @@ export default function App() {
               draft: current,
             }))
         if (!saved) return
+        if (!sameSession(useEditorStore.getState().session, currentSession)) return
         acknowledgeSave(saved, capturedLocalEditRevision)
         invalidateTranscriptJobForSession(useEditorStore.getState().session)
         setError(null)
       } catch (reason) {
-        setError((reason as Error).message)
+        if (sameSession(useEditorStore.getState().session, currentSession))
+          setError((reason as Error).message)
       }
     },
     [acknowledgeSave, invalidateTranscriptJobForSession, snapshot],

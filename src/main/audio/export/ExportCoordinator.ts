@@ -11,6 +11,11 @@ import type {
 } from '../../../shared/ipc.types'
 import type { AudioSourceId, ProjectFile } from '../../../shared/project.types'
 import type { SessionPrecondition } from '../../../shared/session.types'
+import {
+  discardCleanupWarnings,
+  recordCleanupWarning,
+  type CleanupWarningSink,
+} from '../../project/CleanupWarningSink'
 import { getFfmpegPath } from '../binaries'
 import { buildRenderArgs } from '../renderer'
 
@@ -45,6 +50,7 @@ interface ExportCoordinatorDependencies {
   rename: (source: string, destination: string) => Promise<void>
   remove: (path: string) => Promise<void>
   stat: typeof stat
+  cleanupWarningSink: CleanupWarningSink
 }
 
 type ExportState = 'selecting' | 'rendering' | 'publishing' | 'committed' | 'cancelled' | 'failed'
@@ -58,21 +64,17 @@ interface ActiveExport {
 
 export class ExportCoordinator {
   private readonly activeBySender = new Map<number, ActiveExport>()
-  private readonly deferredCleanupWarnings = new Map<string, unknown>()
 
-  constructor(
-    dependencies: Partial<ExportCoordinatorDependencies> &
-      Pick<ExportCoordinatorDependencies, 'spawn' | 'createId'> = {
+  constructor(dependencies: Partial<ExportCoordinatorDependencies> = {}) {
+    this.dependencies = {
       spawn: (command, arguments_) =>
         spawn(command, arguments_, { stdio: ['ignore', 'ignore', 'pipe'] }) as ExportChild,
       createId: randomUUID,
-    },
-  ) {
-    this.dependencies = {
       ffmpegPath: getFfmpegPath,
       rename,
       remove: (path) => rm(path, { force: true }),
       stat,
+      cleanupWarningSink: discardCleanupWarnings,
       ...dependencies,
     }
   }
@@ -191,8 +193,13 @@ export class ExportCoordinator {
         if (backupOwned) {
           try {
             await this.dependencies.remove(backupOutput)
-          } catch (error) {
-            this.deferredCleanupWarnings.set(backupOutput, error)
+          } catch (cause) {
+            await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+              path: backupOutput,
+              operation: 'export-publication',
+              kind: 'destination-backup',
+              cause,
+            })
           }
           backupOwned = false
         }

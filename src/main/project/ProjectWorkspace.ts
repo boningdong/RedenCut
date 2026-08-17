@@ -3,27 +3,50 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } fr
 import { basename, dirname, join } from 'path'
 import type { WorkspaceDescriptor } from '../../shared/import.types'
 import { createEmptyProject, ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
+import {
+  discardCleanupWarnings,
+  recordCleanupWarning,
+  type CleanupWarningOperation,
+  type CleanupWarningSink,
+} from './CleanupWarningSink'
+
+interface ProjectWorkspaceOptions {
+  cleanupWarningSink?: CleanupWarningSink
+  remove?: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<void>
+}
+
+interface ProjectWorkspaceDependencies {
+  cleanupWarningSink: CleanupWarningSink
+  remove: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<void>
+}
 
 export class ProjectWorkspace {
   private constructor(
     public root: string,
     public project: ProjectFile,
     private temporary: boolean,
+    private readonly dependencies: ProjectWorkspaceDependencies,
   ) {}
 
-  static async initialize(temporaryParent: string): Promise<ProjectWorkspace> {
+  static async initialize(
+    temporaryParent: string,
+    options: ProjectWorkspaceOptions = {},
+  ): Promise<ProjectWorkspace> {
     await mkdir(temporaryParent, { recursive: true })
     const root = await mkdtemp(join(temporaryParent, 'podcut-'))
     const project = createEmptyProject()
     await writeFile(join(root, 'project.json'), JSON.stringify(project, null, 2))
-    return new ProjectWorkspace(root, project, true)
+    return new ProjectWorkspace(root, project, true, workspaceDependencies(options))
   }
 
-  static async open(root: string): Promise<ProjectWorkspace> {
+  static async open(
+    root: string,
+    options: ProjectWorkspaceOptions = {},
+  ): Promise<ProjectWorkspace> {
     const project = ProjectFileSchema.parse(
       JSON.parse(await readFile(join(root, 'project.json'), 'utf8')),
     )
-    return new ProjectWorkspace(root, project, false)
+    return new ProjectWorkspace(root, project, false, workspaceDependencies(options))
   }
 
   get descriptor(): WorkspaceDescriptor {
@@ -61,7 +84,7 @@ export class ProjectWorkspace {
     try {
       await cp(this.root, stage, { recursive: true })
       await writeFile(join(stage, 'project.json'), JSON.stringify(validated, null, 2))
-      const candidate = await ProjectWorkspace.open(stage)
+      const candidate = await ProjectWorkspace.open(stage, this.dependencies)
       await prepare?.(candidate)
       await rm(join(stage, '.staging'), { recursive: true, force: true })
       await pruneManagedDirectory(
@@ -87,7 +110,18 @@ export class ProjectWorkspace {
         throw error
       }
       candidate.root = destination
-      if (destinationBackedUp) await rm(backup, { recursive: true, force: true }).catch(() => {})
+      if (destinationBackedUp) {
+        try {
+          await this.dependencies.remove(backup, { recursive: true, force: true })
+        } catch (cause) {
+          await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+            path: backup,
+            operation: 'save-as-publication',
+            kind: 'destination-backup',
+            cause,
+          })
+        }
+      }
       return candidate
     } catch (error) {
       await rm(stage, { recursive: true, force: true }).catch(() => {})
@@ -95,9 +129,25 @@ export class ProjectWorkspace {
     }
   }
 
-  async close(): Promise<void> {
+  async close(operation: CleanupWarningOperation = 'workspace-switch'): Promise<void> {
     if (!this.temporary) return
-    await rm(this.root, { recursive: true, force: true })
+    try {
+      await this.dependencies.remove(this.root, { recursive: true, force: true })
+    } catch (cause) {
+      await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+        path: this.root,
+        operation,
+        kind: 'temporary-workspace',
+        cause,
+      })
+    }
+  }
+}
+
+function workspaceDependencies(options: ProjectWorkspaceOptions): ProjectWorkspaceDependencies {
+  return {
+    cleanupWarningSink: options.cleanupWarningSink ?? discardCleanupWarnings,
+    remove: options.remove ?? rm,
   }
 }
 

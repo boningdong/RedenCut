@@ -14,6 +14,7 @@ import type {
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 import { FfmpegAudioSourceCacheBuilder } from '../audio/import/FfmpegAudioSourceCacheBuilder'
 import { AsyncMutex } from './AsyncMutex'
+import { discardCleanupWarnings, type CleanupWarningSink } from './CleanupWarningSink'
 import { ProjectPathResolver } from './ProjectPathResolver'
 import { ProjectWorkspace } from './ProjectWorkspace'
 import { mergeProjectDraft, toRendererSession } from './sessionProjection'
@@ -49,12 +50,17 @@ export class WorkspaceController {
   private readonly retainedRetiredWorkspaces = new Set<ProjectWorkspace>()
   private readonly preparedAgainstWorkspace = new WeakMap<PreparedWorkspace, ProjectWorkspace>()
 
-  constructor(private readonly cacheBuilder = new FfmpegAudioSourceCacheBuilder()) {}
+  constructor(
+    private readonly cacheBuilder = new FfmpegAudioSourceCacheBuilder(),
+    private readonly cleanupWarningSink: CleanupWarningSink = discardCleanupWarnings,
+  ) {}
 
   async initialize(temporaryParent: string): Promise<RendererSession> {
     return this.mutex.runExclusive(async () => {
       if (!this.current) {
-        const candidate = await ProjectWorkspace.initialize(temporaryParent)
+        const candidate = await ProjectWorkspace.initialize(temporaryParent, {
+          cleanupWarningSink: this.cleanupWarningSink,
+        })
         const descriptors = await this.descriptors(candidate)
         this.current = candidate
         this.workspaceToken = randomUUID() as WorkspaceToken
@@ -85,7 +91,9 @@ export class WorkspaceController {
   }
 
   async prepareOpen(root: string): Promise<PreparedWorkspace> {
-    const workspace = await ProjectWorkspace.open(root)
+    const workspace = await ProjectWorkspace.open(root, {
+      cleanupWarningSink: this.cleanupWarningSink,
+    })
     const descriptors = await this.descriptors(workspace)
     return { workspace, descriptors }
   }
@@ -210,13 +218,13 @@ export class WorkspaceController {
     if (!descriptors) throw new Error('Save As candidate was not validated')
     this.installWorkspace(state, candidate)
     if (retainPrevious) retainPrevious(workspace)
-    else await workspace.close().catch(() => {})
+    else await workspace.close('save-as-publication')
     return toRendererSession(candidate, state.workspaceToken, state.revision, descriptors)
   }
 
   private async releaseRetiredWorkspaces(workspaces: Set<ProjectWorkspace>): Promise<void> {
     for (const workspace of [...workspaces]) {
-      await workspace.close()
+      await workspace.close('workspace-switch')
       workspaces.delete(workspace)
       this.retainedRetiredWorkspaces.delete(workspace)
     }
@@ -231,7 +239,7 @@ export class WorkspaceController {
       await assertSafeSwitchRoot(oldWorkspace, candidate.workspace.root)
     this.preparedAgainstWorkspace.delete(candidate)
     this.installWorkspace(state, candidate.workspace)
-    await oldWorkspace.close().catch(() => {})
+    await oldWorkspace.close('workspace-switch')
     return toRendererSession(
       candidate.workspace,
       state.workspaceToken,

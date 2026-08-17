@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, protocol } from 'electron'
 import { join } from 'path'
 import { APP_FILE_EXT, APP_NAME } from '../shared/constants'
 import { startApplicationLifecycle } from './applicationLifecycle'
+import { ExportCoordinator } from './audio/export/ExportCoordinator'
 import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
 import { registerRenderIpc } from './ipc/render.ipc'
@@ -10,6 +11,7 @@ import {
   PendingProjectOpenRegistry,
   removePendingProjectOpensOnSenderDestroyed,
 } from './project/PendingProjectOpenRegistry'
+import { CleanupWarningStore } from './project/CleanupWarningSink'
 import { ProjectTransitionCoordinator } from './project/ProjectTransitionCoordinator'
 import type { ProjectSwitchSender } from './project/SessionSwitchBarrier'
 import { SessionSwitchBarrier } from './project/SessionSwitchBarrier'
@@ -52,7 +54,8 @@ startApplicationLifecycle({
     ])
   },
   initialize: async () => {
-    const controller = new WorkspaceController()
+    const cleanupWarnings = new CleanupWarningStore()
+    const controller = new WorkspaceController(undefined, cleanupWarnings)
     await controller.initialize(app.getPath('temp'))
     const jobs = new SessionJobRegistry()
     const barrier = new SessionSwitchBarrier()
@@ -93,7 +96,12 @@ startApplicationLifecycle({
     registerProjectIpc(controller, transitions, pendingOpens, barrier)
     registerAudioIpc(controller, jobs)
     registerTranscriptIpc(controller, jobs)
-    registerRenderIpc(controller, jobs)
+    registerRenderIpc(
+      controller,
+      jobs,
+      console.error,
+      new ExportCoordinator({ cleanupWarningSink: cleanupWarnings }),
+    )
     protocol.handle(
       'podcut',
       createCacheProtocolHandler(

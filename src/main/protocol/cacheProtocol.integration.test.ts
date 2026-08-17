@@ -96,8 +96,11 @@ async function createFixture(): Promise<{
   const cacheRoot = join(root, 'cache', SOURCE_ID)
   await mkdir(join(cacheRoot, 'waveform'), { recursive: true })
 
-  const interleaved = new Float32Array([0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1, -1])
-  const pcmBytes = new Uint8Array(interleaved.buffer)
+  const pcmBytes = new Uint8Array(8 * Float32Array.BYTES_PER_ELEMENT)
+  const pcmView = new DataView(pcmBytes.buffer)
+  ;[0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1, -1].forEach((value, index) =>
+    pcmView.setFloat32(index * Float32Array.BYTES_PER_ELEMENT, value, true),
+  )
   const waveformBytes = new Uint8Array(8)
   const waveformView = new DataView(waveformBytes.buffer)
   waveformView.setFloat32(0, -1, true)

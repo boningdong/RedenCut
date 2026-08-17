@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   registerAudioSource: vi.fn(async (_id?: unknown, _provider?: unknown): Promise<void> => {}),
   destroyPlayer: vi.fn(async (): Promise<void> => {}),
   players: [] as Array<{ pause: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>,
+  keyboardSave: undefined as (() => void) | undefined,
 }))
 
 vi.mock('./audio/WorkletAudioPlayer', () => ({
@@ -47,7 +48,11 @@ vi.mock('./components/Waveform/WaveformView', () => ({
 vi.mock('./components/FileInfoPanel', () => ({ FileInfoPanel: () => null }))
 vi.mock('./components/Transport/TransportBar', () => ({ TransportBar: () => null }))
 vi.mock('./components/Export/ExportModal', () => ({ ExportModal: () => null }))
-vi.mock('./hooks/useKeyboardShortcuts', () => ({ useKeyboardShortcuts: () => undefined }))
+vi.mock('./hooks/useKeyboardShortcuts', () => ({
+  useKeyboardShortcuts: ({ onSave }: { onSave?: () => void }) => {
+    mocks.keyboardSave = onSave
+  },
+}))
 vi.mock('./components/Transcript/TranscriptPanel', () => ({
   TranscriptPanel: ({
     onGenerate,
@@ -275,11 +280,79 @@ describe('App transcription job identity', () => {
     mocks.destroyPlayer.mockReset()
     mocks.destroyPlayer.mockResolvedValue(undefined)
     mocks.players.splice(0)
+    mocks.keyboardSave = undefined
     const ids = ['job-a', 'job-b', 'job-c']
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
       () => ids.shift()! as `${string}-${string}-${string}-${string}-${string}`,
     )
   })
+
+  it.each([
+    ['Save button', () => fireEvent.click(screen.getByRole('button', { name: 'Save' }))],
+    ['Save As button', () => fireEvent.click(screen.getByRole('button', { name: 'Save As' }))],
+    ['keyboard Save', () => mocks.keyboardSave?.()],
+  ] as const)(
+    'shows the same sanitized current-session failure for %s without clearing dirty',
+    async (_name, invoke) => {
+      const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+      const { api } = await renderInitialized(initial)
+      act(() => useEditorStore.getState().markEdited())
+      api.project.save.mockRejectedValueOnce(new Error('The operation could not be completed.'))
+      api.project.saveAs.mockRejectedValueOnce(new Error('The operation could not be completed.'))
+
+      invoke()
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.'),
+      )
+      expect(useEditorStore.getState().isDirty).toBe(true)
+      expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_A)
+      expect(useEditorStore.getState().session?.revision).toBe(1)
+    },
+  )
+
+  it.each(['Save', 'Save As'] as const)(
+    'ignores a stale %s settlement after a successor session becomes visible',
+    async (button) => {
+      const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+      const successor = session(TOKEN_B, 3, SOURCE_B, 'B')
+      const staleSaved = session(TOKEN_A, 2, SOURCE_A, 'Saved A')
+      const pending = deferred<RendererSession | null>()
+      const { api } = await renderInitialized(initial)
+      act(() => useEditorStore.getState().markEdited())
+      if (button === 'Save') api.project.save.mockReturnValueOnce(pending.promise)
+      else api.project.saveAs.mockReturnValueOnce(pending.promise)
+
+      fireEvent.click(screen.getByRole('button', { name: button }))
+      act(() => useEditorStore.getState().loadSession(successor))
+      pending.resolve(staleSaved)
+      await act(async () => Promise.resolve())
+
+      expect(useEditorStore.getState().session).toBe(successor)
+      expect(screen.queryByRole('alert')).toBeNull()
+    },
+  )
+
+  it.each(['Save', 'Save As'] as const)(
+    'ignores a stale %s rejection after a successor session becomes visible',
+    async (button) => {
+      const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+      const successor = session(TOKEN_B, 3, SOURCE_B, 'B')
+      const pending = deferred<RendererSession | null>()
+      const { api } = await renderInitialized(initial)
+      act(() => useEditorStore.getState().markEdited())
+      if (button === 'Save') api.project.save.mockReturnValueOnce(pending.promise)
+      else api.project.saveAs.mockReturnValueOnce(pending.promise)
+
+      fireEvent.click(screen.getByRole('button', { name: button }))
+      act(() => useEditorStore.getState().loadSession(successor))
+      pending.reject(new Error('The operation could not be completed.'))
+      await act(async () => Promise.resolve())
+
+      expect(useEditorStore.getState().session).toBe(successor)
+      expect(screen.queryByRole('alert')).toBeNull()
+    },
+  )
 
   afterEach(() => {
     cleanup()
