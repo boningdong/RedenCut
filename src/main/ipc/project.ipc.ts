@@ -6,6 +6,7 @@ import type {
   ProjectDraft,
 } from '../../shared/session.types'
 import type { PendingProjectOpenRegistry } from '../project/PendingProjectOpenRegistry'
+import type { ProjectMutationCoordinator } from '../project/ProjectMutationCoordinator'
 import type { ProjectTransitionCoordinator } from '../project/ProjectTransitionCoordinator'
 import type { SessionSwitchBarrier } from '../project/SessionSwitchBarrier'
 import type { WorkspaceController } from '../project/WorkspaceController'
@@ -18,6 +19,7 @@ export function registerProjectIpc(
   transitions: ProjectTransitionCoordinator,
   pendingOpens: PendingProjectOpenRegistry,
   switchBarrier: SessionSwitchBarrier,
+  mutations: ProjectMutationCoordinator,
   diagnosticSink: DiagnosticSink = console.error,
 ): void {
   ipcMain.handle('project:initialize', () =>
@@ -52,13 +54,13 @@ export function registerProjectIpc(
   ipcMain.handle('project:save', (event, input: unknown) =>
     toIpcResult(async () => {
       const request = mutationRequest(input)
-      if (controller.workspace.descriptor.kind === 'saved') return controller.save(request)
-      return chooseAndSaveAs(event.sender.id, controller, request)
+      if (controller.workspace.descriptor.kind === 'saved') return mutations.save(request)
+      return chooseAndSaveAs(event.sender.id, mutations, request)
     }, diagnosticSink),
   )
   ipcMain.handle('project:save-as', (event, input: unknown) =>
     toIpcResult(
-      () => chooseAndSaveAs(event.sender.id, controller, mutationRequest(input)),
+      () => chooseAndSaveAs(event.sender.id, mutations, mutationRequest(input)),
       diagnosticSink,
     ),
   )
@@ -83,7 +85,7 @@ function mutationRequest(input: unknown): ProjectMutationRequest {
 
 async function chooseAndSaveAs(
   senderId: number,
-  controller: WorkspaceController,
+  mutations: ProjectMutationCoordinator,
   request: ProjectMutationRequest,
 ) {
   const window = BrowserWindow.getAllWindows().find(
@@ -97,5 +99,5 @@ async function chooseAndSaveAs(
   const destination = result.filePath.endsWith(APP_FILE_EXT)
     ? result.filePath
     : `${result.filePath}${APP_FILE_EXT}`
-  return controller.saveAs(destination, request)
+  return mutations.saveAs(destination, request)
 }

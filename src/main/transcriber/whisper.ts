@@ -33,6 +33,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { mkdtemp, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir, homedir } from 'os'
+import { StringDecoder } from 'string_decoder'
 import { existsSync } from 'fs'
 import { getWhisperPath, getFfmpegPath } from '../audio/binaries'
 import type { ITranscriber, TranscribeOptions } from '../../shared/transcriber.types'
@@ -235,8 +236,8 @@ function extractWords(segment: WhisperSegment): Word[] {
 /**
  * Detects how many milliseconds of silence precede the first audible speech.
  *
- * Runs FFmpeg's `silencedetect` filter and reads the first `silence_end` line
- * from stderr, e.g. "silence_end: 5.023 | silence_duration: 5.023".
+ * Probes only the first 30 seconds and returns a silence end only when its
+ * matching first silence interval begins at the start of the file.
  *
  * Returns 0 if the audio starts immediately (no leading silence) or if
  * detection fails for any reason — making this always safe to call.
@@ -256,21 +257,66 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
 
   const proc = spawn(
     ffmpegPath,
-    ['-i', audioFilePath, '-af', 'silencedetect=n=-40dB:d=0.1', '-f', 'null', '-'],
+    ['-i', audioFilePath, '-t', '30', '-af', 'silencedetect=n=-40dB:d=0.1', '-f', 'null', '-'],
     { stdio: ['ignore', 'ignore', 'pipe'] },
   )
-  let stderr = ''
-  proc.stderr!.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString()
-  })
-  try {
-    await waitForProcess(proc, signal, { allowNonZero: true })
-  } catch (error) {
-    if (isAbortError(error)) throw error
-    return 0
+  const decoder = new StringDecoder('utf8')
+  let tail = ''
+  let leadingInterval = false
+  let decision: number | undefined
+  let killed = false
+  const killOnce = () => {
+    if (killed) return
+    killed = true
+    proc.kill()
   }
-  const match = stderr.match(/silence_end:\s*([\d.]+)/)
-  return match ? Math.round(parseFloat(match[1]) * 1000) : 0
+  const inspect = (line: string) => {
+    const markers = line.matchAll(/silence_(start|end):\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/g)
+    for (const marker of markers) {
+      const seconds = Number.parseFloat(marker[2])
+      if (!Number.isFinite(seconds)) continue
+      if (marker[1] === 'start') {
+        if (leadingInterval) continue
+        if (Math.abs(seconds) <= 0.05) leadingInterval = true
+        else decision = 0
+      } else {
+        decision = leadingInterval ? Math.max(0, Math.round(seconds * 1000)) : 0
+      }
+      if (decision !== undefined) {
+        killOnce()
+        return
+      }
+    }
+  }
+  const consume = (text: string, flush = false) => {
+    const lines = `${tail}${text}`.split(/\r?\n/)
+    tail = flush ? '' : (lines.pop() ?? '').slice(-4096)
+    for (const line of lines) {
+      inspect(line)
+      if (decision !== undefined) return
+    }
+    if (flush && tail) inspect(tail)
+  }
+
+  return new Promise<number>((resolve, reject) => {
+    let aborted = signal.aborted
+    const onAbort = () => {
+      aborted = true
+      killOnce()
+    }
+    proc.stderr!.on('data', (chunk: Buffer) => consume(decoder.write(chunk)))
+    proc.once('error', () => {
+      // Detection is optional. Process errors resolve to zero after close/reap.
+    })
+    proc.once('close', () => {
+      signal.removeEventListener('abort', onAbort)
+      if (decision === undefined) consume(decoder.end(), true)
+      if (aborted) reject(abortError())
+      else resolve(decision ?? 0)
+    })
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) onAbort()
+  })
 }
 
 // ── WhisperTranscriber ────────────────────────────────────────────────────────
@@ -482,10 +528,6 @@ function throwIfAborted(signal: AbortSignal): void {
 
 function abortError(): DOMException {
   return new DOMException('Transcription cancelled', 'AbortError')
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 export const whisperTranscriber = new WhisperTranscriber()

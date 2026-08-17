@@ -347,7 +347,7 @@ describe('ExportCoordinator', () => {
     await writeFile(destination, 'original')
     const child = new FakeChild()
     const remove = vi.fn(async (path: string) => {
-      if (remove.mock.calls.length === 1) throw new Error('backup cleanup failed')
+      if (path === backup) throw new Error('backup cleanup failed')
       await rm(path, { force: true })
     })
     const warningSink = {
@@ -376,7 +376,7 @@ describe('ExportCoordinator', () => {
     await expect(execution.settled).resolves.toMatchObject({ value: true })
     expect(await readFile(destination, 'utf8')).toBe('new-export')
     expect(await readFile(backup, 'utf8')).toBe('original')
-    expect(remove).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledTimes(2)
     expect(remove).toHaveBeenCalledWith(backup)
     expect(warningSink.record).toHaveBeenCalledWith({
       path: backup,
@@ -413,6 +413,164 @@ describe('ExportCoordinator', () => {
     expect(await readFile(destination, 'utf8')).toBe('new-export')
     expect(await readdir(root)).toEqual(['episode.mp3'])
     expect(warningSink.record).not.toHaveBeenCalled()
+  })
+
+  it('never overwrites a competitor created after backing up the observed destination', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    const backup = join(root, '.episode.podcut-backup-unique-a.mp3')
+    const temporary = join(root, '.episode.podcut-export-unique-a.mp3')
+    await writeFile(destination, 'original')
+    const child = new FakeChild()
+    const warningSink = { record: vi.fn() }
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
+        return child
+      },
+      createId: () => 'unique-a',
+      rename: async (source, target) => {
+        await rename(source, target)
+        if (source === destination && target === backup) await writeFile(destination, 'competitor')
+      },
+      cleanupWarningSink: warningSink,
+    })
+    const execution = coordinator.start({
+      identity: identity(),
+      project: project(),
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: vi.fn(),
+    })
+
+    await expect(execution.settled).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(await readFile(destination, 'utf8')).toBe('competitor')
+    expect(await readFile(backup, 'utf8')).toBe('original')
+    expect(await readFile(temporary, 'utf8')).toBe('new-export')
+    expect(warningSink.record.mock.calls.map(([warning]) => warning)).toEqual([
+      expect.objectContaining({
+        path: temporary,
+        operation: 'export-publication',
+        kind: 'publication-temporary',
+      }),
+      expect.objectContaining({
+        path: backup,
+        operation: 'export-publication',
+        kind: 'destination-backup',
+      }),
+    ])
+  })
+
+  it('detects a destination replacement immediately before backup and restores the replacement', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    await writeFile(destination, 'original')
+    const child = new FakeChild()
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
+        return child
+      },
+      createId: () => 'unique-a',
+      rename: async (source, target) => {
+        if (source === destination) await writeFile(destination, 'competitor')
+        await rename(source, target)
+      },
+    })
+    const execution = coordinator.start({
+      identity: identity(),
+      project: project(),
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: vi.fn(),
+    })
+
+    await expect(execution.settled).rejects.toThrow('destination changed during publication')
+    expect(await readFile(destination, 'utf8')).toBe('competitor')
+    expect(await readdir(root)).toEqual(['episode.mp3'])
+  })
+
+  it('never overwrites a competitor created after an absent destination was observed', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    const temporary = join(root, '.episode.podcut-export-unique-a.mp3')
+    const child = new FakeChild()
+    const warningSink = { record: vi.fn() }
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
+        return child
+      },
+      createId: () => 'unique-a',
+      publishNoClobber: async () => {
+        await writeFile(destination, 'competitor')
+        throw Object.assign(new Error('destination appeared'), { code: 'EEXIST' })
+      },
+      cleanupWarningSink: warningSink,
+    })
+    const execution = coordinator.start({
+      identity: identity(),
+      project: project(),
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: vi.fn(),
+    })
+
+    await expect(execution.settled).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(await readFile(destination, 'utf8')).toBe('competitor')
+    expect(await readFile(temporary, 'utf8')).toBe('new-export')
+    expect(warningSink.record).toHaveBeenCalledWith(
+      expect.objectContaining({ path: temporary, kind: 'publication-temporary' }),
+    )
+  })
+
+  it('preserves a cancellation competitor and the exact original backup', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    const backup = join(root, '.episode.podcut-backup-unique-a.mp3')
+    await writeFile(destination, 'original')
+    const child = new FakeChild()
+    const backupMoved = deferred<void>()
+    const releaseBackupMove = deferred<void>()
+    const warningSink = { record: vi.fn() }
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
+        return child
+      },
+      createId: () => 'unique-a',
+      rename: async (source, target) => {
+        await rename(source, target)
+        if (source === destination && target === backup) {
+          await writeFile(destination, 'competitor')
+          backupMoved.resolve()
+          await releaseBackupMove.promise
+        }
+      },
+      cleanupWarningSink: warningSink,
+    })
+    const execution = coordinator.start({
+      identity: identity(),
+      project: project(),
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: vi.fn(),
+    })
+
+    await backupMoved.promise
+    const cancelling = execution.requestCancel()
+    releaseBackupMove.resolve()
+    await expect(cancelling).resolves.toBe('cancelled')
+    await expect(execution.settled).rejects.toBeInstanceOf(AggregateError)
+    expect(await readFile(destination, 'utf8')).toBe('competitor')
+    expect(await readFile(backup, 'utf8')).toBe('original')
+    expect(warningSink.record).toHaveBeenCalledWith(
+      expect.objectContaining({ path: backup, kind: 'destination-backup' }),
+    )
   })
 
   it('revalidates after code zero and preserves an existing destination when the session is stale', async () => {
@@ -486,17 +644,16 @@ describe('ExportCoordinator', () => {
     await writeFile(destination, 'original')
     await writeFile(unrelated, 'keep')
     const child = new FakeChild()
-    let renameCalls = 0
+    let publicationCalls = 0
     const coordinator = new ExportCoordinator({
       spawn: (_command, arguments_) => {
         void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
         return child
       },
       createId: () => 'unique-a',
-      rename: async (source, target) => {
-        renameCalls += 1
-        if (renameCalls === 1) return rename(source, target)
-        if (renameCalls === 2) throw new Error('publication failed')
+      publishNoClobber: async () => {
+        publicationCalls += 1
+        if (publicationCalls === 1) throw new Error('publication failed')
         throw new Error('rollback failed')
       },
     })

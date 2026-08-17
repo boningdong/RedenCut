@@ -85,6 +85,75 @@ describe('WhisperTranscriber cancellation', () => {
     expect(mocks.spawn).toHaveBeenCalledTimes(1)
   })
 
+  it('does not treat a later speech pause as leading silence and bounds the probe window', async () => {
+    const controller = new AbortController()
+    const silence = new FakeChild()
+    const whisper = new FakeChild()
+    mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
+    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    await waitForSpawnCount(1)
+
+    silence.stderr.emit('data', Buffer.from('silence_start: 10.000\nsilence_end: 12.000\n'))
+    expect(silence.kill).toHaveBeenCalledTimes(1)
+    silence.emit('close', null)
+    await waitForSpawnCount(2)
+
+    const probeArgs = mocks.spawn.mock.calls[0][1] as string[]
+    expect(probeArgs).toEqual(expect.arrayContaining(['-t', '30']))
+    const whisperArgs = mocks.spawn.mock.calls[1][1] as string[]
+    expect(whisperArgs).not.toContain('--offset-t')
+    whisper.emit('close', 0)
+    await expect(transcription).resolves.toBeDefined()
+  })
+
+  it('uses only a true leading silence end and reaps an early-decision probe', async () => {
+    const controller = new AbortController()
+    const silence = new FakeChild()
+    const whisper = new FakeChild()
+    mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
+    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    await waitForSpawnCount(1)
+
+    silence.stderr.emit('data', Buffer.from('silence_sta'))
+    silence.stderr.emit(
+      'data',
+      Buffer.from('rt: 0.000\nsilence_end: 5.023 | silence_duration: 5.023\n'),
+    )
+    expect(silence.kill).toHaveBeenCalledTimes(1)
+    expect(mocks.spawn).toHaveBeenCalledTimes(1)
+    silence.emit('close', null)
+    await waitForSpawnCount(2)
+
+    const whisperArgs = mocks.spawn.mock.calls[1][1] as string[]
+    expect(
+      whisperArgs.slice(whisperArgs.indexOf('--offset-t'), whisperArgs.indexOf('--offset-t') + 2),
+    ).toEqual(['--offset-t', '5023'])
+    whisper.emit('close', 0)
+    await expect(transcription).resolves.toBeDefined()
+  })
+
+  it('parses a bounded split tail without a trailing newline and ignores malformed diagnostics', async () => {
+    const controller = new AbortController()
+    const silence = new FakeChild()
+    const whisper = new FakeChild()
+    mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
+    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    await waitForSpawnCount(1)
+
+    silence.stderr.emit('data', Buffer.from(`silence_start: malformed ${'x'.repeat(16_384)}`))
+    silence.stderr.emit('data', Buffer.from(' silence_start: 0.000 silence_'))
+    silence.stderr.emit('data', Buffer.from('end: 2.500'))
+    silence.emit('close', 0)
+    await waitForSpawnCount(2)
+
+    const whisperArgs = mocks.spawn.mock.calls[1][1] as string[]
+    expect(
+      whisperArgs.slice(whisperArgs.indexOf('--offset-t'), whisperArgs.indexOf('--offset-t') + 2),
+    ).toEqual(['--offset-t', '2500'])
+    whisper.emit('close', 0)
+    await expect(transcription).resolves.toBeDefined()
+  })
+
   it('kills whisper once and awaits close before removing the temporary directory', async () => {
     const controller = new AbortController()
     const { whisper, transcription } = await advanceToWhisper(controller.signal)

@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, stat } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenProjectResult } from '../../shared/session.types'
 import type { WorkspaceToken } from '../../shared/session.types'
 
@@ -18,11 +21,14 @@ vi.mock('electron', () => ({
 
 import { registerProjectIpc } from './project.ipc'
 import type { PendingProjectOpenRegistry } from '../project/PendingProjectOpenRegistry'
+import { ProjectMutationCoordinator } from '../project/ProjectMutationCoordinator'
 import type { ProjectTransitionCoordinator } from '../project/ProjectTransitionCoordinator'
 import type { SessionSwitchBarrier } from '../project/SessionSwitchBarrier'
-import type { WorkspaceController } from '../project/WorkspaceController'
+import { SessionJobRegistry } from '../project/SessionJobRegistry'
+import { WorkspaceController } from '../project/WorkspaceController'
 
 const TOKEN = 'workspace-a' as WorkspaceToken
+const roots: string[] = []
 const request = { workspaceToken: TOKEN, revision: 3, isDirty: false as const }
 const stayed: OpenProjectResult = {
   outcome: 'stayed',
@@ -49,8 +55,23 @@ function sender(id = 7) {
   }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
+function mutationStub(): ProjectMutationCoordinator {
+  return { save: vi.fn(), saveAs: vi.fn() } as unknown as ProjectMutationCoordinator
+}
+
 describe('project IPC', () => {
   beforeEach(() => mocks.handlers.clear())
+  afterEach(async () => {
+    await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  })
 
   it('routes dialog and pending opens through the same transition coordinator without returning paths', async () => {
     const coordinator = {
@@ -63,6 +84,7 @@ describe('project IPC', () => {
       coordinator as unknown as ProjectTransitionCoordinator,
       pending as unknown as PendingProjectOpenRegistry,
       { acknowledge: vi.fn() } as unknown as SessionSwitchBarrier,
+      mutationStub(),
       vi.fn(),
     )
     const ownedSender = sender()
@@ -98,6 +120,7 @@ describe('project IPC', () => {
       coordinator as unknown as ProjectTransitionCoordinator,
       pending as unknown as PendingProjectOpenRegistry,
       { acknowledge: vi.fn() } as unknown as SessionSwitchBarrier,
+      mutationStub(),
       vi.fn(),
     )
 
@@ -125,6 +148,7 @@ describe('project IPC', () => {
       { openDialog: vi.fn(), openPath: vi.fn() } as unknown as ProjectTransitionCoordinator,
       { consume: vi.fn() } as unknown as PendingProjectOpenRegistry,
       barrier as unknown as SessionSwitchBarrier,
+      mutationStub(),
       vi.fn(),
     )
     const acknowledgement = {
@@ -137,5 +161,127 @@ describe('project IPC', () => {
       mocks.handlers.get('project:acknowledge-switch')!({ sender: sender(9) }, acknowledgement),
     ).resolves.toEqual({ ok: true, value: true })
     expect(barrier.acknowledge).toHaveBeenCalledWith(9, acknowledgement)
+  })
+
+  it.each(['import', 'transcription', 'export'] as const)(
+    'closes admission and settles an active %s before Save advances its revision',
+    async (kind) => {
+      const parent = await mkdtemp(join(tmpdir(), 'podcut-project-ipc-'))
+      roots.push(parent)
+      const controller = new WorkspaceController()
+      const initialized = await controller.initialize(parent)
+      const current = await controller.saveAs(join(parent, 'Current.podcut'), {
+        ...initialized,
+        draft: initialized.draft,
+      })
+      const jobs = new SessionJobRegistry()
+      let settleJob!: () => void
+      const settled = new Promise<void>((resolve) => {
+        settleJob = resolve
+      })
+      const cancel = vi.fn()
+      jobs.register(
+        {
+          kind,
+          jobId: `active-${kind}`,
+          senderId: 7,
+          workspaceToken: current.workspaceToken,
+          revision: current.revision,
+        },
+        () => ({ cancel, settled }),
+      )
+      registerProjectIpc(
+        controller,
+        { openDialog: vi.fn(), openPath: vi.fn() } as unknown as ProjectTransitionCoordinator,
+        { consume: vi.fn() } as unknown as PendingProjectOpenRegistry,
+        { acknowledge: vi.fn() } as unknown as SessionSwitchBarrier,
+        new ProjectMutationCoordinator(controller, jobs),
+        vi.fn(),
+      )
+
+      let saveResolved = false
+      const saving = Promise.resolve(
+        mocks.handlers.get('project:save')!(
+          { sender: sender() },
+          { ...current, draft: current.draft },
+        ),
+      ).then((value) => {
+        saveResolved = true
+        return value
+      })
+
+      await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
+      expect(saveResolved).toBe(false)
+      expect(() =>
+        jobs.register(
+          {
+            kind: 'import',
+            jobId: 'late-import',
+            senderId: 7,
+            workspaceToken: current.workspaceToken,
+            revision: current.revision,
+          },
+          () => ({ cancel: vi.fn(), settled: Promise.resolve() }),
+        ),
+      ).toThrow('Session is closing')
+
+      settleJob()
+      await expect(saving).resolves.toMatchObject({
+        ok: true,
+        value: { workspaceToken: current.workspaceToken, revision: 3 },
+      })
+    },
+  )
+
+  it('settles jobs before Save As publication and releases an old temporary root only afterward', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-project-ipc-'))
+    roots.push(parent)
+    const controller = new WorkspaceController()
+    const current = await controller.initialize(parent)
+    const oldRoot = controller.workspace.root
+    const destination = join(parent, 'Saved.podcut')
+    const jobs = new SessionJobRegistry()
+    const settled = deferred<void>()
+    const cancel = vi.fn(async () => {
+      await expect(stat(oldRoot)).resolves.toBeTruthy()
+    })
+    jobs.register(
+      {
+        kind: 'transcription',
+        jobId: 'active-transcription',
+        senderId: 7,
+        workspaceToken: current.workspaceToken,
+        revision: current.revision,
+      },
+      () => ({ cancel, settled: settled.promise }),
+    )
+    mocks.showSaveDialog.mockResolvedValue({ canceled: false, filePath: destination })
+    registerProjectIpc(
+      controller,
+      { openDialog: vi.fn(), openPath: vi.fn() } as unknown as ProjectTransitionCoordinator,
+      { consume: vi.fn() } as unknown as PendingProjectOpenRegistry,
+      { acknowledge: vi.fn() } as unknown as SessionSwitchBarrier,
+      new ProjectMutationCoordinator(controller, jobs),
+      vi.fn(),
+    )
+
+    const saving = mocks.handlers.get('project:save-as')!(
+      { sender: sender() },
+      {
+        ...current,
+        draft: current.draft,
+      },
+    )
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
+    await expect(stat(oldRoot)).resolves.toBeTruthy()
+    await expect(stat(destination)).rejects.toMatchObject({ code: 'ENOENT' })
+
+    settled.resolve()
+    await expect(saving).resolves.toMatchObject({
+      ok: true,
+      value: { revision: current.revision + 1, workspace: { kind: 'saved' } },
+    })
+    await expect(stat(oldRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(stat(destination)).resolves.toBeTruthy()
   })
 })

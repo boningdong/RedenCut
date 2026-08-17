@@ -89,15 +89,19 @@ function emptyDraft(): ProjectDraft {
 }
 
 function sender(id = 1) {
-  const destroyedListeners: Array<() => void> = []
+  const destroyedListeners = new Set<() => void>()
   return {
     id,
     isDestroyed: vi.fn(() => false),
     send: vi.fn(),
     once: vi.fn((event: string, listener: () => void) => {
-      if (event === 'destroyed') destroyedListeners.push(listener)
+      if (event === 'destroyed') destroyedListeners.add(listener)
     }),
-    destroy: () => destroyedListeners.forEach((listener) => listener()),
+    removeListener: vi.fn((event: string, listener: () => void) => {
+      if (event === 'destroyed') destroyedListeners.delete(listener)
+    }),
+    listenerCount: () => destroyedListeners.size,
+    destroy: () => [...destroyedListeners].forEach((listener) => listener()),
   }
 }
 
@@ -172,6 +176,113 @@ describe('IPC job admission', () => {
     expect(result).toMatchObject({ ok: false })
     expect(mocks.importInstances[0].import).not.toHaveBeenCalled()
   })
+
+  it('keeps one sender-scoped selection listener across repeated selections', async () => {
+    const controller = controllerStub()
+    registerAudioIpc(
+      controller as unknown as WorkspaceController,
+      new SessionJobRegistry(),
+      vi.fn(),
+    )
+    mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+    const ownedSender = sender()
+    const event = { sender: ownedSender }
+
+    await mocks.handlers.get('audio:select-import-file')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })
+    await mocks.handlers.get('audio:select-import-file')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })
+
+    expect(ownedSender.listenerCount()).toBe(1)
+  })
+
+  it('owns selection cleanup by sender object even when a numeric sender ID is reused', async () => {
+    const controller = controllerStub()
+    registerAudioIpc(
+      controller as unknown as WorkspaceController,
+      new SessionJobRegistry(),
+      vi.fn(),
+    )
+    mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+    const firstSender = sender(7)
+    const replacementSender = sender(7)
+
+    await mocks.handlers.get('audio:select-import-file')!(
+      { sender: firstSender },
+      { workspaceToken: TOKEN_A, revision: 1 },
+    )
+    const replacementSelection = (await mocks.handlers.get('audio:select-import-file')!(
+      { sender: replacementSender },
+      { workspaceToken: TOKEN_A, revision: 1 },
+    )) as { value: { token: string } }
+
+    expect(firstSender.listenerCount()).toBe(1)
+    expect(replacementSender.listenerCount()).toBe(1)
+
+    firstSender.destroy()
+    mocks.nextImportResult = Promise.resolve({ project: createEmptyProject() })
+    const result = await mocks.handlers.get('audio:start-import')!(
+      { sender: replacementSender },
+      {
+        workspaceToken: TOKEN_A,
+        revision: 1,
+        jobId: 'replacement-sender-job',
+        selectionToken: replacementSelection.value.token,
+        mode: 'copy',
+        draft: emptyDraft(),
+      },
+    )
+
+    expect(result).toMatchObject({ ok: true })
+  })
+
+  it.each(['success', 'failure', 'cancel'] as const)(
+    'removes the per-import destroyed listener after %s settlement',
+    async (outcome) => {
+      const controller = controllerStub()
+      const jobs = new SessionJobRegistry()
+      registerAudioIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
+      mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+      const ownedSender = sender()
+      const event = { sender: ownedSender }
+      const selection = (await mocks.handlers.get('audio:select-import-file')!(event, {
+        workspaceToken: TOKEN_A,
+        revision: 1,
+      })) as { value: { token: string } }
+      const pending = deferred<{ project: ProjectFile }>()
+      mocks.nextImportResult = pending.promise
+      mocks.importInstances[0].cancel.mockReturnValue('cancelled')
+      const importing = mocks.handlers.get('audio:start-import')!(event, {
+        workspaceToken: TOKEN_A,
+        revision: 1,
+        jobId: 'listener-job',
+        selectionToken: selection.value.token,
+        mode: 'copy',
+        draft: emptyDraft(),
+      })
+      await vi.waitFor(() => expect(ownedSender.listenerCount()).toBe(2))
+
+      if (outcome === 'success') pending.resolve({ project: createEmptyProject() })
+      else if (outcome === 'failure') pending.reject(new Error('import failed'))
+      else {
+        const cancelling = mocks.handlers.get('audio:cancel-import')!(event, {
+          workspaceToken: TOKEN_A,
+          revision: 1,
+          jobId: 'listener-job',
+        })
+        await vi.waitFor(() => expect(mocks.importInstances[0].cancel).toHaveBeenCalledTimes(1))
+        pending.reject(new DOMException('cancelled', 'AbortError'))
+        await cancelling
+      }
+      await importing
+
+      expect(ownedSender.listenerCount()).toBe(1)
+    },
+  )
 
   it('does not start transcription when registry admission rejects', async () => {
     const controller = controllerStub()

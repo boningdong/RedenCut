@@ -20,6 +20,7 @@ class FakeApp extends EventEmitter {
 function runtime() {
   let minimized = true
   return {
+    ensureWindow: vi.fn(async () => {}),
     isWindowDestroyed: vi.fn(() => false),
     isWindowMinimized: vi.fn(() => minimized),
     restoreWindow: vi.fn(() => {
@@ -70,7 +71,7 @@ describe('application lifecycle', () => {
     expect(preventDefault).toHaveBeenCalledTimes(1)
   })
 
-  it('forwards later requests, skips destroyed windows, and shuts down barriers', async () => {
+  it('recreates a destroyed macOS window before forwarding and shuts down barriers', async () => {
     const app = new FakeApp()
     const active = runtime()
     startApplicationLifecycle({ app, initialize: async () => active })
@@ -82,10 +83,77 @@ describe('application lifecycle', () => {
       expect(active.forwardProject).toHaveBeenCalledWith('/private/Later.podcut'),
     )
     active.isWindowDestroyed.mockReturnValue(true)
+    active.ensureWindow.mockImplementationOnce(async () => {
+      active.isWindowDestroyed.mockReturnValue(false)
+    })
     app.emit('second-instance', {}, ['/private/Ignored.podcut'])
-    expect(active.forwardProject).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() =>
+      expect(active.forwardProject).toHaveBeenCalledWith('/private/Ignored.podcut'),
+    )
+    expect(active.ensureWindow).toHaveBeenCalledTimes(2)
 
     app.emit('before-quit')
     expect(active.shutdown).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps destroyed-window requests FIFO until recreation has finished', async () => {
+    const app = new FakeApp()
+    const active = runtime()
+    const recreated = deferred<void>()
+    active.isWindowDestroyed.mockReturnValue(true)
+    active.ensureWindow.mockImplementation(async () => {
+      await recreated.promise
+      active.isWindowDestroyed.mockReturnValue(false)
+    })
+    startApplicationLifecycle({ app, initialize: async () => active })
+    app.ready.resolve()
+    await vi.waitFor(() => expect(active.ensureWindow).toHaveBeenCalledTimes(0))
+
+    app.emit('second-instance', {}, ['/private/First.podcut'])
+    app.emit('second-instance', {}, ['/private/Second.podcut'])
+    await vi.waitFor(() => expect(active.ensureWindow).toHaveBeenCalledTimes(1))
+    expect(active.forwardProject).not.toHaveBeenCalled()
+
+    recreated.resolve()
+    await vi.waitFor(() => expect(active.forwardProject).toHaveBeenCalledTimes(2))
+    expect(active.forwardProject.mock.calls.map(([path]) => path)).toEqual([
+      '/private/First.podcut',
+      '/private/Second.podcut',
+    ])
+  })
+
+  it('bounds main-only early requests and reports overflow without exposing a path', async () => {
+    const app = new FakeApp()
+    const active = runtime()
+    const reportDiagnostic = vi.fn()
+    startApplicationLifecycle({ app, initialize: async () => active, reportDiagnostic })
+
+    for (let index = 0; index < 33; index += 1)
+      app.emit('second-instance', {}, [`/private/Queued-${index}.podcut`])
+    expect(reportDiagnostic).toHaveBeenCalledTimes(1)
+    expect(String(reportDiagnostic.mock.calls[0][0])).not.toContain('/private')
+
+    app.ready.resolve()
+    await vi.waitFor(() => expect(active.forwardProject).toHaveBeenCalledTimes(32))
+    expect(active.forwardProject.mock.calls.at(0)?.[0]).toBe('/private/Queued-0.podcut')
+    expect(active.forwardProject.mock.calls.at(-1)?.[0]).toBe('/private/Queued-31.podcut')
+  })
+
+  it('drops only its bounded main queue on shutdown while recreation is pending', async () => {
+    const app = new FakeApp()
+    const active = runtime()
+    const recreated = deferred<void>()
+    active.ensureWindow.mockReturnValue(recreated.promise)
+    startApplicationLifecycle({ app, initialize: async () => active })
+    app.ready.resolve()
+    app.emit('second-instance', {}, ['/private/Shutdown.podcut'])
+    await vi.waitFor(() => expect(active.ensureWindow).toHaveBeenCalledTimes(1))
+
+    app.emit('before-quit')
+    recreated.resolve()
+    await Promise.resolve()
+
+    expect(active.shutdown).toHaveBeenCalledTimes(1)
+    expect(active.forwardProject).not.toHaveBeenCalled()
   })
 })

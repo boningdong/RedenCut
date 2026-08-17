@@ -199,6 +199,41 @@ describe('ImportCoordinator transaction', () => {
     expect(await readdir(join(workspace.root, '.staging'))).toEqual([])
   })
 
+  it('contains an asynchronous copy-writer failure and removes only its owned partial stage', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-import-writer-'))
+    const workspace = await ProjectWorkspace.initialize(parent)
+    const sourcePath = join(parent, 'episode.mp3')
+    await writeFile(sourcePath, new Uint8Array([1, 2, 3, 4]))
+    const sibling = join(parent, 'keep.txt')
+    await writeFile(sibling, 'keep')
+    const build = vi.fn()
+    const copy = vi.fn(async (_source: string, destination: string) => {
+      await writeFile(destination, 'partial')
+      await Promise.resolve()
+      throw Object.assign(new Error('disk full'), { code: 'ENOSPC' })
+    })
+    const coordinator = new ImportCoordinator(workspace, {
+      builder: { build },
+      probe: vi.fn(async () => metadata),
+      createId: () => SOURCE_ID,
+      availableBytes: vi.fn(async () => Number.MAX_SAFE_INTEGER),
+      copy,
+    } as never)
+
+    await expect(
+      coordinator.import(
+        IMPORT_ID,
+        sourcePath,
+        'copy',
+        workspace.project,
+        commitToWorkspace(workspace),
+      ),
+    ).rejects.toMatchObject({ code: 'ENOSPC' })
+    expect(build).not.toHaveBeenCalled()
+    expect(await readFile(sibling, 'utf8')).toBe('keep')
+    expect(await readdir(join(workspace.root, '.staging'))).toEqual([])
+  })
+
   it('rejects renderer-controlled import IDs that are not UUID path segments', async () => {
     const builder = { build: vi.fn(buildStagedCache) }
     const { coordinator, workspace, sourcePath } = await setup(builder)
@@ -327,6 +362,37 @@ describe('ImportCoordinator transaction', () => {
       code: 'ENOENT',
     })
     expect(coordinator.cancel(IMPORT_ID)).toBe('not-found')
+  })
+
+  it('revalidates a referenced source after cache construction and before commit', async () => {
+    let sourcePath = ''
+    const builder = {
+      build: vi.fn(async (request: CacheBuildRequest) => {
+        const result = await buildStagedCache(request)
+        await writeFile(sourcePath, new Uint8Array([4, 3, 2, 1]))
+        return result
+      }),
+    }
+    const setupResult = await setup(builder)
+    ;({ sourcePath } = setupResult)
+    const runCommitBoundary = vi.fn(commitToWorkspace(setupResult.workspace))
+
+    await expect(
+      setupResult.coordinator.import(
+        IMPORT_ID,
+        sourcePath,
+        'reference',
+        setupResult.workspace.project,
+        runCommitBoundary,
+      ),
+    ).rejects.toThrow('Original audio changed since import')
+
+    expect(runCommitBoundary).not.toHaveBeenCalled()
+    expect(setupResult.workspace.project.audioSources).toEqual([])
+    await expect(stat(join(setupResult.workspace.root, 'cache', SOURCE_ID))).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+    expect(await readdir(join(setupResult.workspace.root, '.staging'))).toEqual([])
   })
 
   it('attempts every rollback cleanup and aggregates failures with the commit error', async () => {

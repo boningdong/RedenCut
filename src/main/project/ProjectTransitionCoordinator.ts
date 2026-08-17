@@ -7,6 +7,10 @@ import type {
 } from '../../shared/session.types'
 import type { SessionJobRegistry } from './SessionJobRegistry'
 import {
+  ProjectMutationCoordinator,
+  SessionMutationSettlementError,
+} from './ProjectMutationCoordinator'
+import {
   ProjectSwitchShutdownError,
   type ProjectSwitchSender,
   type SessionSwitchBarrier,
@@ -25,7 +29,11 @@ interface ProjectTransitionDependencies {
 }
 
 export class ProjectTransitionCoordinator {
-  constructor(private readonly dependencies: ProjectTransitionDependencies) {}
+  private readonly mutations: ProjectMutationCoordinator
+
+  constructor(private readonly dependencies: ProjectTransitionDependencies) {
+    this.mutations = new ProjectMutationCoordinator(dependencies.controller, dependencies.jobs)
+  }
 
   openDialog(sender: ProjectSwitchSender, request: OpenProjectRequest): Promise<OpenProjectResult> {
     return this.transition(sender, request, () => this.dependencies.chooseOpenDestination(sender))
@@ -48,19 +56,32 @@ export class ProjectTransitionCoordinator {
       const startingToken = transaction.precondition.workspaceToken
       let rollback = await transaction.describe()
       let retainedStartingWorkspace = false
+      const settledClosedTokens = new Set<WorkspaceToken>()
 
       if (request.isDirty) {
         const action = await this.dependencies.chooseDirtyAction(sender)
         if (action === 'cancel') return stayed(rollback, 'cancelled')
         if (action === 'save') {
+          let mutation
+          try {
+            mutation = await this.mutations.begin(transaction)
+          } catch (error) {
+            if (error instanceof SessionMutationSettlementError)
+              return stayed(await transaction.describe(), 'job-settlement-failed')
+            throw error
+          }
           try {
             if (rollback.workspace.kind === 'temporary') {
               const destination = await this.dependencies.chooseSaveDestination(sender)
-              if (!destination) return stayed(rollback, 'cancelled')
-              rollback = await transaction.saveAsForOpen(destination, request.draft)
+              if (!destination) {
+                mutation.cancel()
+                return stayed(rollback, 'cancelled')
+              }
+              rollback = await mutation.saveAsForOpen(destination, request.draft)
               retainedStartingWorkspace = true
+              settledClosedTokens.add(startingToken)
             } else {
-              rollback = await transaction.save(request.draft)
+              rollback = await mutation.save(request.draft)
             }
           } catch {
             return stayed(await transaction.describe(), 'save-failed')
@@ -100,7 +121,9 @@ export class ProjectTransitionCoordinator {
           : stayed(rollback, 'candidate-invalid')
       }
 
-      const closingTokens = uniqueTokens(startingToken, rollback.workspaceToken)
+      const closingTokens = uniqueTokens(startingToken, rollback.workspaceToken).filter(
+        (token) => !settledClosedTokens.has(token),
+      )
       closingTokens.forEach((token) => this.dependencies.jobs.beginClosing(token))
       try {
         for (const token of closingTokens) await this.dependencies.jobs.cancelAndSettleToken(token)

@@ -27,7 +27,8 @@ export function registerAudioIpc(
       expiresAt: number
     }
   >()
-  const senderSelections = new Map<number, string>()
+  const senderSelections = new Map<number, { token: string; sender: object }>()
+  const selectionCleanupSenders = new WeakSet<object>()
   const cancellationOutcomes = new Map<string, ImportCancellationResult>()
   const cancellationWaiters = new Map<string, number>()
   let coordinator = new ImportCoordinator(controller.workspace)
@@ -46,22 +47,30 @@ export function registerAudioIpc(
         ],
         properties: ['openFile'],
       })
-      if (result.canceled || !result.filePaths[0]) return null
+      if (result.canceled || !result.filePaths[0] || event.sender.isDestroyed()) return null
       const token = randomUUID()
       const previous = senderSelections.get(event.sender.id)
-      if (previous) selections.delete(previous)
+      if (previous) selections.delete(previous.token)
       selections.set(token, {
         senderId: event.sender.id,
         path: result.filePaths[0],
         ...expected,
         expiresAt: Date.now() + 10 * 60 * 1000,
       })
-      senderSelections.set(event.sender.id, token)
-      event.sender.once('destroyed', () => {
-        const active = senderSelections.get(event.sender.id)
-        if (active) selections.delete(active)
-        senderSelections.delete(event.sender.id)
-      })
+      senderSelections.set(event.sender.id, { token, sender: event.sender })
+      if (!selectionCleanupSenders.has(event.sender)) {
+        const ownedSender = event.sender
+        const cleanupSelections = () => {
+          const active = senderSelections.get(ownedSender.id)
+          if (active?.sender === ownedSender) {
+            selections.delete(active.token)
+            senderSelections.delete(ownedSender.id)
+          }
+          selectionCleanupSenders.delete(ownedSender)
+        }
+        selectionCleanupSenders.add(ownedSender)
+        ownedSender.once('destroyed', cleanupSelections)
+      }
       return { token, displayName: basename(result.filePaths[0]) }
     }, diagnosticSink),
   )
@@ -72,7 +81,11 @@ export function registerAudioIpc(
       controller.assertCurrent(request)
       const selection = selections.get(request.selectionToken)
       selections.delete(request.selectionToken)
-      if (senderSelections.get(event.sender.id) === request.selectionToken)
+      const activeSelection = senderSelections.get(event.sender.id)
+      if (
+        activeSelection?.sender === event.sender &&
+        activeSelection.token === request.selectionToken
+      )
         senderSelections.delete(event.sender.id)
       if (
         !selection ||
@@ -136,12 +149,15 @@ export function registerAudioIpc(
           settled: operation,
         }
       })
-      event.sender.once('destroyed', () => {
+      const cancelSenderJobs = () => {
         void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
-      })
+      }
+      event.sender.once('destroyed', cancelSenderJobs)
+      if (event.sender.isDestroyed()) cancelSenderJobs()
       try {
         return await operation
       } finally {
+        event.sender.removeListener('destroyed', cancelSenderJobs)
         unregister()
         if (!cancellationWaiters.has(cancellationKey)) cancellationOutcomes.delete(cancellationKey)
       }

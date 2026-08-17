@@ -1,7 +1,7 @@
 export type CleanupWarningOperation =
   'workspace-switch' | 'save-as-publication' | 'export-publication'
 
-type CleanupWarningKind = 'temporary-workspace' | 'destination-backup'
+type CleanupWarningKind = 'temporary-workspace' | 'destination-backup' | 'publication-temporary'
 
 export interface CleanupWarning {
   path: string

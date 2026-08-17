@@ -1,5 +1,15 @@
 import { createHash } from 'crypto'
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
@@ -659,5 +669,44 @@ describe('WorkspaceController cache recovery', () => {
     const persisted = JSON.parse(await readFile(join(root, 'project.json'), 'utf8'))
     expect(persisted.export.targetLUFS).toBe(session.draft.export.targetLUFS)
     expect(() => controller.assertCurrent(session)).not.toThrow()
+  })
+
+  it('hashes and rejects same-length changed bytes when quick-save metadata differs', async () => {
+    const controller = new WorkspaceController({
+      build: vi.fn(),
+    } as unknown as FfmpegAudioSourceCacheBuilder)
+    const root = await packageWithoutCache()
+    await writeValidCache(root)
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'podcut-controller-')))
+    const session = await controller.open(root)
+    await writeFile(join(root, 'media', SOURCE_ID, 'source.wav'), new Uint8Array([4, 3, 2, 1]))
+
+    await expect(controller.save(request(session, draftWithLufs(session, -10)))).rejects.toThrow(
+      'Original audio changed since import',
+    )
+
+    const persisted = JSON.parse(await readFile(join(root, 'project.json'), 'utf8'))
+    expect(persisted.export.targetLUFS).toBe(session.draft.export.targetLUFS)
+    expect(() => controller.assertCurrent(session)).not.toThrow()
+  })
+
+  it('accepts a metadata-only timestamp change after quick validation falls back to the hash', async () => {
+    const builder = { build: vi.fn() } as unknown as FfmpegAudioSourceCacheBuilder
+    const controller = new WorkspaceController(builder)
+    const root = await packageWithoutCache()
+    await writeValidCache(root)
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'podcut-controller-')))
+    const session = await controller.open(root)
+    const sourcePath = join(root, 'media', SOURCE_ID, 'source.wav')
+    const touched = new Date(Date.now() + 10_000)
+    await utimes(sourcePath, touched, touched)
+
+    await expect(
+      controller.save(request(session, draftWithLufs(session, -10))),
+    ).resolves.toMatchObject({
+      workspaceToken: session.workspaceToken,
+      revision: session.revision + 1,
+    })
+    expect(builder.build).not.toHaveBeenCalled()
   })
 })

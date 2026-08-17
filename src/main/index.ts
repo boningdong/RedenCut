@@ -12,6 +12,7 @@ import {
   removePendingProjectOpensOnSenderDestroyed,
 } from './project/PendingProjectOpenRegistry'
 import { CleanupWarningStore } from './project/CleanupWarningSink'
+import { ProjectMutationCoordinator } from './project/ProjectMutationCoordinator'
 import { ProjectTransitionCoordinator } from './project/ProjectTransitionCoordinator'
 import type { ProjectSwitchSender } from './project/SessionSwitchBarrier'
 import { SessionSwitchBarrier } from './project/SessionSwitchBarrier'
@@ -58,6 +59,7 @@ startApplicationLifecycle({
     const controller = new WorkspaceController(undefined, cleanupWarnings)
     await controller.initialize(app.getPath('temp'))
     const jobs = new SessionJobRegistry()
+    const mutations = new ProjectMutationCoordinator(controller, jobs)
     const barrier = new SessionSwitchBarrier()
     const pendingOpens = new PendingProjectOpenRegistry()
     const transitions = new ProjectTransitionCoordinator({
@@ -93,7 +95,7 @@ startApplicationLifecycle({
         return result.canceled ? null : (result.filePaths[0] ?? null)
       },
     })
-    registerProjectIpc(controller, transitions, pendingOpens, barrier)
+    registerProjectIpc(controller, transitions, pendingOpens, barrier, mutations)
     registerAudioIpc(controller, jobs)
     registerTranscriptIpc(controller, jobs)
     registerRenderIpc(
@@ -112,36 +114,42 @@ startApplicationLifecycle({
 
     let window = createWindow()
     let rendererLoaded = false
-    const forwardedProjects: string[] = []
-    const flushForwardedProjects = () => {
-      if (!rendererLoaded || window.isDestroyed()) return
-      forwardedProjects.splice(0).forEach((path) => {
-        const pending = pendingOpens.issue(window.webContents.id, path)
-        window.webContents.send('project:pending-open', pending)
-      })
-    }
+    let rendererLoad: Promise<void> = Promise.resolve()
     const observeRendererLoad = () => {
       rendererLoaded = false
       removePendingProjectOpensOnSenderDestroyed(pendingOpens, window.webContents)
-      window.webContents.once('did-finish-load', () => {
-        rendererLoaded = true
-        flushForwardedProjects()
+      rendererLoad = new Promise<void>((resolve) => {
+        window.webContents.once('did-finish-load', () => {
+          rendererLoaded = true
+          resolve()
+        })
+        window.webContents.once('destroyed', resolve)
       })
+    }
+    const ensureWindow = async () => {
+      if (window.isDestroyed()) {
+        window = createWindow()
+        observeRendererLoad()
+      }
+      await rendererLoad
+      if (window.isDestroyed() || !rendererLoaded)
+        throw new Error('Primary window did not finish loading')
     }
     observeRendererLoad()
     app.on('activate', () => {
-      if (!window.isDestroyed()) return
-      window = createWindow()
-      observeRendererLoad()
+      void ensureWindow().catch(console.error)
     })
     return {
+      ensureWindow,
       isWindowDestroyed: () => window.isDestroyed(),
       isWindowMinimized: () => window.isMinimized(),
       restoreWindow: () => window.restore(),
       focusWindow: () => window.focus(),
       forwardProject: (path: string) => {
-        forwardedProjects.push(path)
-        flushForwardedProjects()
+        if (!rendererLoaded || window.isDestroyed())
+          throw new Error('Primary window is unavailable')
+        const pending = pendingOpens.issue(window.webContents.id, path)
+        window.webContents.send('project:pending-open', pending)
       },
       shutdown: () => barrier.shutdown(),
     }

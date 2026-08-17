@@ -1,7 +1,7 @@
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
 import type { EventEmitter } from 'events'
-import { rename, rm, stat } from 'fs/promises'
+import { link, rename, rm, stat } from 'fs/promises'
 import { basename, dirname, extname, join } from 'path'
 import type {
   ExportCancellationResult,
@@ -49,6 +49,10 @@ interface ExportCoordinatorDependencies {
   ffmpegPath: () => string
   rename: (source: string, destination: string) => Promise<void>
   remove: (path: string) => Promise<void>
+  publishNoClobber: (
+    source: string,
+    destination: string,
+  ) => Promise<{ sourceRemoved: boolean; cleanupError?: unknown }>
   stat: typeof stat
   cleanupWarningSink: CleanupWarningSink
 }
@@ -66,13 +70,16 @@ export class ExportCoordinator {
   private readonly activeBySender = new Map<number, ActiveExport>()
 
   constructor(dependencies: Partial<ExportCoordinatorDependencies> = {}) {
+    const remove = dependencies.remove ?? ((path: string) => rm(path, { force: true }))
     this.dependencies = {
       spawn: (command, arguments_) =>
         spawn(command, arguments_, { stdio: ['ignore', 'ignore', 'pipe'] }) as ExportChild,
       createId: randomUUID,
       ffmpegPath: getFfmpegPath,
       rename,
-      remove: (path) => rm(path, { force: true }),
+      remove,
+      publishNoClobber: (source, destination) =>
+        atomicPublishNoClobber(source, destination, link, remove),
       stat,
       cleanupWarningSink: discardCleanupWarnings,
       ...dependencies,
@@ -150,36 +157,129 @@ export class ExportCoordinator {
           request.onProgress,
         )
         throwIfAborted(controller.signal)
-        const destinationExists = await pathExists(this.dependencies.stat, destination)
+        const destinationVersion = await pathStat(this.dependencies.stat, destination)
         throwIfAborted(controller.signal)
         request.revalidate()
         active.state = 'publishing'
-        if (destinationExists) {
+        if (destinationVersion) {
           await this.dependencies.rename(destination, backupOutput)
           backupOwned = true
-          if (controller.signal.aborted) {
+          const backupVersion = await this.dependencies.stat(backupOutput)
+          if (!sameFileVersion(destinationVersion, backupVersion)) {
+            const replacementError = new Error('Export destination changed during publication')
             try {
-              await this.dependencies.rename(backupOutput, destination)
-              backupOwned = false
+              const rollback = await this.dependencies.publishNoClobber(backupOutput, destination)
+              backupOwned = !rollback.sourceRemoved
+              if (rollback.cleanupError) {
+                await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                  path: backupOutput,
+                  operation: 'export-publication',
+                  kind: 'destination-backup',
+                  cause: rollback.cleanupError,
+                })
+                backupOwned = false
+              }
             } catch (rollbackError) {
+              await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                path: backupOutput,
+                operation: 'export-publication',
+                kind: 'destination-backup',
+                cause: rollbackError,
+              })
+              backupOwned = false
               throw new AggregateError(
-                [new DOMException('Export cancelled', 'AbortError'), rollbackError],
+                [replacementError, rollbackError],
+                'Export destination replacement rollback failed',
+                { cause: rollbackError },
+              )
+            }
+            throw replacementError
+          }
+          if (controller.signal.aborted) {
+            const cancellationError = new DOMException('Export cancelled', 'AbortError')
+            try {
+              const rollback = await this.dependencies.publishNoClobber(backupOutput, destination)
+              backupOwned = !rollback.sourceRemoved
+              if (rollback.cleanupError) {
+                await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                  path: backupOutput,
+                  operation: 'export-publication',
+                  kind: 'destination-backup',
+                  cause: rollback.cleanupError,
+                })
+                backupOwned = false
+              }
+            } catch (rollbackError) {
+              await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                path: backupOutput,
+                operation: 'export-publication',
+                kind: 'destination-backup',
+                cause: rollbackError,
+              })
+              backupOwned = false
+              throw new AggregateError(
+                [cancellationError, rollbackError],
                 'Export publication rollback failed',
                 { cause: rollbackError },
               )
             }
-            throw new DOMException('Export cancelled', 'AbortError')
+            throw cancellationError
           }
         }
         try {
-          await this.dependencies.rename(temporaryOutput, destination)
-          temporaryOwned = false
+          const publication = await this.dependencies.publishNoClobber(temporaryOutput, destination)
+          temporaryOwned = !publication.sourceRemoved
+          active.state = 'committed'
+          if (publication.cleanupError) {
+            await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+              path: temporaryOutput,
+              operation: 'export-publication',
+              kind: 'publication-temporary',
+              cause: publication.cleanupError,
+            })
+            temporaryOwned = false
+          }
         } catch (publicationError) {
+          if (isAlreadyExists(publicationError)) {
+            await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+              path: temporaryOutput,
+              operation: 'export-publication',
+              kind: 'publication-temporary',
+              cause: publicationError,
+            })
+            temporaryOwned = false
+            if (backupOwned) {
+              await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                path: backupOutput,
+                operation: 'export-publication',
+                kind: 'destination-backup',
+                cause: publicationError,
+              })
+              backupOwned = false
+            }
+            throw publicationError
+          }
           if (backupOwned) {
             try {
-              await this.dependencies.rename(backupOutput, destination)
-              backupOwned = false
+              const rollback = await this.dependencies.publishNoClobber(backupOutput, destination)
+              backupOwned = !rollback.sourceRemoved
+              if (rollback.cleanupError) {
+                await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                  path: backupOutput,
+                  operation: 'export-publication',
+                  kind: 'destination-backup',
+                  cause: rollback.cleanupError,
+                })
+                backupOwned = false
+              }
             } catch (rollbackError) {
+              await recordCleanupWarning(this.dependencies.cleanupWarningSink, {
+                path: backupOutput,
+                operation: 'export-publication',
+                kind: 'destination-backup',
+                cause: rollbackError,
+              })
+              backupOwned = false
               throw new AggregateError(
                 [publicationError, rollbackError],
                 'Export publication rollback failed',
@@ -189,7 +289,6 @@ export class ExportCoordinator {
           }
           throw publicationError
         }
-        active.state = 'committed'
         if (backupOwned) {
           try {
             await this.dependencies.remove(backupOutput)
@@ -236,6 +335,30 @@ export class ExportCoordinator {
         this.activeBySender.delete(identity.senderId)
     }
   }
+}
+
+async function atomicPublishNoClobber(
+  source: string,
+  destination: string,
+  createLink: (source: string, destination: string) => Promise<void>,
+  removeSource: (path: string) => Promise<void>,
+): Promise<{ sourceRemoved: boolean; cleanupError?: unknown }> {
+  await createLink(source, destination)
+  try {
+    await removeSource(source)
+    return { sourceRemoved: true }
+  } catch (cleanupError) {
+    return { sourceRemoved: false, cleanupError }
+  }
+}
+
+function isAlreadyExists(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'EEXIST'
+  )
 }
 
 function siblingArtifact(destination: string, kind: 'export' | 'backup', id: string): string {
@@ -333,14 +456,28 @@ function isCommitted(active: ActiveExport): boolean {
   return active.state === 'committed'
 }
 
-async function pathExists(statPath: typeof stat, path: string): Promise<boolean> {
+async function pathStat(
+  statPath: typeof stat,
+  path: string,
+): Promise<Awaited<ReturnType<typeof stat>> | null> {
   try {
-    await statPath(path)
-    return true
+    return await statPath(path)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw error
   }
+}
+
+function sameFileVersion(
+  before: Awaited<ReturnType<typeof stat>>,
+  after: Awaited<ReturnType<typeof stat>>,
+): boolean {
+  return (
+    before.dev === after.dev &&
+    before.ino === after.ino &&
+    before.size === after.size &&
+    before.mtimeMs === after.mtimeMs
+  )
 }
 
 function envelope(identity: ExportIdentity) {

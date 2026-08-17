@@ -1,5 +1,4 @@
-import { createHash, randomUUID } from 'crypto'
-import { createReadStream } from 'fs'
+import { randomUUID } from 'crypto'
 import { realpath, stat } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { AudioSourceCacheDescriptor } from '../../shared/import.types'
@@ -13,6 +12,7 @@ import type {
 } from '../../shared/session.types'
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 import { FfmpegAudioSourceCacheBuilder } from '../audio/import/FfmpegAudioSourceCacheBuilder'
+import { verifyAudioFingerprint } from '../audio/import/audioFingerprint'
 import { AsyncMutex } from './AsyncMutex'
 import { discardCleanupWarnings, type CleanupWarningSink } from './CleanupWarningSink'
 import { ProjectPathResolver } from './ProjectPathResolver'
@@ -158,7 +158,7 @@ export class WorkspaceController {
     )
     if (!source) throw new Error(`Unknown audio source: ${audioSourceId}`)
     const path = await resolveOriginal(workspace, source)
-    await verifyFingerprint(path, source.fingerprint)
+    await verifyAudioFingerprint(path, source.fingerprint)
     return path
   }
 
@@ -172,7 +172,7 @@ export class WorkspaceController {
       const source = sources.get(audioSourceId)
       if (!source) throw new Error(`Unknown audio source: ${audioSourceId}`)
       const path = await resolveOriginal(workspace, source)
-      await verifyFingerprint(path, source.fingerprint)
+      await verifyAudioFingerprint(path, source.fingerprint)
       return path
     }
   }
@@ -301,11 +301,11 @@ export class WorkspaceController {
     const result: AudioSourceCacheDescriptor[] = []
     for (const source of project.audioSources) {
       const original = await resolveOriginal(workspace, source)
-      await verifyFingerprint(original, source.fingerprint, originalValidation === 'full')
+      await verifyAudioFingerprint(original, source.fingerprint, originalValidation)
       let manifest = await store.validate(source)
       if (!manifest) {
         if (originalValidation === 'quick')
-          await verifyFingerprint(original, source.fingerprint, true)
+          await verifyAudioFingerprint(original, source.fingerprint, 'full')
         manifest = await this.cacheBuilder.build(
           {
             projectRoot: workspace.root,
@@ -318,6 +318,7 @@ export class WorkspaceController {
           },
           new AbortController().signal,
         )
+        await verifyAudioFingerprint(original, source.fingerprint, 'full')
       }
       result.push(store.descriptor(manifest))
     }
@@ -372,17 +373,4 @@ async function resolveOriginal(
   } catch (error) {
     throw new Error(`Original audio is unavailable for ${source.displayName}`, { cause: error })
   }
-}
-
-async function verifyFingerprint(
-  path: string,
-  expected: ProjectFile['audioSources'][number]['fingerprint'],
-  includeHash = true,
-): Promise<void> {
-  const info = await stat(path)
-  if (info.size !== expected.byteLength) throw new Error('Original audio changed since import')
-  if (!includeHash) return
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer)
-  if (hash.digest('hex') !== expected.sha256) throw new Error('Original audio changed since import')
 }

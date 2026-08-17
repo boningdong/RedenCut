@@ -57,6 +57,7 @@ export function TranscriptPanel({
   const tracks = useTimelineStore((s) => s.tracks)
 
   const setSelection = useEditorStore((s) => s.setSelection)
+  const markEdited = useEditorStore((s) => s.markEdited)
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const containerRef = useRef<HTMLDivElement>(null)
@@ -168,7 +169,8 @@ export function TranscriptPanel({
     const offset = currentTime - firstWord.start
     if (Math.abs(offset) < 0.01) return // already aligned — nothing to do
     shiftTimestamps(offset)
-  }, [words, currentTime, shiftTimestamps])
+    markEdited()
+  }, [words, currentTime, shiftTimestamps, markEdited])
 
   // ── Clip state map — computed once per words+tracks change ───────────────
   // Declared here (before handleDeleteFromSelection) to avoid temporal dead zone.

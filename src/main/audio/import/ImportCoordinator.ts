@@ -1,6 +1,4 @@
-import { createHash, randomUUID } from 'crypto'
-import { once } from 'events'
-import { createReadStream, createWriteStream } from 'fs'
+import { randomUUID } from 'crypto'
 import { mkdir, rename, rm, stat, statfs } from 'fs/promises'
 import { basename, extname, join } from 'path'
 import type {
@@ -23,6 +21,8 @@ import type { ProjectWorkspace } from '../../project/ProjectWorkspace'
 import { probeAudio } from './probeAudio'
 import { AudioSourceCacheStore } from '../cache/AudioSourceCacheStore'
 import { FfmpegAudioSourceCacheBuilder } from './FfmpegAudioSourceCacheBuilder'
+import { copyWithHash } from './copyWithHash'
+import { fingerprintAudioFile, verifyAudioFingerprint } from './audioFingerprint'
 
 const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
 
@@ -41,6 +41,7 @@ export class ImportCoordinator {
       createId: () => string
       availableBytes: (path: string) => Promise<number>
       remove?: typeof rm
+      copy?: typeof copyWithHash
     } = {
       builder: new FfmpegAudioSourceCacheBuilder(),
       probe: probeAudio,
@@ -123,7 +124,7 @@ export class ImportCoordinator {
         const stageMediaRoot = join(stageRoot, 'media', id)
         await mkdir(stageMediaRoot, { recursive: true })
         durablePath = join(stageMediaRoot, safeMediaName(displayName))
-        copiedFingerprint = await copyWithHash(
+        copiedFingerprint = await (this.dependencies.copy ?? copyWithHash)(
           sourcePath,
           durablePath,
           controller.signal,
@@ -143,7 +144,7 @@ export class ImportCoordinator {
             ...copiedFingerprint,
             modifiedTimeMs: (await stat(durablePath)).mtimeMs,
           }
-        : await fingerprintFile(durablePath, controller.signal)
+        : await fingerprintAudioFile(durablePath, controller.signal)
       const source: AudioSource = { id, displayName, location, fingerprint, metadata }
       progress('building-cache', 0)
       const manifest = await this.dependencies.builder.build(
@@ -160,6 +161,8 @@ export class ImportCoordinator {
         (value) => progress('building-cache', value),
       )
       this.throwIfAborted(controller.signal)
+      if (mode === 'reference')
+        await verifyAudioFingerprint(durablePath, fingerprint, 'full', controller.signal)
       let committedProject: ProjectFile | null = null
       const value = await runCommitBoundary(async (commitProject) => {
         this.throwIfAborted(controller.signal)
@@ -255,43 +258,6 @@ function safeMediaName(name: string): string {
   return `${stem}${extension.toLowerCase()}`
 }
 
-async function copyWithHash(
-  source: string,
-  destination: string,
-  signal: AbortSignal,
-  onBytes?: (byteLength: number) => void,
-): Promise<{ byteLength: number; sha256: string }> {
-  if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
-  const input = createReadStream(source)
-  const output = createWriteStream(destination, { flags: 'wx' })
-  const hash = createHash('sha256')
-  let byteLength = 0
-  const abort = () => {
-    input.destroy(new DOMException('Import aborted', 'AbortError'))
-    output.destroy()
-  }
-  signal.addEventListener('abort', abort, { once: true })
-  if (signal.aborted) abort()
-  try {
-    for await (const chunk of input) {
-      hash.update(chunk as Buffer)
-      byteLength += (chunk as Buffer).byteLength
-      onBytes?.(byteLength)
-      if (!output.write(chunk)) await once(output, 'drain')
-    }
-    if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
-    output.end()
-    await once(output, 'close')
-    return { byteLength, sha256: hash.digest('hex') }
-  } catch (error) {
-    input.destroy()
-    output.destroy()
-    throw error
-  } finally {
-    signal.removeEventListener('abort', abort)
-  }
-}
-
 function estimateImportBytes(
   sourceBytes: number,
   metadata: AudioMetadata,
@@ -305,19 +271,4 @@ function estimateImportBytes(
   )
   const copiedBytes = mode === 'copy' ? sourceBytes : 0
   return Math.ceil((copiedBytes + pcmBytes + waveformBytes) * 1.1)
-}
-
-async function fingerprintFile(
-  path: string,
-  signal: AbortSignal,
-): Promise<AudioSource['fingerprint']> {
-  if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) {
-    if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
-    hash.update(chunk as Buffer)
-  }
-  if (signal.aborted) throw new DOMException('Import aborted', 'AbortError')
-  const info = await stat(path)
-  return { byteLength: info.size, modifiedTimeMs: info.mtimeMs, sha256: hash.digest('hex') }
 }

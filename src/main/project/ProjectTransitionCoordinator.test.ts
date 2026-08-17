@@ -181,13 +181,22 @@ describe('ProjectTransitionCoordinator', () => {
 
     const result = await configured.coordinator.openDialog(sender(), request(current, true))
 
-    expect(result).toMatchObject({
-      outcome: 'stayed',
-      reason,
-      session: { revision: 2, workspace: { kind: 'saved', displayName: 'Saved' } },
-    })
-    expect(result.session.workspaceToken).not.toBe(current.workspaceToken)
-    expect(controller.workspace.root).toBe(destination)
+    if (failure === 'job settlement failure') {
+      expect(result).toEqual({
+        outcome: 'stayed',
+        reason,
+        session: current,
+      })
+      expect(controller.workspace.root).not.toBe(destination)
+    } else {
+      expect(result).toMatchObject({
+        outcome: 'stayed',
+        reason,
+        session: { revision: 2, workspace: { kind: 'saved', displayName: 'Saved' } },
+      })
+      expect(result.session.workspaceToken).not.toBe(current.workspaceToken)
+      expect(controller.workspace.root).toBe(destination)
+    }
   })
 
   it.each([
@@ -276,7 +285,8 @@ describe('ProjectTransitionCoordinator', () => {
 
     expect(result).toMatchObject({ outcome: 'stayed', reason: 'job-settlement-failed' })
     await expect(stat(oldRoot)).resolves.toBeTruthy()
-    expect(controller.workspace.root).toBe(destination)
+    expect(controller.workspace.root).toBe(oldRoot)
+    await expect(stat(destination)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('settles the starting token before releasing a retired temporary workspace when candidate selection rejects', async () => {
@@ -362,11 +372,12 @@ describe('ProjectTransitionCoordinator', () => {
     expect(result).toMatchObject({
       outcome: 'stayed',
       reason: 'job-settlement-failed',
-      session: { revision: 2, workspace: { kind: 'saved', displayName: 'Saved' } },
+      session: { revision: 1, workspace: { kind: 'temporary', displayName: 'Untitled' } },
     })
-    expect(result.session.workspaceToken).not.toBe(current.workspaceToken)
+    expect(result.session.workspaceToken).toBe(current.workspaceToken)
     await expect(stat(oldRoot)).resolves.toBeTruthy()
-    expect(controller.workspace.root).toBe(destination)
+    expect(controller.workspace.root).toBe(oldRoot)
+    await expect(stat(destination)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('maps candidate selection rejection without Save As to a stayed result without settling jobs', async () => {
@@ -516,8 +527,8 @@ describe('ProjectTransitionCoordinator', () => {
     expect(rollbackToken).not.toBe(result.session.workspaceToken)
     expect(events).toEqual([
       `close:${current.workspaceToken}`,
-      `close:${rollbackToken}`,
       `settle:${current.workspaceToken}`,
+      `close:${rollbackToken}`,
       `settle:${rollbackToken}`,
       'ack',
     ])

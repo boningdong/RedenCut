@@ -214,6 +214,19 @@ export default function App() {
     useTranscriptStore.getState().setGeneratingStatus('')
   }, [])
 
+  const invalidateImportJob = useCallback(() => {
+    importJob.current = null
+    setImportState(null)
+  }, [])
+
+  const invalidateImportJobForSession = useCallback(
+    (appliedSession: SessionPrecondition | null) => {
+      if (importJob.current && !sameSession(appliedSession, importJob.current))
+        invalidateImportJob()
+    },
+    [invalidateImportJob],
+  )
+
   const invalidateTranscriptJobForSession = useCallback(
     (appliedSession: SessionPrecondition | null) => {
       if (
@@ -232,13 +245,14 @@ export default function App() {
       retainVisibleEditorState = false,
     ) => {
       invalidateTranscriptJob()
+      invalidateImportJobForSession(result)
       return loadCoordinator.current!.load({
         session: result,
         retainVisibleEditorState,
         importLedger,
       })
     },
-    [invalidateTranscriptJob],
+    [invalidateImportJobForSession, invalidateTranscriptJob],
   )
 
   useEffect(() => {
@@ -259,10 +273,13 @@ export default function App() {
   useEffect(
     () =>
       window.electronAPI.on.importProgress((progress) => {
+        const editorSession = useEditorStore.getState().session
         setImportState((current) =>
           current?.id === progress.jobId &&
           current.workspaceToken === progress.workspaceToken &&
-          current.revision === progress.revision
+          current.revision === progress.revision &&
+          importJobMatches(importJob.current, progress) &&
+          sameSession(editorSession, progress)
             ? {
                 ...current,
                 displayName: progress.displayName,
@@ -364,6 +381,7 @@ export default function App() {
         lastSwitchTransition.current = event.transitionId
         suspendedSession.current = event
         invalidateTranscriptJob()
+        invalidateImportJob()
         importJob.current = null
         setImportState(null)
         setShowExport(false)
@@ -376,7 +394,7 @@ export default function App() {
           setError((reason as Error).message)
         }
       }),
-    [destroyPlayer, invalidateTranscriptJob],
+    [destroyPlayer, invalidateImportJob, invalidateTranscriptJob],
   )
 
   const drainOpenQueue = useCallback(async () => {
@@ -482,17 +500,18 @@ export default function App() {
         if (!sameSession(useEditorStore.getState().session, currentSession)) return
         acknowledgeSave(saved, capturedLocalEditRevision)
         invalidateTranscriptJobForSession(useEditorStore.getState().session)
+        invalidateImportJobForSession(useEditorStore.getState().session)
         setError(null)
       } catch (reason) {
         if (sameSession(useEditorStore.getState().session, currentSession))
           setError((reason as Error).message)
       }
     },
-    [acknowledgeSave, invalidateTranscriptJobForSession, snapshot],
+    [acknowledgeSave, invalidateImportJobForSession, invalidateTranscriptJobForSession, snapshot],
   )
 
   useKeyboardShortcuts({
-    onSave: () => void save(false),
+    onSave: importState ? undefined : () => void save(false),
   })
 
   const importAudio = useCallback(
@@ -536,10 +555,14 @@ export default function App() {
           draft: submittedDraft,
         })
         const latestSession = useEditorStore.getState().session
+        const identity = {
+          jobId: id,
+          workspaceToken: submittedSession.workspaceToken,
+          revision: submittedSession.revision,
+        }
         if (
-          imported.jobId === id &&
-          imported.workspaceToken === submittedSession.workspaceToken &&
-          imported.revision === submittedSession.revision &&
+          importJobMatches(importJob.current, identity) &&
+          importJobMatches(imported, identity) &&
           latestSession?.workspaceToken === imported.workspaceToken &&
           latestSession.revision === imported.revision
         ) {
@@ -549,12 +572,14 @@ export default function App() {
           })
         }
       } catch (reason) {
+        const identity = {
+          jobId: id,
+          workspaceToken: submittedSession.workspaceToken,
+          revision: submittedSession.revision,
+        }
         if (
-          importJobMatches(importJob.current, {
-            jobId: id,
-            workspaceToken: submittedSession.workspaceToken,
-            revision: submittedSession.revision,
-          })
+          importJobMatches(importJob.current, identity) &&
+          sameSession(useEditorStore.getState().session, identity)
         )
           setError((reason as Error).message)
       } finally {
@@ -563,13 +588,14 @@ export default function App() {
           workspaceToken: submittedSession.workspaceToken,
           revision: submittedSession.revision,
         }
-        if (importJobMatches(importJob.current, identity)) {
-          importJob.current = null
-          setImportState(null)
-        }
+        if (
+          importJobMatches(importJob.current, identity) &&
+          sameSession(useEditorStore.getState().session, identity)
+        )
+          invalidateImportJob()
       }
     },
-    [importState, loadSession, snapshot],
+    [importState, invalidateImportJob, loadSession, snapshot],
   )
 
   const cancelImport = useCallback(async () => {

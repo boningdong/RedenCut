@@ -190,6 +190,7 @@ function result(
 }
 
 function installApi(initial: RendererSession) {
+  let importProgress!: Parameters<IElectronAPI['on']['importProgress']>[0]
   let transcriptProgress!: Parameters<IElectronAPI['on']['transcriptProgress']>[0]
   let projectWillSwitch!: Parameters<IElectronAPI['on']['projectWillSwitch']>[0]
   let pendingProjectOpen!: Parameters<IElectronAPI['on']['pendingProjectOpen']>[0]
@@ -237,7 +238,10 @@ function installApi(initial: RendererSession) {
       cancelExport: vi.fn(async () => 'not-found' as const),
     },
     on: {
-      importProgress: vi.fn(() => vi.fn()),
+      importProgress: vi.fn((callback) => {
+        importProgress = callback
+        return vi.fn()
+      }),
       transcriptProgress: vi.fn((callback) => {
         transcriptProgress = callback
         return vi.fn()
@@ -257,6 +261,7 @@ function installApi(initial: RendererSession) {
   return {
     api,
     requests,
+    importProgress: () => importProgress,
     progress: () => transcriptProgress,
     willSwitch: () => projectWillSwitch,
     pendingOpen: () => pendingProjectOpen,
@@ -332,6 +337,45 @@ describe('App transcription job identity', () => {
       expect(screen.queryByRole('alert')).toBeNull()
     },
   )
+
+  it('invalidates an r1 import before an earlier keyboard Save applies r2 and ignores its late failure', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const saved = session(TOKEN_A, 2, SOURCE_A, 'Saved')
+    const importing = deferred<Awaited<ReturnType<IElectronAPI['audio']['startImport']>>>()
+    const saving = deferred<RendererSession | null>()
+    const { api, importProgress } = await renderInitialized(initial)
+    api.project.save.mockReturnValueOnce(saving.promise)
+    act(() => mocks.keyboardSave?.())
+    api.audio.selectImportFile.mockResolvedValueOnce({
+      token: 'selection-a',
+      displayName: 'late.mp3',
+    })
+    api.audio.startImport.mockReturnValueOnce(importing.promise)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import Audio' }))
+    await waitFor(() => expect(api.audio.startImport).toHaveBeenCalledTimes(1))
+    expect(mocks.keyboardSave).toBeUndefined()
+    saving.resolve(saved)
+
+    await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
+    expect(screen.queryByText(/Importing late\.mp3/)).toBeNull()
+    act(() =>
+      importProgress()({
+        workspaceToken: TOKEN_A,
+        revision: 1,
+        jobId: 'job-a',
+        displayName: 'late.mp3',
+        stage: 'building-cache',
+        percent: 0.9,
+      }),
+    )
+    importing.reject(new Error('stale r1 import failure'))
+    await act(async () => Promise.resolve())
+
+    expect(useEditorStore.getState().session).toEqual(saved)
+    expect(screen.queryByText(/Importing late\.mp3/)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 
   it.each(['Save', 'Save As'] as const)(
     'ignores a stale %s rejection after a successor session becomes visible',
@@ -643,6 +687,58 @@ describe('App transcription job identity', () => {
       isDirty: true,
       draft: initial.draft,
     })
+  })
+
+  it('keeps a shifted transcript dirty through cancelled Open and saves the exact current draft', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const saved = session(TOKEN_A, 2, SOURCE_A, 'A')
+    saved.draft.transcript!.words[0] = {
+      ...saved.draft.transcript!.words[0],
+      start: 4,
+      end: 5,
+    }
+    const { api } = await renderInitialized(initial)
+    act(() => {
+      useTranscriptStore.getState().shiftTimestamps(4)
+      useEditorStore.getState().markEdited()
+    })
+    api.project.openDialog.mockResolvedValueOnce({
+      outcome: 'stayed',
+      reason: 'cancelled',
+      session: initial,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+
+    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
+    expect(api.project.openDialog).toHaveBeenCalledWith({
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      isDirty: true,
+      draft: expect.objectContaining({
+        transcript: expect.objectContaining({
+          words: [expect.objectContaining({ start: 4, end: 5 })],
+        }),
+      }),
+    })
+    expect(useTranscriptStore.getState().words[0]).toMatchObject({ start: 4, end: 5 })
+    expect(useEditorStore.getState().isDirty).toBe(true)
+
+    api.project.save.mockResolvedValueOnce(saved)
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.project.save).toHaveBeenCalledTimes(1))
+    expect(api.project.save).toHaveBeenCalledWith({
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      draft: expect.objectContaining({
+        transcript: expect.objectContaining({
+          words: [expect.objectContaining({ start: 4, end: 5 })],
+        }),
+      }),
+    })
+    await waitFor(() => expect(useEditorStore.getState().isDirty).toBe(false))
+    expect(useEditorStore.getState().session?.revision).toBe(2)
   })
 
   it('consumes opaque forwarded opens without receiving a project path', async () => {

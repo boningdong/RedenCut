@@ -14,6 +14,7 @@ interface ApplicationLike {
 }
 
 interface ApplicationRuntime {
+  ensureWindow(): Promise<void>
   isWindowDestroyed(): boolean
   isWindowMinimized(): boolean
   restoreWindow(): void
@@ -26,12 +27,16 @@ interface ApplicationLifecycleDependencies {
   app: ApplicationLike
   preparePrimary?: () => void
   initialize(): Promise<ApplicationRuntime>
+  reportDiagnostic?: (error: unknown) => void
 }
+
+const MAX_PENDING_PROJECTS = 32
 
 export function startApplicationLifecycle({
   app,
   preparePrimary,
   initialize,
+  reportDiagnostic = console.error,
 }: ApplicationLifecycleDependencies): boolean {
   if (!app.requestSingleInstanceLock()) {
     app.quit()
@@ -41,17 +46,39 @@ export function startApplicationLifecycle({
 
   const queuedProjects: string[] = []
   let runtime: ApplicationRuntime | null = null
+  let draining = false
+  let shuttingDown = false
+
+  const drain = async () => {
+    if (draining || !runtime || shuttingDown) return
+    draining = true
+    try {
+      while (queuedProjects.length > 0 && !shuttingDown) {
+        try {
+          await runtime.ensureWindow()
+          if (shuttingDown) return
+          if (runtime.isWindowDestroyed()) throw new Error('Primary window recreation failed')
+          if (runtime.isWindowMinimized()) runtime.restoreWindow()
+          runtime.focusWindow()
+          runtime.forwardProject(queuedProjects.shift()!)
+        } catch (error) {
+          reportDiagnostic(error)
+          return
+        }
+      }
+    } finally {
+      draining = false
+    }
+  }
 
   const forward = (path: string) => {
-    if (!isProjectPath(path)) return
-    if (!runtime) {
-      queuedProjects.push(path)
+    if (!isProjectPath(path) || shuttingDown) return
+    if (queuedProjects.length >= MAX_PENDING_PROJECTS) {
+      reportDiagnostic(new Error('Pending project-open queue capacity reached'))
       return
     }
-    if (runtime.isWindowDestroyed()) return
-    if (runtime.isWindowMinimized()) runtime.restoreWindow()
-    runtime.focusWindow()
-    runtime.forwardProject(path)
+    queuedProjects.push(path)
+    void drain()
   }
 
   app.on('second-instance', (_event: unknown, argv: string[]) => {
@@ -61,12 +88,19 @@ export function startApplicationLifecycle({
     event.preventDefault()
     forward(path)
   })
-  app.on('before-quit', () => runtime?.shutdown())
-
-  void app.whenReady().then(async () => {
-    runtime = await initialize()
-    queuedProjects.splice(0).forEach(forward)
+  app.on('before-quit', () => {
+    shuttingDown = true
+    queuedProjects.splice(0)
+    runtime?.shutdown()
   })
+
+  void app
+    .whenReady()
+    .then(async () => {
+      runtime = await initialize()
+      await drain()
+    })
+    .catch(reportDiagnostic)
   return true
 }
 
