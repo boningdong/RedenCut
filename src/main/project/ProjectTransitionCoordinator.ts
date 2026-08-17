@@ -68,7 +68,19 @@ export class ProjectTransitionCoordinator {
         }
       }
 
-      const candidatePath = await chooseCandidate()
+      let candidatePath: string | null
+      try {
+        candidatePath = await chooseCandidate()
+      } catch {
+        return retainedStartingWorkspace
+          ? await this.settleStartingAndStay(
+              transaction,
+              startingToken,
+              rollback,
+              'candidate-invalid',
+            )
+          : stayed(rollback, 'candidate-invalid')
+      }
       if (!candidatePath)
         return retainedStartingWorkspace
           ? await this.settleStartingAndStay(transaction, startingToken, rollback, 'cancelled')

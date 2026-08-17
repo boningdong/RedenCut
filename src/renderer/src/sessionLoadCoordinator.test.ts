@@ -32,7 +32,7 @@ describe('session load coordinator', () => {
     await expect(firstLoad).resolves.toBe(false)
 
     expect(commit).toHaveBeenCalledTimes(1)
-    expect(commit).toHaveBeenCalledWith('second', secondResource)
+    expect(commit).toHaveBeenCalledWith('second', secondResource, expect.any(Function))
     expect(firstResource.destroy).toHaveBeenCalledTimes(1)
     expect(secondResource.destroy).not.toHaveBeenCalled()
   })
@@ -70,6 +70,32 @@ describe('session load coordinator', () => {
 
     await expect(invalidation).rejects.toThrow('teardown failed')
     await expect(loading).rejects.toThrow('teardown failed')
+  })
+
+  it('does not publish a prepared resource after invalidation begins during an awaited commit', async () => {
+    const commitEntered = deferred<void>()
+    const releaseCommit = deferred<void>()
+    const resource = { destroy: vi.fn(async () => undefined) }
+    let published = false
+    const coordinator = createSessionLoadCoordinator(
+      async () => resource,
+      async (_input, _prepared, isCurrent: () => boolean) => {
+        commitEntered.resolve()
+        await releaseCommit.promise
+        if (isCurrent()) published = true
+      },
+      (prepared) => prepared.destroy(),
+    )
+
+    const loading = coordinator.load('session')
+    await commitEntered.promise
+    const invalidation = coordinator.invalidate()
+    releaseCommit.resolve()
+
+    await expect(invalidation).resolves.toBeUndefined()
+    await expect(loading).resolves.toBe(false)
+    expect(published).toBe(false)
+    expect(resource.destroy).toHaveBeenCalledTimes(1)
   })
 
   it('suppresses a stale preparation failure after a newer session commits', async () => {

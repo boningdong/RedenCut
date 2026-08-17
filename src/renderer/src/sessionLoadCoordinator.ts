@@ -5,7 +5,7 @@ export interface SessionLoadCoordinator<Input> {
 
 export function createSessionLoadCoordinator<Input, Prepared>(
   prepare: (input: Input) => Promise<Prepared>,
-  commit: (input: Input, prepared: Prepared) => void | Promise<void>,
+  commit: (input: Input, prepared: Prepared, isCurrent: () => boolean) => void | Promise<void>,
   destroy: (prepared: Prepared) => void | Promise<void>,
 ): SessionLoadCoordinator<Input> {
   let epoch = 0
@@ -24,10 +24,14 @@ export function createSessionLoadCoordinator<Input, Prepared>(
       return false
     }
     try {
-      await commit(input, prepared)
+      await commit(input, prepared, () => loadEpoch === epoch)
     } catch (error) {
       await destroy(prepared)
       throw error
+    }
+    if (loadEpoch !== epoch) {
+      await destroy(prepared)
+      return false
     }
     return true
   }

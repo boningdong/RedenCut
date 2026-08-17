@@ -7,6 +7,7 @@ import type { IElectronAPI, SessionJobResult } from '@shared/ipc.types'
 import type { AudioSourceId, Transcript } from '@shared/project.types'
 import type { RendererSession, WorkspaceToken } from '@shared/session.types'
 import type { TranscriptionJobId } from '@shared/transcriber.types'
+import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from './stores/editor.store'
 import { useTimelineStore } from './stores/timeline.store'
 import { useTranscriptStore } from './stores/transcript.store'
@@ -213,8 +214,8 @@ function installApi(initial: RendererSession) {
       saveAs: saveProjectAs,
     },
     audio: {
-      selectImportFile: vi.fn(async () => null),
-      startImport: vi.fn(),
+      selectImportFile: vi.fn<IElectronAPI['audio']['selectImportFile']>(async () => null),
+      startImport: vi.fn<IElectronAPI['audio']['startImport']>(),
       cancelImport: vi.fn(async () => 'not-found' as const),
     },
     transcript: {
@@ -462,14 +463,14 @@ describe('App transcription job identity', () => {
     ).then(() => {
       switchSettled = true
     })
-    await Promise.resolve()
-
-    expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1))
     expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
     expect(switchSettled).toBe(false)
 
-    destruction.resolve()
-    await switching
+    await act(async () => {
+      destruction.resolve()
+      await switching
+    })
     expect(api.project.acknowledgeSwitch).toHaveBeenCalledWith({
       transitionId: 'transition-delayed-destroy',
       workspaceToken: TOKEN_A,
@@ -492,6 +493,60 @@ describe('App transcription job identity', () => {
 
     expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toContain('audio teardown failed')
+  })
+
+  it('invalidates an awaited session commit before destroying its prepared player and acknowledging', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const imported = session(TOKEN_A, 2, SOURCE_B, 'Imported')
+    const { api, willSwitch } = await renderInitialized(initial)
+    const oldTeardown = deferred<void>()
+    const stalePreparedTeardown = deferred<void>()
+    mocks.destroyPlayer
+      .mockReturnValueOnce(oldTeardown.promise)
+      .mockReturnValueOnce(stalePreparedTeardown.promise)
+    api.audio.selectImportFile.mockResolvedValueOnce({
+      token: 'opaque-selection',
+      displayName: 'Imported.mp3',
+    })
+    api.audio.startImport.mockResolvedValueOnce({
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      jobId: 'job-a',
+      value: imported,
+    })
+    api.project.acknowledgeSwitch.mockImplementationOnce(async () => {
+      expect(getAudioPlayerInstance()).toBeNull()
+      return true
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import Audio' }))
+    await waitFor(() => expect(mocks.players).toHaveLength(2))
+    await waitFor(() => expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1))
+    expect(getAudioPlayerInstance()).toBeNull()
+
+    const switching = Promise.resolve(
+      willSwitch()({
+        transitionId: 'transition-during-load-commit',
+        workspaceToken: TOKEN_A,
+        revision: 1,
+      }),
+    )
+    await Promise.resolve()
+    expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
+
+    oldTeardown.resolve()
+    await waitFor(() => expect(mocks.players[1].destroy).toHaveBeenCalledTimes(1))
+    expect(useEditorStore.getState().session?.revision).toBe(1)
+    expect(getAudioPlayerInstance()).toBeNull()
+    expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
+
+    stalePreparedTeardown.resolve()
+    await switching
+    expect(api.project.acknowledgeSwitch).toHaveBeenCalledWith({
+      transitionId: 'transition-during-load-commit',
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })
   })
 
   it('submits dirty path-free opens and applies an advanced stayed rollback session', async () => {

@@ -279,6 +279,112 @@ describe('ProjectTransitionCoordinator', () => {
     expect(controller.workspace.root).toBe(destination)
   })
 
+  it('settles the starting token before releasing a retired temporary workspace when candidate selection rejects', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const current = await controller.initialize(parent)
+    const oldRoot = controller.workspace.root
+    const destination = join(parent, 'Saved.podcut')
+    const selection = deferred<string | null>()
+    const jobs = new SessionJobRegistry()
+    const settled = deferred()
+    const cancel = vi.fn(async () => {
+      await expect(stat(oldRoot)).resolves.toBeTruthy()
+      await writeFile(join(oldRoot, 'picker-rejection-job-finished.txt'), 'settled')
+      settled.resolve()
+    })
+    jobs.register(
+      {
+        kind: 'transcription',
+        jobId: 'picker-rejection-job',
+        senderId: 7,
+        workspaceToken: current.workspaceToken,
+        revision: current.revision,
+      },
+      () => ({ cancel, settled: settled.promise }),
+    )
+    const coordinator = new ProjectTransitionCoordinator({
+      controller,
+      jobs,
+      barrier: { wait: vi.fn(async () => {}) },
+      chooseDirtyAction: async () => 'save',
+      chooseSaveDestination: async () => destination,
+      chooseOpenDestination: () => selection.promise,
+    })
+
+    const opening = coordinator.openDialog(sender(), request(current, true))
+    await vi.waitFor(() => expect(controller.workspace.root).toBe(destination))
+    selection.reject(new Error('/private/selection failure'))
+
+    const result = await opening
+    expect(result).toMatchObject({
+      outcome: 'stayed',
+      reason: 'candidate-invalid',
+      session: { revision: 2, workspace: { kind: 'saved', displayName: 'Saved' } },
+    })
+    expect(result.session.workspaceToken).not.toBe(current.workspaceToken)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    await expect(stat(oldRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(JSON.stringify(result)).not.toContain('/private/selection failure')
+  })
+
+  it('retains the retired temporary root and returns the advanced rollback when selection rejection settlement fails', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const current = await controller.initialize(parent)
+    const oldRoot = controller.workspace.root
+    const destination = join(parent, 'Saved.podcut')
+    const jobs = new SessionJobRegistry()
+    jobs.register(
+      {
+        kind: 'export',
+        jobId: 'picker-rejection-failed-job',
+        senderId: 7,
+        workspaceToken: current.workspaceToken,
+        revision: current.revision,
+      },
+      () => ({
+        cancel: vi.fn(async () => Promise.reject(new Error('cancel failed'))),
+        settled: Promise.resolve(),
+      }),
+    )
+    const coordinator = new ProjectTransitionCoordinator({
+      controller,
+      jobs,
+      barrier: { wait: vi.fn(async () => {}) },
+      chooseDirtyAction: async () => 'save',
+      chooseSaveDestination: async () => destination,
+      chooseOpenDestination: async () => Promise.reject(new Error('selection failed')),
+    })
+
+    const result = await coordinator.openDialog(sender(), request(current, true))
+
+    expect(result).toMatchObject({
+      outcome: 'stayed',
+      reason: 'job-settlement-failed',
+      session: { revision: 2, workspace: { kind: 'saved', displayName: 'Saved' } },
+    })
+    expect(result.session.workspaceToken).not.toBe(current.workspaceToken)
+    await expect(stat(oldRoot)).resolves.toBeTruthy()
+    expect(controller.workspace.root).toBe(destination)
+  })
+
+  it('maps candidate selection rejection without Save As to a stayed result without settling jobs', async () => {
+    const controller = new WorkspaceController()
+    const current = await controller.initialize(await mkdtemp(join(tmpdir(), 'podcut-transition-')))
+    const configured = harness(controller, {
+      chooseOpenDestination: vi.fn(async () => Promise.reject(new Error('selection failed'))),
+    })
+
+    await expect(configured.coordinator.openDialog(sender(), request(current))).resolves.toEqual({
+      outcome: 'stayed',
+      reason: 'candidate-invalid',
+      session: current,
+    })
+    expect(configured.jobs.beginClosing).not.toHaveBeenCalled()
+    expect(configured.jobs.cancelAndSettleToken).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['picker cancellation', null, 'cancelled'],
     ['candidate validation failure', 'missing', 'candidate-invalid'],

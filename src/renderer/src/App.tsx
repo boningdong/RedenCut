@@ -163,7 +163,7 @@ export default function App() {
           throw error
         }
       },
-      async (request, prepared) => {
+      async (request, prepared, isCurrent) => {
         let result = request.session
         let preserveDirty = false
         const latestDraft = request.importLedger ? snapshotDraft() : null
@@ -180,6 +180,7 @@ export default function App() {
           prepared.player.setTracks(result.draft.tracks)
         }
         await destroyPlayer()
+        if (!isCurrent()) return
         usePlaybackStore.getState().reset()
         if (request.retainVisibleEditorState) {
           useTimelineStore.getState().refreshAudioSources(result.sources)
@@ -362,14 +363,14 @@ export default function App() {
           return
         lastSwitchTransition.current = event.transitionId
         suspendedSession.current = event
-        const invalidation = loadCoordinator.current?.invalidate() ?? Promise.resolve()
         invalidateTranscriptJob()
         importJob.current = null
         setImportState(null)
         setShowExport(false)
-        usePlaybackStore.getState().reset()
         try {
-          await Promise.all([invalidation, destroyPlayer()])
+          await (loadCoordinator.current?.invalidate() ?? Promise.resolve())
+          await destroyPlayer()
+          usePlaybackStore.getState().reset()
           await window.electronAPI.project.acknowledgeSwitch(event)
         } catch (reason) {
           setError((reason as Error).message)
