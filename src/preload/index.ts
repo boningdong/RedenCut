@@ -8,6 +8,8 @@ import type {
   IElectronAPI,
   ImportJobRequest,
   ImportProgressEvent,
+  PendingProjectOpenEvent,
+  ProjectSwitchEvent,
   RenderProgressEvent,
   SessionJobResult,
   TranscriptProgressEvent,
@@ -21,6 +23,8 @@ import type {
   TranscriptionJobId,
 } from '../shared/transcriber.types'
 import type {
+  OpenProjectRequest,
+  OpenProjectResult,
   ProjectMutationRequest,
   RendererSession,
   SessionPrecondition,
@@ -28,6 +32,18 @@ import type {
 import { invokeSafe } from './invokeSafe'
 
 const invoke = (channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args)
+
+const pendingProjectOpenEvents: PendingProjectOpenEvent[] = []
+const pendingProjectOpenCallbacks = new Set<
+  (event: PendingProjectOpenEvent) => void | Promise<void>
+>()
+ipcRenderer.on('project:pending-open', (_event, value: PendingProjectOpenEvent) => {
+  if (pendingProjectOpenCallbacks.size === 0) {
+    pendingProjectOpenEvents.push(value)
+    return
+  }
+  pendingProjectOpenCallbacks.forEach((callback) => void callback(value))
+})
 
 const api = {
   audio: {
@@ -40,8 +56,12 @@ const api = {
   },
   project: {
     initialize: () => invokeSafe<RendererSession>(invoke, 'project:initialize'),
-    openDialog: (expected: SessionPrecondition) =>
-      invokeSafe<RendererSession | null>(invoke, 'project:open-dialog', expected),
+    openDialog: (request: OpenProjectRequest) =>
+      invokeSafe<OpenProjectResult>(invoke, 'project:open-dialog', request),
+    openPending: (request: OpenProjectRequest & { requestId: string }) =>
+      invokeSafe<OpenProjectResult>(invoke, 'project:open-pending', request),
+    acknowledgeSwitch: (event: ProjectSwitchEvent) =>
+      invokeSafe<boolean>(invoke, 'project:acknowledge-switch', event),
     save: (request: ProjectMutationRequest) =>
       invokeSafe<RendererSession | null>(invoke, 'project:save', request),
     saveAs: (request: ProjectMutationRequest) =>
@@ -82,6 +102,16 @@ const api = {
         callback(progress)
       ipcRenderer.on('render:progress', handler)
       return () => ipcRenderer.off('render:progress', handler)
+    },
+    projectWillSwitch: (callback: (event: ProjectSwitchEvent) => void | Promise<void>) => {
+      const handler = (_event: IpcRendererEvent, value: ProjectSwitchEvent) => void callback(value)
+      ipcRenderer.on('project:will-switch', handler)
+      return () => ipcRenderer.off('project:will-switch', handler)
+    },
+    pendingProjectOpen: (callback: (event: PendingProjectOpenEvent) => void | Promise<void>) => {
+      pendingProjectOpenCallbacks.add(callback)
+      pendingProjectOpenEvents.splice(0).forEach((value) => void callback(value))
+      return () => pendingProjectOpenCallbacks.delete(callback)
     },
   },
 } satisfies IElectronAPI

@@ -3,6 +3,8 @@ import { APP_NAME } from '@shared/constants'
 import type { AudioSourceId, Word } from '@shared/project.types'
 import type { ImportMode } from '@shared/import.types'
 import type {
+  OpenProjectRequest,
+  OpenProjectResult,
   ProjectDraft,
   RendererSession,
   SessionPrecondition,
@@ -87,7 +89,14 @@ export default function App() {
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
   const transcriptJob = useRef<TranscriptJobIdentity | null>(null)
+  const importJob = useRef<(SessionPrecondition & { jobId: string }) | null>(null)
   const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
+  const openEpoch = useRef(0)
+  const lastSwitchTransition = useRef<string | null>(null)
+  const suspendedSession = useRef<SessionPrecondition | null>(null)
+  const pendingOpenRequests = useRef<string[]>([])
+  const processingPendingOpens = useRef(false)
+  const activeOpenRequests = useRef(0)
 
   const session = useEditorStore((state) => state.session)
   const isDirty = useEditorStore((state) => state.isDirty)
@@ -99,6 +108,7 @@ export default function App() {
   const generatingStatus = useTranscriptStore((state) => state.generatingStatus)
 
   const destroyPlayer = useCallback(() => {
+    playerRef.current?.pause()
     playerSubscriptions.current.splice(0).forEach((unsubscribe) => unsubscribe())
     playerRef.current?.destroy()
     playerRef.current = null
@@ -234,6 +244,112 @@ export default function App() {
     [],
   )
 
+  const applyOpenResult = useCallback(
+    async (result: OpenProjectResult) => {
+      const current = useEditorStore.getState().session
+      const requiresResume = sameSession(suspendedSession.current, result.session)
+      if (
+        current?.workspaceToken === result.session.workspaceToken &&
+        current.revision === result.session.revision &&
+        !requiresResume
+      ) {
+        setError(openResultMessage(result))
+        return
+      }
+      await loadSession(result.session)
+      suspendedSession.current = null
+      setError(openResultMessage(result))
+    },
+    [loadSession],
+  )
+
+  const createOpenRequest = useCallback((): OpenProjectRequest | null => {
+    const current = useEditorStore.getState().session
+    if (!current) return null
+    if (!useEditorStore.getState().isDirty)
+      return {
+        workspaceToken: current.workspaceToken,
+        revision: current.revision,
+        isDirty: false,
+      }
+    const draft = snapshotDraft()
+    if (!draft) return null
+    return {
+      workspaceToken: current.workspaceToken,
+      revision: current.revision,
+      isDirty: true,
+      draft,
+    }
+  }, [])
+
+  useEffect(
+    () =>
+      window.electronAPI.on.projectWillSwitch(async (event) => {
+        const current = useEditorStore.getState().session
+        const matchesVisibleSession =
+          current?.workspaceToken === event.workspaceToken && current.revision === event.revision
+        if (
+          !current ||
+          (!matchesVisibleSession && activeOpenRequests.current === 0) ||
+          lastSwitchTransition.current === event.transitionId
+        )
+          return
+        lastSwitchTransition.current = event.transitionId
+        suspendedSession.current = event
+        loadCoordinator.current?.invalidate()
+        invalidateTranscriptJob()
+        importJob.current = null
+        setImportState(null)
+        setShowExport(false)
+        destroyPlayer()
+        usePlaybackStore.getState().reset()
+        try {
+          await window.electronAPI.project.acknowledgeSwitch(event)
+        } catch (reason) {
+          setError((reason as Error).message)
+        }
+      }),
+    [destroyPlayer, invalidateTranscriptJob],
+  )
+
+  const drainPendingOpens = useCallback(async () => {
+    if (processingPendingOpens.current) return
+    processingPendingOpens.current = true
+    try {
+      while (pendingOpenRequests.current.length > 0) {
+        const request = createOpenRequest()
+        if (!request) return
+        const requestId = pendingOpenRequests.current.shift()!
+        const epoch = ++openEpoch.current
+        activeOpenRequests.current += 1
+        try {
+          const result = await window.electronAPI.project.openPending({ ...request, requestId })
+          if (epoch !== openEpoch.current) continue
+          await applyOpenResult(result)
+        } catch (reason) {
+          if (epoch === openEpoch.current) setError((reason as Error).message)
+        } finally {
+          activeOpenRequests.current -= 1
+        }
+      }
+    } finally {
+      processingPendingOpens.current = false
+    }
+  }, [applyOpenResult, createOpenRequest])
+
+  useEffect(
+    () =>
+      window.electronAPI.on.pendingProjectOpen(async ({ requestId }) => {
+        pendingOpenRequests.current.push(requestId)
+        await drainPendingOpens()
+      }),
+    [drainPendingOpens],
+  )
+
+  useEffect(() => {
+    if (session) void drainPendingOpens()
+  }, [drainPendingOpens, session])
+
   useEffect(
     () =>
       window.electronAPI.on.transcriptProgress((progress) => {
@@ -311,6 +427,11 @@ export default function App() {
         stage: 'selected',
         percent: 0,
       })
+      importJob.current = {
+        jobId: id,
+        workspaceToken: submittedSession.workspaceToken,
+        revision: submittedSession.revision,
+      }
       setError(null)
       try {
         const imported = await window.electronAPI.audio.startImport({
@@ -335,9 +456,24 @@ export default function App() {
           })
         }
       } catch (reason) {
-        setError((reason as Error).message)
+        if (
+          importJobMatches(importJob.current, {
+            jobId: id,
+            workspaceToken: submittedSession.workspaceToken,
+            revision: submittedSession.revision,
+          })
+        )
+          setError((reason as Error).message)
       } finally {
-        setImportState(null)
+        const identity = {
+          jobId: id,
+          workspaceToken: submittedSession.workspaceToken,
+          revision: submittedSession.revision,
+        }
+        if (importJobMatches(importJob.current, identity)) {
+          importJob.current = null
+          setImportState(null)
+        }
       }
     },
     [importState, loadSession, snapshot],
@@ -353,11 +489,18 @@ export default function App() {
   }, [importState])
 
   const openProject = useCallback(async () => {
-    const current = useEditorStore.getState().session
-    if (!current) return
-    const result = await window.electronAPI.project.openDialog(current)
-    if (result) await loadSession(result)
-  }, [loadSession])
+    const request = createOpenRequest()
+    if (!request) return
+    const epoch = ++openEpoch.current
+    activeOpenRequests.current += 1
+    try {
+      const result = await window.electronAPI.project.openDialog(request)
+      if (epoch !== openEpoch.current) return
+      await applyOpenResult(result)
+    } finally {
+      activeOpenRequests.current -= 1
+    }
+  }, [applyOpenResult, createOpenRequest])
 
   const generateTranscript = useCallback(
     async (trackId?: string) => {
@@ -623,4 +766,29 @@ function sessionMatchesTranscriptJob(
   job: SessionPrecondition,
 ): boolean {
   return session?.workspaceToken === job.workspaceToken && session.revision === job.revision
+}
+
+function importJobMatches(
+  active: (SessionPrecondition & { jobId: string }) | null,
+  candidate: SessionPrecondition & { jobId: string },
+): boolean {
+  return (
+    active?.jobId === candidate.jobId &&
+    active.workspaceToken === candidate.workspaceToken &&
+    active.revision === candidate.revision
+  )
+}
+
+function openResultMessage(result: OpenProjectResult): string | null {
+  if (result.outcome === 'switched' || result.reason === 'cancelled') return null
+  return {
+    'save-failed': 'The current project could not be saved.',
+    'candidate-invalid': 'The selected project could not be opened.',
+    'job-settlement-failed': 'Background work could not be stopped safely.',
+    'switch-unacknowledged': 'Playback could not be stopped safely.',
+  }[result.reason]
+}
+
+function sameSession(left: SessionPrecondition | null, right: SessionPrecondition): boolean {
+  return left?.workspaceToken === right.workspaceToken && left.revision === right.revision
 }

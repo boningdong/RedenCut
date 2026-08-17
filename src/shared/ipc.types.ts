@@ -7,11 +7,22 @@ import type {
 import type { AudioSourceId, Transcript } from './project.types'
 import type { TranscriptionCancellationResult, TranscriptionJobId } from './transcriber.types'
 import type {
+  OpenProjectRequest,
+  OpenProjectResult,
   ProjectDraft,
   ProjectMutationRequest,
   RendererSession,
   SessionPrecondition,
 } from './session.types'
+
+export interface ProjectSwitchEvent extends SessionPrecondition {
+  transitionId: string
+}
+
+export interface PendingProjectOpenEvent {
+  requestId: string
+  displayName: string
+}
 
 export interface IpcError {
   code: 'stale-session' | 'cancelled' | 'invalid-request' | 'operation-failed'
@@ -78,7 +89,9 @@ export interface IElectronAPI {
   }
   project: {
     initialize(): Promise<RendererSession>
-    openDialog(expected: SessionPrecondition): Promise<RendererSession | null>
+    openDialog(request: OpenProjectRequest): Promise<OpenProjectResult>
+    openPending(request: OpenProjectRequest & { requestId: string }): Promise<OpenProjectResult>
+    acknowledgeSwitch(event: ProjectSwitchEvent): Promise<boolean>
     save(request: ProjectMutationRequest): Promise<RendererSession | null>
     saveAs(request: ProjectMutationRequest): Promise<RendererSession | null>
   }
@@ -99,6 +112,10 @@ export interface IElectronAPI {
     importProgress(callback: (progress: ImportProgressEvent) => void): () => void
     transcriptProgress(callback: (progress: TranscriptProgressEvent) => void): () => void
     renderProgress(callback: (progress: RenderProgressEvent) => void): () => void
+    projectWillSwitch(callback: (event: ProjectSwitchEvent) => void | Promise<void>): () => void
+    pendingProjectOpen(
+      callback: (event: PendingProjectOpenEvent) => void | Promise<void>,
+    ): () => void
   }
 }
 

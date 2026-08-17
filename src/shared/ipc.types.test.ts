@@ -1,7 +1,13 @@
 import { expectTypeOf, test } from 'vitest'
 import type { ImportCancellationResult, ImportMode, ImportSelection } from './import.types'
 import type { AudioSourceId, ProjectFile, Transcript } from './project.types'
-import type { ProjectDraft, RendererSession, SessionPrecondition } from './session.types'
+import type {
+  OpenProjectRequest,
+  OpenProjectResult,
+  ProjectDraft,
+  RendererSession,
+  SessionPrecondition,
+} from './session.types'
 import type { TranscriptionCancellationResult, TranscriptionJobId } from './transcriber.types'
 import type {
   CancelSessionJobRequest,
@@ -20,7 +26,10 @@ test('preload methods use path-free session requests and results', () => {
     () => Promise<RendererSession>
   >()
   expectTypeOf<IElectronAPI['project']['openDialog']>().toEqualTypeOf<
-    (expected: SessionPrecondition) => Promise<RendererSession | null>
+    (request: OpenProjectRequest) => Promise<OpenProjectResult>
+  >()
+  expectTypeOf<IElectronAPI['project']['openPending']>().toEqualTypeOf<
+    (request: OpenProjectRequest & { requestId: string }) => Promise<OpenProjectResult>
   >()
   expectTypeOf<IElectronAPI['project']['save']>().toEqualTypeOf<
     (request: {
@@ -58,6 +67,16 @@ test('preload methods use path-free session requests and results', () => {
   >()
   expectTypeOf<IElectronAPI['render']['cancelExport']>().toEqualTypeOf<
     (request: CancelSessionJobRequest<ExportJobId>) => Promise<ExportCancellationResult>
+  >()
+  expectTypeOf<Parameters<IElectronAPI['on']['projectWillSwitch']>[0]>().toEqualTypeOf<
+    (event: {
+      transitionId: string
+      workspaceToken: SessionPrecondition['workspaceToken']
+      revision: number
+    }) => void | Promise<void>
+  >()
+  expectTypeOf<Parameters<IElectronAPI['on']['pendingProjectOpen']>[0]>().toEqualTypeOf<
+    (event: { requestId: string; displayName: string }) => void | Promise<void>
   >()
 
   expectTypeOf<ImportJobRequest>().toMatchTypeOf<SessionPrecondition>()

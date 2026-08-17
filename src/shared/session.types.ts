@@ -30,3 +30,17 @@ export interface RendererSession extends SessionPrecondition {
 export interface ProjectMutationRequest extends SessionPrecondition {
   draft: ProjectDraft
 }
+
+export type OpenProjectRequest = SessionPrecondition &
+  ({ isDirty: false } | { isDirty: true; draft: ProjectDraft })
+
+export type OpenProjectStayedReason =
+  | 'cancelled'
+  | 'save-failed'
+  | 'candidate-invalid'
+  | 'job-settlement-failed'
+  | 'switch-unacknowledged'
+
+export type OpenProjectResult =
+  | { outcome: 'switched'; session: RendererSession }
+  | { outcome: 'stayed'; session: RendererSession; reason: OpenProjectStayedReason }
