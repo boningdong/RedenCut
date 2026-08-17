@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, stat, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, stat, symlink, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,7 +6,7 @@ import { createEmptyProject } from '../../shared/project.types'
 import type { OpenProjectRequest, RendererSession } from '../../shared/session.types'
 import { ProjectWorkspace } from './ProjectWorkspace'
 import { ProjectTransitionCoordinator } from './ProjectTransitionCoordinator'
-import type { SessionJobRegistry } from './SessionJobRegistry'
+import { SessionJobRegistry } from './SessionJobRegistry'
 import { ProjectSwitchShutdownError } from './SessionSwitchBarrier'
 import { WorkspaceController } from './WorkspaceController'
 
@@ -18,6 +18,16 @@ function sender(id = 7) {
     once: vi.fn(),
     removeListener: vi.fn(),
   }
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
 }
 
 function request(session: RendererSession, isDirty = false): OpenProjectRequest {
@@ -181,6 +191,95 @@ describe('ProjectTransitionCoordinator', () => {
   })
 
   it.each([
+    ['picker cancellation', null],
+    ['candidate validation failure', 'missing'],
+  ] as const)(
+    'settles starting-token jobs before releasing a retired temporary workspace on %s',
+    async (_failure, candidateSelection) => {
+      const controller = new WorkspaceController()
+      const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+      const current = await controller.initialize(parent)
+      const oldRoot = controller.workspace.root
+      const destination = join(parent, 'Saved.podcut')
+      const jobs = new SessionJobRegistry()
+      const settlement = deferred()
+      const cancel = vi.fn(async () => {
+        await expect(stat(oldRoot)).resolves.toBeTruthy()
+        await writeFile(join(oldRoot, 'job-finished.txt'), 'settled')
+        settlement.resolve()
+      })
+      jobs.register(
+        {
+          kind: 'transcription',
+          jobId: 'old-job',
+          senderId: 7,
+          workspaceToken: current.workspaceToken,
+          revision: current.revision,
+        },
+        () => ({ cancel, settled: settlement.promise }),
+      )
+      const coordinator = new ProjectTransitionCoordinator({
+        controller,
+        jobs,
+        barrier: { wait: vi.fn(async () => {}) },
+        chooseDirtyAction: async () => 'save',
+        chooseSaveDestination: async () => destination,
+        chooseOpenDestination: async () =>
+          candidateSelection === null ? null : join(parent, 'Missing.podcut'),
+      })
+
+      const result = await coordinator.openDialog(sender(), request(current, true))
+
+      expect(result).toMatchObject({
+        outcome: 'stayed',
+        reason: candidateSelection === null ? 'cancelled' : 'candidate-invalid',
+        session: { revision: 2 },
+      })
+      expect(cancel).toHaveBeenCalledTimes(1)
+      await expect(stat(oldRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(controller.workspace.root).toBe(destination)
+    },
+  )
+
+  it('retains a retired temporary root when starting-token settlement fails', async () => {
+    const controller = new WorkspaceController()
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const current = await controller.initialize(parent)
+    const oldRoot = controller.workspace.root
+    const destination = join(parent, 'Saved.podcut')
+    const jobs = new SessionJobRegistry()
+    jobs.register(
+      {
+        kind: 'export',
+        jobId: 'failed-job',
+        senderId: 7,
+        workspaceToken: current.workspaceToken,
+        revision: current.revision,
+      },
+      () => ({
+        cancel: vi.fn(async () => {
+          throw new Error('cancel failed')
+        }),
+        settled: Promise.resolve(),
+      }),
+    )
+    const coordinator = new ProjectTransitionCoordinator({
+      controller,
+      jobs,
+      barrier: { wait: vi.fn(async () => {}) },
+      chooseDirtyAction: async () => 'save',
+      chooseSaveDestination: async () => destination,
+      chooseOpenDestination: async () => null,
+    })
+
+    const result = await coordinator.openDialog(sender(), request(current, true))
+
+    expect(result).toMatchObject({ outcome: 'stayed', reason: 'job-settlement-failed' })
+    await expect(stat(oldRoot)).resolves.toBeTruthy()
+    expect(controller.workspace.root).toBe(destination)
+  })
+
+  it.each([
     ['picker cancellation', null, 'cancelled'],
     ['candidate validation failure', 'missing', 'candidate-invalid'],
   ] as const)('keeps the current project after %s', async (_name, selected, reason) => {
@@ -216,6 +315,38 @@ describe('ProjectTransitionCoordinator', () => {
     expect(jobs.reopen).not.toHaveBeenCalled()
     expect(controller.workspace.root).not.toBe(candidate)
   })
+
+  it.each(['nested', 'symlink'] as const)(
+    'rejects a %s overlapping candidate before closing jobs or requesting playback teardown',
+    async (kind) => {
+      const controller = new WorkspaceController()
+      const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+      const current = await controller.initialize(parent)
+      const temporaryRoot = controller.workspace.root
+      let candidate: string
+      if (kind === 'nested') {
+        candidate = await packageRoot(temporaryRoot, 'Nested.podcut')
+      } else {
+        candidate = join(parent, 'Alias.podcut')
+        await symlink(temporaryRoot, candidate, 'dir')
+      }
+      const configured = harness(controller, {
+        chooseOpenDestination: vi.fn(async () => candidate),
+      })
+
+      const result = await configured.coordinator.openDialog(sender(), request(current))
+
+      expect(result).toEqual({
+        outcome: 'stayed',
+        reason: 'candidate-invalid',
+        session: current,
+      })
+      expect(configured.jobs.beginClosing).not.toHaveBeenCalled()
+      expect(configured.jobs.cancelAndSettleToken).not.toHaveBeenCalled()
+      expect(configured.barrier.wait).not.toHaveBeenCalled()
+      expect(controller.workspace.root).toBe(temporaryRoot)
+    },
+  )
 
   it.each([
     ['job settlement', 'job-settlement-failed'],

@@ -47,6 +47,7 @@ export class ProjectTransitionCoordinator {
     return this.dependencies.controller.runTransition(request, async (transaction) => {
       const startingToken = transaction.precondition.workspaceToken
       let rollback = await transaction.describe()
+      let retainedStartingWorkspace = false
 
       if (request.isDirty) {
         const action = await this.dependencies.chooseDirtyAction(sender)
@@ -56,7 +57,8 @@ export class ProjectTransitionCoordinator {
             if (rollback.workspace.kind === 'temporary') {
               const destination = await this.dependencies.chooseSaveDestination(sender)
               if (!destination) return stayed(rollback, 'cancelled')
-              rollback = await transaction.saveAs(destination, request.draft)
+              rollback = await transaction.saveAsForOpen(destination, request.draft)
+              retainedStartingWorkspace = true
             } else {
               rollback = await transaction.save(request.draft)
             }
@@ -67,13 +69,23 @@ export class ProjectTransitionCoordinator {
       }
 
       const candidatePath = await chooseCandidate()
-      if (!candidatePath) return stayed(rollback, 'cancelled')
+      if (!candidatePath)
+        return retainedStartingWorkspace
+          ? await this.settleStartingAndStay(transaction, startingToken, rollback, 'cancelled')
+          : stayed(rollback, 'cancelled')
 
       let candidate
       try {
         candidate = await transaction.prepareOpen(candidatePath)
       } catch {
-        return stayed(rollback, 'candidate-invalid')
+        return retainedStartingWorkspace
+          ? await this.settleStartingAndStay(
+              transaction,
+              startingToken,
+              rollback,
+              'candidate-invalid',
+            )
+          : stayed(rollback, 'candidate-invalid')
       }
 
       const closingTokens = uniqueTokens(startingToken, rollback.workspaceToken)
@@ -83,6 +95,7 @@ export class ProjectTransitionCoordinator {
       } catch {
         return this.reopenAndStay(rollback, 'job-settlement-failed')
       }
+      if (retainedStartingWorkspace) await transaction.releaseRetiredWorkspaces().catch(() => {})
       try {
         await this.dependencies.barrier.wait(sender, rollback)
       } catch (error) {
@@ -102,6 +115,22 @@ export class ProjectTransitionCoordinator {
     reason: OpenProjectStayedReason,
   ): OpenProjectResult {
     this.dependencies.jobs.reopen(rollback.workspaceToken)
+    return stayed(rollback, reason)
+  }
+
+  private async settleStartingAndStay(
+    transaction: { releaseRetiredWorkspaces(): Promise<void> },
+    startingToken: WorkspaceToken,
+    rollback: RendererSession,
+    reason: OpenProjectStayedReason,
+  ): Promise<OpenProjectResult> {
+    this.dependencies.jobs.beginClosing(startingToken)
+    try {
+      await this.dependencies.jobs.cancelAndSettleToken(startingToken)
+    } catch {
+      return this.reopenAndStay(rollback, 'job-settlement-failed')
+    }
+    await transaction.releaseRetiredWorkspaces().catch(() => {})
     return stayed(rollback, reason)
   }
 }

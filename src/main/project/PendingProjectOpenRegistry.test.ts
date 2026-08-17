@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { PendingProjectOpenRegistry } from './PendingProjectOpenRegistry'
+import { EventEmitter } from 'events'
+import {
+  PendingProjectOpenRegistry,
+  removePendingProjectOpensOnSenderDestroyed,
+} from './PendingProjectOpenRegistry'
 
 describe('PendingProjectOpenRegistry', () => {
   it('keeps paths behind opaque sender-bound one-use identifiers', () => {
@@ -31,4 +35,50 @@ describe('PendingProjectOpenRegistry', () => {
       'Pending project request is invalid',
     )
   })
+
+  it('sweeps every expired path entry when issuing or consuming another request', () => {
+    let now = 100
+    let id = 0
+    const registry = new PendingProjectOpenRegistry({
+      createId: () => `opaque-${++id}`,
+      now: () => now,
+      ttlMs: 1_000,
+    })
+    registry.issue(7, '/private/projects/Expired-on-issue.podcut')
+    now = 1_100
+    registry.issue(8, '/private/projects/Fresh.podcut')
+    expect(entryCount(registry)).toBe(1)
+
+    registry.issue(7, '/private/projects/Expired-on-consume.podcut')
+    now = 1_600
+    registry.issue(8, '/private/projects/Fresh-on-consume.podcut')
+    now = 2_100
+    expect(registry.consume(8, 'opaque-4')).toBe('/private/projects/Fresh-on-consume.podcut')
+    expect(entryCount(registry)).toBe(0)
+  })
+
+  it('removes all paths owned by a destroyed sender without consuming their exact IDs', () => {
+    let id = 0
+    const registry = new PendingProjectOpenRegistry({ createId: () => `opaque-${++id}` })
+    const sender = Object.assign(new EventEmitter(), { id: 7 })
+    removePendingProjectOpensOnSenderDestroyed(registry, sender)
+    const first = registry.issue(sender.id, '/private/projects/First.podcut')
+    const second = registry.issue(sender.id, '/private/projects/Second.podcut')
+    const other = registry.issue(8, '/private/projects/Other.podcut')
+
+    sender.emit('destroyed')
+
+    expect(entryCount(registry)).toBe(1)
+    expect(() => registry.consume(sender.id, first.requestId)).toThrow(
+      'Pending project request is invalid',
+    )
+    expect(() => registry.consume(sender.id, second.requestId)).toThrow(
+      'Pending project request is invalid',
+    )
+    expect(registry.consume(8, other.requestId)).toBe('/private/projects/Other.podcut')
+  })
 })
+
+function entryCount(registry: PendingProjectOpenRegistry): number {
+  return (registry as unknown as { entries: Map<string, { path: string }> }).entries.size
+}

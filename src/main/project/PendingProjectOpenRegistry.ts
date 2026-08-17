@@ -6,6 +6,11 @@ export interface PendingProjectOpen {
   displayName: string
 }
 
+interface PendingProjectOpenSender {
+  id: number
+  once(event: 'destroyed', listener: () => void): unknown
+}
+
 interface PendingEntry {
   senderId: number
   path: string
@@ -31,6 +36,7 @@ export class PendingProjectOpenRegistry {
   }
 
   issue(senderId: number, path: string): PendingProjectOpen {
+    this.sweepExpired()
     const requestId = this.createId()
     this.entries.set(requestId, {
       senderId,
@@ -44,12 +50,31 @@ export class PendingProjectOpenRegistry {
   }
 
   consume(senderId: number, requestId: string): string {
+    this.sweepExpired()
     const entry = this.entries.get(requestId)
-    if (!entry || entry.senderId !== senderId || entry.expiresAt < this.now()) {
-      if (entry?.expiresAt && entry.expiresAt < this.now()) this.entries.delete(requestId)
-      throw new Error('Pending project request is invalid')
-    }
+    if (!entry || entry.senderId !== senderId) throw new Error('Pending project request is invalid')
     this.entries.delete(requestId)
     return entry.path
   }
+
+  removeSender(senderId: number): void {
+    for (const [requestId, entry] of this.entries) {
+      if (entry.senderId === senderId) this.entries.delete(requestId)
+    }
+  }
+
+  private sweepExpired(): void {
+    const now = this.now()
+    for (const [requestId, entry] of this.entries) {
+      if (entry.expiresAt <= now) this.entries.delete(requestId)
+    }
+  }
+}
+
+export function removePendingProjectOpensOnSenderDestroyed(
+  registry: PendingProjectOpenRegistry,
+  sender: PendingProjectOpenSender,
+): void {
+  const senderId = sender.id
+  sender.once('destroyed', () => registry.removeSender(senderId))
 }

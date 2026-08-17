@@ -35,6 +35,8 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   private context: AudioContext | null = null
   private contextInitialization: Promise<void> | null = null
   private contextLifecycle = 0
+  private destroyed = false
+  private destruction: Promise<void> | null = null
   private providers = new Map<AudioSourceId, AudioSampleProvider>()
   private tracks: Track[] = []
   private queues = new Map<string, TrackQueue>()
@@ -58,6 +60,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   private errorCallbacks = new Set<(error: Error) => void>()
 
   async registerAudioSource(id: AudioSourceId, samples: AudioSampleProvider): Promise<void> {
+    if (this.destroyed) throw createAbortError()
     if (id !== samples.audioSourceId) throw new Error('Audio source provider identity mismatch')
     if (samples.sampleRate !== SAMPLE_RATE) throw new Error('Audio source cache must use 48000 Hz')
     this.providers.set(id, samples)
@@ -68,6 +71,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   setTracks(tracks: Track[]): void {
+    if (this.destroyed) return
     const volumeOnlyChange = hasSamePlaybackStructure(this.tracks, tracks)
     this.tracks = tracks
     const nextDuration = tracks
@@ -89,6 +93,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   async play(): Promise<void> {
+    if (this.destroyed) return
     if (this.playing) return
     this.playing = true
     this.stateCallbacks.forEach((callback) => callback(true))
@@ -139,6 +144,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   seekTo(outputTime: number): void {
+    if (this.destroyed) return
     this.suspendForRebuild()
     this.currentTime = Math.max(0, Math.min(this.duration, outputTime))
     this.timeCallbacks.forEach((callback) => callback(this.currentTime))
@@ -183,7 +189,9 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     return () => this.errorCallbacks.delete(callback)
   }
 
-  destroy(): void {
+  destroy(): Promise<void> {
+    if (this.destruction) return this.destruction
+    this.destroyed = true
     this.rebuildToken++
     this.contextLifecycle++
     this.pause()
@@ -196,11 +204,23 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     }
     this.queues.clear()
     this.providers.clear()
-    void this.context?.close()
+    const context = this.context
+    const initialization = this.contextInitialization
     this.context = null
+    const teardown = [context ? Promise.resolve().then(() => context.close()) : Promise.resolve()]
+    if (initialization) teardown.push(initialization)
+    this.destruction = Promise.allSettled(teardown).then((results) => {
+      const failure = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === 'rejected' && !isAbortError(result.reason),
+      )
+      if (failure) throw failure.reason
+    })
+    return this.destruction
   }
 
   private async ensureContext(): Promise<void> {
+    if (this.destroyed) throw createAbortError()
     if (this.context) return
     let initialization = this.contextInitialization
     if (!initialization) {
@@ -225,7 +245,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     )
     try {
       await context.audioWorklet.addModule(blobUrl)
-      if (lifecycle !== this.contextLifecycle) throw createAbortError()
+      if (this.destroyed || lifecycle !== this.contextLifecycle) throw createAbortError()
       this.context = context
     } catch (error) {
       await context.close()

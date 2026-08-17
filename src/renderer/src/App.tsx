@@ -52,10 +52,26 @@ interface PreparedRendererSession {
 
 interface RendererSessionLoad {
   session: RendererSession
+  retainVisibleEditorState?: boolean
   importLedger?: {
     submittedDraft: ProjectDraft
     submittedLocalEditRevision: number
   }
+}
+
+interface OpenOperationLedger {
+  startingSession: RendererSession
+  visibleDraft: ProjectDraft
+  wasDirty: boolean
+  localEditRevision: number
+}
+
+type OpenOperationDescriptor = { kind: 'manual' } | { kind: 'pending'; requestId: string }
+
+interface QueuedOpenOperation {
+  descriptor: OpenOperationDescriptor
+  resolve: () => void
+  reject: (reason: unknown) => void
 }
 
 function snapshotDraft(): ProjectDraft | null {
@@ -91,11 +107,11 @@ export default function App() {
   const transcriptJob = useRef<TranscriptJobIdentity | null>(null)
   const importJob = useRef<(SessionPrecondition & { jobId: string }) | null>(null)
   const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
-  const openEpoch = useRef(0)
   const lastSwitchTransition = useRef<string | null>(null)
   const suspendedSession = useRef<SessionPrecondition | null>(null)
-  const pendingOpenRequests = useRef<string[]>([])
-  const processingPendingOpens = useRef(false)
+  const openQueue = useRef<QueuedOpenOperation[]>([])
+  const processingOpenQueue = useRef(false)
+  const manualOpenPromise = useRef<Promise<void> | null>(null)
   const activeOpenRequests = useRef(0)
 
   const session = useEditorStore((state) => state.session)
@@ -107,12 +123,14 @@ export default function App() {
   const isGenerating = useTranscriptStore((state) => state.isGenerating)
   const generatingStatus = useTranscriptStore((state) => state.generatingStatus)
 
-  const destroyPlayer = useCallback(() => {
-    playerRef.current?.pause()
-    playerSubscriptions.current.splice(0).forEach((unsubscribe) => unsubscribe())
-    playerRef.current?.destroy()
+  const destroyPlayer = useCallback(async (): Promise<void> => {
+    const player = playerRef.current
     playerRef.current = null
     setAudioPlayerInstance(null)
+    playerSubscriptions.current.splice(0).forEach((unsubscribe) => unsubscribe())
+    if (!player) return
+    player.pause()
+    await player.destroy()
   }, [])
 
   if (!loadCoordinator.current) {
@@ -141,11 +159,11 @@ export default function App() {
             ],
           }
         } catch (error) {
-          player.destroy()
+          await player.destroy()
           throw error
         }
       },
-      (request, prepared) => {
+      async (request, prepared) => {
         let result = request.session
         let preserveDirty = false
         const latestDraft = request.importLedger ? snapshotDraft() : null
@@ -161,26 +179,30 @@ export default function App() {
           preserveDirty = reconciled.preserveDirty
           prepared.player.setTracks(result.draft.tracks)
         }
-        destroyPlayer()
+        await destroyPlayer()
         usePlaybackStore.getState().reset()
-        useTimelineStore.getState().loadFromProject(result.sources, result.draft.tracks)
-        useTranscriptStore.getState().reset()
-        useTranscriptStore.getState().setWords(result.draft.transcript?.words ?? [])
-        for (const track of result.draft.tracks) {
-          if (result.draft.transcript?.words.some((word) => word.trackId === track.id))
-            useTranscriptStore.getState().ensureTrackVisible(track.id)
+        if (request.retainVisibleEditorState) {
+          useTimelineStore.getState().refreshAudioSources(result.sources)
+        } else {
+          useTimelineStore.getState().loadFromProject(result.sources, result.draft.tracks)
+          useTranscriptStore.getState().reset()
+          useTranscriptStore.getState().setWords(result.draft.transcript?.words ?? [])
+          for (const track of result.draft.tracks) {
+            if (result.draft.transcript?.words.some((word) => word.trackId === track.id))
+              useTranscriptStore.getState().ensureTrackVisible(track.id)
+          }
         }
         playerSubscriptions.current = prepared.subscriptions
         usePlaybackStore.getState().setDuration(prepared.player.getDuration())
         playerRef.current = prepared.player
         setAudioPlayerInstance(prepared.player)
-        loadEditorSession(result, preserveDirty)
+        loadEditorSession(result, request.retainVisibleEditorState || preserveDirty)
         setWaveforms(prepared.waveforms)
         setError(null)
       },
-      (prepared) => {
+      async (prepared) => {
         prepared.subscriptions.forEach((unsubscribe) => unsubscribe())
-        prepared.player.destroy()
+        await prepared.player.destroy()
       },
     )
   }
@@ -203,9 +225,17 @@ export default function App() {
   )
 
   const loadSession = useCallback(
-    (result: RendererSession, importLedger?: RendererSessionLoad['importLedger']) => {
+    (
+      result: RendererSession,
+      importLedger?: RendererSessionLoad['importLedger'],
+      retainVisibleEditorState = false,
+    ) => {
       invalidateTranscriptJob()
-      return loadCoordinator.current!.load({ session: result, importLedger })
+      return loadCoordinator.current!.load({
+        session: result,
+        retainVisibleEditorState,
+        importLedger,
+      })
     },
     [invalidateTranscriptJob],
   )
@@ -220,8 +250,8 @@ export default function App() {
         setError((reason as Error).message)
       })
     return () => {
-      loadCoordinator.current?.invalidate()
-      destroyPlayer()
+      const invalidation = loadCoordinator.current?.invalidate() ?? Promise.resolve()
+      void Promise.allSettled([invalidation, destroyPlayer()])
     }
   }, [destroyPlayer, loadSession])
 
@@ -245,7 +275,7 @@ export default function App() {
   )
 
   const applyOpenResult = useCallback(
-    async (result: OpenProjectResult) => {
+    async (result: OpenProjectResult, ledger: OpenOperationLedger) => {
       const current = useEditorStore.getState().session
       const requiresResume = sameSession(suspendedSession.current, result.session)
       if (
@@ -256,29 +286,65 @@ export default function App() {
         setError(openResultMessage(result))
         return
       }
-      await loadSession(result.session)
+      let sessionToLoad = result.session
+      let retainVisibleEditorState = false
+      if (result.outcome === 'stayed') {
+        const saveAdvancedRollback = !sameSession(ledger.startingSession, result.session)
+        const latestState = useEditorStore.getState()
+        const visibleStillBelongsToStartingSession = sameSession(
+          latestState.session,
+          ledger.startingSession,
+        )
+        const latestDraft = visibleStillBelongsToStartingSession
+          ? (snapshotDraft() ?? ledger.visibleDraft)
+          : ledger.visibleDraft
+        const hasLaterEdits =
+          visibleStillBelongsToStartingSession &&
+          latestState.localEditRevision > ledger.localEditRevision
+        if (!saveAdvancedRollback || hasLaterEdits) {
+          sessionToLoad = { ...result.session, draft: latestDraft }
+          retainVisibleEditorState = true
+        }
+      }
+      await loadSession(sessionToLoad, undefined, retainVisibleEditorState)
       suspendedSession.current = null
       setError(openResultMessage(result))
     },
     [loadSession],
   )
 
-  const createOpenRequest = useCallback((): OpenProjectRequest | null => {
+  const captureOpenOperation = useCallback((): {
+    request: OpenProjectRequest
+    ledger: OpenOperationLedger
+  } | null => {
     const current = useEditorStore.getState().session
     if (!current) return null
-    if (!useEditorStore.getState().isDirty)
+    const visibleDraft = snapshotDraft()
+    if (!visibleDraft) return null
+    const editor = useEditorStore.getState()
+    const ledger = {
+      startingSession: current,
+      visibleDraft,
+      wasDirty: editor.isDirty,
+      localEditRevision: editor.localEditRevision,
+    }
+    if (!editor.isDirty)
       return {
+        ledger,
+        request: {
+          workspaceToken: current.workspaceToken,
+          revision: current.revision,
+          isDirty: false,
+        },
+      }
+    return {
+      ledger,
+      request: {
         workspaceToken: current.workspaceToken,
         revision: current.revision,
-        isDirty: false,
-      }
-    const draft = snapshotDraft()
-    if (!draft) return null
-    return {
-      workspaceToken: current.workspaceToken,
-      revision: current.revision,
-      isDirty: true,
-      draft,
+        isDirty: true,
+        draft: visibleDraft,
+      },
     }
   }, [])
 
@@ -296,14 +362,14 @@ export default function App() {
           return
         lastSwitchTransition.current = event.transitionId
         suspendedSession.current = event
-        loadCoordinator.current?.invalidate()
+        const invalidation = loadCoordinator.current?.invalidate() ?? Promise.resolve()
         invalidateTranscriptJob()
         importJob.current = null
         setImportState(null)
         setShowExport(false)
-        destroyPlayer()
         usePlaybackStore.getState().reset()
         try {
+          await Promise.all([invalidation, destroyPlayer()])
           await window.electronAPI.project.acknowledgeSwitch(event)
         } catch (reason) {
           setError((reason as Error).message)
@@ -312,43 +378,67 @@ export default function App() {
     [destroyPlayer, invalidateTranscriptJob],
   )
 
-  const drainPendingOpens = useCallback(async () => {
-    if (processingPendingOpens.current) return
-    processingPendingOpens.current = true
+  const drainOpenQueue = useCallback(async () => {
+    if (processingOpenQueue.current) return
+    processingOpenQueue.current = true
     try {
-      while (pendingOpenRequests.current.length > 0) {
-        const request = createOpenRequest()
-        if (!request) return
-        const requestId = pendingOpenRequests.current.shift()!
-        const epoch = ++openEpoch.current
+      while (openQueue.current.length > 0) {
+        const captured = captureOpenOperation()
+        if (!captured) return
+        const operation = openQueue.current.shift()!
         activeOpenRequests.current += 1
         try {
-          const result = await window.electronAPI.project.openPending({ ...request, requestId })
-          if (epoch !== openEpoch.current) continue
-          await applyOpenResult(result)
+          const result =
+            operation.descriptor.kind === 'manual'
+              ? await window.electronAPI.project.openDialog(captured.request)
+              : await window.electronAPI.project.openPending({
+                  ...captured.request,
+                  requestId: operation.descriptor.requestId,
+                })
+          await applyOpenResult(result, captured.ledger)
+          operation.resolve()
         } catch (reason) {
-          if (epoch === openEpoch.current) setError((reason as Error).message)
+          setError((reason as Error).message)
+          operation.reject(reason)
         } finally {
           activeOpenRequests.current -= 1
+          if (operation.descriptor.kind === 'manual') manualOpenPromise.current = null
         }
       }
     } finally {
-      processingPendingOpens.current = false
+      processingOpenQueue.current = false
     }
-  }, [applyOpenResult, createOpenRequest])
+  }, [applyOpenResult, captureOpenOperation])
+
+  const enqueueOpen = useCallback(
+    (descriptor: OpenOperationDescriptor): Promise<void> => {
+      if (descriptor.kind === 'manual' && manualOpenPromise.current)
+        return manualOpenPromise.current
+      const queued = new Promise<void>((resolve, reject) => {
+        openQueue.current.push({ descriptor, resolve, reject })
+      })
+      if (descriptor.kind === 'manual') manualOpenPromise.current = queued
+      void drainOpenQueue()
+      return queued
+    },
+    [drainOpenQueue],
+  )
 
   useEffect(
     () =>
       window.electronAPI.on.pendingProjectOpen(async ({ requestId }) => {
-        pendingOpenRequests.current.push(requestId)
-        await drainPendingOpens()
+        try {
+          await enqueueOpen({ kind: 'pending', requestId })
+        } catch {
+          // The queue already exposed the sanitized failure and must continue with later items.
+        }
       }),
-    [drainPendingOpens],
+    [enqueueOpen],
   )
 
   useEffect(() => {
-    if (session) void drainPendingOpens()
-  }, [drainPendingOpens, session])
+    if (session) void drainOpenQueue()
+  }, [drainOpenQueue, session])
 
   useEffect(
     () =>
@@ -489,18 +579,8 @@ export default function App() {
   }, [importState])
 
   const openProject = useCallback(async () => {
-    const request = createOpenRequest()
-    if (!request) return
-    const epoch = ++openEpoch.current
-    activeOpenRequests.current += 1
-    try {
-      const result = await window.electronAPI.project.openDialog(request)
-      if (epoch !== openEpoch.current) return
-      await applyOpenResult(result)
-    } finally {
-      activeOpenRequests.current -= 1
-    }
-  }, [applyOpenResult, createOpenRequest])
+    await enqueueOpen({ kind: 'manual' })
+  }, [enqueueOpen])
 
   const generateTranscript = useCallback(
     async (trackId?: string) => {

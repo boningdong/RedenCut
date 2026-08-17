@@ -96,6 +96,9 @@ interface TimelineState {
    */
   loadFromProject(audioSources: RendererAudioSource[], tracks: Track[]): void
 
+  /** Refresh authoritative source descriptors without discarding visible edit history. */
+  refreshAudioSources(audioSources: RendererAudioSource[]): void
+
   /** Register a managed source by stable identity. Not undoable. */
   addAudioSource(audioSource: RendererAudioSource): AudioSourceId
 
@@ -237,6 +240,10 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       selectedTrackId: null,
       selectedClipId: null,
     })
+  },
+
+  refreshAudioSources(audioSources) {
+    set({ audioSources })
   },
 
   // ── addAudioSource ─────────────────────────────────────────────────────────

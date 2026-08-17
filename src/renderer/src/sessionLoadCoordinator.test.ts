@@ -48,12 +48,28 @@ describe('session load coordinator', () => {
     const loading = coordinator.load('session')
     const resource = { destroy: vi.fn() }
 
-    coordinator.invalidate()
+    const invalidation = coordinator.invalidate()
     prepared.resolve(resource)
+    await invalidation
     await expect(loading).resolves.toBe(false)
 
     expect(resource.destroy).toHaveBeenCalledTimes(1)
     expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalidation when a stale prepared resource cannot be destroyed', async () => {
+    const prepared = deferred<{ destroy: () => Promise<void> }>()
+    const coordinator = createSessionLoadCoordinator(
+      () => prepared.promise,
+      vi.fn(),
+      (resource) => resource.destroy(),
+    )
+    const loading = coordinator.load('session')
+    const invalidation = coordinator.invalidate()
+    prepared.resolve({ destroy: vi.fn(async () => Promise.reject(new Error('teardown failed'))) })
+
+    await expect(invalidation).rejects.toThrow('teardown failed')
+    await expect(loading).rejects.toThrow('teardown failed')
   })
 
   it('suppresses a stale preparation failure after a newer session commits', async () => {

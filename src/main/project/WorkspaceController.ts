@@ -28,6 +28,8 @@ export interface WorkspaceTransaction {
   describe(): Promise<RendererSession>
   save(draft: ProjectDraft): Promise<RendererSession>
   saveAs(destination: string, draft: ProjectDraft): Promise<RendererSession>
+  saveAsForOpen(destination: string, draft: ProjectDraft): Promise<RendererSession>
+  releaseRetiredWorkspaces(): Promise<void>
   prepareOpen(root: string): Promise<PreparedWorkspace>
   commitPreparedOpen(candidate: PreparedWorkspace): Promise<RendererSession>
   commitImport(authoritativeProject: ProjectFile): Promise<RendererSession>
@@ -44,6 +46,8 @@ export class WorkspaceController {
   private current: ProjectWorkspace | null = null
   private workspaceToken: WorkspaceToken | null = null
   private revision = 0
+  private readonly retainedRetiredWorkspaces = new Set<ProjectWorkspace>()
+  private readonly preparedAgainstWorkspace = new WeakMap<PreparedWorkspace, ProjectWorkspace>()
 
   constructor(private readonly cacheBuilder = new FfmpegAudioSourceCacheBuilder()) {}
 
@@ -114,6 +118,7 @@ export class WorkspaceController {
     return this.mutex.runExclusive(async () => {
       this.assertCurrent(expected)
       const state = this.captureState()
+      const transactionRetiredWorkspaces = new Set<ProjectWorkspace>()
       const transaction: WorkspaceTransaction = {
         get precondition() {
           return {
@@ -124,7 +129,13 @@ export class WorkspaceController {
         describe: () => this.describeState(state),
         save: (draft) => this.saveState(state, draft),
         saveAs: (destination, draft) => this.saveAsState(state, destination, draft),
-        prepareOpen: (root) => this.prepareOpen(root),
+        saveAsForOpen: (destination, draft) =>
+          this.saveAsState(state, destination, draft, (retired) => {
+            transactionRetiredWorkspaces.add(retired)
+            this.retainedRetiredWorkspaces.add(retired)
+          }),
+        releaseRetiredWorkspaces: () => this.releaseRetiredWorkspaces(transactionRetiredWorkspaces),
+        prepareOpen: (root) => this.prepareOpenState(state, root),
         commitPreparedOpen: (candidate) => this.commitPreparedOpenState(state, candidate),
         commitImport: (authoritativeProject) => this.commitImportState(state, authoritativeProject),
       }
@@ -187,6 +198,7 @@ export class WorkspaceController {
     state: TransactionState,
     destination: string,
     draft: ProjectDraft,
+    retainPrevious?: (workspace: ProjectWorkspace) => void,
   ): Promise<RendererSession> {
     const workspace = state.workspace
     const project = mergeProjectDraft(workspace.project, draft)
@@ -197,8 +209,17 @@ export class WorkspaceController {
     })
     if (!descriptors) throw new Error('Save As candidate was not validated')
     this.installWorkspace(state, candidate)
-    await workspace.close().catch(() => {})
+    if (retainPrevious) retainPrevious(workspace)
+    else await workspace.close().catch(() => {})
     return toRendererSession(candidate, state.workspaceToken, state.revision, descriptors)
+  }
+
+  private async releaseRetiredWorkspaces(workspaces: Set<ProjectWorkspace>): Promise<void> {
+    for (const workspace of [...workspaces]) {
+      await workspace.close()
+      workspaces.delete(workspace)
+      this.retainedRetiredWorkspaces.delete(workspace)
+    }
   }
 
   private async commitPreparedOpenState(
@@ -206,7 +227,9 @@ export class WorkspaceController {
     candidate: PreparedWorkspace,
   ): Promise<RendererSession> {
     const oldWorkspace = state.workspace
-    await assertSafeSwitchRoot(oldWorkspace, candidate.workspace.root)
+    if (this.preparedAgainstWorkspace.get(candidate) !== oldWorkspace)
+      await assertSafeSwitchRoot(oldWorkspace, candidate.workspace.root)
+    this.preparedAgainstWorkspace.delete(candidate)
     this.installWorkspace(state, candidate.workspace)
     await oldWorkspace.close().catch(() => {})
     return toRendererSession(
@@ -215,6 +238,21 @@ export class WorkspaceController {
       state.revision,
       candidate.descriptors,
     )
+  }
+
+  private async prepareOpenState(
+    state: TransactionState,
+    root: string,
+  ): Promise<PreparedWorkspace> {
+    const candidate = await this.prepareOpen(root)
+    try {
+      await assertSafeSwitchRoot(state.workspace, candidate.workspace.root)
+      this.preparedAgainstWorkspace.set(candidate, state.workspace)
+      return candidate
+    } catch (error) {
+      await candidate.workspace.close().catch(() => {})
+      throw error
+    }
   }
 
   private async commitImportState(

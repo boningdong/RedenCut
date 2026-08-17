@@ -46,6 +46,7 @@ class FakeNode {
 }
 
 class FakeContext {
+  static instances: FakeContext[] = []
   currentTime = 0
   sampleRate = 48_000
   state = 'running'
@@ -56,6 +57,9 @@ class FakeContext {
   }
   resume = vi.fn(async () => undefined)
   close = vi.fn(async () => undefined)
+  constructor() {
+    FakeContext.instances.push(this)
+  }
 }
 
 function track(id: string, outputStart = 0, sourceEnd = 5): Track {
@@ -119,6 +123,7 @@ function provider(): AudioSampleProvider {
 describe('WorkletAudioPlayer bounded scheduling', () => {
   beforeEach(() => {
     FakeNode.instances = []
+    FakeContext.instances = []
     FakePort.autoAcknowledge = true
     vi.stubGlobal('AudioContext', FakeContext)
     vi.stubGlobal('AudioWorkletNode', FakeNode)
@@ -157,7 +162,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
         node.port.messages.some(({ message }) => message.type === 'play'),
       ),
     ).toBe(false)
-    player.destroy()
+    await player.destroy()
     await expect(playback).resolves.toBeUndefined()
   })
 
@@ -188,7 +193,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
         node.port.messages.some(({ message }) => message.type === 'play'),
       ),
     ).toBe(true)
-    player.destroy()
+    await player.destroy()
   })
 
   it('starts a finite short plan after its complete planned frame count is acknowledged', async () => {
@@ -212,7 +217,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     acknowledgePrefill(node)
     await expect(playback).resolves.toBeUndefined()
     expect(node.port.messages.some(({ message }) => message.type === 'play')).toBe(true)
-    player.destroy()
+    await player.destroy()
   })
 
   it('ignores stale generation acknowledgements after a seek and posts play only to replacement queues', async () => {
@@ -239,7 +244,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     await vi.waitFor(() =>
       expect(replacement.port.messages.some(({ message }) => message.type === 'play')).toBe(true),
     )
-    player.destroy()
+    await player.destroy()
   })
 
   it('cancels withheld prefill on structural rebuild without a late play post', async () => {
@@ -267,7 +272,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
           .every((node) => node.port.messages.some(({ message }) => message.type === 'play')),
       ).toBe(true),
     )
-    player.destroy()
+    await player.destroy()
   })
 
   it('cancels withheld prefill on destroy without posting play or rejecting publicly', async () => {
@@ -277,7 +282,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     player.setTracks([track('one')])
     const playback = player.play()
     await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(1))
-    player.destroy()
+    await player.destroy()
     await expect(playback).resolves.toBeUndefined()
     expect(FakeNode.instances[0].port.messages.some(({ message }) => message.type === 'play')).toBe(
       false,
@@ -304,10 +309,42 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     player.setTracks([track('one')])
     const playback = player.play()
     await vi.waitFor(() => expect(releaseModule).toBeTypeOf('function'))
-    player.destroy()
+    const destruction = player.destroy()
     releaseModule!()
+    await destruction
     await expect(playback).resolves.toBeUndefined()
     expect(FakeNode.instances).toHaveLength(0)
+    expect(FakeContext.instances[0].close).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns one destruction promise that settles only after the audio context closes', async () => {
+    let releaseClose: (() => void) | undefined
+    class DelayedCloseContext extends FakeContext {
+      close = vi.fn(
+        () =>
+          new Promise<undefined>((resolve) => {
+            releaseClose = () => resolve(undefined)
+          }),
+      )
+    }
+    vi.stubGlobal('AudioContext', DelayedCloseContext)
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await player.play()
+
+    let settled = false
+    const destruction = player.destroy()
+    void destruction.then(() => {
+      settled = true
+    })
+    expect(player.destroy()).toBe(destruction)
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    releaseClose!()
+    await destruction
+    expect(FakeContext.instances[0].close).toHaveBeenCalledTimes(1)
   })
 
   it('waits for the initial worklet module before creating a seek replacement queue', async () => {
@@ -342,7 +379,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
       expect(replacement.port.messages.some(({ message }) => message.type === 'play')).toBe(true),
     )
     expect(player.getCurrentTime()).toBe(2)
-    player.destroy()
+    await player.destroy()
   })
 
   it('waits for the initial worklet module before applying structural tracks', async () => {
@@ -379,7 +416,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
         node.port.messages.some(({ message }) => message.type === 'play'),
       ),
     ).toBe(true)
-    player.destroy()
+    await player.destroy()
   })
 
   it('retries worklet initialization only after a rejected module load is cleaned up', async () => {
@@ -401,7 +438,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     await player.play()
     expect(attempts).toBe(2)
     expect(FakeNode.instances).toHaveLength(1)
-    player.destroy()
+    await player.destroy()
   })
 
   it('cancels withheld prefill when paused without posting play', async () => {
@@ -416,7 +453,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     expect(FakeNode.instances[0].port.messages.some(({ message }) => message.type === 'play')).toBe(
       false,
     )
-    player.destroy()
+    await player.destroy()
   })
 
   it('shares one source provider while keeping a bounded queue per track', async () => {
@@ -440,7 +477,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     }
     expect(samples.readFrames).toHaveBeenCalled()
     expect(player.getDiagnostics().maximumReadFrames).toBeLessThanOrEqual(4096)
-    player.destroy()
+    await player.destroy()
   })
 
   it('refills from a low watermark back toward the two-second target in useful chunks', async () => {
@@ -471,7 +508,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
       .slice(before)
       .find(({ message }) => message.type === 'pcm')!.message
     expect((firstRefill.channels as Float32Array[])[0]).toHaveLength(4096)
-    player.destroy()
+    await player.destroy()
   })
 
   it('starts replacement queues when tracks change during playback', async () => {
@@ -484,7 +521,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     for (const node of FakeNode.instances.slice(1)) {
       expect(node.port.messages.some(({ message }) => message.type === 'play')).toBe(true)
     }
-    player.destroy()
+    await player.destroy()
   })
 
   it('applies track-volume changes without rebuilding worklet queues', async () => {
@@ -498,7 +535,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     await Promise.resolve()
     expect(FakeNode.instances).toHaveLength(1)
     expect(node.connect).toHaveBeenCalledTimes(1)
-    player.destroy()
+    await player.destroy()
   })
 
   it('rejects caches that are not the 48 kHz processing format', async () => {
@@ -536,7 +573,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(2))
     expect(oldSignal.aborted).toBe(true)
     expect(player.getCurrentTime()).toBe(3)
-    player.destroy()
+    await player.destroy()
   })
 
   it('resumes only the newest queue after rapid seeks while playing', async () => {
@@ -553,7 +590,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     )
     expect(player.isPlaying()).toBe(true)
     expect(player.getCurrentTime()).toBe(2)
-    player.destroy()
+    await player.destroy()
   })
 
   it('keeps the latest seek playing when it aborts the initial play prefill', async () => {
@@ -589,7 +626,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     })
     expect(player.isPlaying()).toBe(true)
     expect(player.getCurrentTime()).toBe(2)
-    player.destroy()
+    await player.destroy()
   })
 
   it('discards delayed provider work across a rapid seek stress run', async () => {
@@ -641,7 +678,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     expect(signals.some((signal) => signal.aborted)).toBe(true)
     expect(player.getCurrentTime()).toBe(2.5)
     expect(player.getDiagnostics().underruns).toBe(0)
-    player.destroy()
+    await player.destroy()
   })
 
   it('pads a short EOF provider read with silence to preserve output timing', async () => {
@@ -662,6 +699,6 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     expect(channel).toHaveLength(4096)
     expect(channel[0]).toBe(0.5)
     expect(channel[4095]).toBe(0)
-    player.destroy()
+    await player.destroy()
   })
 })

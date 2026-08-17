@@ -6,7 +6,10 @@ import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
 import { registerRenderIpc } from './ipc/render.ipc'
 import { registerTranscriptIpc } from './ipc/transcript.ipc'
-import { PendingProjectOpenRegistry } from './project/PendingProjectOpenRegistry'
+import {
+  PendingProjectOpenRegistry,
+  removePendingProjectOpensOnSenderDestroyed,
+} from './project/PendingProjectOpenRegistry'
 import { ProjectTransitionCoordinator } from './project/ProjectTransitionCoordinator'
 import type { ProjectSwitchSender } from './project/SessionSwitchBarrier'
 import { SessionSwitchBarrier } from './project/SessionSwitchBarrier'
@@ -111,6 +114,7 @@ startApplicationLifecycle({
     }
     const observeRendererLoad = () => {
       rendererLoaded = false
+      removePendingProjectOpensOnSenderDestroyed(pendingOpens, window.webContents)
       window.webContents.once('did-finish-load', () => {
         rendererLoaded = true
         flushForwardedProjects()

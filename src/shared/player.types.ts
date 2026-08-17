@@ -102,8 +102,8 @@ export interface IAudioPlayer {
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  /** Release all resources. Call when closing a file. */
-  destroy(): void
+  /** Release all resources. Settles after asynchronous audio teardown completes. */
+  destroy(): Promise<void>
 }
 
 export interface PlaybackDiagnostics {

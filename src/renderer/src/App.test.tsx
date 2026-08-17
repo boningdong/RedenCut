@@ -13,6 +13,7 @@ import { useTranscriptStore } from './stores/transcript.store'
 
 const mocks = vi.hoisted(() => ({
   registerAudioSource: vi.fn(async (_id?: unknown, _provider?: unknown): Promise<void> => {}),
+  destroyPlayer: vi.fn(async (): Promise<void> => {}),
   players: [] as Array<{ pause: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }>,
 }))
 
@@ -30,7 +31,7 @@ vi.mock('./audio/WorkletAudioPlayer', () => ({
     onDurationChange = vi.fn(() => vi.fn())
     onEnded = vi.fn(() => vi.fn())
     onError = vi.fn(() => vi.fn())
-    destroy = vi.fn()
+    destroy = vi.fn(() => mocks.destroyPlayer())
   },
 }))
 vi.mock('./audio/samples/ContinuousPcmSampleProvider', () => ({
@@ -270,6 +271,8 @@ describe('App transcription job identity', () => {
     useTranscriptStore.getState().reset()
     mocks.registerAudioSource.mockReset()
     mocks.registerAudioSource.mockResolvedValue(undefined)
+    mocks.destroyPlayer.mockReset()
+    mocks.destroyPlayer.mockResolvedValue(undefined)
     mocks.players.splice(0)
     const ids = ['job-a', 'job-b', 'job-c']
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
@@ -443,6 +446,54 @@ describe('App transcription job identity', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('acknowledges a switch only after player destruction settles', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { api, willSwitch } = await renderInitialized(initial)
+    const destruction = deferred<void>()
+    mocks.destroyPlayer.mockReturnValueOnce(destruction.promise)
+
+    let switchSettled = false
+    const switching = Promise.resolve(
+      willSwitch()({
+        transitionId: 'transition-delayed-destroy',
+        workspaceToken: TOKEN_A,
+        revision: 1,
+      }),
+    ).then(() => {
+      switchSettled = true
+    })
+    await Promise.resolve()
+
+    expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1)
+    expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
+    expect(switchSettled).toBe(false)
+
+    destruction.resolve()
+    await switching
+    expect(api.project.acknowledgeSwitch).toHaveBeenCalledWith({
+      transitionId: 'transition-delayed-destroy',
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })
+  })
+
+  it('does not acknowledge a switch when player destruction fails', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { api, willSwitch } = await renderInitialized(initial)
+    mocks.destroyPlayer.mockRejectedValueOnce(new Error('audio teardown failed'))
+
+    await act(async () => {
+      await willSwitch()({
+        transitionId: 'transition-failed-destroy',
+        workspaceToken: TOKEN_A,
+        revision: 1,
+      })
+    })
+
+    expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toContain('audio teardown failed')
+  })
+
   it('submits dirty path-free opens and applies an advanced stayed rollback session', async () => {
     const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
     const saved = session(TOKEN_B, 2, SOURCE_A, 'Saved')
@@ -505,6 +556,105 @@ describe('App transcription job identity', () => {
     expect(screen.getByRole('alert').textContent).toContain('selected project could not be opened')
   })
 
+  it("retains dirty visible edits and undo history after Don't Save reaches a post-acknowledgement failure", async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { api, willSwitch } = await renderInitialized(initial)
+    act(() => useTimelineStore.getState().updateTrack('track-1', { name: 'Unsaved edit' }))
+    const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
+    api.project.openDialog.mockReturnValueOnce(opening.promise)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
+    expect(api.project.openDialog.mock.calls[0][0]).toMatchObject({
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      isDirty: true,
+    })
+    expect(
+      api.project.openDialog.mock.calls[0][0].isDirty
+        ? api.project.openDialog.mock.calls[0][0].draft.tracks[0].name
+        : null,
+    ).toBe('Unsaved edit')
+    const undoCount = useTimelineStore.getState().undoStack.length
+    await act(async () => {
+      await willSwitch()({
+        transitionId: 'discard-transition',
+        workspaceToken: TOKEN_A,
+        revision: 1,
+      })
+    })
+
+    opening.resolve({ outcome: 'stayed', reason: 'switch-unacknowledged', session: initial })
+    await waitFor(() => expect(mocks.players).toHaveLength(2))
+
+    expect(useTimelineStore.getState().tracks[0].name).toBe('Unsaved edit')
+    expect(useTimelineStore.getState().undoStack).toHaveLength(undoCount)
+    expect(useEditorStore.getState().session?.draft.tracks[0].name).toBe('Unsaved edit')
+    expect(useEditorStore.getState().isDirty).toBe(true)
+  })
+
+  it('applies an advanced saved rollback while retaining edits made after the open snapshot', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const saved = session(TOKEN_B, 2, SOURCE_A, 'Saved')
+    const { api, willSwitch } = await renderInitialized(initial)
+    act(() => useTimelineStore.getState().updateTrack('track-1', { name: 'Saved snapshot' }))
+    const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
+    api.project.openDialog.mockReturnValueOnce(opening.promise)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
+    act(() => useTimelineStore.getState().updateTrack('track-2', { name: 'Edit during switch' }))
+    const undoCount = useTimelineStore.getState().undoStack.length
+    await act(async () => {
+      await willSwitch()({
+        transitionId: 'saved-edit-transition',
+        workspaceToken: TOKEN_B,
+        revision: 2,
+      })
+    })
+
+    opening.resolve({ outcome: 'stayed', reason: 'switch-unacknowledged', session: saved })
+    await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
+
+    expect(useEditorStore.getState().session?.workspace.displayName).toBe('Saved')
+    expect(useTimelineStore.getState().audioSources[0].displayName).toBe('Saved.wav')
+    expect(useTimelineStore.getState().tracks.map((track) => track.name)).toEqual([
+      'Saved snapshot',
+      'Edit during switch',
+    ])
+    expect(useTimelineStore.getState().undoStack).toHaveLength(undoCount)
+    expect(useEditorStore.getState().session?.draft.tracks.map((track) => track.name)).toEqual([
+      'Saved snapshot',
+      'Edit during switch',
+    ])
+    expect(useEditorStore.getState().isDirty).toBe(true)
+  })
+
+  it('uses an advanced Save As rollback as authoritative when no later edit exists', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const saved = session(TOKEN_B, 2, SOURCE_A, 'Saved')
+    saved.draft.tracks[0] = { ...saved.draft.tracks[0], name: 'Authoritative saved track' }
+    const { api, willSwitch } = await renderInitialized(initial)
+    act(() => useTimelineStore.getState().updateTrack('track-1', { name: 'Submitted edit' }))
+    const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
+    api.project.openDialog.mockReturnValueOnce(opening.promise)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await willSwitch()({
+        transitionId: 'save-as-transition',
+        workspaceToken: TOKEN_B,
+        revision: 2,
+      })
+    })
+
+    opening.resolve({ outcome: 'stayed', reason: 'candidate-invalid', session: saved })
+    await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
+
+    expect(useTimelineStore.getState().tracks[0].name).toBe('Authoritative saved track')
+    expect(useEditorStore.getState().isDirty).toBe(false)
+  })
+
   it('queues a forwarded open until the initial renderer session is ready', async () => {
     const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
     const installed = installApi(initial)
@@ -513,8 +663,8 @@ describe('App transcription job identity', () => {
     render(<App />)
     await waitFor(() => expect(installed.api.on.pendingProjectOpen).toHaveBeenCalledTimes(1))
 
-    await act(async () => {
-      await installed.pendingOpen()({ requestId: 'early-request', displayName: 'Early' })
+    act(() => {
+      void installed.pendingOpen()({ requestId: 'early-request', displayName: 'Early' })
     })
     expect(installed.api.project.openPending).not.toHaveBeenCalled()
 
@@ -551,5 +701,86 @@ describe('App transcription job identity', () => {
     expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_A)
     opening.resolve({ outcome: 'stayed', reason: 'candidate-invalid', session: saved })
     await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
+  })
+
+  it('serializes manual then pending opens and constructs the second request from the first result', async () => {
+    const first = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const second = session(TOKEN_B, 2, SOURCE_B, 'B')
+    const third = session('workspace-c' as WorkspaceToken, 3, SOURCE_A, 'C')
+    const installed = await renderInitialized(first)
+    const manual = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
+    installed.api.project.openDialog.mockReturnValueOnce(manual.promise)
+    installed.api.project.openPending.mockResolvedValueOnce({ outcome: 'switched', session: third })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(installed.api.project.openDialog).toHaveBeenCalledTimes(1))
+    const queued = installed.pendingOpen()({ requestId: 'queued-pending', displayName: 'C' })
+    expect(installed.api.project.openPending).not.toHaveBeenCalled()
+
+    manual.resolve({ outcome: 'switched', session: second })
+    await queued
+
+    expect(installed.api.project.openPending).toHaveBeenCalledWith({
+      workspaceToken: TOKEN_B,
+      revision: 2,
+      isDirty: false,
+      requestId: 'queued-pending',
+    })
+    expect(useEditorStore.getState().session?.workspaceToken).toBe(third.workspaceToken)
+  })
+
+  it('applies a first stayed result before running a queued manual open and coalesces duplicate manual clicks', async () => {
+    const first = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const rollback = session(TOKEN_B, 2, SOURCE_A, 'Saved')
+    const final = session('workspace-c' as WorkspaceToken, 3, SOURCE_B, 'Final')
+    const installed = await renderInitialized(first)
+    const pending = deferred<Awaited<ReturnType<IElectronAPI['project']['openPending']>>>()
+    installed.api.project.openPending.mockReturnValueOnce(pending.promise)
+    installed.api.project.openDialog.mockResolvedValueOnce({ outcome: 'switched', session: final })
+
+    const firstOpen = installed.pendingOpen()({ requestId: 'first-pending', displayName: 'Saved' })
+    await waitFor(() => expect(installed.api.project.openPending).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    expect(installed.api.project.openDialog).not.toHaveBeenCalled()
+
+    pending.resolve({ outcome: 'stayed', reason: 'candidate-invalid', session: rollback })
+    await firstOpen
+    await waitFor(() => expect(installed.api.project.openDialog).toHaveBeenCalledTimes(1))
+
+    expect(installed.api.project.openDialog).toHaveBeenCalledWith({
+      workspaceToken: TOKEN_B,
+      revision: 2,
+      isDirty: false,
+    })
+    await waitFor(() =>
+      expect(useEditorStore.getState().session?.workspaceToken).toBe(final.workspaceToken),
+    )
+  })
+
+  it('continues the FIFO from the unchanged session after the first open rejects', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const successor = session(TOKEN_B, 2, SOURCE_B, 'B')
+    const installed = await renderInitialized(initial)
+    const failed = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
+    installed.api.project.openDialog.mockReturnValueOnce(failed.promise)
+    installed.api.project.openPending.mockResolvedValueOnce({
+      outcome: 'switched',
+      session: successor,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(installed.api.project.openDialog).toHaveBeenCalledTimes(1))
+    const queued = installed.pendingOpen()({ requestId: 'after-failure', displayName: 'B' })
+    failed.reject(new Error('safe open failure'))
+    await queued
+
+    expect(installed.api.project.openPending).toHaveBeenCalledWith({
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      isDirty: false,
+      requestId: 'after-failure',
+    })
+    expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B)
   })
 })
