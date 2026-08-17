@@ -31,6 +31,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
   const [isCancelling, setIsCancelling] = useState(false)
   const activeJob = useRef<ActiveExportIdentity | null>(null)
+  const cancellationOwner = useRef<ActiveExportIdentity | null>(null)
   const currentSession = useRef<SessionPrecondition>({
     workspaceToken: session.workspaceToken,
     revision: session.revision,
@@ -44,6 +45,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
     const active = activeJob.current
     if (active && !sameSession(active, currentSession.current)) {
       activeJob.current = null
+      cancellationOwner.current = null
       setIsCancelling(false)
       setExportState({ status: 'idle' })
     }
@@ -79,6 +81,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         draft: { ...draft, export: { ...draft.export, format } },
         format,
       })
+      if (activeJobMatches(cancellationOwner.current, identity)) return
       if (
         !activeJobMatches(activeJob.current, identity) ||
         !sameSession(currentSession.current, identity) ||
@@ -88,6 +91,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
       shouldFinish = true
       setExportState(exported.value ? { status: 'done' } : { status: 'idle' })
     } catch (err) {
+      if (activeJobMatches(cancellationOwner.current, identity)) return
       if (
         !activeJobMatches(activeJob.current, identity) ||
         !sameSession(currentSession.current, identity)
@@ -106,21 +110,25 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
       onClose()
       return
     }
+    cancellationOwner.current = identity
     setIsCancelling(true)
     try {
       await window.electronAPI.render.cancelExport(identity)
       if (
         !activeJobMatches(activeJob.current, identity) ||
+        !activeJobMatches(cancellationOwner.current, identity) ||
         !sameSession(currentSession.current, identity)
       )
         return
       setIsCancelling(false)
+      cancellationOwner.current = null
       activeJob.current = null
       setExportState({ status: 'idle' })
       onClose()
     } catch (error) {
       if (
         !activeJobMatches(activeJob.current, identity) ||
+        !activeJobMatches(cancellationOwner.current, identity) ||
         !sameSession(currentSession.current, identity)
       )
         return
@@ -130,6 +138,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
   }, [onClose])
 
   const isExporting = exportState.status === 'exporting'
+  const hasActiveExport = activeJob.current !== null
   const pct =
     exportState.status === 'exporting'
       ? Math.round(exportState.progress.percent * 100)
@@ -272,7 +281,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
             onClick={() => {
               void handleExport()
             }}
-            disabled={isExporting || exportState.status === 'done'}
+            disabled={hasActiveExport || exportState.status === 'done'}
             style={{
               background: 'var(--color-accent)',
               border: 'none',

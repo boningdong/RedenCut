@@ -176,6 +176,103 @@ describe('ExportModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps cancellation ownership when start rejects before the cancel acknowledgement', async () => {
+    const installed = installApi()
+    const onClose = vi.fn()
+    render(<ExportModal session={session()} draft={session().draft} onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await waitFor(() => expect(installed.exports).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(installed.cancellations).toHaveLength(1))
+
+    await act(async () => {
+      installed.exports[0].result.reject(
+        Object.assign(new Error('The operation was cancelled.'), { code: 'cancelled' }),
+      )
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('The operation was cancelled.')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Cancelling…' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Exporting…' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Exporting…' }))
+    expect(installed.exports).toHaveLength(1)
+    expect(onClose).not.toHaveBeenCalled()
+
+    await act(async () => {
+      installed.cancellations[0].result.resolve('cancelled')
+      await Promise.resolve()
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a failed cancellation recoverable for an exact-session retry', async () => {
+    const installed = installApi()
+    const onClose = vi.fn()
+    render(<ExportModal session={session()} draft={session().draft} onClose={onClose} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await waitFor(() => expect(installed.exports).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(installed.cancellations).toHaveLength(1))
+
+    await act(async () => {
+      installed.cancellations[0].result.reject(new Error('Cancellation could not be completed.'))
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('Cancellation could not be completed.')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Export' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(installed.cancellations).toHaveLength(2))
+    await act(async () => {
+      installed.cancellations[1].result.resolve('cancelled')
+      await Promise.resolve()
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a cancellation rejection after a successor session loads', async () => {
+    const installed = installApi()
+    const onClose = vi.fn()
+    const view = render(
+      <ExportModal
+        session={session(TOKEN_A, 7)}
+        draft={session(TOKEN_A, 7).draft}
+        onClose={onClose}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await waitFor(() => expect(installed.exports).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(installed.cancellations).toHaveLength(1))
+
+    view.rerender(
+      <ExportModal
+        session={session(TOKEN_B, 8)}
+        draft={session(TOKEN_B, 8).draft}
+        onClose={onClose}
+      />,
+    )
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: 'Export' }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    )
+    await act(async () => {
+      installed.cancellations[0].result.reject(new Error('old cancellation failed'))
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('old cancellation failed')).toBeNull()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('prevents an old session rejection and finally block from altering its successor job', async () => {
     const installed = installApi()
     const view = render(

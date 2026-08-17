@@ -340,6 +340,66 @@ describe('ExportCoordinator', () => {
     expect(await readFile(unrelated, 'utf8')).toBe('keep')
   })
 
+  it('keeps a post-commit backup when its first cleanup attempt fails without retrying or failing export', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    const backup = join(root, '.episode.podcut-backup-unique-a.mp3')
+    await writeFile(destination, 'original')
+    const child = new FakeChild()
+    const remove = vi.fn(async (path: string) => {
+      if (remove.mock.calls.length === 1) throw new Error('backup cleanup failed')
+      await rm(path, { force: true })
+    })
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
+        return child
+      },
+      createId: () => 'unique-a',
+      remove,
+    })
+    const execution = coordinator.start({
+      identity: identity(),
+      project: project(),
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: vi.fn(),
+    })
+
+    await expect(execution.settled).resolves.toMatchObject({ value: true })
+    expect(await readFile(destination, 'utf8')).toBe('new-export')
+    expect(await readFile(backup, 'utf8')).toBe('original')
+    expect(remove).toHaveBeenCalledTimes(1)
+    expect(remove).toHaveBeenCalledWith(backup)
+  })
+
+  it('removes an existing-destination backup after ordinary successful publication', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    await writeFile(destination, 'original')
+    const child = new FakeChild()
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        void writeFile(arguments_.at(-1)!, 'new-export').then(() => child.emit('close', 0, null))
+        return child
+      },
+      createId: () => 'unique-a',
+    })
+    const execution = coordinator.start({
+      identity: identity(),
+      project: project(),
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: vi.fn(),
+    })
+
+    await expect(execution.settled).resolves.toMatchObject({ value: true })
+    expect(await readFile(destination, 'utf8')).toBe('new-export')
+    expect(await readdir(root)).toEqual(['episode.mp3'])
+  })
+
   it('revalidates after code zero and preserves an existing destination when the session is stale', async () => {
     const root = await temporaryRoot()
     const destination = join(root, 'episode.mp3')

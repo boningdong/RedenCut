@@ -58,6 +58,7 @@ interface ActiveExport {
 
 export class ExportCoordinator {
   private readonly activeBySender = new Map<number, ActiveExport>()
+  private readonly deferredCleanupWarnings = new Map<string, unknown>()
 
   constructor(
     dependencies: Partial<ExportCoordinatorDependencies> &
@@ -188,7 +189,11 @@ export class ExportCoordinator {
         }
         active.state = 'committed'
         if (backupOwned) {
-          await this.dependencies.remove(backupOutput)
+          try {
+            await this.dependencies.remove(backupOutput)
+          } catch (error) {
+            this.deferredCleanupWarnings.set(backupOutput, error)
+          }
           backupOwned = false
         }
         result = { ...envelope(identity), value: true }
