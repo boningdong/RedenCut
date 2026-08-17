@@ -7,8 +7,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import type { RenderProgress } from '@shared/ipc.types'
-import type { ProjectDraft, RendererSession } from '@shared/session.types'
+import type { ExportJobId, RenderProgress } from '@shared/ipc.types'
+import type { ProjectDraft, RendererSession, SessionPrecondition } from '@shared/session.types'
 
 interface ExportModalProps {
   session: RendererSession
@@ -22,47 +22,112 @@ type ExportState =
   | { status: 'done' }
   | { status: 'error'; message: string }
 
+interface ActiveExportIdentity extends SessionPrecondition {
+  jobId: ExportJobId
+}
+
 export function ExportModal({ session, draft, onClose }: ExportModalProps) {
   const [format, setFormat] = useState<ProjectDraft['export']['format']>('mp3')
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
-  const activeJob = useRef<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const activeJob = useRef<ActiveExportIdentity | null>(null)
+  const currentSession = useRef<SessionPrecondition>({
+    workspaceToken: session.workspaceToken,
+    revision: session.revision,
+  })
+  currentSession.current = {
+    workspaceToken: session.workspaceToken,
+    revision: session.revision,
+  }
+
+  useEffect(() => {
+    const active = activeJob.current
+    if (active && !sameSession(active, currentSession.current)) {
+      activeJob.current = null
+      setIsCancelling(false)
+      setExportState({ status: 'idle' })
+    }
+  }, [session.revision, session.workspaceToken])
 
   // Subscribe to render progress events
   useEffect(() => {
     return window.electronAPI.on.renderProgress((progress) => {
       if (
-        progress.jobId !== activeJob.current ||
-        progress.workspaceToken !== session.workspaceToken ||
-        progress.revision !== session.revision
+        !activeJobMatches(activeJob.current, progress) ||
+        !sameSession(currentSession.current, progress)
       )
         return
       setExportState({ status: 'exporting', progress })
-      if (progress.percent >= 1) setExportState({ status: 'done' })
     })
-  }, [session.revision, session.workspaceToken])
+  }, [])
 
   const handleExport = useCallback(async () => {
     setExportState({
       status: 'exporting',
       progress: { percent: 0, currentSeconds: 0, totalSeconds: 0 },
     })
+    const identity: ActiveExportIdentity = {
+      jobId: crypto.randomUUID() as ExportJobId,
+      workspaceToken: session.workspaceToken,
+      revision: session.revision,
+    }
+    activeJob.current = identity
+    let shouldFinish = false
     try {
-      const jobId = crypto.randomUUID()
-      activeJob.current = jobId
-      const exported = await window.electronAPI.render.export({
-        workspaceToken: session.workspaceToken,
-        revision: session.revision,
-        jobId,
+      const exported = await window.electronAPI.render.startExport({
+        ...identity,
         draft: { ...draft, export: { ...draft.export, format } },
         format,
       })
+      if (
+        !activeJobMatches(activeJob.current, identity) ||
+        !sameSession(currentSession.current, identity) ||
+        !activeJobMatches(identity, exported)
+      )
+        return
+      shouldFinish = true
       setExportState(exported.value ? { status: 'done' } : { status: 'idle' })
     } catch (err) {
+      if (
+        !activeJobMatches(activeJob.current, identity) ||
+        !sameSession(currentSession.current, identity)
+      )
+        return
+      shouldFinish = true
       setExportState({ status: 'error', message: (err as Error).message })
     } finally {
-      activeJob.current = null
+      if (shouldFinish && activeJobMatches(activeJob.current, identity)) activeJob.current = null
     }
   }, [draft, format, session.revision, session.workspaceToken])
+
+  const handleCancel = useCallback(async () => {
+    const identity = activeJob.current
+    if (!identity) {
+      onClose()
+      return
+    }
+    setIsCancelling(true)
+    try {
+      await window.electronAPI.render.cancelExport(identity)
+      if (
+        !activeJobMatches(activeJob.current, identity) ||
+        !sameSession(currentSession.current, identity)
+      )
+        return
+      setIsCancelling(false)
+      activeJob.current = null
+      setExportState({ status: 'idle' })
+      onClose()
+    } catch (error) {
+      if (
+        !activeJobMatches(activeJob.current, identity) ||
+        !sameSession(currentSession.current, identity)
+      )
+        return
+      setIsCancelling(false)
+      setExportState({ status: 'error', message: (error as Error).message })
+    }
+  }, [onClose])
 
   const isExporting = exportState.status === 'exporting'
   const pct =
@@ -84,7 +149,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         zIndex: 1000,
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget && !isCancelling) void handleCancel()
       }}
     >
       <div
@@ -189,7 +254,8 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         {/* Actions */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button
-            onClick={onClose}
+            onClick={() => void handleCancel()}
+            disabled={isCancelling}
             style={{
               background: 'none',
               border: '1px solid var(--color-border)',
@@ -200,7 +266,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
               cursor: 'pointer',
             }}
           >
-            {exportState.status === 'done' ? 'Close' : 'Cancel'}
+            {isCancelling ? 'Cancelling…' : exportState.status === 'done' ? 'Close' : 'Cancel'}
           </button>
           <button
             onClick={() => {
@@ -224,4 +290,19 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
       </div>
     </div>
   )
+}
+
+function activeJobMatches(
+  active: ActiveExportIdentity | null,
+  candidate: ActiveExportIdentity,
+): boolean {
+  return (
+    active?.jobId === candidate.jobId &&
+    active.workspaceToken === candidate.workspaceToken &&
+    active.revision === candidate.revision
+  )
+}
+
+function sameSession(first: SessionPrecondition, second: SessionPrecondition): boolean {
+  return first.workspaceToken === second.workspaceToken && first.revision === second.revision
 }

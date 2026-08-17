@@ -20,6 +20,9 @@ export interface IpcError {
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: IpcError }
 
+export type ExportJobId = string & { readonly __brand: 'ExportJobId' }
+export type ExportCancellationResult = 'cancelled' | 'commit-won' | 'not-found'
+
 interface SessionJobRequest<JobId extends string = string> extends SessionPrecondition {
   jobId: JobId
 }
@@ -37,7 +40,7 @@ export interface TranscriptionJobRequest extends SessionJobRequest<Transcription
   language?: string
 }
 
-export interface ExportJobRequest extends SessionJobRequest {
+export interface ExportJobRequest extends SessionJobRequest<ExportJobId> {
   draft: ProjectDraft
   format: ProjectDraft['export']['format']
 }
@@ -65,7 +68,7 @@ export interface RenderProgress {
   totalSeconds: number
 }
 
-export interface RenderProgressEvent extends SessionJobRequest, RenderProgress {}
+export interface RenderProgressEvent extends SessionJobRequest<ExportJobId>, RenderProgress {}
 
 export interface IElectronAPI {
   audio: {
@@ -89,7 +92,8 @@ export interface IElectronAPI {
     ): Promise<TranscriptionCancellationResult>
   }
   render: {
-    export(request: ExportJobRequest): Promise<SessionJobResult<boolean>>
+    startExport(request: ExportJobRequest): Promise<SessionJobResult<boolean, ExportJobId>>
+    cancelExport(request: CancelSessionJobRequest<ExportJobId>): Promise<ExportCancellationResult>
   }
   on: {
     importProgress(callback: (progress: ImportProgressEvent) => void): () => void

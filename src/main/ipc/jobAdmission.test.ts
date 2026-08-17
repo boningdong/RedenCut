@@ -201,7 +201,7 @@ describe('IPC job admission', () => {
     registerRenderIpc(controller as unknown as WorkspaceController, rejectingRegistry(), vi.fn())
     mocks.showSaveDialog.mockResolvedValue({ canceled: true })
 
-    const result = await mocks.handlers.get('project:export')!(
+    const result = await mocks.handlers.get('render:start-export')!(
       { sender: sender() },
       {
         workspaceToken: TOKEN_A,

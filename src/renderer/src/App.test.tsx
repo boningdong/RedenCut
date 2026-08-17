@@ -207,7 +207,10 @@ function installApi(initial: RendererSession) {
       }),
       cancel: vi.fn(async () => 'not-found' as const),
     },
-    render: { export: vi.fn() },
+    render: {
+      startExport: vi.fn(),
+      cancelExport: vi.fn(async () => 'not-found' as const),
+    },
     on: {
       importProgress: vi.fn(() => vi.fn()),
       transcriptProgress: vi.fn((callback) => {

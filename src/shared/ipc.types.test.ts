@@ -5,6 +5,8 @@ import type { ProjectDraft, RendererSession, SessionPrecondition } from './sessi
 import type { TranscriptionCancellationResult, TranscriptionJobId } from './transcriber.types'
 import type {
   CancelSessionJobRequest,
+  ExportCancellationResult,
+  ExportJobId,
   ExportJobRequest,
   IElectronAPI,
   ImportJobRequest,
@@ -51,8 +53,11 @@ test('preload methods use path-free session requests and results', () => {
       request: CancelSessionJobRequest<TranscriptionJobId>,
     ) => Promise<TranscriptionCancellationResult>
   >()
-  expectTypeOf<IElectronAPI['render']['export']>().toEqualTypeOf<
-    (request: ExportJobRequest) => Promise<SessionJobResult<boolean>>
+  expectTypeOf<IElectronAPI['render']['startExport']>().toEqualTypeOf<
+    (request: ExportJobRequest) => Promise<SessionJobResult<boolean, ExportJobId>>
+  >()
+  expectTypeOf<IElectronAPI['render']['cancelExport']>().toEqualTypeOf<
+    (request: CancelSessionJobRequest<ExportJobId>) => Promise<ExportCancellationResult>
   >()
 
   expectTypeOf<ImportJobRequest>().toMatchTypeOf<SessionPrecondition>()
@@ -66,11 +71,18 @@ test('preload methods use path-free session requests and results', () => {
     jobId: TranscriptionJobId
     audioSourceId: AudioSourceId
   }>()
+  expectTypeOf<ExportJobRequest>().toMatchTypeOf<{
+    jobId: ExportJobId
+    draft: ProjectDraft
+    format: ProjectDraft['export']['format']
+  }>()
   expectTypeOf<ImportProgressEvent>().toMatchTypeOf<SessionPrecondition & { jobId: string }>()
 
   expectTypeOf<Parameters<IElectronAPI['project']['save']>[0]>().not.toMatchTypeOf<ProjectFile>()
   expectTypeOf<
     Parameters<IElectronAPI['audio']['startImport']>[0]
   >().not.toMatchTypeOf<ProjectFile>()
-  expectTypeOf<Parameters<IElectronAPI['render']['export']>[0]>().not.toMatchTypeOf<ProjectFile>()
+  expectTypeOf<
+    Parameters<IElectronAPI['render']['startExport']>[0]
+  >().not.toMatchTypeOf<ProjectFile>()
 })

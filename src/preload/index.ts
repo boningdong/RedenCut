@@ -2,6 +2,8 @@ import type { IpcRendererEvent } from 'electron'
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   CancelSessionJobRequest,
+  ExportCancellationResult,
+  ExportJobId,
   ExportJobRequest,
   IElectronAPI,
   ImportJobRequest,
@@ -57,8 +59,10 @@ const api = {
       invokeSafe<TranscriptionCancellationResult>(invoke, 'transcript:cancel', request),
   },
   render: {
-    export: (request: ExportJobRequest) =>
-      invokeSafe<SessionJobResult<boolean>>(invoke, 'project:export', request),
+    startExport: (request: ExportJobRequest) =>
+      invokeSafe<SessionJobResult<boolean, ExportJobId>>(invoke, 'render:start-export', request),
+    cancelExport: (request: CancelSessionJobRequest<ExportJobId>) =>
+      invokeSafe<ExportCancellationResult>(invoke, 'render:cancel-export', request),
   },
   on: {
     importProgress: (callback: (progress: ImportProgressEvent) => void) => {
