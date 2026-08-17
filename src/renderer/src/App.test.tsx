@@ -184,12 +184,14 @@ function installApi(initial: RendererSession) {
     deferred: ReturnType<typeof deferred<SessionJobResult<Transcript, TranscriptionJobId>>>
   }> = []
   const openDialog = vi.fn<IElectronAPI['project']['openDialog']>(async () => null)
+  const saveProject = vi.fn<IElectronAPI['project']['save']>(async () => null)
+  const saveProjectAs = vi.fn<IElectronAPI['project']['saveAs']>(async () => null)
   const api = {
     project: {
       initialize: vi.fn(async () => initial),
       openDialog,
-      save: vi.fn(async () => null),
-      saveAs: vi.fn(async () => null),
+      save: saveProject,
+      saveAs: saveProjectAs,
     },
     audio: {
       selectImportFile: vi.fn(async () => null),
@@ -337,5 +339,46 @@ describe('App transcription job identity', () => {
     prepareSuccessor.resolve()
     await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
     expect(useTranscriptStore.getState().words.map((word) => word.text)).toEqual(['seed-B'])
+  })
+
+  it.each([
+    { button: 'Save', token: TOKEN_A, name: 'same-token revision advance' },
+    { button: 'Save As', token: TOKEN_B, name: 'token replacement' },
+  ])('invalidates a deferred job after Save applies a $name', async ({ button, token }) => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const saved = session(token, 2, SOURCE_A, 'Saved')
+    const { api, requests, progress } = await renderInitialized(initial)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    act(() => progress()({ ...requests[0].request, status: 'old running' }))
+    if (button === 'Save') api.project.save.mockResolvedValueOnce(saved)
+    else api.project.saveAs.mockResolvedValueOnce(saved)
+
+    fireEvent.click(screen.getByRole('button', { name: button }))
+    await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
+    expect(useEditorStore.getState().session?.workspaceToken).toBe(token)
+    expect(useTranscriptStore.getState().isGenerating).toBe(false)
+    expect(useTranscriptStore.getState().generatingStatus).toBe('')
+    const appliedState = {
+      words: useTranscriptStore.getState().words,
+      visible: useTranscriptStore.getState().visibleTrackIds,
+      dirty: useEditorStore.getState().isDirty,
+      revision: useEditorStore.getState().localEditRevision,
+      draft: useEditorStore.getState().session?.draft,
+    }
+
+    act(() => progress()({ ...requests[0].request, status: 'stale progress' }))
+    requests[0].deferred.reject(new Error('stale failure'))
+    await act(async () => Promise.resolve())
+
+    expect(useTranscriptStore.getState().isGenerating).toBe(false)
+    expect(useTranscriptStore.getState().generatingStatus).toBe('')
+    expect({
+      words: useTranscriptStore.getState().words,
+      visible: useTranscriptStore.getState().visibleTrackIds,
+      dirty: useEditorStore.getState().isDirty,
+      revision: useEditorStore.getState().localEditRevision,
+      draft: useEditorStore.getState().session?.draft,
+    }).toEqual(appliedState)
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

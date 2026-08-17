@@ -64,12 +64,14 @@ export function registerTranscriptIpc(
           settled: operation,
         }
       })
-      event.sender.once('destroyed', () => {
+      const cancelSenderJobs = () => {
         void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
-      })
+      }
+      event.sender.once('destroyed', cancelSenderJobs)
       try {
         return await operation
       } finally {
+        event.sender.removeListener('destroyed', cancelSenderJobs)
         unregister()
         if (!cancellationWaiters.has(cancellationKey)) cancellationOutcomes.delete(cancellationKey)
       }
@@ -78,7 +80,6 @@ export function registerTranscriptIpc(
   ipcMain.handle('transcript:cancel', (event, input: unknown) =>
     toIpcResult(async (): Promise<TranscriptionCancellationResult> => {
       const request = transcriptionCancelRequest(input)
-      controller.assertCurrent(request)
       const identity = {
         kind: 'transcription' as const,
         ...request,
@@ -125,6 +126,12 @@ function transcriptionIdentityKey(identity: {
   jobId: TranscriptionJobId
   senderId: number
   workspaceToken: TranscriptionJobRequest['workspaceToken']
+  revision: number
 }): string {
-  return JSON.stringify([identity.jobId, identity.senderId, identity.workspaceToken])
+  return JSON.stringify([
+    identity.jobId,
+    identity.senderId,
+    identity.workspaceToken,
+    identity.revision,
+  ])
 }

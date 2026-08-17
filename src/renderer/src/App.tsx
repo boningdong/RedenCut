@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { APP_NAME } from '@shared/constants'
 import type { AudioSourceId, Word } from '@shared/project.types'
 import type { ImportMode } from '@shared/import.types'
-import type { ProjectDraft, RendererSession, WorkspaceToken } from '@shared/session.types'
+import type {
+  ProjectDraft,
+  RendererSession,
+  SessionPrecondition,
+  WorkspaceToken,
+} from '@shared/session.types'
 import type { TranscriptionJobId } from '@shared/transcriber.types'
 import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
 import { WorkletAudioPlayer } from './audio/WorkletAudioPlayer'
@@ -31,6 +36,10 @@ interface ImportState {
   displayName: string
   stage: string
   percent: number
+}
+
+interface TranscriptJobIdentity extends SessionPrecondition {
+  jobId: TranscriptionJobId
 }
 
 interface PreparedRendererSession {
@@ -77,7 +86,7 @@ export default function App() {
   const playerRef = useRef<IAudioPlayer | null>(null)
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
-  const transcriptJobId = useRef<TranscriptionJobId | null>(null)
+  const transcriptJob = useRef<TranscriptJobIdentity | null>(null)
   const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
 
   const session = useEditorStore((state) => state.session)
@@ -166,14 +175,29 @@ export default function App() {
     )
   }
 
+  const invalidateTranscriptJob = useCallback(() => {
+    transcriptJob.current = null
+    useTranscriptStore.getState().setIsGenerating(false)
+    useTranscriptStore.getState().setGeneratingStatus('')
+  }, [])
+
+  const invalidateTranscriptJobForSession = useCallback(
+    (appliedSession: SessionPrecondition | null) => {
+      if (
+        transcriptJob.current &&
+        !sessionMatchesTranscriptJob(appliedSession, transcriptJob.current)
+      )
+        invalidateTranscriptJob()
+    },
+    [invalidateTranscriptJob],
+  )
+
   const loadSession = useCallback(
     (result: RendererSession, importLedger?: RendererSessionLoad['importLedger']) => {
-      transcriptJobId.current = null
-      useTranscriptStore.getState().setIsGenerating(false)
-      useTranscriptStore.getState().setGeneratingStatus('')
+      invalidateTranscriptJob()
       return loadCoordinator.current!.load({ session: result, importLedger })
     },
-    [],
+    [invalidateTranscriptJob],
   )
 
   useEffect(() => {
@@ -215,9 +239,8 @@ export default function App() {
       window.electronAPI.on.transcriptProgress((progress) => {
         const current = useEditorStore.getState().session
         if (
-          current?.workspaceToken === progress.workspaceToken &&
-          current.revision === progress.revision &&
-          transcriptJobId.current === progress.jobId
+          transcriptJobMatches(transcriptJob.current, progress) &&
+          sessionMatchesTranscriptJob(current, progress)
         )
           useTranscriptStore.getState().setGeneratingStatus(progress.status)
       }),
@@ -250,12 +273,13 @@ export default function App() {
             }))
         if (!saved) return
         acknowledgeSave(saved, capturedLocalEditRevision)
+        invalidateTranscriptJobForSession(useEditorStore.getState().session)
         setError(null)
       } catch (reason) {
         setError((reason as Error).message)
       }
     },
-    [acknowledgeSave, snapshot],
+    [acknowledgeSave, invalidateTranscriptJobForSession, snapshot],
   )
 
   useKeyboardShortcuts({
@@ -344,7 +368,12 @@ export default function App() {
       const currentSession = useEditorStore.getState().session
       if (!track || !sourceId || !currentSession) return
       const jobId = crypto.randomUUID() as TranscriptionJobId
-      transcriptJobId.current = jobId
+      const job = {
+        jobId,
+        workspaceToken: currentSession.workspaceToken,
+        revision: currentSession.revision,
+      }
+      transcriptJob.current = job
       useTranscriptStore.getState().setIsGenerating(true)
       useTranscriptStore.getState().setGeneratingStatus('')
       setError(null)
@@ -357,12 +386,9 @@ export default function App() {
         })
         const latest = useEditorStore.getState().session
         if (
-          generated.jobId !== jobId ||
-          transcriptJobId.current !== generated.jobId ||
-          generated.workspaceToken !== currentSession.workspaceToken ||
-          generated.revision !== currentSession.revision ||
-          latest?.workspaceToken !== generated.workspaceToken ||
-          latest.revision !== generated.revision
+          !transcriptJobMatches(transcriptJob.current, generated) ||
+          !transcriptJobMatches(job, generated) ||
+          !sessionMatchesTranscriptJob(latest, job)
         )
           return
         const currentTrack = useTimelineStore
@@ -380,10 +406,17 @@ export default function App() {
         latestTranscript.ensureTrackVisible(track.id)
         markEdited()
       } catch (reason) {
-        if (transcriptJobId.current === jobId) setError((reason as Error).message)
+        if (
+          transcriptJobMatches(transcriptJob.current, job) &&
+          sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
+        )
+          setError((reason as Error).message)
       } finally {
-        if (transcriptJobId.current === jobId) {
-          transcriptJobId.current = null
+        if (
+          transcriptJobMatches(transcriptJob.current, job) &&
+          sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
+        ) {
+          transcriptJob.current = null
           useTranscriptStore.getState().setIsGenerating(false)
           useTranscriptStore.getState().setGeneratingStatus('')
         }
@@ -572,4 +605,22 @@ export default function App() {
       ) : null}
     </div>
   )
+}
+
+function transcriptJobMatches(
+  active: TranscriptJobIdentity | null,
+  candidate: TranscriptJobIdentity,
+): boolean {
+  return (
+    active?.jobId === candidate.jobId &&
+    active.workspaceToken === candidate.workspaceToken &&
+    active.revision === candidate.revision
+  )
+}
+
+function sessionMatchesTranscriptJob(
+  session: SessionPrecondition | null,
+  job: SessionPrecondition,
+): boolean {
+  return session?.workspaceToken === job.workspaceToken && session.revision === job.revision
 }

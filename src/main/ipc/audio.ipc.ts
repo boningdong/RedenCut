@@ -151,7 +151,6 @@ export function registerAudioIpc(
   ipcMain.handle('audio:cancel-import', (event, input: unknown) =>
     toIpcResult(async () => {
       const request = importCancelRequest(input)
-      controller.assertCurrent(request)
       const identity = {
         kind: 'import',
         ...request,
@@ -214,6 +213,12 @@ function importIdentityKey(identity: {
   jobId: string
   senderId: number
   workspaceToken: RendererSession['workspaceToken']
+  revision: number
 }): string {
-  return JSON.stringify([identity.jobId, identity.senderId, identity.workspaceToken])
+  return JSON.stringify([
+    identity.jobId,
+    identity.senderId,
+    identity.workspaceToken,
+    identity.revision,
+  ])
 }

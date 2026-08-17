@@ -24,6 +24,7 @@ describe('SessionJobRegistry', () => {
       jobId: 'job-1',
       senderId: 1,
       workspaceToken: TOKEN_A,
+      revision: 1,
     }
     const start = vi.fn(() => ({ cancel: vi.fn(), settled: Promise.resolve() }))
 
@@ -43,12 +44,44 @@ describe('SessionJobRegistry', () => {
       jobId: 'job-1',
       senderId: 7,
       workspaceToken: TOKEN_A,
+      revision: 1,
     }
     registry.register(identity, () => ({ cancel: vi.fn(), settled: Promise.resolve() }))
     const duplicateStart = vi.fn(() => ({ cancel: vi.fn(), settled: Promise.resolve() }))
 
     expect(() => registry.register(identity, duplicateStart)).toThrow('Job is already registered')
     expect(duplicateStart).not.toHaveBeenCalled()
+  })
+
+  it('distinguishes exact jobs by starting revision while token settlement spans revisions', async () => {
+    const registry = new SessionJobRegistry()
+    const revisionOneCancel = vi.fn()
+    const revisionTwoCancel = vi.fn()
+    const common = {
+      kind: 'transcription' as const,
+      jobId: 'shared-job',
+      senderId: 7,
+      workspaceToken: TOKEN_A,
+    }
+    registry.register({ ...common, revision: 1 }, () => ({
+      cancel: revisionOneCancel,
+      settled: Promise.resolve(),
+    }))
+    registry.register({ ...common, revision: 2 }, () => ({
+      cancel: revisionTwoCancel,
+      settled: Promise.resolve(),
+    }))
+
+    await expect(registry.cancelAndSettleJob({ ...common, revision: 3 })).resolves.toBe(false)
+    expect(revisionOneCancel).not.toHaveBeenCalled()
+    expect(revisionTwoCancel).not.toHaveBeenCalled()
+
+    await expect(registry.cancelAndSettleJob({ ...common, revision: 1 })).resolves.toBe(true)
+    expect(revisionOneCancel).toHaveBeenCalledTimes(1)
+    expect(revisionTwoCancel).not.toHaveBeenCalled()
+
+    await registry.cancelAndSettleToken(TOKEN_A)
+    expect(revisionTwoCancel).toHaveBeenCalledTimes(1)
   })
 
   it('cancels a job once across concurrent calls and awaits settlement', async () => {
@@ -60,6 +93,7 @@ describe('SessionJobRegistry', () => {
       jobId: 'job-1',
       senderId: 1,
       workspaceToken: TOKEN_A,
+      revision: 1,
     }
     registry.register(identity, () => ({ cancel, settled: settled.promise }))
 
@@ -86,6 +120,7 @@ describe('SessionJobRegistry', () => {
       jobId: 'job-1',
       senderId: 1,
       workspaceToken: TOKEN_A,
+      revision: 1,
     }
     registry.register(identity, () => ({ cancel: vi.fn(), settled: settled.promise }))
 
@@ -102,11 +137,11 @@ describe('SessionJobRegistry', () => {
     const firstCancel = vi.fn()
     const secondCancel = vi.fn()
     registry.register(
-      { kind: 'import', jobId: 'first', senderId: 1, workspaceToken: TOKEN_A },
+      { kind: 'import', jobId: 'first', senderId: 1, workspaceToken: TOKEN_A, revision: 1 },
       () => ({ cancel: firstCancel, settled: first.promise }),
     )
     registry.register(
-      { kind: 'export', jobId: 'second', senderId: 2, workspaceToken: TOKEN_A },
+      { kind: 'export', jobId: 'second', senderId: 2, workspaceToken: TOKEN_A, revision: 2 },
       () => ({ cancel: secondCancel, settled: second.promise }),
     )
 
@@ -132,15 +167,27 @@ describe('SessionJobRegistry', () => {
     const otherSenderCancel = vi.fn()
     const otherTokenCancel = vi.fn()
     registry.register(
-      { kind: 'import', jobId: 'matching', senderId: 1, workspaceToken: TOKEN_A },
+      { kind: 'import', jobId: 'matching', senderId: 1, workspaceToken: TOKEN_A, revision: 1 },
       () => ({ cancel: matchingCancel, settled: Promise.resolve() }),
     )
     registry.register(
-      { kind: 'transcription', jobId: 'other-sender', senderId: 2, workspaceToken: TOKEN_A },
+      {
+        kind: 'transcription',
+        jobId: 'other-sender',
+        senderId: 2,
+        workspaceToken: TOKEN_A,
+        revision: 1,
+      },
       () => ({ cancel: otherSenderCancel, settled: Promise.resolve() }),
     )
     registry.register(
-      { kind: 'export', jobId: 'other-token', senderId: 1, workspaceToken: TOKEN_B },
+      {
+        kind: 'export',
+        jobId: 'other-token',
+        senderId: 1,
+        workspaceToken: TOKEN_B,
+        revision: 1,
+      },
       () => ({ cancel: otherTokenCancel, settled: Promise.resolve() }),
     )
 

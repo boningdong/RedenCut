@@ -268,6 +268,7 @@ describe('IPC job admission', () => {
       jobId: 'shared-job-id',
       senderId: event.sender.id,
       workspaceToken: TOKEN_A,
+      revision: 1,
     })
     await Promise.resolve()
     expect(mocks.importInstances[0].cancel).toHaveBeenCalledWith('shared-job-id')
@@ -404,6 +405,94 @@ describe('IPC job admission', () => {
         },
       ),
     ).resolves.toMatchObject({ ok: true, value: 'not-found' })
+  })
+
+  it('cancels an admitted import by its starting revision after current revision advances', async () => {
+    const controller = controllerStub()
+    const jobs = new SessionJobRegistry()
+    registerAudioIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
+    mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+    const event = { sender: sender() }
+    const selection = (await mocks.handlers.get('audio:select-import-file')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })) as { value: { token: string } }
+    const pending = deferred<{ project: ProjectFile }>()
+    mocks.nextImportResult = pending.promise
+    mocks.importInstances[0].cancel.mockReturnValue('cancelled')
+    const importing = mocks.handlers.get('audio:start-import')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      jobId: 'job-1',
+      selectionToken: selection.value.token,
+      mode: 'copy',
+      draft: emptyDraft(),
+    })
+    await vi.waitFor(() => expect(mocks.importInstances[0].import).toHaveBeenCalled())
+    controller.assertCurrent.mockImplementation((expected: unknown) => {
+      if ((expected as { revision: number }).revision !== 2)
+        throw new Error('Stale workspace revision')
+    })
+
+    const cancelling = mocks.handlers.get('audio:cancel-import')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      jobId: 'job-1',
+    })
+    await vi.waitFor(() => expect(mocks.importInstances[0].cancel).toHaveBeenCalledTimes(1))
+    pending.reject(new DOMException('cancelled', 'AbortError'))
+
+    await expect(cancelling).resolves.toEqual({ ok: true, value: 'cancelled' })
+    await importing
+  })
+
+  it('does not cancel an admitted import through a different revision', async () => {
+    const controller = controllerStub()
+    const jobs = new SessionJobRegistry()
+    registerAudioIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
+    mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+    const event = { sender: sender() }
+    const selection = (await mocks.handlers.get('audio:select-import-file')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })) as { value: { token: string } }
+    const pending = deferred<{ project: ProjectFile }>()
+    mocks.nextImportResult = pending.promise
+    mocks.importInstances[0].cancel.mockReturnValue('cancelled')
+    const importing = mocks.handlers.get('audio:start-import')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+      jobId: 'job-1',
+      selectionToken: selection.value.token,
+      mode: 'copy',
+      draft: emptyDraft(),
+    })
+    await vi.waitFor(() => expect(mocks.importInstances[0].import).toHaveBeenCalled())
+
+    const wrongRevision = mocks.handlers.get('audio:cancel-import')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 2,
+      jobId: 'job-1',
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    const incorrectlyCancelled = mocks.importInstances[0].cancel.mock.calls.length > 0
+    if (incorrectlyCancelled) pending.reject(new DOMException('cancelled', 'AbortError'))
+    const result = await wrongRevision
+
+    expect(mocks.importInstances[0].cancel).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: true, value: 'not-found' })
+    if (!incorrectlyCancelled) {
+      const cleanupCancellation = mocks.handlers.get('audio:cancel-import')!(event, {
+        workspaceToken: TOKEN_A,
+        revision: 1,
+        jobId: 'job-1',
+      })
+      await vi.waitFor(() => expect(mocks.importInstances[0].cancel).toHaveBeenCalledTimes(1))
+      pending.reject(new DOMException('cancelled', 'AbortError'))
+      await cleanupCancellation
+    }
+    await importing
   })
 
   it('drops progress after the request envelope becomes stale', async () => {

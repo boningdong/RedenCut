@@ -48,15 +48,23 @@ function deferred<T>() {
 }
 
 function sender(id = 1) {
-  const destroyed: Array<() => void> = []
+  const destroyed = new Set<() => void>()
   return {
     id,
     isDestroyed: vi.fn(() => false),
     send: vi.fn(),
     once: vi.fn((event: string, listener: () => void) => {
-      if (event === 'destroyed') destroyed.push(listener)
+      if (event === 'destroyed') destroyed.add(listener)
     }),
-    destroy: () => destroyed.forEach((listener) => listener()),
+    removeListener: vi.fn((event: string, listener: () => void) => {
+      if (event === 'destroyed') destroyed.delete(listener)
+    }),
+    destroy: () => {
+      const listeners = [...destroyed]
+      destroyed.clear()
+      listeners.forEach((listener) => listener())
+    },
+    destroyedListenerCount: () => destroyed.size,
   }
 }
 
@@ -67,7 +75,7 @@ function controllerStub() {
     setCurrent(value: boolean) {
       current = value
     },
-    assertCurrent: vi.fn(() => {
+    assertCurrent: vi.fn((_expected?: unknown) => {
       if (!current) throw new Error('Stale workspace token')
     }),
     captureOriginalResolver: vi.fn(() => resolveOriginal),
@@ -156,6 +164,60 @@ describe('transcript IPC', () => {
       mocks.handlers.get('transcript:cancel')!(event, request('job-a')),
     ).resolves.toEqual({ ok: true, value: 'not-found' })
   })
+
+  it('authorizes cancellation by the admitted starting revision after current revision advances', async () => {
+    const controller = controllerStub()
+    let signal!: AbortSignal
+    mocks.transcribe.mockImplementation(async (_path, _options, admittedSignal: AbortSignal) => {
+      signal = admittedSignal
+      return new Promise<Transcript>((_resolve, reject) => {
+        admittedSignal.addEventListener(
+          'abort',
+          () => reject(new DOMException('cancelled', 'AbortError')),
+          { once: true },
+        )
+      })
+    })
+    const jobs = new SessionJobRegistry()
+    registerTranscriptIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
+    const event = { sender: sender() }
+    const generating = mocks.handlers.get('transcript:generate')!(event, request('job-a'))
+    await vi.waitFor(() => expect(mocks.transcribe).toHaveBeenCalledTimes(1))
+    controller.assertCurrent.mockImplementation((expected: unknown) => {
+      if ((expected as { revision: number }).revision !== 4)
+        throw new Error('Stale workspace revision')
+    })
+
+    await expect(
+      mocks.handlers.get('transcript:cancel')!(event, { ...request('job-a'), revision: 4 }),
+    ).resolves.toEqual({ ok: true, value: 'not-found' })
+    expect(signal.aborted).toBe(false)
+    await expect(
+      mocks.handlers.get('transcript:cancel')!(event, request('job-a')),
+    ).resolves.toEqual({ ok: true, value: 'cancelled' })
+    expect(signal.aborted).toBe(true)
+    await generating
+  })
+
+  it.each(['success', 'failure'] as const)(
+    'removes the per-job destroyed listener after %s settlement',
+    async (outcome) => {
+      const controller = controllerStub()
+      if (outcome === 'success') mocks.transcribe.mockResolvedValue(transcript('done'))
+      else mocks.transcribe.mockRejectedValue(new Error('failed'))
+      registerTranscriptIpc(
+        controller as unknown as WorkspaceController,
+        new SessionJobRegistry(),
+        vi.fn(),
+      )
+      const ownedSender = sender()
+
+      await mocks.handlers.get('transcript:generate')!({ sender: ownedSender }, request('job-a'))
+
+      expect(ownedSender.destroyedListenerCount()).toBe(0)
+      expect(ownedSender.removeListener).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('sender destruction and session closing abort their exact admitted operation', async () => {
     const controller = controllerStub()

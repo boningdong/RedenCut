@@ -7,6 +7,7 @@ export interface SessionJobIdentity {
   jobId: string
   senderId: number
   workspaceToken: WorkspaceToken
+  revision: number
 }
 
 export interface SessionJobExecution {
@@ -105,7 +106,13 @@ export class SessionJobRegistry {
 }
 
 function jobKey(identity: SessionJobIdentity): string {
-  return JSON.stringify([identity.kind, identity.jobId, identity.senderId, identity.workspaceToken])
+  return JSON.stringify([
+    identity.kind,
+    identity.jobId,
+    identity.senderId,
+    identity.workspaceToken,
+    identity.revision,
+  ])
 }
 
 function isAbortError(reason: unknown): boolean {
