@@ -13,16 +13,28 @@ interface TrackQueue {
   node: AudioWorkletNode
   gain: GainNode
   generation: number
+  sentFrames: number
+  acknowledgedFrames: number
   queuedFrames: number
+  plannedFrames: number
   plan: PlaybackSegment[]
   segmentIndex: number
   segmentOffset: number
   controller: AbortController
   filling: boolean
+  prefillWaiter: PrefillWaiter | null
+}
+
+interface PrefillWaiter {
+  generation: number
+  resolve: () => void
+  reject: (error: Error) => void
 }
 
 export class WorkletAudioPlayer implements IAudioPlayer {
   private context: AudioContext | null = null
+  private contextInitialization: Promise<void> | null = null
+  private contextLifecycle = 0
   private providers = new Map<AudioSourceId, AudioSampleProvider>()
   private tracks: Track[] = []
   private queues = new Map<string, TrackQueue>()
@@ -80,15 +92,21 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     if (this.playing) return
     this.playing = true
     this.stateCallbacks.forEach((callback) => callback(true))
+    const lifecycleToken = this.rebuildToken
     try {
       await this.ensureContext()
+      if (lifecycleToken !== this.rebuildToken || !this.playing) return
       if (this.queues.size === 0) {
         await this.rebuildQueues(this.currentTime)
         return
       }
+      const rebuildToken = this.rebuildToken
       await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
-      if (!this.playing) return
+      if (rebuildToken !== this.rebuildToken || !this.playing) return
+      await Promise.all([...this.queues.values()].map((queue) => this.waitForPrefill(queue)))
+      if (rebuildToken !== this.rebuildToken || !this.playing) return
       if (this.context!.state === 'suspended') await this.context!.resume()
+      if (rebuildToken !== this.rebuildToken || !this.playing) return
       this.startedAt = null
       this.positionAtStart = this.currentTime
       for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
@@ -107,7 +125,10 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     if (!this.playing) return
     this.updateTime()
     this.playing = false
-    for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'pause' })
+    for (const queue of this.queues.values()) {
+      this.cancelPrefill(queue)
+      queue.node.port.postMessage({ type: 'pause' })
+    }
     this.stopClock()
     this.stateCallbacks.forEach((callback) => callback(false))
   }
@@ -164,8 +185,10 @@ export class WorkletAudioPlayer implements IAudioPlayer {
 
   destroy(): void {
     this.rebuildToken++
+    this.contextLifecycle++
     this.pause()
     for (const queue of this.queues.values()) {
+      this.cancelPrefill(queue)
       queue.generation++
       queue.controller.abort()
       queue.node.disconnect()
@@ -179,20 +202,33 @@ export class WorkletAudioPlayer implements IAudioPlayer {
 
   private async ensureContext(): Promise<void> {
     if (this.context) return
-    this.context = new AudioContext({ sampleRate: SAMPLE_RATE })
-    if (this.context.sampleRate !== SAMPLE_RATE) {
-      await this.context.close()
-      this.context = null
+    let initialization = this.contextInitialization
+    if (!initialization) {
+      const context = new AudioContext({ sampleRate: SAMPLE_RATE })
+      initialization = this.initializeContext(context, this.contextLifecycle)
+      this.contextInitialization = initialization
+    }
+    try {
+      await initialization
+    } finally {
+      if (this.contextInitialization === initialization) this.contextInitialization = null
+    }
+  }
+
+  private async initializeContext(context: AudioContext, lifecycle: number): Promise<void> {
+    if (context.sampleRate !== SAMPLE_RATE) {
+      await context.close()
       throw new Error('Audio device could not create the required 48000 Hz context')
     }
     const blobUrl = URL.createObjectURL(
       new Blob([WORKLET_CODE], { type: 'application/javascript' }),
     )
     try {
-      await this.context.audioWorklet.addModule(blobUrl)
+      await context.audioWorklet.addModule(blobUrl)
+      if (lifecycle !== this.contextLifecycle) throw createAbortError()
+      this.context = context
     } catch (error) {
-      await this.context.close()
-      this.context = null
+      await context.close()
       throw error
     } finally {
       URL.revokeObjectURL(blobUrl)
@@ -204,6 +240,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     await this.ensureContext()
     if (rebuildToken !== this.rebuildToken) return
     for (const queue of this.queues.values()) {
+      this.cancelPrefill(queue)
       queue.generation++
       queue.controller.abort()
       queue.node.disconnect()
@@ -229,22 +266,29 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       gain.gain.value = track.volume
       node.connect(gain)
       gain.connect(this.context!.destination)
+      const plan = buildTrackPlaybackPlan(track, fromTime, this.duration, SAMPLE_RATE, anySolo)
       const queue: TrackQueue = {
         node,
         gain,
         generation: ++this.queueGeneration,
+        sentFrames: 0,
+        acknowledgedFrames: 0,
         queuedFrames: 0,
-        plan: buildTrackPlaybackPlan(track, fromTime, this.duration, SAMPLE_RATE, anySolo),
+        plannedFrames: plan.reduce((total, segment) => total + segment.frameCount, 0),
+        plan,
         segmentIndex: 0,
         segmentOffset: 0,
         controller: new AbortController(),
         filling: false,
+        prefillWaiter: null,
       }
       node.port.onmessage = ({ data }) => this.onQueueMessage(queue, data)
       node.port.postMessage({ type: 'flush', generation: queue.generation })
       this.queues.set(track.id, queue)
     }
     await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
+    if (rebuildToken !== this.rebuildToken || !this.playing) return
+    await Promise.all([...this.queues.values()].map((queue) => this.waitForPrefill(queue)))
     if (rebuildToken === this.rebuildToken && this.playing) {
       if (this.context!.state === 'suspended') await this.context!.resume()
       if (rebuildToken !== this.rebuildToken || !this.playing) return
@@ -261,6 +305,16 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       this.startedAt = this.context.currentTime
     } else if (data.type === 'depth' || data.type === 'need-data') {
       queue.queuedFrames = Number(data.queuedFrames)
+      if (data.type === 'depth') {
+        const acceptedFrames = Number(data.acceptedFrames)
+        if (Number.isFinite(acceptedFrames)) {
+          queue.acknowledgedFrames = Math.min(
+            queue.sentFrames,
+            Math.max(queue.acknowledgedFrames, acceptedFrames),
+          )
+        }
+        this.resolvePrefill(queue)
+      }
       this.diagnostics.maximumQueuedFrames = Math.max(
         this.diagnostics.maximumQueuedFrames,
         queue.queuedFrames,
@@ -278,14 +332,17 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     queue.filling = true
     const generation = queue.generation
     try {
-      while (queue.queuedFrames < TARGET_FRAMES && queue.segmentIndex < queue.plan.length) {
+      while (
+        queue.queuedFrames + this.inFlightFrames(queue) < TARGET_FRAMES &&
+        queue.segmentIndex < queue.plan.length
+      ) {
         const segment = queue.plan[queue.segmentIndex]
         const remaining = segment.frameCount - queue.segmentOffset
         const count = Math.min(
           READ_FRAMES,
           remaining,
-          TARGET_FRAMES - queue.queuedFrames,
-          MAX_FRAMES - queue.queuedFrames,
+          TARGET_FRAMES - queue.queuedFrames - this.inFlightFrames(queue),
+          MAX_FRAMES - queue.queuedFrames - this.inFlightFrames(queue),
         )
         if (count <= 0) break
         let channels: Float32Array[]
@@ -324,7 +381,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
           this.diagnostics.maximumReadFrames = Math.max(this.diagnostics.maximumReadFrames, count)
         }
         sendPcmChunk(queue.node.port, { type: 'pcm', generation, channels, gain })
-        queue.queuedFrames += count
+        queue.sentFrames += count
         queue.segmentOffset += count
         if (queue.segmentOffset === segment.frameCount) {
           queue.segmentIndex++
@@ -348,8 +405,12 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   private suspendForRebuild(): void {
+    this.rebuildToken++
     if (this.playing) this.updateTime()
-    for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'pause' })
+    for (const queue of this.queues.values()) {
+      this.cancelPrefill(queue)
+      queue.node.port.postMessage({ type: 'pause' })
+    }
     this.positionAtStart = this.currentTime
     this.startedAt = null
     this.stopClock()
@@ -382,12 +443,47 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     const resolved = error instanceof Error ? error : new Error(String(error))
     this.errorCallbacks.forEach((callback) => callback(resolved))
   }
+
+  private inFlightFrames(queue: TrackQueue): number {
+    return queue.sentFrames - queue.acknowledgedFrames
+  }
+
+  private waitForPrefill(queue: TrackQueue): Promise<void> {
+    if (this.isPrefilled(queue)) return Promise.resolve()
+    return new Promise<void>((resolve, reject) => {
+      queue.prefillWaiter = { generation: queue.generation, resolve, reject }
+    })
+  }
+
+  private resolvePrefill(queue: TrackQueue): void {
+    const waiter = queue.prefillWaiter
+    if (!waiter || waiter.generation !== queue.generation || !this.isPrefilled(queue)) return
+    queue.prefillWaiter = null
+    waiter.resolve()
+  }
+
+  private cancelPrefill(queue: TrackQueue): void {
+    const waiter = queue.prefillWaiter
+    if (!waiter) return
+    queue.prefillWaiter = null
+    waiter.reject(createAbortError())
+  }
+
+  private isPrefilled(queue: TrackQueue): boolean {
+    return queue.queuedFrames >= Math.min(TARGET_FRAMES, queue.plannedFrames)
+  }
 }
 
 function isAbortError(error: unknown): boolean {
   return (
     typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
   )
+}
+
+function createAbortError(): Error {
+  const error = new Error('AudioWorklet prefill was cancelled')
+  error.name = 'AbortError'
+  return error
 }
 
 function hasSamePlaybackStructure(previous: Track[], next: Track[]): boolean {

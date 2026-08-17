@@ -55,6 +55,7 @@ describe('PodCut AudioWorklet queue', () => {
       type: 'depth',
       generation: 2,
       queuedFrames: 4,
+      acceptedFrames: 4,
     })
     expect(processor.port.messages).toContainEqual({ type: 'started', generation: 2 })
   })

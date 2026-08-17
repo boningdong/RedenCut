@@ -18,6 +18,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
     super()
     this.queue = []
     this.queuedFrames = 0
+    this.acceptedFrames = 0
     this.generation = 0
     this.playing = false
     this.started = false
@@ -36,11 +37,18 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
         }
         this.queue.push({ channels: data.channels, gain: data.gain, offset: 0 })
         this.queuedFrames += frames
+        this.acceptedFrames += frames
         this.requestOutstanding = false
-        this.port.postMessage({ type: 'depth', generation: this.generation, queuedFrames: this.queuedFrames })
+        this.port.postMessage({
+          type: 'depth',
+          generation: this.generation,
+          queuedFrames: this.queuedFrames,
+          acceptedFrames: this.acceptedFrames,
+        })
       } else if (data.type === 'flush') {
         this.queue = []
         this.queuedFrames = 0
+        this.acceptedFrames = 0
         this.generation = data.generation
         this.started = false
         this.ended = false
