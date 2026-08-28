@@ -70,14 +70,23 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 
 ## Phase 5 — Editing Intelligence ⏳
 
+The program-level design for transcript alignment, anonymous speaker attribution, disfluency detection, and future speech generation is documented in [`docs/superpowers/specs/2026-08-27-speech-intelligence-program-design.md`](docs/superpowers/specs/2026-08-27-speech-intelligence-program-design.md).
+
+### Verbatim Speech Analysis
+
+- Add a replaceable speech-analysis pipeline that composes verbatim transcription, forced alignment, anonymous speaker diarization, and speaker attribution.
+- Keep every analysis artifact tied to stable audio-source identity and source-relative time.
+- Preserve user edits and publish complete analysis results atomically.
+
 ### Filler Detection
 
-- Detect configurable filler phrases from transcript words as reviewable suggestions.
+- Run hybrid disfluency detection only when requested and return independent source-time intervals without replacing the canonical transcript.
+- Combine intended-versus-verbatim differences with configurable rule and algorithm detectors while retaining per-detector evidence.
 - Let users accept, reject, or selectively apply suggestions before creating edits.
 
 ### Speaker Workflow
 
-- Add speaker diarization behind the transcription abstraction.
+- Distinguish anonymous local speakers without attempting real-world voice identification.
 - Support persistent, editable speaker labels and transcript badges.
 
 ### Transition Review
@@ -92,6 +101,13 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 - Isolate plugin project data and storage from core application state.
 - Add controlled contribution points for commands, panels, transcription engines, edit detectors, and export processing.
 - Build a first-party plugin to validate that the public contract is sufficient without privileged internal access.
+
+## Phase 7 — Assisted Speech Generation ⏳
+
+- Let an authorized user generate speech in a selected speaker's voice through a replaceable synthesis engine.
+- Insert generated speech at a text position or replace a selected source interval using normal managed audio sources and clips.
+- Match duration, loudness, room character, and edit boundaries before publishing a reversible timeline edit.
+- Keep restricted model adapters outside the distributable core when their licenses require separate installation or authorization.
 
 ## Known Issue
 
