@@ -298,6 +298,14 @@ Replaceable first-party interfaces are not automatically public plugin contracts
 
 The future plugin-system project may expose selected speech-engine capabilities after the built-in adapters demonstrate that the contracts are sufficient and the security boundary is understood.
 
+### Model runtime and configuration
+
+The first macOS release uses an independently installed local model worker. Electron does not embed Python or model runtimes, and PodCut detects the worker and provides actionable installation guidance when it is unavailable.
+
+The first release uses the configured default engine and model for each pipeline and does not include a model-selection interface.
+
+A future settings experience may let users select and configure the engine and model used by transcription, alignment, diarization, disfluency detection, and speech generation independently. Persisted configuration must identify pipeline capabilities rather than expose model-specific assumptions to the rest of the application.
+
 ## Delivery sequence
 
 ```text
