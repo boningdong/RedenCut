@@ -122,6 +122,10 @@ Cache reuse is exact by default. A later subproject may define compatible reuse 
 
 Create one reliable product operation that produces a time-accurate, speaker-aware verbatim transcript.
 
+### Detailed design
+
+The current review candidate is [Verbatim Speech Analysis Pipeline Design](./2026-08-30-verbatim-speech-analysis-pipeline-design.md).
+
 ### Logical flow
 
 ```text
