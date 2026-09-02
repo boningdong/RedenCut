@@ -8,8 +8,9 @@ It targets macOS first and Windows later, with future extensibility tracked in t
 ## Documentation Policy
 
 This file is the entry point for repository instructions.
-The `dev-docs/` directory contains only durable project rules and standards that extend this file; do not place plans, progress logs, audits, verification reports, historical proposals, or superseded designs there.
-For every change, review this file and its linked `dev-docs/` standards for affected guidance, and update or remove anything that has become inaccurate or obsolete as part of the same change.
+The durable project rules and standards that extend this file live at the root of `docs/`; plans and historical design records live under `docs/superpowers/`.
+Do not place progress logs, audits, verification reports, historical proposals, or superseded designs alongside the active standards.
+For every change, review this file and its linked `docs/` standards for affected guidance, and update or remove anything that has become inaccurate or obsolete as part of the same change.
 
 ## Repository References
 
@@ -18,9 +19,9 @@ Use the repository's authoritative files instead of duplicating their contents h
 | Topic | Authoritative source |
 | --- | --- |
 | Commands and verification | [`package.json`](package.json) |
-| Coding and review standards | [`dev-docs/coding-standards.md`](dev-docs/coding-standards.md) |
-| Architecture standards | [`dev-docs/architecture-standards.md`](dev-docs/architecture-standards.md) |
-| Keyboard interaction contract | [`dev-docs/key-mappings.md`](dev-docs/key-mappings.md) |
+| Coding and review standards | [`docs/coding-standards.md`](docs/coding-standards.md) |
+| Architecture standards | [`docs/architecture-standards.md`](docs/architecture-standards.md) |
+| Keyboard interaction contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
 | Product direction | [`ROADMAP.md`](ROADMAP.md) |
 | Shared project model and schemas | [`src/shared/project.types.ts`](src/shared/project.types.ts) |
 | IPC contract | [`src/shared/ipc.types.ts`](src/shared/ipc.types.ts) |

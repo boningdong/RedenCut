@@ -120,9 +120,9 @@ The program-level design for transcript alignment, anonymous speaker attribution
 | Topic | Source |
 | --- | --- |
 | Repository instructions | [`AGENTS.md`](AGENTS.md) |
-| Architecture rules | [`dev-docs/architecture-standards.md`](dev-docs/architecture-standards.md) |
-| Coding and verification rules | [`dev-docs/coding-standards.md`](dev-docs/coding-standards.md) |
-| Keyboard interaction contract | [`dev-docs/key-mappings.md`](dev-docs/key-mappings.md) |
+| Architecture rules | [`docs/architecture-standards.md`](docs/architecture-standards.md) |
+| Coding and verification rules | [`docs/coding-standards.md`](docs/coding-standards.md) |
+| Keyboard interaction contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
 | Persisted project model | [`src/shared/project.types.ts`](src/shared/project.types.ts) |
 | IPC contract | [`src/shared/ipc.types.ts`](src/shared/ipc.types.ts) |
 | Playback contract | [`src/shared/player.types.ts`](src/shared/player.types.ts) |

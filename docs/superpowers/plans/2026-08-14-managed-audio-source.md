@@ -185,7 +185,7 @@
 
 - [ ] Remove the legacy implementations only after all replacement tests pass.
 - [ ] Replace obsolete architecture rules and performance instrumentation with managed-cache/player metrics.
-- [ ] Run `rg "WebCodecsPlayer|FrameIndex|EncodedAudioChunk|sourceFileId|SourceFile|generatePeaks|peaks\\.json" src dev-docs ROADMAP.md` and resolve every result.
+- [ ] Run `rg "WebCodecsPlayer|FrameIndex|EncodedAudioChunk|sourceFileId|SourceFile|generatePeaks|peaks\\.json" src docs ROADMAP.md` and resolve every result.
 - [ ] Run `npm run format`, `npm run check`, `npm run profile:waveform`, and `git diff --check`.
 - [ ] Manually exercise copy/reference import, late MP3 playback and seeking, cancellation, package reopen, Save/Save As, shared-source concurrent tracks, transcription, export, and waveform pan/zoom; record anything not verifiable in the environment.
 - [ ] Commit with `refactor: retire compressed audio playback`.

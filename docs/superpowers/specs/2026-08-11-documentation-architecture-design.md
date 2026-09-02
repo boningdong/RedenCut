@@ -2,7 +2,7 @@
 
 ## Goal
 
-Keep the repository documentation small, current, and clearly authoritative. `AGENTS.md` defines the repository-wide working contract, while `dev-docs/` contains focused extensions of that contract.
+Keep the repository documentation small, current, and clearly authoritative. `AGENTS.md` defines the repository-wide working contract, while the root of `docs/` contains focused extensions of that contract and `docs/superpowers/` contains dated implementation records.
 
 ## Documentation Roles
 
@@ -13,15 +13,15 @@ Keep the repository documentation small, current, and clearly authoritative. `AG
 - a concise description of the project and its supported platforms;
 - links to authoritative repository contracts and standards;
 - the working agreement for making and verifying changes; and
-- the policy governing what belongs in `dev-docs/`.
+- the policy governing the structure of `docs/`.
 
 When a linked file defines a rule or contract, `AGENTS.md` links to it instead of repeating it.
 
-### `dev-docs/`
+### `docs/`
 
-`dev-docs/` contains only durable project rules and standards that extend `AGENTS.md`. It must not contain plans, progress logs, audits, verification reports, historical proposals, or superseded design documents.
+The root of `docs/` contains only durable project rules and standards that extend `AGENTS.md`. Plans and dated design records live under `docs/superpowers/`; progress logs, audits, verification reports, historical proposals, and superseded designs do not belong alongside the active standards.
 
-Every repository change must check `AGENTS.md` and the linked `dev-docs/` files for guidance affected by that change. Obsolete or inaccurate guidance must be updated or removed as part of the same change.
+Every repository change must check `AGENTS.md` and the linked `docs/` files for guidance affected by that change. Obsolete or inaccurate guidance must be updated or removed as part of the same change.
 
 The active files will be:
 
@@ -57,11 +57,11 @@ The cleanup preserves these durable requirements from the older documents:
 Delete these obsolete or misplaced documents:
 
 - `DEVLOG.md`
-- `dev-docs/project-proposal.md`
-- `dev-docs/project-proposal-simplified.md`
-- `dev-docs/technical-roadmap.md`
-- `dev-docs/technical-roadmap-addendum.md`
-- `dev-docs/readability-cleanup-audit.md`
+- `docs/project-proposal.md`
+- `docs/project-proposal-simplified.md`
+- `docs/technical-roadmap.md`
+- `docs/technical-roadmap-addendum.md`
+- `docs/readability-cleanup-audit.md`
 
 Do not carry forward outdated AssemblyAI recommendations, CLI-first architecture, obsolete directory layouts, WaveSurfer playback guidance, speculative Radix/cmdk or plugin APIs, development estimates, stale test counts, or resolved bug notes.
 
@@ -70,7 +70,7 @@ Do not carry forward outdated AssemblyAI recommendations, CLI-first architecture
 The documentation cleanup will verify:
 
 - every link in `AGENTS.md` resolves;
-- `dev-docs/` contains only the three active standards files;
+- the root of `docs/` contains only the three active standards files;
 - deleted filenames and `CLAUDE.md` are not referenced by current authoritative documentation;
 - shortcut documentation matches `useKeyboardShortcuts.ts`;
 - architecture standards match current contracts and reachable implementations; and

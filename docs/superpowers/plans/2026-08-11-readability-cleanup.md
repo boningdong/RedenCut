@@ -186,7 +186,7 @@ git commit -m "test: restore green refactor baseline"
 - Create: `.prettierignore`
 - Create: `eslint.config.mjs`
 - Create: `knip.jsonc`
-- Create: `dev-docs/coding-standards.md`
+- Create: `docs/coding-standards.md`
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
@@ -409,7 +409,7 @@ Add these scripts to `package.json` while preserving the existing commands:
 
 - [ ] **Step 6: Document the repository coding standard**
 
-Create `dev-docs/coding-standards.md` with these sections and approved rules:
+Create `docs/coding-standards.md` with these sections and approved rules:
 
 ```markdown
 # PodCut Coding Standards
@@ -474,7 +474,7 @@ Expected:
 - [ ] **Step 8: Commit the tooling and standards**
 
 ```bash
-git add .prettierrc.json .prettierignore eslint.config.mjs knip.jsonc dev-docs/coding-standards.md package.json package-lock.json
+git add .prettierrc.json .prettierignore eslint.config.mjs knip.jsonc docs/coding-standards.md package.json package-lock.json
 git commit -m "chore: add repository quality checks"
 ```
 
@@ -710,7 +710,7 @@ git commit -m "test: colocate renderer unit tests"
 
 **Files:**
 
-- Create: `dev-docs/readability-cleanup-audit.md`
+- Create: `docs/readability-cleanup-audit.md`
 - Modify: files named by confirmed Knip findings.
 - Modify: `src/shared/constants.ts`
 - Modify: `src/shared/project.types.ts`
@@ -739,7 +739,7 @@ npx knip --files
 npx knip --dependencies
 ```
 
-Create `dev-docs/readability-cleanup-audit.md` with one row per finding using these columns:
+Create `docs/readability-cleanup-audit.md` with one row per finding using these columns:
 
 ```markdown
 | Candidate | Finding type | Reference evidence | Dynamic-entry check | Decision |
@@ -862,8 +862,8 @@ git commit -m "refactor: remove confirmed unused code"
 
 **Files:**
 
-- Modify: `dev-docs/coding-standards.md` only if command names or narrow exceptions changed during implementation.
-- Modify: `dev-docs/readability-cleanup-audit.md` with final verification results.
+- Modify: `docs/coding-standards.md` only if command names or narrow exceptions changed during implementation.
+- Modify: `docs/readability-cleanup-audit.md` with final verification results.
 
 **Interfaces:**
 
@@ -909,7 +909,7 @@ Do not claim an item passed if the required media, legacy fixture, Whisper binar
 
 - [ ] **Step 4: Record final evidence**
 
-Append a `## Final Verification` section to `dev-docs/readability-cleanup-audit.md` containing:
+Append a `## Final Verification` section to `docs/readability-cleanup-audit.md` containing:
 
 - The commit tested.
 - Exit status for each command in `npm run check`.
@@ -919,7 +919,7 @@ Append a `## Final Verification` section to `dev-docs/readability-cleanup-audit.
 - [ ] **Step 5: Commit final documentation if it changed**
 
 ```bash
-git add dev-docs/coding-standards.md dev-docs/readability-cleanup-audit.md
+git add docs/coding-standards.md docs/readability-cleanup-audit.md
 git commit -m "docs: record readability cleanup verification"
 ```
 
