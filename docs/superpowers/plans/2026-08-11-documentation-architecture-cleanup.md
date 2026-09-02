@@ -4,7 +4,7 @@
 
 **Goal:** Replace stale and misplaced repository documentation with a concise, authoritative instruction system and an implementation-accurate product roadmap.
 
-**Architecture:** `AGENTS.md` remains the instruction entry point and links to focused standards in `dev-docs/` without repeating them. `dev-docs/` contains only durable coding, architecture, and keyboard-interaction rules; `ROADMAP.md` contains product status and future work; dated Superpowers specifications and plans remain non-authoritative implementation records.
+**Architecture:** `AGENTS.md` remains the instruction entry point and links to focused standards at the root of `docs/` without repeating them. `docs/superpowers/` contains dated, non-authoritative implementation records; `ROADMAP.md` contains product status and future work.
 
 **Tech Stack:** Markdown, Electron, React, TypeScript, Zustand, Zod, Web Audio, WebCodecs, whisper.cpp, npm verification scripts.
 
@@ -14,8 +14,8 @@
 - Keep every prose sentence on one Markdown source line.
 - Link authoritative files instead of duplicating their contents.
 - Delete obsolete documentation rather than archiving it.
-- `dev-docs/` contains only durable project rules and standards that extend `AGENTS.md`.
-- Every change must review `AGENTS.md` and its linked `dev-docs/` files and update or remove obsolete guidance affected by that change.
+- The root of `docs/` contains only durable project rules and standards that extend `AGENTS.md`; dated records remain under `docs/superpowers/`.
+- Every change must review `AGENTS.md` and its linked `docs/` files and update or remove obsolete guidance affected by that change.
 - Do not present dated plans, specifications, audits, or verification results as current repository standards.
 
 ---
@@ -24,9 +24,9 @@
 
 **Files:**
 - Modify: `AGENTS.md`
-- Create: `dev-docs/architecture-standards.md`
-- Create: `dev-docs/key-mappings.md`
-- Verify: `dev-docs/coding-standards.md`
+- Create: `docs/architecture-standards.md`
+- Create: `docs/key-mappings.md`
+- Verify: `docs/coding-standards.md`
 
 **Interfaces:**
 - Consumes: Current contracts in `src/shared/project.types.ts`, `src/shared/ipc.types.ts`, `src/shared/player.types.ts`, and `src/shared/transcriber.types.ts`; current shortcut behavior in `src/renderer/src/hooks/useKeyboardShortcuts.ts`.
@@ -34,11 +34,11 @@
 
 - [x] **Step 1: Add the documentation policy and project scope to `AGENTS.md`**
 
-Add a concise project scope, link rows for `dev-docs/architecture-standards.md` and `dev-docs/key-mappings.md`, and the rule that `dev-docs/` contains only durable extensions of `AGENTS.md`.
+Add a concise project scope, link rows for `docs/architecture-standards.md` and `docs/key-mappings.md`, and the rule that the root of `docs/` contains only durable extensions of `AGENTS.md`.
 
 Add the maintenance requirement that every change checks affected instructions for drift and updates or removes obsolete guidance in the same change.
 
-- [x] **Step 2: Create `dev-docs/architecture-standards.md`**
+- [x] **Step 2: Create `docs/architecture-standards.md`**
 
 Document only current, enforceable invariants:
 
@@ -53,7 +53,7 @@ Document only current, enforceable invariants:
 
 Use links to source contracts and implementation files instead of copying interfaces or code.
 
-- [x] **Step 3: Create `dev-docs/key-mappings.md`**
+- [x] **Step 3: Create `docs/key-mappings.md`**
 
 Document the mappings implemented by `useKeyboardShortcuts.ts`, including:
 
@@ -68,44 +68,44 @@ Document the mappings implemented by `useKeyboardShortcuts.ts`, including:
 Run:
 
 ```bash
-for doc_path in dev-docs/coding-standards.md dev-docs/architecture-standards.md dev-docs/key-mappings.md ROADMAP.md src/shared/project.types.ts src/shared/ipc.types.ts src/shared/player.types.ts src/shared/transcriber.types.ts src/shared/constants.ts; do test -e "$doc_path"; done
+for doc_path in docs/coding-standards.md docs/architecture-standards.md docs/key-mappings.md ROADMAP.md src/shared/project.types.ts src/shared/ipc.types.ts src/shared/player.types.ts src/shared/transcriber.types.ts src/shared/constants.ts; do test -e "$doc_path"; done
 rg -n "case 'Space'|case 'KeyS'|case 'KeyM'|case 'KeyU'|case 'Delete'|case 'Backspace'|case 'Escape'|case 'ArrowLeft'|case 'ArrowRight'|KeyZ|KeyS" src/renderer/src/hooks/useKeyboardShortcuts.ts
 ```
 
-Expected: every linked path exists, and every implemented keyboard branch has a corresponding entry in `dev-docs/key-mappings.md`.
+Expected: every linked path exists, and every implemented keyboard branch has a corresponding entry in `docs/key-mappings.md`.
 
 ### Task 2: Remove Obsolete and Misplaced Documentation
 
 **Files:**
 - Delete: `DEVLOG.md`
-- Delete: `dev-docs/project-proposal.md`
-- Delete: `dev-docs/project-proposal-simplified.md`
-- Delete: `dev-docs/technical-roadmap.md`
-- Delete: `dev-docs/technical-roadmap-addendum.md`
-- Delete: `dev-docs/readability-cleanup-audit.md`
+- Delete: `docs/project-proposal.md`
+- Delete: `docs/project-proposal-simplified.md`
+- Delete: `docs/technical-roadmap.md`
+- Delete: `docs/technical-roadmap-addendum.md`
+- Delete: `docs/readability-cleanup-audit.md`
 
 **Interfaces:**
 - Consumes: The durable requirements extracted into Task 1 and current product direction retained in `ROADMAP.md`.
-- Produces: A `dev-docs/` directory containing only the three approved standards files.
+- Produces: A `docs/` root containing only the three approved standards files, with dated plans and specifications under `docs/superpowers/`.
 
 - [x] **Step 1: Delete the six obsolete or misplaced documents**
 
 Use `apply_patch` to delete the exact files listed above after Task 1 has preserved the approved durable rules.
 
-- [x] **Step 2: Verify the `dev-docs/` boundary**
+- [x] **Step 2: Verify the `docs/` boundary**
 
 Run:
 
 ```bash
-find dev-docs -maxdepth 1 -type f -name '*.md' -print | sort
+find docs -maxdepth 1 -type f -name '*.md' -print | sort
 ```
 
 Expected output contains only:
 
 ```text
-dev-docs/architecture-standards.md
-dev-docs/coding-standards.md
-dev-docs/key-mappings.md
+docs/architecture-standards.md
+docs/coding-standards.md
+docs/key-mappings.md
 ```
 
 ### Task 3: Reconcile the Product Roadmap
@@ -125,7 +125,7 @@ Mark implemented Phase 3 capabilities as complete and retain current limitations
 
 - [x] **Step 2: Remove duplicated architecture rules**
 
-Replace detailed architecture notes with links to `dev-docs/architecture-standards.md` and the relevant source contracts.
+Replace detailed architecture notes with links to `docs/architecture-standards.md` and the relevant source contracts.
 
 Keep future audio polish, intelligence, and plugin milestones only where they still express intended product direction.
 
@@ -145,7 +145,7 @@ Expected: completed roadmap claims have reachable implementations, while absent 
 **Files:**
 - Verify: `AGENTS.md`
 - Verify: `ROADMAP.md`
-- Verify: `dev-docs/*.md`
+- Verify: `docs/*.md`
 - Verify: repository-wide Markdown references
 
 **Interfaces:**
@@ -157,7 +157,7 @@ Expected: completed roadmap claims have reachable implementations, while absent 
 Run:
 
 ```bash
-rg -n "CLAUDE\.md|DEVLOG\.md|project-proposal|technical-roadmap|readability-cleanup-audit|activeTrackFilter|77 unit|77 existing" AGENTS.md ROADMAP.md dev-docs || true
+rg -n "CLAUDE\.md|DEVLOG\.md|project-proposal|technical-roadmap|readability-cleanup-audit|activeTrackFilter|77 unit|77 existing" AGENTS.md ROADMAP.md docs || true
 ```
 
 Expected: no matches.
@@ -169,7 +169,7 @@ Run:
 ```bash
 git diff --check
 git diff --stat
-git diff -- AGENTS.md ROADMAP.md dev-docs
+git diff -- AGENTS.md ROADMAP.md docs
 ```
 
 Expected: no whitespace errors; all changes match the approved documentation roles; no application source files changed.
@@ -189,7 +189,7 @@ Expected: Prettier, ESLint, Knip, TypeScript, all Vitest suites, and the Electro
 Run:
 
 ```bash
-git add AGENTS.md ROADMAP.md dev-docs DEVLOG.md
+git add AGENTS.md ROADMAP.md docs DEVLOG.md
 git commit -m "docs: establish authoritative repository standards"
 ```
 

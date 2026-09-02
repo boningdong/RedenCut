@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Follow [`AGENTS.md`](../../../AGENTS.md), [`dev-docs/architecture-standards.md`](../../../dev-docs/architecture-standards.md), and [`dev-docs/coding-standards.md`](../../../dev-docs/coding-standards.md).
+- Follow [`AGENTS.md`](../../../AGENTS.md), [`docs/architecture-standards.md`](../../architecture-standards.md), and [`docs/coding-standards.md`](../../coding-standards.md).
 - Follow test-driven development: add a focused failing test, confirm the expected failure, add the minimum implementation, and confirm the test passes.
 - Renderer work for a fixed viewport and visible-track count must be bounded independently of source duration after provider initialization.
 - `LegacyPeakDataProvider` initialization is the only accepted duration-proportional renderer step in this project.
@@ -47,7 +47,7 @@ src/renderer/src/components/Waveform/
 
 `WaveformView` remains timeline orchestration. Each new file owns exactly the responsibility named by its filename.
 
-Supporting changes are limited to `vitest.config.ts`, a new `vitest.performance.config.ts`, package manifests, affected WaveSurfer comments, and `dev-docs/architecture-standards.md`.
+Supporting changes are limited to `vitest.config.ts`, a new `vitest.performance.config.ts`, package manifests, affected WaveSurfer comments, and `docs/architecture-standards.md`.
 
 ---
 
@@ -664,7 +664,7 @@ git commit -m "feat: render bounded waveform canvases"
 - Modify: `src/main/audio/peaks.ts`
 - Modify: `src/renderer/src/App.tsx`
 - Modify: `src/renderer/src/components/Transport/TransportBar.tsx`
-- Modify: `dev-docs/architecture-standards.md`
+- Modify: `docs/architecture-standards.md`
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
@@ -733,14 +733,14 @@ npm uninstall wavesurfer.js
 
 Update stale WaveSurfer-specific comments in `src/shared/project.types.ts`, `src/main/audio/peaks.ts`, `src/renderer/src/App.tsx`, `src/renderer/src/components/Transport/TransportBar.tsx`, and `WaveformView.tsx`.
 
-In `dev-docs/architecture-standards.md`, replace the WaveSurfer visualization rule with this boundary: waveform UI depends on `WaveformDataProvider`; playback remains owned by `PreviewPlayer`; storage and decoding must not leak into the renderer.
+In `docs/architecture-standards.md`, replace the WaveSurfer visualization rule with this boundary: waveform UI depends on `WaveformDataProvider`; playback remains owned by `PreviewPlayer`; storage and decoding must not leak into the renderer.
 
 - [ ] **Step 6: Run automated integration verification**
 
 ```bash
 npx vitest run src/renderer/src/components/Waveform/WaveformView.test.tsx
 npm test
-rg -n "WaveSurfer|wavesurfer|<svg|<rect" src package.json package-lock.json dev-docs
+rg -n "WaveSurfer|wavesurfer|<svg|<rect" src package.json package-lock.json docs
 ```
 
 Expected: tests PASS. Search output contains no WaveSurfer dependency/reference and no waveform peak SVG implementation; unrelated SVG icons may remain.
@@ -756,7 +756,7 @@ Open representative short and one-hour sources and verify waveform display, fit,
 - [ ] **Step 8: Commit the integration**
 
 ```bash
-git add src/renderer/src/components/Waveform/WaveformView.tsx src/renderer/src/components/Waveform/WaveformView.test.tsx src/shared/project.types.ts src/main/audio/peaks.ts src/renderer/src/App.tsx src/renderer/src/components/Transport/TransportBar.tsx dev-docs/architecture-standards.md package.json package-lock.json
+git add src/renderer/src/components/Waveform/WaveformView.tsx src/renderer/src/components/Waveform/WaveformView.test.tsx src/shared/project.types.ts src/main/audio/peaks.ts src/renderer/src/App.tsx src/renderer/src/components/Transport/TransportBar.tsx docs/architecture-standards.md package.json package-lock.json
 git commit -m "refactor: replace waveform SVG with canvas"
 ```
 
