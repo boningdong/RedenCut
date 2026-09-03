@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, protocol } from 'electron'
 import { join } from 'path'
 import { APP_FILE_EXT, APP_NAME } from '../shared/constants'
 import { startApplicationLifecycle } from './applicationLifecycle'
+import { configureHarnessStartup } from './harnessStartup'
 import { ExportCoordinator } from './audio/export/ExportCoordinator'
 import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
@@ -21,6 +22,9 @@ import { WorkspaceController } from './project/WorkspaceController'
 import { createCacheProtocolHandler } from './protocol/cacheProtocol'
 import { createFileRangeResponse } from './protocol/fileRangeResponse'
 
+// Isolation must precede the single-instance lock and all workspace initialization.
+const harnessMode = configureHarnessStartup(app, process.env)
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
@@ -31,7 +35,7 @@ function createWindow(): BrowserWindow {
     titleBarStyle: 'hiddenInset',
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false },
   })
-  if (process.env['ELECTRON_RENDERER_URL']) {
+  if (process.env['ELECTRON_RENDERER_URL'] && !harnessMode) {
     void window.loadURL(process.env['ELECTRON_RENDERER_URL'])
     window.webContents.openDevTools()
   } else {

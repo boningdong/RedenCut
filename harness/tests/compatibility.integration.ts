@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
@@ -9,8 +8,8 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { expect, test } from 'vitest'
 import { createMcpFacade } from '../mcp/createMcpFacade'
 import { PlaywrightMcpAdapter } from '../ui/PlaywrightMcpAdapter'
-
-const require = createRequire(import.meta.url)
+import { electronEnvironment } from '../runtime/electronEnvironment'
+import { deadline } from '../runtime/deadline'
 
 function resultText(result: CallToolResult): string {
   expect(result.isError, JSON.stringify(result.content)).not.toBe(true)
@@ -24,24 +23,29 @@ test('forwards official MCP UI actions and images without transferring Electron 
   const outputRoot = resolve('.harness-runs')
   await mkdir(outputRoot, { recursive: true })
   const outputDir = await mkdtemp(join(outputRoot, 'compatibility-'))
-  const env: Record<string, string> = Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
-    ),
-  )
+  const env = electronEnvironment({ ...process.env, SECRET_TOKEN: 'sentinel-do-not-record' })
   env.PODCUT_HARNESS_RUN_DIRECTORY = outputDir
-  delete env.ELECTRON_RUN_AS_NODE
   const application = await _electron.launch({
-    executablePath: require('electron') as string,
     args: [resolve('harness/tests/fixtures/minimal-electron.cjs')],
     env,
     timeout: 20_000,
   })
   const child = application.process()
   let adapter: PlaywrightMcpAdapter | undefined
+  let failure: unknown
   const client = new Client({ name: 'podcut-gate-a', version: '1.0.0' })
   try {
-    const page = await application.firstWindow()
+    expect(
+      await deadline(
+        application.evaluate(async ({ app }) => {
+          await app.whenReady()
+          return app.isReady()
+        }),
+        10_000,
+        'MAIN_READY_TIMEOUT',
+      ),
+    ).toBe(true)
+    const page = await application.firstWindow({ timeout: 10_000 })
     await page.getByRole('heading', { name: 'Harness probe' }).waitFor()
     await application.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
     adapter = await PlaywrightMcpAdapter.create(async () => application.context(), outputDir)
@@ -76,9 +80,9 @@ test('forwards official MCP UI actions and images without transferring Electron 
     const tracePath = join(outputDir, 'trace.zip')
     await application.context().tracing.stop({ path: tracePath })
     expect((await readFile(tracePath)).byteLength).toBeGreaterThan(1000)
-    expect(execFileSync('unzip', ['-p', tracePath, 'trace.trace'], { encoding: 'utf8' })).toContain(
-      'click',
-    )
+    const trace = execFileSync('unzip', ['-p', tracePath, 'trace.trace'], { encoding: 'utf8' })
+    expect(trace).toContain('click')
+    expect(trace).not.toContain('sentinel-do-not-record')
     expect(execFileSync('unzip', ['-Z1', tracePath], { encoding: 'utf8' })).toMatch(
       /screencast\/.*\.jpeg/,
     )
@@ -87,10 +91,36 @@ test('forwards official MCP UI actions and images without transferring Electron 
     expect(await application.evaluate(({ app }) => app.isReady())).toBe(true)
     expect(await page.locator('output').textContent()).toBe('1')
     console.error(`Gate A evidence: ${outputDir}`)
+  } catch (error) {
+    failure = error
+    console.error('Gate A failure:', error)
+    console.error('Gate A observed windows:', application.windows().length)
+    console.error(
+      'Gate A Main state:',
+      await deadline(
+        application.evaluate(({ app, BrowserWindow }) => ({
+          ready: app.isReady(),
+          windows: BrowserWindow.getAllWindows().length,
+        })),
+        1000,
+        'MAIN_DIAGNOSTICS_TIMEOUT',
+      ).catch(String),
+    )
   } finally {
-    await client.close().catch(() => {})
-    await adapter?.close()
-    await application.close()
+    const disposal = await Promise.allSettled([
+      deadline(client.close(), 5000, 'GATE_A_CLIENT_CLOSE_TIMEOUT'),
+      deadline(adapter?.close() ?? Promise.resolve(), 5000, 'GATE_A_ADAPTER_CLOSE_TIMEOUT'),
+    ])
+    for (const result of disposal) {
+      if (result.status === 'rejected') failure ??= result.reason
+    }
+    try {
+      await deadline(application.close(), 5000, 'GATE_A_CLOSE_TIMEOUT')
+    } catch (error) {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      failure ??= error
+    }
   }
+  if (failure) throw failure
   expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
 }, 60_000)

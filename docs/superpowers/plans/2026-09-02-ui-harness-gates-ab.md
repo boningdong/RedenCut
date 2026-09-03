@@ -37,7 +37,12 @@ The external facade forwards MCP schemas/results, with runtime admission and gen
 | `harness/runtime/ElectronSession.ts`          | Owned Electron launch/readiness/close and fixed read-only diagnostics |
 | `harness/runtime/deadline.ts`                 | Bounded operation waits without silent retries                        |
 | `harness/artifacts/RunArtifacts.ts`           | Durable run/generation manifests, logs and tool events                |
+| `harness/artifacts/buildProvenance.ts`        | Fresh checkout/dependency observations for each generation            |
 | `harness/artifacts/TraceRecorder.ts`          | Single tracing owner and incomplete-trace reporting                   |
+| `harness/runtime/electronEnvironment.ts`      | Explicit child environment allowlist; exclude unrelated secrets       |
+| `harness/runtime/processIdentity.ts`          | OS process identity lookup and comparison                             |
+| `harness/runtime/orphanInspection.ts`         | Read-only matching of retained ownership manifests to surviving apps  |
+| `harness/runtime/closePreconditions.ts`       | Dirty/busy close policy                                               |
 | `harness/mcp/RuntimeToolBackend.ts`           | Lifecycle schemas, curated UI tools and generation envelopes          |
 | `harness/server.ts`                           | Stdio entry, signal/disconnect cleanup; no user-facing CLI            |
 | `src/main/harnessStartup.ts`                  | Opt-in isolated paths configured before the single-instance lock      |
@@ -45,6 +50,8 @@ The external facade forwards MCP schemas/results, with runtime admission and gen
 | `harness/tests/compatibility.integration.ts`  | Gate A: actual MCP traffic, images, context lifetime, trace           |
 | `harness/tests/lifecycle.integration.ts`      | Gate B: real Podcut lifecycle, isolation and failures                 |
 | `harness/tests/server.integration.ts`         | External stdio discovery, calls and disconnect behavior               |
+| `harness/tests/failureCleanup.integration.ts` | Cleanup despite ownership/evidence write failures                     |
+| `harness/tests/startupRaces.integration.ts`   | Bounded startup, crash races, and late adapter disposal               |
 | `harness/tests/*.test.ts`                     | Focused infrastructure unit tests                                     |
 | `vitest.harness.config.ts`                    | Explicit headed integration test runner, serial execution             |
 | `harness/tsconfig.json`                       | Type-check harness without including it in product bundles            |
@@ -80,21 +87,21 @@ class PlaywrightMcpAdapter implements ToolBackend {
 }
 ```
 
-- [ ] Install exact MCP/Playwright versions matching the official MCP dependency declaration; retain existing Electron initially and record audit findings without unrelated upgrades.
-- [ ] Write a compatibility test that launches a visible isolated fixture, connects an SDK client to the actual facade, lists upstream tools and performs snapshot/click/screenshot requests.
-- [ ] Use this observable fixture behavior: heading `Harness probe`, button `Increment`, and an output initially `0`; a real click must produce `1`.
-- [ ] Assert screenshot content has an image block with PNG bytes, not merely a path; assert the Main PID matches the launched child.
-- [ ] Start tracing before the UI actions; stop it to a retained ZIP; inspect the trace for the click and screenshot resources.
-- [ ] Close the adapter and assert a Main evaluation and renderer read still succeed, then explicitly close Electron and assert process exit.
-- [ ] Run the new test red before implementing the forwarding/adapter behavior:
+- [x] Install exact MCP/Playwright versions matching the official MCP dependency declaration; retain existing Electron initially and record audit findings without unrelated upgrades.
+- [x] Write a compatibility test that launches a visible isolated fixture, connects an SDK client to the actual facade, lists upstream tools and performs snapshot/click/screenshot requests.
+- [x] Use this observable fixture behavior: heading `Harness probe`, button `Increment`, and an output initially `0`; a real click must produce `1`.
+- [x] Assert screenshot content has an image block with PNG bytes, not merely a path; assert the Main PID matches the launched child.
+- [x] Start tracing before the UI actions; stop it to a retained ZIP; inspect the trace for the click and screenshot resources.
+- [x] Close the adapter and assert a Main evaluation and renderer read still succeed, then explicitly close Electron and assert process exit.
+- [x] Run the new test red before implementing the forwarding/adapter behavior:
 
 ```sh
 npm run test:harness -- harness/tests/compatibility.integration.ts
 ```
 
-- [ ] Implement only public SDK transports and `@playwright/mcp.createConnection`; configure `browser.isolated: false`, `imageResponses: 'allow'`, no upstream session/trace recording, and bounded action timeouts.
-- [ ] Re-run Gate A and type/lint checks; inspect its screenshot and trace; request code review before promoting the composition into Gate B.
-- [ ] If context ownership fails, investigate compatible public versions; stop for user confirmation before any topology or private-API workaround.
+- [x] Implement only public SDK transports and `@playwright/mcp.createConnection`; configure `browser.isolated: false`, `imageResponses: 'allow'`, no upstream session/trace recording, and bounded action timeouts.
+- [x] Re-run Gate A and type/lint checks; inspect its screenshot and trace; request code review before promoting the composition into Gate B.
+- [x] If context ownership fails, investigate compatible public versions; stop for user confirmation before any topology or private-API workaround.
 
 ## Task 2: Isolated Real Application and Runtime (Gate B)
 
@@ -133,36 +140,36 @@ class HarnessRuntime {
 }
 ```
 
-- [ ] Write focused red tests for admission: lifecycle excludes new UI calls, already-admitted work settles first, queued UI never enters a new generation, timeout does not replay a mutation, and status stays readable.
-- [ ] Implement admission with promise settlement, explicit timeout errors, and generation validation at execution time as well as request time.
-- [ ] Write startup tests proving opt-in paths are absolute and isolated, ordinary startup is unchanged, and invalid harness configuration fails before Electron starts.
-- [ ] Configure `userData`, `sessionData` and `temp` under a unique run directory before `startApplicationLifecycle`; never disable the ordinary lock globally.
-- [ ] Add DOM attributes reporting installed renderer session, dirty state and busy jobs; do not expose stores or a new renderer filesystem/control API.
-- [ ] Build the real application and launch its built entry with no dev-server environment; verify Main initialization and renderer session readiness rather than just window creation.
-- [ ] Create generation-tagged evidence containing build commit, dirty status, dependency versions, paths, PID, tool calls and independent Main/renderer logs.
-- [ ] Implement one trace owner per generation; flush before closing and retain incomplete status if a crash interrupts finalization.
-- [ ] Implement restart as admission close → settle work → dirty/busy preflight → trace flush → adapter dispose → owned Electron close → optional build → next generation readiness → fresh adapter.
-- [ ] Dirty projects require save through UI or explicit discard; busy product work blocks ordinary restart/stop until settled, since C/D job controls are not implemented yet.
-- [ ] Write and run real integration checks for repeated restart, stale refs, isolation between independent runs, startup timeout and application crash.
-- [ ] Validate owned-process shutdown by process identity; never kill by app name, and report hard-kill recovery limits instead of claiming guaranteed cleanup.
+- [x] Write focused red tests for admission: lifecycle excludes new UI calls, already-admitted work settles first, queued UI never enters a new generation, timeout does not replay a mutation, and status stays readable.
+- [x] Implement admission with promise settlement, explicit timeout errors, and generation validation at execution time as well as request time.
+- [x] Write startup tests proving opt-in paths are absolute and isolated, ordinary startup is unchanged, and invalid harness configuration fails before Electron starts.
+- [x] Configure `userData`, `sessionData` and `temp` under a unique run directory before `startApplicationLifecycle`; never disable the ordinary lock globally.
+- [x] Add DOM attributes reporting installed renderer session, dirty state and busy jobs; do not expose stores or a new renderer filesystem/control API.
+- [x] Build the real application and launch its built entry with no dev-server environment; verify Main initialization and renderer session readiness rather than just window creation.
+- [x] Create generation-tagged evidence containing build commit, dirty status, dependency versions, paths, PID, tool calls and independent Main/renderer logs.
+- [x] Implement one trace owner per generation; flush before closing and retain incomplete status if a crash interrupts finalization.
+- [x] Implement restart as admission close → settle work → dirty/busy preflight → trace flush → adapter dispose → owned Electron close → optional build → next generation readiness → fresh adapter.
+- [x] Dirty projects require save through UI or explicit discard; busy product work blocks ordinary restart/stop until settled, since C/D job controls are not implemented yet.
+- [x] Write and run real integration checks for repeated restart, stale refs, isolation between independent runs, startup timeout and application crash.
+- [x] Validate owned-process shutdown by process identity; never kill by app name, and report hard-kill recovery limits instead of claiming guaranteed cleanup.
 
 ## Task 3: Single MCP Entry and Failure Acceptance (Gate B)
 
 **Files:** Create runtime tool backend and stdio server; extend unit/integration tests and package scripts.
 
-**Interfaces:** External tools are `podcut_start`, `podcut_status`, `podcut_restart`, `podcut_stop`, `podcut_list_artifacts`, plus curated upstream UI tools.
+**Interfaces:** External tools are `podcut_start`, `podcut_status`, `podcut_restart`, `podcut_stop`, `podcut_read_diagnostics`, `podcut_list_artifacts`, plus curated upstream UI tools.
 UI tool schemas add required `runId` and `generation`; returned results carry the same identity.
 Only `browser_snapshot` may establish the first current-generation snapshot; state-dependent UI calls fail until it succeeds.
 
-- [ ] Write red protocol tests that list tools before launch, reject UI calls before readiness, and forward image/text/structured results unchanged except for the documented identity metadata.
-- [ ] Discover the upstream tool catalog without launching an unrelated browser; allow only snapshot, click, drag, keyboard, typing, hovering, scrolling, screenshots and console/network observation as supported by the pinned version.
-- [ ] Exclude browser/context close, navigation, new tabs, arbitrary evaluation/code execution, browser installation, file upload, and independent tracing tools from the external catalog.
-- [ ] Reject unlisted tools and stale identities with structured recovery instructions; do not accept client overrides of internal output roots or upstream metadata.
-- [ ] Keep stdout protocol-only; send host diagnostics to stderr and run evidence.
-- [ ] On ordinary stdin close/SIGTERM, close admission and clean up owned resources with bounded waits; record unsaved-loss caveats for forced host shutdown.
-- [ ] Test a real SDK stdio client against `node --import tsx harness/server.ts`; verify start/snapshot/click/screenshot/restart/stop and exit after client disconnect.
-- [ ] Test crash/timeout paths and owned-process leak checks, including host hard kill where safely observable; record limitations in the acceptance result.
-- [ ] Run full verification and inspect generated evidence:
+- [x] Write red protocol tests that list tools before launch, reject UI calls before readiness, and forward image/text/structured results unchanged except for the documented identity metadata.
+- [x] Discover the upstream tool catalog without launching an unrelated browser; allow only snapshot, click, drag, keyboard, typing, hovering, scrolling, screenshots and console/network observation as supported by the pinned version.
+- [x] Exclude browser/context close, navigation, new tabs, arbitrary evaluation/code execution, browser installation, file upload, and independent tracing tools from the external catalog.
+- [x] Reject unlisted tools and stale identities with structured recovery instructions; do not accept client overrides of internal output roots or upstream metadata.
+- [x] Keep stdout protocol-only; send host diagnostics to stderr and run evidence.
+- [x] On ordinary stdin close/SIGTERM, close admission and clean up owned resources with bounded waits; record unsaved-loss caveats for forced host shutdown.
+- [x] Test a real SDK stdio client against `node --import tsx harness/server.ts`; verify discovery/start/snapshot/screenshot/restart and exit after client disconnect; real UI click and explicit stop are also covered by the runtime integration test.
+- [x] Test crash/timeout paths and owned-process leak checks, including host hard kill where safely observable; record limitations in the acceptance result.
+- [x] Run full verification and inspect generated evidence:
 
 ```sh
 npm run format
@@ -171,5 +178,16 @@ npm run test:harness
 git diff --check
 ```
 
-- [ ] Obtain independent final code review, address correctness/safety findings, update design status with exact verified versions and A/B results, and commit the worktree changes.
-- [ ] Report A/B results and remaining risks without claiming AI-client registration or C/D workflows are complete.
+- [x] Obtain independent code review and address the reported correctness/safety findings.
+- [ ] Complete repeatable startup acceptance before declaring Gates A/B complete; retain failure evidence and do not silently change topology.
+
+## Acceptance notes — 2026-09-03
+
+Gates A/B implementation is present, but final stability acceptance remains incomplete.
+Full repository verification passed with 467 unit tests, and the headed suite has passed all 18 infrastructure integration tests in a single run.
+Other full-suite runs intermittently timed out before Main readiness, including with the default public Electron launcher and the explicit Main-ready barrier; a green rerun does not establish that this issue is fixed.
+The final rerun passed 16 of 18 integration tests, with two `MAIN_READY_TIMEOUT` failures; no owned process was found surviving the suite.
+Independent review and scoped re-review resolved the reported findings, but do not supersede this outstanding runtime evidence.
+The [design acceptance record](../specs/2026-09-02-ai-ui-debugging-harness-design.md#12-gates-ab-acceptance-record) records the tested version set, entry point, evidence layout and unresolved startup risk.
+Next acceptance work must reproduce and resolve the Main-startup instability using public APIs or a verified compatible version set; changing topology still requires explicit approval.
+Host hard-kill recovery remains manual after read-only identity-checked detection; AI-client registration and Gates C/D remain outside this implementation.

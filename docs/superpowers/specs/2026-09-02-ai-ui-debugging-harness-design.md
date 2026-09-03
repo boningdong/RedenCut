@@ -1,7 +1,7 @@
 # Podcut AI UI Debugging Harness
 
 Date: 2026-09-02
-Status: Architecture agreed in conversation; written design pending user review; runtime compatibility not yet verified.
+Status: Gates A/B implementation checkpoint, independently reviewed on 2026-09-03; final stability acceptance is incomplete because intermittent Main-readiness timeouts remain unresolved; Gates C/D remain unimplemented.
 
 ## 1. Goal and scope
 
@@ -63,7 +63,8 @@ There is no separate end-user command vocabulary to document.
 
 ### Proposed application tool surface
 
-These names specify responsibilities for review, not implemented APIs.
+The A/B implementation exposes start, status, restart, stop, read-diagnostics and list-artifacts, plus curated upstream UI tools.
+Scenario selection and native-dialog preparation below are deferred to Gate C; the installed MCP schemas are authoritative for current arguments.
 
 | Tool                      | Contract                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -277,13 +278,64 @@ Confirmed from public interfaces/source:
 - [Playwright double-CDP test](https://github.com/microsoft/playwright/blob/main/tests/library/chromium/connect-over-cdp.spec.ts) is evidence for an alternative topology, not permission to switch to it.
 - [External trace merge discussion](https://github.com/microsoft/playwright/issues/40915) distinguishes context traces from test-runner traces.
 
-Research inspected moving upstream sources, not an installed, validated version combination.
-BrowserContext sharing with Podcut's exact Electron version, facade composition, shutdown ownership, restart invalidation, and trace integrity remain runtime acceptance checks.
-No compatibility probe or product UI verification has been performed for this design yet.
+Initial research inspected moving upstream sources; Gates A/B now exercise the installed version set below through real Electron and MCP traffic.
+Successful runs demonstrate the infrastructure and the real Podcut empty state, but intermittent Main-startup timeouts still prevent final stability acceptance.
+Editing workflows in Gates C/D have not been tested.
 
 ## 11. Review boundary
 
-This document records the approved architectural direction and makes implementation defaults explicit for written review.
-After user review, produce a bounded implementation plan for the first bring-up gates.
-Do not treat written design approval as evidence of working runtime integration.
+This document records the approved architectural direction, with implementation tracked in the [Gates A/B plan](../plans/2026-09-02-ui-harness-gates-ab.md).
+Acceptance evidence below applies only to the tested scope and pinned versions.
 If the shared-context route is blocked, stop at that boundary, report the concrete result and alternatives, and obtain explicit approval before changing topology.
+
+## 12. Gates A/B acceptance record
+
+Status: implementation checkpoint; final stability acceptance is incomplete.
+Tested locally on macOS on 2026-09-03 with Node 24.14.0, Electron 40.8.0, Playwright 1.63.0-alpha-2026-08-31, Playwright MCP 0.0.80, and MCP SDK 1.30.0.
+Playwright matches the exact dependency required by this MCP release; upgrade this combination only after rerunning the compatibility test.
+Launch the built JavaScript entry with the public default `_electron.launch({ args, ... })` path, without an `executablePath` override.
+In this pinned version, overriding the executable bypasses the upstream loader's startup coordination and automation defaults.
+
+| Gate       | Verified behavior                                                                                                                                                                                                                                         |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A          | Public shared-context injection, real MCP discovery/click/PNG forwarding, Main access, trace action/screenshots, adapter disposal without closing Electron                                                                                                |
+| B          | Real Podcut readiness, isolated paths/locks, loopback debug listeners, lifecycle tools, explicit rebuild/restart, fresh-generation snapshots, logs/traces, ordinary disconnect/SIGTERM cleanup                                                            |
+| B failures | Readiness/adapter timeouts, crash during adapter creation, late-adapter disposal, uncertain UI timeout with no replay, shutdown during launch, close-failure retry, artifact-write failure cleanup, host hard-kill detection with process-identity checks |
+
+Verification commands are `npm run format`, `npm run check`, and `npm run test:harness`.
+Repository verification passed 467 unit tests, formatting, lint, Knip, type checking and the production build.
+The headed suite has passed all 18 integration tests in one run, but other full-suite runs failed with Main-readiness timeouts; successful reruns are not evidence that the intermittent failure is resolved.
+The final rerun at 00:38 PDT on 2026-09-03 passed 16 of 18 integration tests; the real-app restart and close-failure-retry scenarios both failed during Main startup with `MAIN_READY_TIMEOUT`.
+Their retained run directories are `.harness-runs/9aad731f-75c5-489f-98f8-989a70ff85c9/` and `.harness-runs/863adc5f-3b07-4467-801b-b89789d8db44/`; the post-suite process check found no surviving harness host, Electron application or minimal fixture.
+Independent review and re-review resolved launch-environment privacy, ownership/evidence failure cleanup, bounded startup, crash/late-adapter races, and per-generation provenance findings.
+The headed suite requires a logged-in macOS GUI session and the local `lsof`, `ps` and `unzip` utilities.
+
+Restoring the default launch path passed a regression that checks actual Electron automation switches, ten consecutive independent stdio start/restart/disconnect runs (20 launches), and fifteen consecutive isolated Gate A probes.
+However, later full-suite runs still timed out before window creation, including after adding an explicit bounded public `app.whenReady()` barrier.
+The minimal fixture independently recorded `app.isReady() === false` and zero windows at timeout, followed by readiness events during shutdown; note that the upstream loader wraps readiness, so this does not establish the native Electron readiness state or a root cause.
+Retained example evidence is `.harness-runs/compatibility-fPYQqz/main-startup.jsonl`; the failure occurs before creating the shared-context UI adapter and is not evidence of competing MCP connections.
+The runtime preserves timeout failures instead of retrying silently; the compatibility probe now has bounded cleanup and retains Main-startup observations.
+One earlier probe process that outlived cleanup was terminated only after matching its exact fixture command and run profile; no ordinary application process was targeted.
+The next gate is to isolate and resolve this startup instability without private imports or an unapproved topology fallback.
+
+The developer stdio entry is `node --import tsx harness/server.ts` from the repository root, after dependency installation and `npm run build`.
+This is the MCP host entry, not a separate user-facing command interface; the AI discovers operations from the server's tool catalog.
+Do not use a non-silent npm wrapper as an MCP transport command because its banner can contaminate protocol stdout.
+AI-client registration has not been performed and remains a separate approval step.
+
+Generated run profiles and evidence are retained in ignored `.harness-runs/<runId>/`, with per-generation logs, screenshots and trace ZIPs; artifact-management code remains in `harness/artifacts/`.
+Electron receives an explicit environment allowlist because launch options can be persisted in traces; unrelated environment variables and tokens must not be forwarded.
+Treat retained snapshots, logs and traces as local debugging data; there is no automatic deletion policy or external upload.
+
+### Current limits
+
+- Main startup is not yet repeatably reliable with the pinned combination; do not treat this checkpoint as accepted for unattended debugging.
+- Gate B supports the empty application and dialog-free interactions only; do not invoke open/import/save/export dialogs until Gate C supplies deterministic adapters.
+- Dirty/busy observations cover current renderer session state, import and transcription; they do not yet constitute full product-job or native-dialog coordination.
+- A failed/uncertain UI generation requires an explicit restart/stop decision; failed mutations are never replayed automatically.
+- Transport shutdown may discard unsaved work to stop the owned application; ordinary explicit stop/restart requires settled work and saved edits or `discardUnsaved`.
+- Host SIGKILL cannot run cleanup handlers: `podcut_status` reports matching surviving Electron processes, but recovery remains manual and must revalidate process identity before termination.
+- Cleanup is tested for the owned Electron process in these scenarios, not guaranteed for every OS-level descendant after arbitrary host failure.
+- Each generation records a fresh checkout/dependency observation, including after rebuild; this is not a content-addressed attestation of prebuilt output.
+- System dependencies/models, real media/transcription workflows, root-level product `e2e/`, Windows, CI, HMR and AI-client integration are not part of this acceptance.
+- Dependency installation reported audit warnings; no unrelated dependency upgrades were made, and a later network audit recheck was blocked because it would upload dependency metadata.
