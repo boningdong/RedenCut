@@ -245,7 +245,22 @@ CI, Windows support, HMR, a broad visual baseline matrix, generic fault injectio
 
 ## 9. Repository integration boundaries
 
-Harness implementation belongs under a dedicated repository-level `harness/` directory, with responsibilities split into MCP facade, runtime, UI adapter, artifacts, fixtures, and tests.
+Harness implementation belongs under a dedicated repository-level `harness/` directory, with responsibilities split into MCP facade, runtime, UI adapter, artifacts, fixtures, and infrastructure tests.
+Follow [file organization standards](../../file-organization-standards.md); keep artifact-management code under `harness/artifacts/` and store generated evidence separately.
+Harness unit and integration tests belong in `harness/tests/` and verify the infrastructure itself, including lifecycle and MCP integration.
+Product-level E2E tests belong in a separate repository-level `e2e/` directory alongside `harness/` and `src/`, not inside `harness/`.
+They verify Podcut user workflows and reuse the harness runtime without moving product scenarios into the harness's own tests.
+
+```text
+Podcut/
+├── src/                 # Product implementation and existing unit tests
+├── harness/             # Reusable UI debugging infrastructure
+│   ├── artifacts/       # Artifact-management code, not generated output
+│   └── tests/           # Harness unit and integration tests
+└── e2e/                 # Product workflow E2E tests that use the harness
+```
+
+This partial tree describes the intended layout, not directories already implemented.
 Production entry points receive only the narrow composition changes required for testability.
 Review existing repository standards before implementation; do not change global or project instruction files as an incidental setup action.
 Any AI-client registration is an explicit setup step, not an unannounced user-config mutation.
