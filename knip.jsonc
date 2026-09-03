@@ -1,11 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // electron-vite and Vitest discover the real application, config, and test entries.
-  "project": ["src/**/*.{ts,tsx,css}", "*.config.ts"],
+  "project": ["src/**/*.{ts,tsx,css}", "harness/**/*.{ts,cjs}", "*.config.ts"],
   // The dedicated runner selects this config with npm's dynamic --config argument.
   "entry": [
     "vitest.performance.config.ts",
     "src/renderer/src/components/Waveform/waveform.performance.ts",
+    // The headed integration runner and Electron launcher select these entries dynamically.
+    "harness/tests/**/*.integration.ts",
+    "harness/tests/fixtures/*.cjs",
   ],
   "ignoreDependencies": [
     // Apple Silicon fallbacks loaded by resolveFromStaticPackage(packageName)
