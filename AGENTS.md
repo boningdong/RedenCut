@@ -20,6 +20,7 @@ Use the repository's authoritative files instead of duplicating their contents h
 | --- | --- |
 | Commands and verification | [`package.json`](package.json) |
 | Coding and review standards | [`docs/coding-standards.md`](docs/coding-standards.md) |
+| File responsibility, naming and directory organization | [`docs/file-organization-standards.md`](docs/file-organization-standards.md) |
 | Architecture standards | [`docs/architecture-standards.md`](docs/architecture-standards.md) |
 | Keyboard interaction contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
 | Product direction | [`ROADMAP.md`](ROADMAP.md) |

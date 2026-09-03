@@ -5,7 +5,6 @@
 - Each function performs one coherent operation at one abstraction level.
 - Each class represents one clear responsibility.
 - Each module has one named responsibility.
-- Each file contains one primary class; supporting private types and helpers may remain when they serve only that class.
 - Split large units by responsibility, not by arbitrary line counts.
 
 ## Naming
