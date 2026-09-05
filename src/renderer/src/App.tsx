@@ -518,7 +518,13 @@ export default function App() {
     async (mode: ImportMode) => {
       const selectionSession = useEditorStore.getState().session
       if (!selectionSession || importState) return
-      const selection = await window.electronAPI.audio.selectImportFile(selectionSession)
+      const selection = await window.electronAPI.audio
+        .selectImportFile(selectionSession)
+        .catch((reason: unknown) => {
+          if (sameSession(useEditorStore.getState().session, selectionSession))
+            setError((reason as Error).message)
+          return null
+        })
       if (!selection) return
       const submittedDraft = snapshot()
       const submittedSession = useEditorStore.getState().session

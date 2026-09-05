@@ -367,9 +367,42 @@ Run from the harness worktree in a logged-in macOS GUI session, using the pinned
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `npm run test:harness`        | Normal UI, isolation, restart, disconnect and clean early-shutdown regressions                                |
 | `npm run test:harness:faults` | Explicit fault injection, including crashes, forced termination and timeouts; prints a warning before running |
-| `npm run test:harness:all`    | Both suites; required for full A/B acceptance                                                                 |
+| `npm run test:harness:all`    | Normal and fault suites in background; excludes foreground-only tests                                         |
+| `npm run test:harness:foreground` | Explicitly activating normal suite and foreground-only tests; never run while the user needs uninterrupted focus |
 | `npm run check`               | Repository static checks, unit tests and production build; excludes headed harness tests                      |
 
 Generated evidence remains under `.harness-runs/`; `generation-*/events.jsonl` distinguishes clean `process-exit`, `forced-close` and failure events.
 Do not dismiss a new native crash report merely because fault tests were selected: match its PID and timestamp against the retained events.
 AI-client registration and product workflows in C/D remain separate work.
+
+## 14. Visible background windows — 2026-09-05
+
+The default harness mode is `background`: windows remain visible but do not activate.
+Main creates them with `show: false`, then calls `showInactive()`; background windows also disable native focus and navigation focus, disable background throttling, and use the macOS accessory activation policy.
+This extends protection beyond the moment of initial display, while still allowing Playwright's renderer-targeted input.
+There is no hidden mode, and ordinary non-harness Podcut launches retain their existing behavior.
+
+`podcut_start` accepts optional `windowMode: "background" | "foreground"`; status and generation evidence record the selected mode.
+Restart preserves it; changing mode requires an explicit stop and start.
+For manual interaction or OS-focus tests, explicitly choose `foreground`, which uses normal native focus and shows the window in front.
+Background windows deliberately cannot receive native focus, including through a manual click.
+The harness never silently promotes a run to foreground.
+
+Main rejects background native-dialog requests before calling Electron, using the public IPC code `foreground-required` and an actionable `FOREGROUND_REQUIRED` message.
+The open-dialog IPC entry also preflights this check before the project transition coordinator can normalize a dialog error into a generic project-open result.
+This covers current open/import/save/export and dirty-confirmation dialog boundaries; deterministic dialog adapters and complete product flows remain Gate C work.
+Foreground-required tests belong in `*.foreground.integration.ts`, excluded from both default and `test:harness:all` runs.
+Explicit foreground mode is not a claim that native-dialog product workflows are already tested.
+
+The pinned MCP compatibility test exercises click, typing, key input, drag and screenshot on the existing shared context.
+The real-app regression verifies visible/unfocused/nonfocusable state across MCP actions, restart, reload and rejected Open Project, Import Audio and Save As requests.
+The curated tool surface does not include tab-selection or recording operations that can bring pages forward; adding tools or upgrading the pinned stack requires repeating this focus audit.
+
+With the user's approved pause, a dedicated Dia browser tab retained continuous typed text across two rounds of MCP actions and Electron restart, while its window-blur counter remained **0**.
+The fixture is `harness/tests/fixtures/browser-focus.html`: open it in a foreground browser, reset the counter, keep typing while background tests run, and verify both the text and counter afterward.
+A separate foreground-only test passed explicit activation on both startup and restart.
+These are bounded local macOS observations, not a guarantee for every future tool or OS version.
+
+Final verification passed `npm run check` (471 unit tests, formatting, lint, Knip, type checking and build) and `npm run test:harness:all` (23/23 background integration tests).
+The separately selected foreground-only startup/restart regression passed 1/1; the entire foreground suite was not run.
+Independent re-review found no remaining blocking issue after the open-dialog error preflight and import-selection error handling were corrected.

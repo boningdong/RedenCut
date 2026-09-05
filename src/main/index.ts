@@ -3,6 +3,9 @@ import { join } from 'path'
 import { APP_FILE_EXT, APP_NAME } from '../shared/constants'
 import { startApplicationLifecycle } from './applicationLifecycle'
 import { configureHarnessStartup } from './harnessStartup'
+import { harnessWindowOptions, presentHarnessWindow } from './harnessWindow'
+import { parseHarnessWindowMode } from '../shared/harnessWindowMode'
+import { assertNativeDialogAllowed } from './harnessDialogPolicy'
 import { ExportCoordinator } from './audio/export/ExportCoordinator'
 import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
@@ -24,16 +27,27 @@ import { createFileRangeResponse } from './protocol/fileRangeResponse'
 
 // Isolation must precede the single-instance lock and all workspace initialization.
 const harnessMode = configureHarnessStartup(app, process.env)
+const windowMode = harnessMode
+  ? parseHarnessWindowMode(process.env.PODCUT_HARNESS_WINDOW_MODE)
+  : undefined
+if (windowMode === 'background' && process.platform === 'darwin')
+  app.setActivationPolicy('accessory')
 
 function createWindow(): BrowserWindow {
+  const harnessOptions = harnessWindowOptions(windowMode)
   const window = new BrowserWindow({
+    ...harnessOptions,
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0f0f0f',
     titleBarStyle: 'hiddenInset',
-    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false },
+    webPreferences: {
+      ...harnessOptions.webPreferences,
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+    },
   })
   if (process.env['ELECTRON_RENDERER_URL'] && !harnessMode) {
     void window.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -41,6 +55,7 @@ function createWindow(): BrowserWindow {
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  presentHarnessWindow(window, windowMode)
   return window
 }
 
@@ -71,6 +86,7 @@ startApplicationLifecycle({
       jobs,
       barrier,
       chooseDirtyAction: async (sender) => {
+        assertNativeDialogAllowed()
         const result = await dialog.showMessageBox(windowFor(sender), {
           type: 'question',
           title: APP_NAME,
@@ -82,6 +98,7 @@ startApplicationLifecycle({
         return result.response === 0 ? 'save' : result.response === 1 ? 'discard' : 'cancel'
       },
       chooseSaveDestination: async (sender) => {
+        assertNativeDialogAllowed()
         const result = await dialog.showSaveDialog(windowFor(sender), {
           title: `Save ${APP_NAME} Project`,
           defaultPath: `Untitled${APP_FILE_EXT}`,
@@ -92,6 +109,7 @@ startApplicationLifecycle({
           : `${result.filePath}${APP_FILE_EXT}`
       },
       chooseOpenDestination: async (sender) => {
+        assertNativeDialogAllowed()
         const result = await dialog.showOpenDialog(windowFor(sender), {
           title: `Open ${APP_NAME} Project`,
           properties: ['openDirectory'],

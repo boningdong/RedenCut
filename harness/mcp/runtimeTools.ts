@@ -10,10 +10,10 @@ const close = generationSchema.extend({ discardUnsaved: z.boolean().optional() }
 export const runtimeTools = [
   {
     name: 'podcut_start',
-    schema: empty,
+    schema: z.object({ windowMode: z.enum(['background', 'foreground']).optional() }).strict(),
     readOnly: false,
     description:
-      'Start one isolated visible Podcut empty-state run from the current built application. Does not install dependencies or build implicitly. Returns runId and generation. Take browser_snapshot before UI actions. Gate B: do not invoke open/import/save/export dialogs; dialog adapters arrive in Gate C.',
+      'Start one isolated visible Podcut empty-state run. windowMode defaults to background: visible but non-activating, with native focus disabled. foreground explicitly allows activation for observation or focus-dependent tests. Restart preserves the mode. Does not build implicitly. Returns runId, generation and windowMode. Take browser_snapshot before UI actions. Native dialogs and OS focus/shortcut tests require foreground and are outside Gate B; never switch modes silently.',
   },
   {
     name: 'podcut_status',

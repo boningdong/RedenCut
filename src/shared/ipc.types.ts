@@ -25,7 +25,8 @@ export interface PendingProjectOpenEvent {
 }
 
 export interface IpcError {
-  code: 'stale-session' | 'cancelled' | 'invalid-request' | 'operation-failed'
+  code:
+    'stale-session' | 'cancelled' | 'invalid-request' | 'operation-failed' | 'foreground-required'
   message: string
 }
 

@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Podcut background focus check</title>
+<h1>Browser focus check</h1>
+<p>This local page records focus loss while Podcut runs behind this browser.</p>
+<label>Browser typing <textarea aria-label="Browser typing" rows="8" cols="70"></textarea></label>
+<p id="status">Focus losses: 0</p>
+<button onclick="losses=0;render()">Reset focus counter</button>
+<script>
+  let losses = 0;
+  const render = () => document.querySelector('#status').textContent = `Focus losses: ${losses}`;
+  window.addEventListener('blur', () => { losses++; render(); });
+</script>

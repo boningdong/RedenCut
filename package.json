@@ -13,6 +13,7 @@
     "test:harness": "vitest run --config vitest.harness.config.ts",
     "test:harness:faults": "vitest run --config vitest.harness.config.ts --mode faults",
     "test:harness:all": "vitest run --config vitest.harness.config.ts --mode all",
+    "test:harness:foreground": "vitest run --config vitest.harness.config.ts --mode foreground",
     "harness:mcp": "node --import tsx harness/server.ts",
     "profile:waveform": "node --expose-gc ./node_modules/vitest/vitest.mjs run --config vitest.performance.config.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\" \"harness/**/*.{ts,cjs,json}\" \"*.{ts,mjs,json}\" .prettierrc.json",

@@ -9,6 +9,7 @@ import { mergeProjectDraft } from '../project/sessionProjection'
 import type { SessionJobRegistry } from '../project/SessionJobRegistry'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
+import { assertNativeDialogAllowed } from '../harnessDialogPolicy'
 
 type DiagnosticSink = (error: unknown) => void
 
@@ -40,6 +41,7 @@ export function registerAudioIpc(
       controller.assertCurrent(expected)
       const window =
         BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
+      assertNativeDialogAllowed()
       const result = await dialog.showOpenDialog(window, {
         title: 'Import Audio',
         filters: [

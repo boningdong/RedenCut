@@ -2,6 +2,7 @@ import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import type { HarnessRuntime } from '../runtime/HarnessRuntime'
 import type { ToolBackend } from './ToolBackend'
+import type { HarnessWindowMode } from '../../src/shared/harnessWindowMode'
 import { allowedUiTools, generationSchema, runtimeTools } from './runtimeTools'
 
 export class RuntimeToolBackend implements ToolBackend {
@@ -34,7 +35,9 @@ export class RuntimeToolBackend implements ToolBackend {
         }
         switch (name) {
           case 'podcut_start':
-            return jsonResult(await this.runtime.start())
+            return jsonResult(
+              await this.runtime.start(parsed as { windowMode?: HarnessWindowMode }),
+            )
           case 'podcut_status':
             return jsonResult({
               ...this.runtime.status(),
