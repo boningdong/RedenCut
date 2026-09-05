@@ -67,27 +67,6 @@ test('forwards official MCP UI actions and images without transferring Electron 
     })) as CallToolResult
     resultText(clicked)
     expect(await page.locator('output').textContent()).toBe('1')
-    resultText(
-      await adapter.callTool('browser_type', { target: 'input', text: 'background', slowly: true }),
-    )
-    resultText(await adapter.callTool('browser_press_key', { key: 'End' }))
-    resultText(await adapter.callTool('browser_press_key', { key: '!' }))
-    expect(await page.locator('input').inputValue()).toBe('background!')
-    resultText(
-      await adapter.callTool('browser_drag', { startTarget: '#source', endTarget: '#drop' }),
-    )
-    expect(await page.locator('#drop').textContent()).toBe('Dropped')
-    if (process.env.PODCUT_HARNESS_WINDOW_MODE !== 'foreground') {
-      expect(
-        await application.evaluate(({ BrowserWindow }) =>
-          BrowserWindow.getAllWindows().map((w) => ({
-            visible: w.isVisible(),
-            focused: w.isFocused(),
-            focusable: w.isFocusable(),
-          })),
-        ),
-      ).toEqual([{ visible: true, focused: false, focusable: false }])
-    }
     const screenshot = (await client.callTool({
       name: 'browser_take_screenshot',
       arguments: { type: 'png' },

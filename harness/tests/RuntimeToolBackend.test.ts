@@ -1,16 +1,12 @@
 import { resolve } from 'node:path'
-import { expect, test, vi } from 'vitest'
+import { expect, test } from 'vitest'
 import { RuntimeToolBackend } from '../mcp/RuntimeToolBackend'
 import { HarnessRuntime } from '../runtime/HarnessRuntime'
 
 function backend() {
-  const runtime = new HarnessRuntime({
-    repositoryRoot: resolve('.'),
-    outputRoot: resolve('.harness-runs'),
-  })
-  // Orphan inspection has dedicated tests; catalog tests must not scan retained local runs.
-  vi.spyOn(runtime, 'inspectOrphans').mockReturnValue([])
-  return new RuntimeToolBackend(runtime)
+  return new RuntimeToolBackend(
+    new HarnessRuntime({ repositoryRoot: resolve('.'), outputRoot: resolve('.harness-runs') }),
+  )
 }
 
 test('publishes lifecycle and curated official UI schemas before launch without a browser', async () => {

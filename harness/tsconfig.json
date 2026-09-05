@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts", "../src/shared/harnessWindowMode.ts"]
+  "include": ["**/*.ts"]
 }

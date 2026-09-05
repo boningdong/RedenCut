@@ -206,14 +206,3 @@ Host hard-kill recovery remains manual after read-only identity-checked detectio
 
 Final verification: 467 unit tests and the repository checks/build passed; two consecutive full harness runs passed 22/22 tests each, and three default-suite runs passed 6/6 each.
 No post-fix native crash report or owned process residue was found; the historical normal-startup timeout did not recur, though its causal relationship to the shutdown crash is not proven.
-
-## Visible background window mode — 2026-09-05
-
-- [x] Default tests to visible, non-activating background windows; leave ordinary product startup unchanged.
-- [x] Expose explicit foreground selection through the existing MCP start tool and preserve mode through restart.
-- [x] Prevent native-dialog activation in background runs and return an actionable foreground-required error.
-- [x] Exercise MCP click, typing, key input, drag, screenshot, reload and restart; verify native window state.
-- [x] Verify foreground browser typing with the user's approved pause: complete input retained and zero window-blur events across two rounds.
-- [x] Verify explicit foreground startup/restart separately; exclude foreground-only cases from default and full background suites.
-
-The mode contract and commands are recorded in [design section 14](../specs/2026-09-02-ai-ui-debugging-harness-design.md#14-visible-background-windows--2026-09-05).

@@ -12,8 +12,6 @@ import { assertCloseAllowed } from './closePreconditions'
 import { ElectronSession } from './ElectronSession'
 import { OperationGate } from './OperationGate'
 import { inspectOrphanRuns } from './orphanInspection'
-import { parseHarnessWindowMode } from '../../src/shared/harnessWindowMode'
-import type { HarnessWindowMode } from '../../src/shared/harnessWindowMode'
 import type {
   ApplicationDiagnostics,
   GenerationIdentity,
@@ -48,14 +46,11 @@ export class HarnessRuntime {
     return { ...this.current }
   }
 
-  async start(options: { windowMode?: HarnessWindowMode } = {}): Promise<RuntimeStatus> {
+  async start(): Promise<RuntimeStatus> {
     return this.transition(async () => {
       if (this.shuttingDown) throw new Error('HOST_SHUTTING_DOWN')
       if (!['idle', 'stopped'].includes(this.current.state))
         throw new Error('RUN_ALREADY_ACTIVE: use podcut_restart or podcut_stop')
-      const windowMode = parseHarnessWindowMode(
-        options.windowMode ?? this.options.windowMode ?? process.env.PODCUT_HARNESS_WINDOW_MODE,
-      )
       this.artifacts = new RunArtifacts(this.options.outputRoot, this.options.repositoryRoot)
       this.current = {
         state: 'starting',
@@ -63,7 +58,6 @@ export class HarnessRuntime {
         stage: 'preflight',
         runId: this.artifacts.runId,
         runDirectory: this.artifacts.directory,
-        windowMode,
       }
       return this.launchGeneration()
     })
@@ -263,7 +257,6 @@ export class HarnessRuntime {
             this.fail(new Error('APPLICATION_CRASHED'))
         },
         this.options.applicationEntry,
-        this.current.windowMode,
       )
       this.update({ stage: 'renderer-ready', pid: this.session.child.pid })
       this.assertStartingGeneration(generation)

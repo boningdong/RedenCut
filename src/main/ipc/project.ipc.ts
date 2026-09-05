@@ -11,7 +11,6 @@ import type { ProjectTransitionCoordinator } from '../project/ProjectTransitionC
 import type { SessionSwitchBarrier } from '../project/SessionSwitchBarrier'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
-import { assertNativeDialogAllowed } from '../harnessDialogPolicy'
 
 type DiagnosticSink = (error: unknown) => void
 
@@ -27,11 +26,10 @@ export function registerProjectIpc(
     toIpcResult(() => controller.describe(), diagnosticSink),
   )
   ipcMain.handle('project:open-dialog', (event, input: unknown) =>
-    toIpcResult(() => {
-      const request = openProjectRequest(input)
-      assertNativeDialogAllowed()
-      return transitions.openDialog(event.sender, request)
-    }, diagnosticSink),
+    toIpcResult(
+      () => transitions.openDialog(event.sender, openProjectRequest(input)),
+      diagnosticSink,
+    ),
   )
   ipcMain.handle('project:open-pending', (event, input: unknown) =>
     toIpcResult(async () => {
@@ -93,7 +91,6 @@ async function chooseAndSaveAs(
   const window = BrowserWindow.getAllWindows().find(
     (candidate) => candidate.webContents.id === senderId,
   )
-  assertNativeDialogAllowed()
   const result = await dialog.showSaveDialog(window ?? BrowserWindow.getFocusedWindow()!, {
     title: `Save ${APP_NAME} Project`,
     defaultPath: `Untitled${APP_FILE_EXT}`,

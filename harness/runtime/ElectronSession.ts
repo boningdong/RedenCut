@@ -9,8 +9,6 @@ import { electronEnvironment } from './electronEnvironment'
 import { readProcessIdentity } from './processIdentity'
 import { quitElectronOnEventLoop } from './quitElectronOnEventLoop'
 import type { ApplicationDiagnostics } from './runtime.types'
-import { parseHarnessWindowMode } from '../../src/shared/harnessWindowMode'
-import type { HarnessWindowMode } from '../../src/shared/harnessWindowMode'
 
 export class ElectronSession {
   readonly child: ChildProcess
@@ -65,12 +63,10 @@ export class ElectronSession {
     timeoutMs: number,
     onCrash: () => void,
     applicationEntry = join(repositoryRoot, 'out/main/index.js'),
-    windowMode: HarnessWindowMode = parseHarnessWindowMode(process.env.PODCUT_HARNESS_WINDOW_MODE),
   ): Promise<ElectronSession> {
     const env = electronEnvironment(process.env)
     env.PODCUT_HARNESS_RUN_DIRECTORY = artifacts.directory
     env.PODCUT_HARNESS_RUN_ID = artifacts.runId
-    env.PODCUT_HARNESS_WINDOW_MODE = windowMode
     env.TMPDIR = join(artifacts.directory, 'temporary')
     mkdirSync(env.TMPDIR, { recursive: true })
     // The public default launcher coordinates Electron readiness and applies automation defaults.

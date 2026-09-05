@@ -12,7 +12,6 @@ import type { SessionJobRegistry } from '../project/SessionJobRegistry'
 import { mergeProjectDraft } from '../project/sessionProjection'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
-import { assertNativeDialogAllowed } from '../harnessDialogPolicy'
 
 type DiagnosticSink = (error: unknown) => void
 
@@ -51,7 +50,6 @@ export function registerRenderIpc(
           project,
           resolveOriginal,
           selectDestination: async () => {
-            assertNativeDialogAllowed()
             const destination = await dialog.showSaveDialog(window, {
               title: 'Export Audio',
               defaultPath: `export.${project.export.format}`,

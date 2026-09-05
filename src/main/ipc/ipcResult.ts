@@ -9,8 +9,6 @@ const SAFE_MESSAGES: Record<IpcErrorCode, string> = {
   cancelled: 'The operation was cancelled.',
   'invalid-request': 'The request was invalid.',
   'operation-failed': 'The operation could not be completed.',
-  'foreground-required':
-    'FOREGROUND_REQUIRED: Native dialogs require foreground harness mode. Stop this run and explicitly start in foreground mode.',
 }
 
 export class PublicIpcError extends Error {

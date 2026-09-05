@@ -1,5 +1,3 @@
-import type { HarnessWindowMode } from '../../src/shared/harnessWindowMode'
-
 export interface GenerationIdentity {
   runId: string
   generation: number
@@ -13,11 +11,9 @@ export interface RuntimeStatus {
   runDirectory?: string
   pid?: number
   error?: string
-  windowMode?: HarnessWindowMode
 }
 
 export interface RuntimeOptions {
-  windowMode?: HarnessWindowMode
   repositoryRoot: string
   outputRoot: string
   startupTimeoutMs?: number
