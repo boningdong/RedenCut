@@ -10,6 +10,7 @@ import { createMcpFacade } from '../mcp/createMcpFacade'
 import { PlaywrightMcpAdapter } from '../ui/PlaywrightMcpAdapter'
 import { electronEnvironment } from '../runtime/electronEnvironment'
 import { deadline } from '../runtime/deadline'
+import { quitElectronOnEventLoop } from '../runtime/quitElectronOnEventLoop'
 
 function resultText(result: CallToolResult): string {
   expect(result.isError, JSON.stringify(result.content)).not.toBe(true)
@@ -115,12 +116,13 @@ test('forwards official MCP UI actions and images without transferring Electron 
       if (result.status === 'rejected') failure ??= result.reason
     }
     try {
-      await deadline(application.close(), 5000, 'GATE_A_CLOSE_TIMEOUT')
+      await quitElectronOnEventLoop(application, child, 5000)
     } catch (error) {
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
       failure ??= error
     }
   }
   if (failure) throw failure
-  expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
+  expect(child.signalCode).toBeNull()
+  expect(child.exitCode).toBe(0)
 }, 60_000)

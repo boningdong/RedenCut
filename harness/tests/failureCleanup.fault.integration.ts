@@ -71,7 +71,7 @@ test('forced Electron close is not prevented by a failed evidence write', async 
   )
   const identity = readProcessIdentity(session.child.pid!)
   const closing = vi
-    .spyOn(session.application, 'close')
+    .spyOn(session.application, 'evaluate')
     .mockRejectedValue(new Error('simulated-close-timeout'))
   const recording = vi.spyOn(artifacts, 'record').mockImplementation(() => {
     throw new Error('simulated-disk-full')

@@ -7,12 +7,14 @@ import type { RunArtifacts } from '../artifacts/RunArtifacts'
 import { deadline } from './deadline'
 import { electronEnvironment } from './electronEnvironment'
 import { readProcessIdentity } from './processIdentity'
+import { quitElectronOnEventLoop } from './quitElectronOnEventLoop'
 import type { ApplicationDiagnostics } from './runtime.types'
 
 export class ElectronSession {
   readonly child: ChildProcess
   private page: Page | undefined
   private closing = false
+  private forcedTermination = false
 
   private constructor(
     readonly application: ElectronApplication,
@@ -30,6 +32,13 @@ export class ElectronSession {
     }
     this.child.stdout?.on('data', (data: Buffer) => log('main-stdout', data.toString()))
     this.child.stderr?.on('data', (data: Buffer) => log('main-stderr', data.toString()))
+    this.child.once('exit', (code, signal) => {
+      try {
+        artifacts.record(generation, 'process-exit', { pid: this.child.pid, code, signal })
+      } catch (error) {
+        console.error('Could not persist Electron exit:', String(error))
+      }
+    })
     const observed = new WeakSet<Page>()
     const observePage = (page: Page) => {
       if (observed.has(page)) return
@@ -128,11 +137,14 @@ export class ElectronSession {
     return { main, renderer }
   }
 
-  async close(timeoutMs: number): Promise<void> {
+  async close(timeoutMs: number, allowAbnormalExit = false): Promise<void> {
     this.closing = true
-    if (this.child.exitCode !== null || this.child.signalCode !== null) return
+    if (this.child.exitCode !== null || this.child.signalCode !== null) {
+      this.assertExit(allowAbnormalExit)
+      return
+    }
     try {
-      await deadline(this.application.close(), timeoutMs, 'ELECTRON_CLOSE_TIMEOUT')
+      await quitElectronOnEventLoop(this.application, this.child, timeoutMs)
     } catch (error) {
       try {
         this.artifacts.record(this.generation, 'forced-close', {
@@ -143,7 +155,8 @@ export class ElectronSession {
         console.error('Could not persist forced Electron close:', String(artifactError))
       }
       // Only the still-owned ChildProcess handle is signalled; never search or kill by app name.
-      if (this.child.exitCode === null && this.child.signalCode === null) this.child.kill('SIGKILL')
+      if (this.child.exitCode === null && this.child.signalCode === null)
+        this.forcedTermination = this.child.kill('SIGKILL')
     }
     if (this.child.exitCode === null && this.child.signalCode === null) {
       await deadline(
@@ -152,5 +165,15 @@ export class ElectronSession {
         'OWNED_PROCESS_DID_NOT_EXIT',
       )
     }
+    this.assertExit(allowAbnormalExit)
+  }
+
+  private assertExit(allowAbnormalExit: boolean): void {
+    // An already reported failed generation may be disposed during explicit recovery.
+    if (allowAbnormalExit) return
+    if (this.child.signalCode && !(this.forcedTermination && this.child.signalCode === 'SIGKILL'))
+      throw new Error(`ELECTRON_ABNORMAL_EXIT: ${this.child.signalCode}`)
+    if (this.child.exitCode !== null && this.child.exitCode !== 0)
+      throw new Error(`ELECTRON_ABNORMAL_EXIT: ${this.child.exitCode}`)
   }
 }

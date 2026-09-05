@@ -68,8 +68,9 @@ export class HarnessRuntime {
       if (this.shuttingDown) throw new Error('HOST_SHUTTING_DOWN')
       if (!this.artifacts) throw new Error('NO_RUN: call podcut_start first')
       await this.checkClosePreconditions(options.discardUnsaved ?? false)
+      const recovering = this.current.state === 'failed'
       this.update({ state: 'stopping', stage: 'shutdown' })
-      await this.closeGeneration()
+      await this.closeGeneration(recovering)
       if (options.rebuild) {
         this.update({ state: 'starting', stage: 'build' })
         try {
@@ -93,8 +94,9 @@ export class HarnessRuntime {
     return this.transition(async () => {
       if (!this.artifacts || this.current.state === 'stopped') return this.status()
       await this.checkClosePreconditions(options.discardUnsaved ?? false)
+      const recovering = this.current.state === 'failed'
       this.update({ state: 'stopping', stage: 'shutdown' })
-      await this.closeGeneration()
+      await this.closeGeneration(recovering)
       this.update({ state: 'stopped', stage: 'stopped', pid: undefined })
       return this.status()
     })
@@ -200,7 +202,7 @@ export class HarnessRuntime {
         warning: 'Unsettled work or unsaved edits may be lost when the MCP host exits.',
       })
       this.current = { ...this.current, state: 'stopping', stage: 'forced-shutdown' }
-      await this.closeGeneration()
+      await this.closeGeneration(true)
       try {
         this.update({ state: 'stopped', stage: 'stopped', pid: undefined })
       } catch (artifactError) {
@@ -330,7 +332,9 @@ export class HarnessRuntime {
     assertCloseAllowed(diagnostics.renderer, discardUnsaved)
   }
 
-  private async closeGeneration(): Promise<void> {
+  private async closeGeneration(
+    allowAbnormalExit = this.current.state === 'failed',
+  ): Promise<void> {
     const trace = this.trace
     const adapter = this.adapter
     const session = this.session
@@ -354,7 +358,7 @@ export class HarnessRuntime {
         }
       }
     } finally {
-      await session?.close(this.shutdownTimeout)
+      await session?.close(this.shutdownTimeout, allowAbnormalExit)
       if (this.session === session) this.session = undefined
     }
   }

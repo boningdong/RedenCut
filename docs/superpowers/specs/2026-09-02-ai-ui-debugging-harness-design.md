@@ -1,7 +1,7 @@
 # Podcut AI UI Debugging Harness
 
 Date: 2026-09-02
-Status: Gates A/B implementation checkpoint, independently reviewed on 2026-09-03; final stability acceptance is incomplete because intermittent Main-readiness timeouts remain unresolved; Gates C/D remain unimplemented.
+Status: Gates A/B passed local revalidation on September 5 within the coverage recorded in section 13; the original September 3 checkpoint is retained in section 12; Gates C/D remain unimplemented.
 
 ## 1. Goal and scope
 
@@ -279,7 +279,7 @@ Confirmed from public interfaces/source:
 - [External trace merge discussion](https://github.com/microsoft/playwright/issues/40915) distinguishes context traces from test-runner traces.
 
 Initial research inspected moving upstream sources; Gates A/B now exercise the installed version set below through real Electron and MCP traffic.
-Successful runs demonstrate the infrastructure and the real Podcut empty state, but intermittent Main-startup timeouts still prevent final stability acceptance.
+Successful runs demonstrate the infrastructure and the real Podcut empty state; the September 3 Main-startup timeouts and subsequent September 5 revalidation are recorded below.
 Editing workflows in Gates C/D have not been tested.
 
 ## 11. Review boundary
@@ -290,7 +290,7 @@ If the shared-context route is blocked, stop at that boundary, report the concre
 
 ## 12. Gates A/B acceptance record
 
-Status: implementation checkpoint; final stability acceptance is incomplete.
+Historical status on September 3: implementation checkpoint; final stability acceptance was incomplete.
 Tested locally on macOS on 2026-09-03 with Node 24.14.0, Electron 40.8.0, Playwright 1.63.0-alpha-2026-08-31, Playwright MCP 0.0.80, and MCP SDK 1.30.0.
 Playwright matches the exact dependency required by this MCP release; upgrade this combination only after rerunning the compatibility test.
 Launch the built JavaScript entry with the public default `_electron.launch({ args, ... })` path, without an `executablePath` override.
@@ -302,7 +302,7 @@ In this pinned version, overriding the executable bypasses the upstream loader's
 | B          | Real Podcut readiness, isolated paths/locks, loopback debug listeners, lifecycle tools, explicit rebuild/restart, fresh-generation snapshots, logs/traces, ordinary disconnect/SIGTERM cleanup                                                            |
 | B failures | Readiness/adapter timeouts, crash during adapter creation, late-adapter disposal, uncertain UI timeout with no replay, shutdown during launch, close-failure retry, artifact-write failure cleanup, host hard-kill detection with process-identity checks |
 
-Verification commands are `npm run format`, `npm run check`, and `npm run test:harness`.
+Current full verification commands are `npm run format`, `npm run check`, and `npm run test:harness:all`; the September 3 results below predate the normal/fault suite split.
 Repository verification passed 467 unit tests, formatting, lint, Knip, type checking and the production build.
 The headed suite has passed all 18 integration tests in one run, but other full-suite runs failed with Main-readiness timeouts; successful reruns are not evidence that the intermittent failure is resolved.
 The final rerun at 00:38 PDT on 2026-09-03 passed 16 of 18 integration tests; the real-app restart and close-failure-retry scenarios both failed during Main startup with `MAIN_READY_TIMEOUT`.
@@ -329,7 +329,7 @@ Treat retained snapshots, logs and traces as local debugging data; there is no a
 
 ### Current limits
 
-- Main startup is not yet repeatably reliable with the pinned combination; do not treat this checkpoint as accepted for unattended debugging.
+- The September 3 startup timeouts remain historical evidence; section 13 defines the scope and limits of the subsequent revalidation.
 - Gate B supports the empty application and dialog-free interactions only; do not invoke open/import/save/export dialogs until Gate C supplies deterministic adapters.
 - Dirty/busy observations cover current renderer session state, import and transcription; they do not yet constitute full product-job or native-dialog coordination.
 - A failed/uncertain UI generation requires an explicit restart/stop decision; failed mutations are never replayed automatically.
@@ -339,3 +339,37 @@ Treat retained snapshots, logs and traces as local debugging data; there is no a
 - Each generation records a fresh checkout/dependency observation, including after rebuild; this is not a content-addressed attestation of prebuilt output.
 - System dependencies/models, real media/transcription workflows, root-level product `e2e/`, Windows, CI, HMR and AI-client integration are not part of this acceptance.
 - Dependency installation reported audit warnings; no unrelated dependency upgrades were made, and a later network audit recheck was blocked because it would upload dependency metadata.
+
+## 13. Shutdown stabilization and revalidation — 2026-09-05
+
+The macOS crash reports for PIDs 16810 and 16977 matched the readiness-timeout and shutdown-during-launch harness runs, with `SIGSEGV` in the native window-close stack, rather than an intentionally injected `SIGKILL`.
+An early-shutdown regression failed immediately with `SIGSEGV` against the original synchronous `application.close()` path.
+The fixed public Main evaluation schedules `app.quit()` with `setImmediate`, allowing native window initialization to unwind before quitting; the harness then waits boundedly for its owned child to exit.
+Gate A and the real-app runtime share this shutdown helper, with no private imports, second CDP connection or dependency changes.
+
+Every real-app generation now records a `process-exit` event with PID, exit code and signal.
+Normal stop rejects abnormal exits, including exits during trace disposal before session cleanup begins; explicitly recovering an already-failed generation still works.
+The early-shutdown regression requires eight consecutive clean exits, and the normal restart scenario checks exit evidence for both generations without forced cleanup.
+Fault regressions cover nonzero exits before close, during close and during trace disposal.
+
+Final verification passed `npm run check` (467 unit tests, formatting, lint, Knip, type checking and build) and two consecutive `test:harness:all` runs with 22/22 integration tests each.
+The default suite also passed three consecutive runs (6 tests per run); the final full suite comprises those 6 normal tests and 16 fault tests.
+The eight-attempt early-shutdown regression passed in each final full run, and no post-fix native Electron crash report or surviving harness application/server process was found.
+Exit records after the fix contained no `SIGSEGV`; retained `MAIN_READY_TIMEOUT` events belonged to the intentionally short-timeout minimal fixture, while normal startup/restart tests passed.
+The prior intermittent normal-startup timeout did not recur in this bounded revalidation; its precise relationship to the native shutdown crash is not conclusively established, so a future recurrence must still fail acceptance and retain evidence.
+Independent review and re-review found no remaining blocking issue after the abnormal-exit checks were added.
+
+### Running the harness tests
+
+Run from the harness worktree in a logged-in macOS GUI session, using the pinned Node version and an existing build (`npm run build` after product changes).
+
+| Command                       | Scope                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `npm run test:harness`        | Normal UI, isolation, restart, disconnect and clean early-shutdown regressions                                |
+| `npm run test:harness:faults` | Explicit fault injection, including crashes, forced termination and timeouts; prints a warning before running |
+| `npm run test:harness:all`    | Both suites; required for full A/B acceptance                                                                 |
+| `npm run check`               | Repository static checks, unit tests and production build; excludes headed harness tests                      |
+
+Generated evidence remains under `.harness-runs/`; `generation-*/events.jsonl` distinguishes clean `process-exit`, `forced-close` and failure events.
+Do not dismiss a new native crash report merely because fault tests were selected: match its PID and timestamp against the retained events.
+AI-client registration and product workflows in C/D remain separate work.

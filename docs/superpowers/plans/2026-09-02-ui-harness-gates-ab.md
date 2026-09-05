@@ -27,34 +27,37 @@ The external facade forwards MCP schemas/results, with runtime admission and gen
 
 ## File Responsibilities
 
-| Path                                          | Responsibility                                                        |
-| --------------------------------------------- | --------------------------------------------------------------------- |
-| `harness/mcp/createMcpFacade.ts`              | Public MCP discovery/call forwarding with complete result content     |
-| `harness/mcp/ToolBackend.ts`                  | Facade/backend contract                                               |
-| `harness/ui/PlaywrightMcpAdapter.ts`          | Official MCP server/client pair borrowing a context                   |
-| `harness/runtime/HarnessRuntime.ts`           | Run state, lifecycle and admission coordination                       |
-| `harness/runtime/OperationGate.ts`            | Exclusive lifecycle admission and serialized UI calls                 |
-| `harness/runtime/ElectronSession.ts`          | Owned Electron launch/readiness/close and fixed read-only diagnostics |
-| `harness/runtime/deadline.ts`                 | Bounded operation waits without silent retries                        |
-| `harness/artifacts/RunArtifacts.ts`           | Durable run/generation manifests, logs and tool events                |
-| `harness/artifacts/buildProvenance.ts`        | Fresh checkout/dependency observations for each generation            |
-| `harness/artifacts/TraceRecorder.ts`          | Single tracing owner and incomplete-trace reporting                   |
-| `harness/runtime/electronEnvironment.ts`      | Explicit child environment allowlist; exclude unrelated secrets       |
-| `harness/runtime/processIdentity.ts`          | OS process identity lookup and comparison                             |
-| `harness/runtime/orphanInspection.ts`         | Read-only matching of retained ownership manifests to surviving apps  |
-| `harness/runtime/closePreconditions.ts`       | Dirty/busy close policy                                               |
-| `harness/mcp/RuntimeToolBackend.ts`           | Lifecycle schemas, curated UI tools and generation envelopes          |
-| `harness/server.ts`                           | Stdio entry, signal/disconnect cleanup; no user-facing CLI            |
-| `src/main/harnessStartup.ts`                  | Opt-in isolated paths configured before the single-instance lock      |
-| `harness/tests/fixtures/minimal-electron.cjs` | Small visible Electron compatibility fixture                          |
-| `harness/tests/compatibility.integration.ts`  | Gate A: actual MCP traffic, images, context lifetime, trace           |
-| `harness/tests/lifecycle.integration.ts`      | Gate B: real Podcut lifecycle, isolation and failures                 |
-| `harness/tests/server.integration.ts`         | External stdio discovery, calls and disconnect behavior               |
-| `harness/tests/failureCleanup.integration.ts` | Cleanup despite ownership/evidence write failures                     |
-| `harness/tests/startupRaces.integration.ts`   | Bounded startup, crash races, and late adapter disposal               |
-| `harness/tests/*.test.ts`                     | Focused infrastructure unit tests                                     |
-| `vitest.harness.config.ts`                    | Explicit headed integration test runner, serial execution             |
-| `harness/tsconfig.json`                       | Type-check harness without including it in product bundles            |
+| Path                                                | Responsibility                                                        |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `harness/mcp/createMcpFacade.ts`                    | Public MCP discovery/call forwarding with complete result content     |
+| `harness/mcp/ToolBackend.ts`                        | Facade/backend contract                                               |
+| `harness/ui/PlaywrightMcpAdapter.ts`                | Official MCP server/client pair borrowing a context                   |
+| `harness/runtime/HarnessRuntime.ts`                 | Run state, lifecycle and admission coordination                       |
+| `harness/runtime/OperationGate.ts`                  | Exclusive lifecycle admission and serialized UI calls                 |
+| `harness/runtime/ElectronSession.ts`                | Owned Electron launch/readiness/close and fixed read-only diagnostics |
+| `harness/runtime/deadline.ts`                       | Bounded operation waits without silent retries                        |
+| `harness/artifacts/RunArtifacts.ts`                 | Durable run/generation manifests, logs and tool events                |
+| `harness/artifacts/buildProvenance.ts`              | Fresh checkout/dependency observations for each generation            |
+| `harness/artifacts/TraceRecorder.ts`                | Single tracing owner and incomplete-trace reporting                   |
+| `harness/runtime/electronEnvironment.ts`            | Explicit child environment allowlist; exclude unrelated secrets       |
+| `harness/runtime/processIdentity.ts`                | OS process identity lookup and comparison                             |
+| `harness/runtime/orphanInspection.ts`               | Read-only matching of retained ownership manifests to surviving apps  |
+| `harness/runtime/closePreconditions.ts`             | Dirty/busy close policy                                               |
+| `harness/mcp/RuntimeToolBackend.ts`                 | Lifecycle schemas, curated UI tools and generation envelopes          |
+| `harness/server.ts`                                 | Stdio entry, signal/disconnect cleanup; no user-facing CLI            |
+| `src/main/harnessStartup.ts`                        | Opt-in isolated paths configured before the single-instance lock      |
+| `harness/tests/fixtures/minimal-electron.cjs`       | Small visible Electron compatibility fixture                          |
+| `harness/tests/compatibility.integration.ts`        | Gate A: actual MCP traffic, images, context lifetime, trace           |
+| `harness/tests/lifecycle.integration.ts`            | Gate B: real Podcut lifecycle, isolation and clean exit evidence      |
+| `harness/tests/server.integration.ts`               | External stdio discovery, calls and disconnect behavior               |
+| `harness/tests/failureCleanup.fault.integration.ts` | Cleanup despite ownership/evidence write failures                     |
+| `harness/tests/startupRaces.integration.ts`         | Public launch automation defaults                                     |
+| `harness/tests/*.fault.integration.ts`              | Explicit lifecycle, transport, startup and abnormal-exit fault tests  |
+| `harness/tests/earlyShutdown.integration.ts`        | Repeated clean shutdown during native startup                         |
+| `harness/runtime/quitElectronOnEventLoop.ts`        | Public deferred quit request and bounded owned-process exit wait      |
+| `harness/tests/*.test.ts`                           | Focused infrastructure unit tests                                     |
+| `vitest.harness.config.ts`                          | Explicit headed integration test runner, serial execution             |
+| `harness/tsconfig.json`                             | Type-check harness without including it in product bundles            |
 
 ## Task 1: Shared-Context Compatibility (Gate A)
 
@@ -174,14 +177,14 @@ Only `browser_snapshot` may establish the first current-generation snapshot; sta
 ```sh
 npm run format
 npm run check
-npm run test:harness
+npm run test:harness:all
 git diff --check
 ```
 
 - [x] Obtain independent code review and address the reported correctness/safety findings.
-- [ ] Complete repeatable startup acceptance before declaring Gates A/B complete; retain failure evidence and do not silently change topology.
+- [x] Complete bounded local startup/shutdown revalidation, retain historical failure evidence, and record remaining causal uncertainty in the September 5 acceptance record.
 
-## Acceptance notes — 2026-09-03
+## Historical acceptance notes — 2026-09-03
 
 Gates A/B implementation is present, but final stability acceptance remains incomplete.
 Full repository verification passed with 467 unit tests, and the headed suite has passed all 18 infrastructure integration tests in a single run.
@@ -191,3 +194,15 @@ Independent review and scoped re-review resolved the reported findings, but do n
 The [design acceptance record](../specs/2026-09-02-ai-ui-debugging-harness-design.md#12-gates-ab-acceptance-record) records the tested version set, entry point, evidence layout and unresolved startup risk.
 Next acceptance work must reproduce and resolve the Main-startup instability using public APIs or a verified compatible version set; changing topology still requires explicit approval.
 Host hard-kill recovery remains manual after read-only identity-checked detection; AI-client registration and Gates C/D remain outside this implementation.
+
+## Shutdown stabilization — 2026-09-05
+
+- [x] Correlate native crash reports with run PIDs and reproduce early shutdown with an explicit clean-exit assertion.
+- [x] Defer the fixed public Main quit request onto the normal event loop and share it with Gate A cleanup.
+- [x] Record process exit codes/signals, reject abnormal normal-stop outcomes, and preserve explicit failed-generation recovery.
+- [x] Separate normal and fault test files; preserve `test:harness:all` as the complete acceptance command.
+- [x] Review the lifecycle change independently and address pre-existing abnormal exits during cleanup.
+- [x] Complete final full-suite revalidation and record its scope and remaining uncertainty in [section 13 of the design](../specs/2026-09-02-ai-ui-debugging-harness-design.md#13-shutdown-stabilization-and-revalidation--2026-09-05).
+
+Final verification: 467 unit tests and the repository checks/build passed; two consecutive full harness runs passed 22/22 tests each, and three default-suite runs passed 6/6 each.
+No post-fix native crash report or owned process residue was found; the historical normal-startup timeout did not recur, though its causal relationship to the shutdown crash is not proven.
