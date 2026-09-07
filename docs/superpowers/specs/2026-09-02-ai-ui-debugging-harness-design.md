@@ -361,6 +361,9 @@ Independent review and re-review found no remaining blocking issue after the abn
 
 ### Running the harness tests
 
+For Linux container execution without host windows, see the [container harness guide](../../../harness/container/README.md).
+The commands below describe direct macOS execution.
+
 Run from the harness worktree in a logged-in macOS GUI session, using the pinned Node version and an existing build (`npm run build` after product changes).
 
 | Command                       | Scope                                                                                                         |

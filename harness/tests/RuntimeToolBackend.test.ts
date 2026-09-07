@@ -1,12 +1,21 @@
 import { resolve } from 'node:path'
-import { expect, test } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, expect, test } from 'vitest'
 import { RuntimeToolBackend } from '../mcp/RuntimeToolBackend'
 import { HarnessRuntime } from '../runtime/HarnessRuntime'
 
+const outputRoots: string[] = []
+afterEach(() => {
+  for (const directory of outputRoots.splice(0)) rmSync(directory, { recursive: true, force: true })
+})
+
 function backend() {
-  return new RuntimeToolBackend(
-    new HarnessRuntime({ repositoryRoot: resolve('.'), outputRoot: resolve('.harness-runs') }),
-  )
+  // Real status inspection must not depend on accumulated developer run artifacts.
+  const outputRoot = mkdtempSync(join(tmpdir(), 'podcut-backend-test-'))
+  outputRoots.push(outputRoot)
+  return new RuntimeToolBackend(new HarnessRuntime({ repositoryRoot: resolve('.'), outputRoot }))
 }
 
 test('publishes lifecycle and curated official UI schemas before launch without a browser', async () => {
