@@ -13,6 +13,7 @@ import type { ApplicationDiagnostics, RuntimeStatus } from '../harness/runtime/r
 import { ProjectFileSchema } from '../src/shared/project.types'
 
 test('imported short audio survives project save and a full application restart', async () => {
+  // Establish independent expectations from the input file, not application state.
   const filename = 'mandarin-short-female.wav'
   const fixture = resolve('e2e/fixtures/audio', filename)
   const checksum = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -33,6 +34,8 @@ test('imported short audio survives project save and a full application restart'
     ).trim(),
   )
   expect(duration).toBeGreaterThan(0)
+
+  // Connect a deterministic test driver to the real MCP facade in this process.
   const runtime = new HarnessRuntime({
     repositoryRoot: resolve('.'),
     outputRoot: resolve('.harness-runs'),
@@ -45,6 +48,8 @@ test('imported short audio survives project save and a full application restart'
   await client.connect(clientTransport)
   let identity: { runId: string; generation: number }
   let runDirectory: string | undefined
+
+  // Tool calls, diagnostic polling and screenshots support the scenario below.
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     const result = (await client.callTool({ name, arguments: args }, undefined, {
       timeout: 60_000,
@@ -85,6 +90,7 @@ test('imported short audio survives project save and a full application restart'
     return track
   }
   try {
+    // Launch an isolated app and import through the UI with a prepared file selection.
     const started = (await call('podcut_start')).structuredContent as unknown as RuntimeStatus
     identity = { runId: started.runId!, generation: started.generation }
     runDirectory = started.runDirectory!
@@ -97,6 +103,8 @@ test('imported short audio survives project save and a full application restart'
     await call('browser_click', { ...identity, target: 'button:text-is("Import Audio")' })
     const importedTrack = await readyTrack()
     await screenshot('imported')
+
+    // Save through the UI, then inspect the persisted project and copied audio independently.
     const selection = { type: 'project', name: 'short-audio.podcut' }
     await call('podcut_prepare_dialog', {
       ...identity,
@@ -125,6 +133,8 @@ test('imported short audio survives project save and a full application restart'
     expect(source.metadata.durationSeconds).toBeCloseTo(duration, 3)
     expect(source.location.mode).toBe('copy')
     expect(checksum(join(projectRoot, source.location.path))).toBe(originalHash)
+
+    // Replace the Electron process and reopen the saved project in a fresh UI generation.
     const restarted = (await call('podcut_restart', identity))
       .structuredContent as unknown as RuntimeStatus
     expect(restarted.generation).toBe(started.generation + 1)
@@ -138,6 +148,8 @@ test('imported short audio survives project save and a full application restart'
     })
     await call('browser_click', { ...identity, target: 'button:text-is("Open Project")' })
     const reopenedTrack = await readyTrack()
+
+    // Compare restored identity/data and verify the input audio was never changed.
     expect(reopenedTrack).toEqual(importedTrack)
     expect((await diagnostics()).renderer.dirty).toBe(false)
     await screenshot('reopened')
@@ -146,6 +158,8 @@ test('imported short audio survives project save and a full application restart'
     ).toEqual(saved.audioSources)
     expect(checksum(join(projectRoot, source.location.path))).toBe(originalHash)
     expect(checksum(fixture)).toBe(originalHash)
+
+    // Verify both application generations exited cleanly, without forced termination.
     await call('podcut_stop', identity)
     for (const generation of [1, 2]) {
       const events = readFileSync(
@@ -164,6 +178,7 @@ test('imported short audio survives project save and a full application restart'
       expect(events.some((event) => event.kind === 'forced-close')).toBe(false)
     }
   } catch (error) {
+    // Retain failure evidence; release the app and MCP connections on every exit path.
     if (runDirectory) writeFileSync(join(runDirectory, 'e2e-failure.txt'), String(error))
     throw error
   } finally {

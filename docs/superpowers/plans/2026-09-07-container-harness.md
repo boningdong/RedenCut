@@ -13,7 +13,7 @@ The user approved implementation in this session; execute locally in the existin
 
 - [x] Add a host-side container MCP acceptance test; verify failure before the container launcher exists.
 - [x] Add `harness/container/Dockerfile`, a minimal build context allowlist, container entrypoint, and host launcher.
-- [x] Build the image on OrbStack and verify read-only checkout, Linux dependencies, Git provenance, and artifact mounts.
+- [x] Build the image with Docker and verify read-only checkout, Linux dependencies, Git provenance, and artifact mounts.
 - [x] Run the existing complete harness suite inside Xvfb; investigate actual failures without silent architecture fallback.
 - [x] Pass host-to-container MCP catalog/start/snapshot/click/screenshot/restart/disconnect checks, including retained artifacts and container removal.
 - [x] Run repository formatting/checks, inspect a returned screenshot, review implementation, and document commands and limitations.
@@ -30,11 +30,11 @@ git diff --check
 ```
 
 The smoke test is opt-in and never launches host Electron.
-The container launcher defaults to the current Docker context; this machine uses `orbstack`.
+The container launcher defaults to the current Docker context.
 
 ## Acceptance record
 
-Verified on OrbStack Linux ARM64 with the final image `podcut-harness:local` (image index `sha256:4f66dc1c56b63f25cdedcf684f52748a59f1ed1efafed9df63d9f455c1734f64`).
+Verified with Docker running Linux ARM64 containers using the final image `podcut-harness:local` (image index `sha256:4f66dc1c56b63f25cdedcf684f52748a59f1ed1efafed9df63d9f455c1734f64`).
 
 - Host and container `npm run check`: formatting, lint, Knip, types, 467 unit tests and production build passed on both platforms.
 - Container `test:harness:all`: 22/22 passed, including explicit fault injection.

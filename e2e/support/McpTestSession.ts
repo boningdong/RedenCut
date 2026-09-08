@@ -31,6 +31,7 @@ export class McpTestSession {
 
   async start(): Promise<void> {
     const create = PlaywrightMcpAdapter.create.bind(PlaywrightMcpAdapter)
+
     // Observe the existing shared Context without replacing the real adapter or opening CDP.
     this.observer = vi
       .spyOn(PlaywrightMcpAdapter, 'create')
@@ -38,6 +39,8 @@ export class McpTestSession {
         this.currentPage = (await getContext()).pages()[0]
         return create(getContext, outputDir)
       })
+
+    // Real MCP requests over an in-memory transport; Docker stdio is tested separately.
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     await this.server.connect(serverTransport)
     await this.client.connect(clientTransport)
@@ -47,6 +50,7 @@ export class McpTestSession {
   }
 
   async call(name: string, args: Record<string, unknown> = {}): Promise<CallToolResult> {
+    // The test chooses the tool/arguments; this client performs the protocol call, not an AI model.
     const result = (await this.client.callTool(
       { name, arguments: { ...this.identity, ...args } },
       undefined,
@@ -79,6 +83,7 @@ export class McpTestSession {
   }
 
   async close(): Promise<void> {
+    // Release all owned layers even if an earlier cleanup fails.
     try {
       await this.runtime.shutdown()
     } finally {
