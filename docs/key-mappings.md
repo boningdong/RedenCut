@@ -8,7 +8,7 @@ Update the implementation and this document together whenever a mapping or its c
 | Key | Action | Context and behavior |
 | --- | --- | --- |
 | Space | Play or pause | Requires an active player. In preview mode, starting playback while the playhead is inside a muted clip first seeks to that clip's output end. |
-| S | Split at playhead | Requires an active player and splits the applicable clip at the current output time. |
+| S | Split at playhead | Requires an active player and a selected clip; the playhead must be strictly inside that clip's output range. |
 | M | Mute selection | Requires a waveform drag selection and a primary source file. Associates selected transcript word IDs with the mute, then clears the selection. |
 | U | Unmute | Unmutes the selected clip when one is selected; otherwise unmutes every muted clip overlapping the waveform drag selection and clears that selection. |
 | Delete or Backspace | Remove selected clip or mute selection | Removes the selected clip when one is selected. Otherwise, a waveform drag selection mutes overlapping unmuted audio, associates selected transcript word IDs, and clears the selection. |

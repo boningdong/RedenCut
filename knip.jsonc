@@ -2,8 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // electron-vite and Vitest discover the real application, config, and test entries.
   "project": ["src/**/*.{ts,tsx,css}", "harness/**/*.{ts,cjs}", "e2e/**/*.ts", "*.config.ts"],
-  // Docker installs Debian FFmpeg; E2E uses ffprobe independently of application metadata.
-  "ignoreBinaries": ["ffprobe"],
+  // Docker installs Debian FFmpeg: ffprobe checks metadata; ffmpeg captures and analyzes real output.
+  "ignoreBinaries": ["ffprobe", "ffmpeg"],
   // The dedicated runner selects this config with npm's dynamic --config argument.
   "entry": [
     "vitest.performance.config.ts",

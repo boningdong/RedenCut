@@ -5,5 +5,13 @@ export function electronEnvironment(source: NodeJS.ProcessEnv): Record<string, s
     const value = source[key]
     if (value !== undefined) env[key] = value
   }
+  if (
+    source.PODCUT_CONTAINER_AUDIO === '1' &&
+    source.PULSE_SERVER === 'unix:/tmp/podcut-audio/native' &&
+    source.PULSE_SINK === 'podcut_test'
+  ) {
+    env.PULSE_SERVER = source.PULSE_SERVER
+    env.PULSE_SINK = source.PULSE_SINK
+  }
   return env
 }

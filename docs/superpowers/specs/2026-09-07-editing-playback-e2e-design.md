@@ -4,6 +4,9 @@
 
 Add two product E2Es: split/move/save/reopen, and play/pause/seek/resume.
 First provide container-only virtual audio output and recording, shared by both flows.
+The initial virtual-audio implementation supports Docker containers only; native macOS, Windows and non-container Linux execution are out of scope.
+Audio-dependent E2Es must check this prerequisite before launching Electron and fail with an actionable Docker command when invoked outside the supported environment, rather than silently skipping assertions or using host audio.
+Document this restriction in the E2E and container READMEs and keep the existing audio-capture-independent import/save/reopen test separately runnable.
 All application actions use the existing MCP UI tools and native-dialog preparation; do not add semantic split, move, seek or play MCP methods.
 Do not expose additional application state, read stores/player internals, or assert new flows through hidden clip attributes or project JSON.
 Observe rendered controls, visible time labels, timeline geometry, waveform screenshots and actual audio output.

@@ -13,3 +13,19 @@ test('never forwards unrelated credentials or Node/Electron injection variables 
   })
   expect(env).toEqual({ PATH: '/usr/bin', HOME: '/Users/test', LANG: 'en_US.UTF-8' })
 })
+
+test('forwards only the fixed private container audio endpoint, never arbitrary host endpoints', () => {
+  expect(
+    electronEnvironment({
+      PODCUT_CONTAINER_AUDIO: '1',
+      PULSE_SERVER: 'unix:/tmp/podcut-audio/native',
+      PULSE_SINK: 'podcut_test',
+    }),
+  ).toMatchObject({
+    PULSE_SERVER: 'unix:/tmp/podcut-audio/native',
+    PULSE_SINK: 'podcut_test',
+  })
+  expect(electronEnvironment({ PULSE_SERVER: 'tcp:host.example', PULSE_SINK: 'speakers' })).toEqual(
+    {},
+  )
+})

@@ -1,6 +1,6 @@
 # Container harness
 
-Runs the existing Podcut MCP server, Runtime, Playwright and Electron inside a Linux container with an Xvfb virtual display.
+Runs the existing Podcut MCP server, Runtime, Playwright and Electron inside a Linux container with an Xvfb virtual display and private PulseAudio virtual output.
 The host AI communicates through Docker stdin/stdout; there is no second CDP connection, published port, host display connection, or AI-client registration performed by these scripts.
 
 ## Build
@@ -15,7 +15,7 @@ The launcher uses the normal Docker CLI and its current context; set `DOCKER_CON
 The image uses the repository's Node version and lockfile, installing Linux-native dependencies rather than reusing Mac `node_modules`.
 Debian FFmpeg supplies `/usr/bin/ffmpeg` and `/usr/bin/ffprobe`, avoiding reliance on static npm binary availability for Linux ARM64.
 Debian packages are installed from the configured repositories at build time, so rebuilding without cache is not a bit-for-bit reproducibility guarantee.
-Only the dependency manifests, entrypoint and process supervisor enter the image build context; product source code and Git metadata are not uploaded to a registry or baked into the image.
+Only the dependency manifests and container startup/supervisor scripts enter the image build context; product source code and Git metadata are not uploaded to a registry or baked into the image.
 Rebuild after dependency manifests or container image configuration change; ordinary source changes do not need an image rebuild.
 The entrypoint rejects dependency manifest drift instead of silently running an old dependency set.
 
@@ -31,7 +31,17 @@ The first command runs the existing full normal/fault suite inside the virtual d
 Fault tests deliberately crash or terminate isolated processes; no host Electron is launched.
 The second runs an MCP client on the host against the real container server, including screenshot delivery, rebuild/restart, and cleanup.
 It requires the host project's npm dependencies to be installed.
-The third command runs the [product import/save/reopen E2E](../../e2e/README.md) with the supplied short audio fixture.
+The third command runs the [product E2Es](../../e2e/README.md): import/save/reopen, split/drag/save/reopen, and play/pause/seek/resume with the supplied short audio fixture.
+
+## Virtual audio (container only)
+
+Virtual output and recording currently support Docker containers only; no native host audio setup is performed.
+Startup creates a private 48 kHz PulseAudio null sink (`podcut_test`) and local Unix socket, then waits for the server before starting the requested command.
+Electron routes audio to this device; E2Es record `podcut_test.monitor` as WAV, which never plays through host speakers.
+No sound device, host audio socket, microphone or audio network port is shared.
+Missing audio prerequisites fail explicitly before audio-dependent E2Es launch Electron.
+PulseAudio may log unavailable D-Bus/desktop services in this minimal image; device readiness and actual sound capture are verified separately and these services are not used for the null sink.
+Recorder cleanup is bounded and retained output lives in each test run's evidence directory; container exit removes its private audio server.
 
 ## MCP entry
 
@@ -76,4 +86,4 @@ This avoids competing Playwright SIGTERM handlers and keeps Runtime in charge of
 Explicit container stop has a 15-second supervisor deadline; expiry is a reported nonzero exit, not a clean shutdown.
 Linux containers still share host compute resources, and this does not certify macOS window behavior, GPU performance or audio hardware.
 Native file selection is replaced by purpose-matched one-shot replies for import/open/save; the real UI, import, cache and project persistence paths remain active.
-Audio-output verification, real transcription/model setup, editing E2E and native OS dialog interaction remain separate work.
+Container audio-output and basic editing acceptance are covered by the named product E2Es; real transcription/model setup and native OS dialog interaction remain separate work.

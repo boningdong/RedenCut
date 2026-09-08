@@ -36,7 +36,7 @@ export class RunArtifacts {
       host: readProcessIdentity(process.pid),
       initialProvenance: observeBuildProvenance(repositoryRoot),
       scope:
-        'Isolated UI harness with prepared import/open/save dialogs; playback, transcription and export acceptance are not certified.',
+        'Isolated UI harness with prepared import/open/save dialogs. Product acceptance is established by named E2E results, not this lifecycle manifest; transcription, export and host audio hardware are not certified.',
     }
     this.update({})
   }

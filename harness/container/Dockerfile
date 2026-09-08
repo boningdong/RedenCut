@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git procps lsof unzip xvfb xauth tini \
     libgtk-3-0 libnss3 libasound2 libgbm1 libdrm2 libxss1 \
     libatk-bridge2.0-0 libx11-xcb1 libxkbcommon0 libxshmfence1 \
-    fonts-liberation fonts-noto-color-emoji \
+    fonts-liberation fonts-noto-color-emoji pulseaudio pulseaudio-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 COPY harness/container/entrypoint.sh /opt/podcut-entrypoint.sh
 COPY harness/container/supervise.mjs /opt/podcut-supervise.mjs
+COPY harness/container/start-audio.sh /opt/podcut-start-audio.sh
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 USER node
 RUN git config --global --add safe.directory /workspace

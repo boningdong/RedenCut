@@ -33,4 +33,5 @@ done
 DISPLAY=":$(cat "$display_file")"
 export DISPLAY
 rm "$display_file"
+. /opt/podcut-start-audio.sh
 exec node /opt/podcut-supervise.mjs "$@"
