@@ -50,3 +50,22 @@ test('returns actionable not-ready state rather than launching implicitly', asyn
   const status = await service.callTool('podcut_status', {})
   expect(status.structuredContent).toMatchObject({ state: 'idle' })
 })
+
+test('rejects stale dialog identities and mismatched selection shapes without starting', async () => {
+  const service = backend()
+  const stale = await service.callTool('podcut_prepare_dialog', {
+    runId: 'old',
+    generation: 1,
+    request: { purpose: 'import-audio', selection: { type: 'file', filename: 'voice.wav' } },
+  })
+  expect(stale.structuredContent).toMatchObject({ error: { code: 'STALE_GENERATION' } })
+  const wrongShape = await service.callTool('podcut_prepare_dialog', {
+    runId: 'old',
+    generation: 1,
+    request: { purpose: 'import-audio', selection: { type: 'project', name: 'project.podcut' } },
+  })
+  expect(wrongShape.isError).toBe(true)
+  expect((await service.callTool('podcut_status', {})).structuredContent).toMatchObject({
+    state: 'idle',
+  })
+})

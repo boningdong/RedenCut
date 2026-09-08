@@ -9,7 +9,8 @@ Do not implement playback verification, editing, transcription, export automatio
 ## Input and output ownership
 
 - Store the user-supplied file unchanged at `e2e/fixtures/audio/mandarin-short-female.wav`; retain the Downloads original.
-- Register this fixture by a stable ID rather than accepting arbitrary host filesystem paths from MCP callers.
+- Select audio fixtures by filename, such as `mandarin-short-female.wav`, resolved only within `e2e/fixtures/audio/`; do not introduce fixture IDs or an ID-to-file registry.
+- Accept only a plain filename for audio selection; reject path separators, traversal, absolute paths, missing/non-regular files and symlink escapes from the fixture directory.
 - Keep all saved projects under the current run's `projects/` directory, retained with the existing run artifacts.
 - Accept only normalized project names within that directory; reject traversal, absolute paths and symlink escapes.
 - Saving a new project must not overwrite an existing destination implicitly.
@@ -27,7 +28,8 @@ Supported purposes in this slice are `import-audio`, `save-project` and `open-pr
 Other native dialogs in harness mode must fail explicitly rather than opening a window or choosing a default; dirty-project decisions and export remain unsupported.
 The failure must be visible in harness diagnostics/events, not only in an application notification.
 
-Add `podcut_prepare_dialog` to the existing MCP server with current `runId` and `generation`, a purpose and a typed selection: fixture ID, project name or cancellation.
+Add `podcut_prepare_dialog` to the existing MCP server with current `runId` and `generation`, a purpose and a typed selection: audio filename, project name or cancellation.
+For `import-audio`, use `selection: { "type": "file", "filename": "mandarin-short-female.wav" }`; the fixture directory is fixed and does not depend on the caller's working directory.
 Runtime validates and resolves the selection, serializes preparation with UI/lifecycle work and refuses to replace an unconsumed reply.
 Use a generation-scoped file mailbox inside the isolated run directory to deliver the validated reply to Main; publish replies atomically and consume them once before returning a result.
 Purpose mismatch or an unprepared request is an explicit error and must not leave a reply available for a later unrelated action.
@@ -39,7 +41,7 @@ The adapter substitutes file selection only: selection tokens, IPC validation, i
 ## Acceptance scenario
 
 1. Start an isolated empty application and capture the initial UI snapshot.
-2. Prepare the short-audio fixture selection and click Import Audio through MCP.
+2. Prepare the `mandarin-short-female.wav` filename selection and click Import Audio through MCP.
 3. Wait with a bounded deadline for import completion, one visible track and rendered waveform readiness; capture a screenshot.
 4. Prepare a fresh project destination and click Save through MCP.
 5. Wait for clean/not-busy state and a persisted project whose schema, media location and metadata are valid.

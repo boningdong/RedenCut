@@ -1,5 +1,6 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
-import { APP_FILE_EXT, APP_NAME } from '../../shared/constants'
+import { BrowserWindow, ipcMain } from 'electron'
+import { nativeProjectDialogs } from '../dialogs/nativeProjectDialogs'
+import type { ProjectDialogs } from '../dialogs/ProjectDialogs'
 import type {
   OpenProjectRequest,
   ProjectMutationRequest,
@@ -21,6 +22,7 @@ export function registerProjectIpc(
   switchBarrier: SessionSwitchBarrier,
   mutations: ProjectMutationCoordinator,
   diagnosticSink: DiagnosticSink = console.error,
+  dialogs: ProjectDialogs = nativeProjectDialogs,
 ): void {
   ipcMain.handle('project:initialize', () =>
     toIpcResult(() => controller.describe(), diagnosticSink),
@@ -55,12 +57,12 @@ export function registerProjectIpc(
     toIpcResult(async () => {
       const request = mutationRequest(input)
       if (controller.workspace.descriptor.kind === 'saved') return mutations.save(request)
-      return chooseAndSaveAs(event.sender.id, mutations, request)
+      return chooseAndSaveAs(event.sender.id, mutations, request, dialogs)
     }, diagnosticSink),
   )
   ipcMain.handle('project:save-as', (event, input: unknown) =>
     toIpcResult(
-      () => chooseAndSaveAs(event.sender.id, mutations, mutationRequest(input)),
+      () => chooseAndSaveAs(event.sender.id, mutations, mutationRequest(input), dialogs),
       diagnosticSink,
     ),
   )
@@ -87,17 +89,12 @@ async function chooseAndSaveAs(
   senderId: number,
   mutations: ProjectMutationCoordinator,
   request: ProjectMutationRequest,
+  dialogs: ProjectDialogs,
 ) {
   const window = BrowserWindow.getAllWindows().find(
     (candidate) => candidate.webContents.id === senderId,
   )
-  const result = await dialog.showSaveDialog(window ?? BrowserWindow.getFocusedWindow()!, {
-    title: `Save ${APP_NAME} Project`,
-    defaultPath: `Untitled${APP_FILE_EXT}`,
-  })
-  if (result.canceled || !result.filePath) return null
-  const destination = result.filePath.endsWith(APP_FILE_EXT)
-    ? result.filePath
-    : `${result.filePath}${APP_FILE_EXT}`
+  const destination = await dialogs.saveProject(window ?? BrowserWindow.getFocusedWindow()!)
+  if (!destination) return null
   return mutations.saveAs(destination, request)
 }

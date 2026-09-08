@@ -1,4 +1,6 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
+import { nativeProjectDialogs } from '../dialogs/nativeProjectDialogs'
+import type { ProjectDialogs } from '../dialogs/ProjectDialogs'
 import type {
   CancelSessionJobRequest,
   ExportCancellationResult,
@@ -20,6 +22,7 @@ export function registerRenderIpc(
   jobs: SessionJobRegistry,
   diagnosticSink: DiagnosticSink = console.error,
   coordinator = new ExportCoordinator(),
+  dialogs: ProjectDialogs = nativeProjectDialogs,
 ): void {
   const cancellationOutcomes = new Map<string, ExportCancellationResult>()
   const cancellationWaiters = new Map<string, number>()
@@ -49,19 +52,7 @@ export function registerRenderIpc(
           identity,
           project,
           resolveOriginal,
-          selectDestination: async () => {
-            const destination = await dialog.showSaveDialog(window, {
-              title: 'Export Audio',
-              defaultPath: `export.${project.export.format}`,
-              filters: [
-                {
-                  name: project.export.format.toUpperCase(),
-                  extensions: [project.export.format],
-                },
-              ],
-            })
-            return destination.canceled || !destination.filePath ? null : destination.filePath
-          },
+          selectDestination: () => dialogs.exportAudio(window, project.export.format),
           revalidate: () => controller.assertCurrent(request),
           onProgress: (progress) => {
             if (event.sender.isDestroyed()) return

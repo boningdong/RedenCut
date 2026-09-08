@@ -34,6 +34,7 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
 
   useEffect(() => {
     const canvas = canvasRef.current
+    if (canvas) canvas.dataset.waveformReady = 'false'
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return
 
@@ -45,15 +46,24 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
       sourceStartSeconds,
       sourceEndSeconds,
       backingWidth,
-      (range) => drawWaveform(context, range.buckets, backingWidth, backingHeight, waveformColor),
+      (range) => {
+        drawWaveform(context, range.buckets, backingWidth, backingHeight, waveformColor)
+        canvas.dataset.waveformReady = String(
+          range.buckets.length > 0 && backingWidth > 0 && backingHeight > 0,
+        )
+      },
     )
 
-    return () => requestControllerRef.current?.cancel()
+    return () => {
+      canvas.dataset.waveformReady = 'false'
+      requestControllerRef.current?.cancel()
+    }
   }, [backingHeight, backingWidth, color, muted, provider, sourceEndSeconds, sourceStartSeconds])
 
   return (
     <canvas
       ref={canvasRef}
+      data-waveform-ready="false"
       width={backingWidth}
       height={backingHeight}
       style={{

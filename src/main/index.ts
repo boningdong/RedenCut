@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog, protocol } from 'electron'
+import { app, BrowserWindow, protocol } from 'electron'
 import { join } from 'path'
-import { APP_FILE_EXT, APP_NAME } from '../shared/constants'
+import { createProjectDialogs } from './dialogs/createProjectDialogs'
 import { startApplicationLifecycle } from './applicationLifecycle'
 import { configureHarnessStartup } from './harnessStartup'
 import { ExportCoordinator } from './audio/export/ExportCoordinator'
@@ -24,6 +24,7 @@ import { createFileRangeResponse } from './protocol/fileRangeResponse'
 
 // Isolation must precede the single-instance lock and all workspace initialization.
 const harnessMode = configureHarnessStartup(app, process.env)
+const dialogs = createProjectDialogs(harnessMode, process.env)
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -60,7 +61,11 @@ startApplicationLifecycle({
   },
   initialize: async () => {
     const cleanupWarnings = new CleanupWarningStore()
-    const controller = new WorkspaceController(undefined, cleanupWarnings)
+    const controller = new WorkspaceController(
+      undefined,
+      cleanupWarnings,
+      harnessMode ? 'create' : 'replace',
+    )
     await controller.initialize(app.getPath('temp'))
     const jobs = new SessionJobRegistry()
     const mutations = new ProjectMutationCoordinator(controller, jobs)
@@ -70,43 +75,27 @@ startApplicationLifecycle({
       controller,
       jobs,
       barrier,
-      chooseDirtyAction: async (sender) => {
-        const result = await dialog.showMessageBox(windowFor(sender), {
-          type: 'question',
-          title: APP_NAME,
-          message: 'Save changes before opening another project?',
-          buttons: ['Save', "Don't Save", 'Cancel'],
-          defaultId: 0,
-          cancelId: 2,
-        })
-        return result.response === 0 ? 'save' : result.response === 1 ? 'discard' : 'cancel'
-      },
-      chooseSaveDestination: async (sender) => {
-        const result = await dialog.showSaveDialog(windowFor(sender), {
-          title: `Save ${APP_NAME} Project`,
-          defaultPath: `Untitled${APP_FILE_EXT}`,
-        })
-        if (result.canceled || !result.filePath) return null
-        return result.filePath.endsWith(APP_FILE_EXT)
-          ? result.filePath
-          : `${result.filePath}${APP_FILE_EXT}`
-      },
-      chooseOpenDestination: async (sender) => {
-        const result = await dialog.showOpenDialog(windowFor(sender), {
-          title: `Open ${APP_NAME} Project`,
-          properties: ['openDirectory'],
-        })
-        return result.canceled ? null : (result.filePaths[0] ?? null)
-      },
+      chooseDirtyAction: (sender) => dialogs.dirtyProject(windowFor(sender)),
+      chooseSaveDestination: (sender) => dialogs.saveProject(windowFor(sender)),
+      chooseOpenDestination: (sender) => dialogs.openProject(windowFor(sender)),
     })
-    registerProjectIpc(controller, transitions, pendingOpens, barrier, mutations)
-    registerAudioIpc(controller, jobs)
+    registerProjectIpc(
+      controller,
+      transitions,
+      pendingOpens,
+      barrier,
+      mutations,
+      console.error,
+      dialogs,
+    )
+    registerAudioIpc(controller, jobs, console.error, dialogs)
     registerTranscriptIpc(controller, jobs)
     registerRenderIpc(
       controller,
       jobs,
       console.error,
       new ExportCoordinator({ cleanupWarningSink: cleanupWarnings }),
+      dialogs,
     )
     protocol.handle(
       'podcut',

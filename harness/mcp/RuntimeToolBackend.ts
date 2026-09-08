@@ -1,5 +1,6 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
+import { HarnessDialogRequestSchema } from '../../src/shared/harnessDialog.types'
 import type { HarnessRuntime } from '../runtime/HarnessRuntime'
 import type { ToolBackend } from './ToolBackend'
 import { allowedUiTools, generationSchema, runtimeTools } from './runtimeTools'
@@ -33,6 +34,13 @@ export class RuntimeToolBackend implements ToolBackend {
             throw new Error('STALE_GENERATION: read podcut_status before retrying')
         }
         switch (name) {
+          case 'podcut_prepare_dialog':
+            return jsonResult(
+              await this.runtime.prepareDialog(
+                HarnessDialogRequestSchema.parse('request' in parsed ? parsed.request : undefined),
+                generationSchema.parse(parsed),
+              ),
+            )
           case 'podcut_start':
             return jsonResult(await this.runtime.start())
           case 'podcut_status':
@@ -91,7 +99,7 @@ export class RuntimeToolBackend implements ToolBackend {
         delete properties.filename
         return {
           ...tool,
-          description: `${tool.description ?? ''} Podcut: requires current runId/generation and an initial full browser_snapshot. Only operates the isolated app; do not open native file dialogs in Gate B. Generated files use the runtime-owned artifact directory.`,
+          description: `${tool.description ?? ''} Podcut: requires current runId/generation and an initial full browser_snapshot. Prepare import/open/save dialog replies with podcut_prepare_dialog before clicking; dirty-project and export dialogs are unsupported. Generated files use the runtime-owned artifact directory.`,
           inputSchema: {
             ...tool.inputSchema,
             additionalProperties: false,

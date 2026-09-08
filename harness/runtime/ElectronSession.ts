@@ -67,6 +67,7 @@ export class ElectronSession {
     const env = electronEnvironment(process.env)
     env.PODCUT_HARNESS_RUN_DIRECTORY = artifacts.directory
     env.PODCUT_HARNESS_RUN_ID = artifacts.runId
+    env.PODCUT_HARNESS_GENERATION = String(generation)
     env.TMPDIR = join(artifacts.directory, 'temporary')
     mkdirSync(env.TMPDIR, { recursive: true })
     // The public default launcher coordinates Electron readiness and applies automation defaults.
@@ -133,6 +134,17 @@ export class ElectronSession {
       dirty: element.getAttribute('data-podcut-dirty') === 'true',
       busy: element.getAttribute('data-podcut-busy') === 'true',
       title: element.querySelector('header strong')?.textContent ?? '',
+      tracks: Array.from(element.querySelectorAll('[data-lane]')).map((lane) => ({
+        id: lane.getAttribute('data-trackid') ?? '',
+        name: lane.getAttribute('data-track-name') ?? '',
+        clips: Array.from(lane.querySelectorAll('[data-clip-id]')).map((clip) => ({
+          id: clip.getAttribute('data-clip-id') ?? '',
+          audioSourceId: clip.getAttribute('data-audio-source-id') ?? '',
+          sourceStart: Number(clip.getAttribute('data-source-start')),
+          sourceEnd: Number(clip.getAttribute('data-source-end')),
+          waveformReady: !!clip.querySelector('canvas[data-waveform-ready="true"]'),
+        })),
+      })),
     }))
     return { main, renderer }
   }

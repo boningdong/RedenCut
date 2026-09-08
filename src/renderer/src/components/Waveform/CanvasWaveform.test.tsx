@@ -88,6 +88,7 @@ describe('CanvasWaveform', () => {
     expect(canvas?.style.left).toBe('12px')
     expect(canvas?.style.position).toBe('absolute')
     expect(canvas?.style.width).toBe('300px')
+    expect(canvas?.getAttribute('data-waveform-ready')).toBe('false')
 
     await act(async () => {
       response.resolve({ buckets: [{ min: -0.75, max: 0.5 }] })
@@ -97,6 +98,7 @@ describe('CanvasWaveform', () => {
     expect(context.fillStyle).toBe('#bada55')
     expect(context.clearRect).toHaveBeenCalledWith(0, 0, 600, 80)
     expect(context.fillRect).toHaveBeenCalledWith(0, 20, 600, 50)
+    expect(canvas?.getAttribute('data-waveform-ready')).toBe('true')
   })
 
   it('cancels the obsolete interval and never draws its late result', async () => {
@@ -109,7 +111,7 @@ describe('CanvasWaveform', () => {
         return signals.length === 1 ? first.promise : second.promise
       }),
     }
-    const { rerender } = render(<CanvasWaveform {...waveformProps({ provider })} />)
+    const { rerender, container } = render(<CanvasWaveform {...waveformProps({ provider })} />)
 
     await waitFor(() => expect(provider.readRange).toHaveBeenCalledTimes(1))
     rerender(
@@ -125,12 +127,26 @@ describe('CanvasWaveform', () => {
       await Promise.resolve()
     })
     expect(context.fillRect).not.toHaveBeenCalled()
+    expect(container.querySelector('canvas')?.getAttribute('data-waveform-ready')).toBe('false')
 
     await act(async () => {
       second.resolve({ buckets: [{ min: -0.25, max: 0.75 }] })
       await Promise.resolve()
     })
     expect(context.fillRect).toHaveBeenCalledWith(0, 10, 600, 40)
+    expect(container.querySelector('canvas')?.getAttribute('data-waveform-ready')).toBe('true')
+  })
+
+  it('does not report a failed waveform request as ready', async () => {
+    const provider: WaveformDataProvider = {
+      readRange: vi.fn(() => Promise.reject(new Error('cache unavailable'))),
+    }
+    const { container } = render(<CanvasWaveform {...waveformProps({ provider })} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(container.querySelector('canvas')?.getAttribute('data-waveform-ready')).toBe('false')
+    expect(context.fillRect).not.toHaveBeenCalled()
   })
 
   it('uses the computed muted waveform color', async () => {

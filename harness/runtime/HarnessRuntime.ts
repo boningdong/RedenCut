@@ -1,5 +1,8 @@
 import { execFile } from 'node:child_process'
 import { access } from 'node:fs/promises'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { prepareDialog } from '../dialogs/prepareDialog'
+import type { HarnessDialogRequest } from '../../src/shared/harnessDialog.types'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js'
@@ -171,7 +174,51 @@ export class HarnessRuntime {
     this.assertReady(identity)
     return this.gate.runUi(async () => {
       this.assertReady(identity)
-      return deadline(this.session!.diagnostics(), this.uiTimeout, 'DIAGNOSTICS_TIMEOUT')
+      const diagnostics = await deadline(
+        this.session!.diagnostics(),
+        this.uiTimeout,
+        'DIAGNOSTICS_TIMEOUT',
+      )
+      const path = join(
+        this.artifacts!.generationDirectory(identity.generation),
+        'dialogs/events.jsonl',
+      )
+      return {
+        ...diagnostics,
+        dialogs: existsSync(path)
+          ? readFileSync(path, 'utf8')
+              .trim()
+              .split('\n')
+              .filter(Boolean)
+              .map((line) => JSON.parse(line))
+          : [],
+      }
+    })
+  }
+
+  async prepareDialog(
+    request: HarnessDialogRequest,
+    identity: GenerationIdentity,
+  ): Promise<{ prepared: true }> {
+    this.assertReady(identity)
+    return this.gate.runUi(async () => {
+      this.assertReady(identity)
+      try {
+        prepareDialog(
+          this.options.repositoryRoot,
+          this.artifacts!.directory,
+          identity.generation,
+          request,
+        )
+      } catch (error) {
+        this.artifacts!.record(identity.generation, 'dialog-preparation-rejected', {
+          request,
+          error: String(error),
+        })
+        throw error
+      }
+      this.artifacts!.record(identity.generation, 'dialog-prepared', request)
+      return { prepared: true }
     })
   }
 
@@ -359,6 +406,11 @@ export class HarnessRuntime {
       }
     } finally {
       await session?.close(this.shutdownTimeout, allowAbnormalExit)
+      if (this.artifacts)
+        rmSync(
+          join(this.artifacts.generationDirectory(this.current.generation), 'dialogs/pending.json'),
+          { force: true },
+        )
       if (this.session === session) this.session = undefined
     }
   }

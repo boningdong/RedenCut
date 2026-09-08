@@ -11,5 +11,10 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": [
+    "**/*.ts",
+    "../src/shared/**/*",
+    "../src/main/dialogs/HarnessDialogMailbox.ts",
+    "../e2e/**/*.ts"
+  ]
 }

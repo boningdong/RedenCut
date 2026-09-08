@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto'
 import { basename } from 'path'
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
+import { nativeProjectDialogs } from '../dialogs/nativeProjectDialogs'
+import type { ProjectDialogs } from '../dialogs/ProjectDialogs'
 import type { ImportJobRequest, SessionJobResult } from '../../shared/ipc.types'
 import type { ImportCancellationResult, ImportMode } from '../../shared/import.types'
 import type { RendererSession } from '../../shared/session.types'
@@ -16,6 +18,7 @@ export function registerAudioIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
   diagnosticSink: DiagnosticSink = console.error,
+  dialogs: ProjectDialogs = nativeProjectDialogs,
 ): void {
   const selections = new Map<
     string,
@@ -40,20 +43,14 @@ export function registerAudioIpc(
       controller.assertCurrent(expected)
       const window =
         BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()!
-      const result = await dialog.showOpenDialog(window, {
-        title: 'Import Audio',
-        filters: [
-          { name: 'Audio Files', extensions: ['wav', 'mp3', 'flac', 'aac', 'm4a', 'ogg', 'aiff'] },
-        ],
-        properties: ['openFile'],
-      })
-      if (result.canceled || !result.filePaths[0] || event.sender.isDestroyed()) return null
+      const selectedPath = await dialogs.importAudio(window)
+      if (!selectedPath || event.sender.isDestroyed()) return null
       const token = randomUUID()
       const previous = senderSelections.get(event.sender.id)
       if (previous) selections.delete(previous.token)
       selections.set(token, {
         senderId: event.sender.id,
-        path: result.filePaths[0],
+        path: selectedPath,
         ...expected,
         expiresAt: Date.now() + 10 * 60 * 1000,
       })
@@ -71,7 +68,7 @@ export function registerAudioIpc(
         selectionCleanupSenders.add(ownedSender)
         ownedSender.once('destroyed', cleanupSelections)
       }
-      return { token, displayName: basename(result.filePaths[0]) }
+      return { token, displayName: basename(selectedPath) }
     }, diagnosticSink),
   )
 

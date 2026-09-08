@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { HarnessDialogRequestSchema } from '../../src/shared/harnessDialog.types'
 
 export const generationSchema = z.object({
   runId: z.string().min(1),
@@ -9,11 +10,18 @@ const close = generationSchema.extend({ discardUnsaved: z.boolean().optional() }
 
 export const runtimeTools = [
   {
+    name: 'podcut_prepare_dialog',
+    schema: z.object({ ...generationSchema.shape, request: HarnessDialogRequestSchema }).strict(),
+    readOnly: false,
+    description:
+      'Prepare one native-dialog reply before clicking the real UI. request has purpose import-audio with selection {type:file,filename} from e2e/fixtures/audio, or save-project/open-project with selection {type:project,name} within this run, or {type:cancel}. Project names must end in .podcut. Never replaces a pending reply. Restart clears pending replies. No arbitrary filesystem paths.',
+  },
+  {
     name: 'podcut_start',
     schema: empty,
     readOnly: false,
     description:
-      'Start one isolated visible Podcut empty-state run from the current built application. Does not install dependencies or build implicitly. Returns runId and generation. Take browser_snapshot before UI actions. Gate B: do not invoke open/import/save/export dialogs; dialog adapters arrive in Gate C.',
+      'Start one isolated Podcut run from the current built application. Does not install dependencies or build implicitly. Returns runId and generation. Take browser_snapshot before UI actions. Prepare import/open/save dialog replies with podcut_prepare_dialog before clicking. Dirty-project confirmation and export dialogs are unsupported.',
   },
   {
     name: 'podcut_status',

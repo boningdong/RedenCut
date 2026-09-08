@@ -431,6 +431,7 @@ export function WaveformView({
                   key={track.id}
                   data-lane={track.id}
                   data-trackid={track.id}
+                  data-track-name={track.name}
                   style={{
                     height: LANE_HEIGHT,
                     position: 'relative',
@@ -467,6 +468,10 @@ export function WaveformView({
                     return (
                       <div
                         key={clip.id}
+                        data-clip-id={clip.id}
+                        data-audio-source-id={clip.audioSourceId}
+                        data-source-start={clip.sourceStart}
+                        data-source-end={clip.sourceEnd}
                         onPointerDown={(e) => handleClipPointerDown(e, clip)}
                         onClick={(e) => {
                           e.stopPropagation()

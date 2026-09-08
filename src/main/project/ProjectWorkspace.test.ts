@@ -6,6 +6,23 @@ import { ProjectFileSchema } from '../../shared/project.types'
 import { ProjectWorkspace } from './ProjectWorkspace'
 
 describe('ProjectWorkspace', () => {
+  it('create-only publication preserves a destination that appears during staging', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'podcut-create-only-'))
+    try {
+      const workspace = await ProjectWorkspace.initialize(parent, { saveAsPolicy: 'create' })
+      const destination = join(parent, 'new.podcut')
+      await expect(
+        workspace.saveAs(destination, workspace.project, async () => {
+          await mkdir(destination)
+          await writeFile(join(destination, 'owner.txt'), 'not ours')
+        }),
+      ).rejects.toMatchObject({ code: 'EEXIST' })
+      expect(await readFile(join(destination, 'owner.txt'), 'utf8')).toBe('not ours')
+      expect((await readdir(parent)).some((name) => name.endsWith('.staging'))).toBe(false)
+    } finally {
+      await rm(parent, { recursive: true, force: true })
+    }
+  })
   it('initializes a temporary managed bundle with a valid empty project', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'podcut-workspaces-'))
     const workspace = await ProjectWorkspace.initialize(parent)

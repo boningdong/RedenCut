@@ -53,12 +53,14 @@ export class WorkspaceController {
   constructor(
     private readonly cacheBuilder = new FfmpegAudioSourceCacheBuilder(),
     private readonly cleanupWarningSink: CleanupWarningSink = discardCleanupWarnings,
+    private readonly saveAsPolicy: 'replace' | 'create' = 'replace',
   ) {}
 
   async initialize(temporaryParent: string): Promise<RendererSession> {
     return this.mutex.runExclusive(async () => {
       if (!this.current) {
         const candidate = await ProjectWorkspace.initialize(temporaryParent, {
+          saveAsPolicy: this.saveAsPolicy,
           cleanupWarningSink: this.cleanupWarningSink,
         })
         const descriptors = await this.descriptors(candidate)
@@ -92,6 +94,7 @@ export class WorkspaceController {
 
   async prepareOpen(root: string): Promise<PreparedWorkspace> {
     const workspace = await ProjectWorkspace.open(root, {
+      saveAsPolicy: this.saveAsPolicy,
       cleanupWarningSink: this.cleanupWarningSink,
     })
     const descriptors = await this.descriptors(workspace)

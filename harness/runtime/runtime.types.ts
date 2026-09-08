@@ -24,6 +24,7 @@ export interface RuntimeOptions {
 }
 
 export interface ApplicationDiagnostics {
+  dialogs?: Array<{ at: string; state: string; purpose: string; error?: string }>
   main: {
     pid: number
     userData: string
@@ -31,5 +32,21 @@ export interface ApplicationDiagnostics {
     sessionData: string
     hasSingleInstanceLock: boolean
   }
-  renderer: { ready: boolean; dirty: boolean; busy: boolean; title: string }
+  renderer: {
+    ready: boolean
+    dirty: boolean
+    busy: boolean
+    title: string
+    tracks?: Array<{
+      id: string
+      name: string
+      clips: Array<{
+        id: string
+        audioSourceId: string
+        sourceStart: number
+        sourceEnd: number
+        waveformReady: boolean
+      }>
+    }>
+  }
 }

@@ -1,5 +1,16 @@
 import { randomUUID } from 'crypto'
-import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'fs/promises'
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  rmdir,
+  stat,
+  writeFile,
+} from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import type { WorkspaceDescriptor } from '../../shared/import.types'
 import { createEmptyProject, ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
@@ -11,11 +22,13 @@ import {
 } from './CleanupWarningSink'
 
 interface ProjectWorkspaceOptions {
+  saveAsPolicy?: 'replace' | 'create'
   cleanupWarningSink?: CleanupWarningSink
   remove?: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<void>
 }
 
 interface ProjectWorkspaceDependencies {
+  saveAsPolicy: 'replace' | 'create'
   cleanupWarningSink: CleanupWarningSink
   remove: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<void>
 }
@@ -99,6 +112,19 @@ export class ProjectWorkspace {
             .map((source) => source.id),
         ),
       )
+      if (this.dependencies.saveAsPolicy === 'create') {
+        // Atomic reservation: never back up or replace a destination created by another actor.
+        await mkdir(destination)
+        try {
+          await rename(stage, destination)
+        } catch (error) {
+          // Only remove our empty reservation; preserve any concurrently added contents.
+          await rmdir(destination).catch(() => {})
+          throw error
+        }
+        candidate.root = destination
+        return candidate
+      }
       if (await exists(destination)) {
         await rename(destination, backup)
         destinationBackedUp = true
@@ -146,6 +172,7 @@ export class ProjectWorkspace {
 
 function workspaceDependencies(options: ProjectWorkspaceOptions): ProjectWorkspaceDependencies {
   return {
+    saveAsPolicy: options.saveAsPolicy ?? 'replace',
     cleanupWarningSink: options.cleanupWarningSink ?? discardCleanupWarnings,
     remove: options.remove ?? rm,
   }

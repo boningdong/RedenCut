@@ -11,7 +11,7 @@ From the repository/worktree root, with Docker Engine running:
 docker build -f harness/container/Dockerfile -t podcut-harness:local .
 ```
 
-OrbStack is supported through the normal Docker CLI; select its context explicitly with `DOCKER_CONTEXT=orbstack` if necessary.
+The launcher uses the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
 The image uses the repository's Node version and lockfile, installing Linux-native dependencies rather than reusing Mac `node_modules`.
 Debian FFmpeg supplies `/usr/bin/ffmpeg` and `/usr/bin/ffprobe`, avoiding reliance on static npm binary availability for Linux ARM64.
 Debian packages are installed from the configured repositories at build time, so rebuilding without cache is not a bit-for-bit reproducibility guarantee.
@@ -24,12 +24,14 @@ The entrypoint rejects dependency manifest drift instead of silently running an 
 ```sh
 sh harness/container/run.sh npm run test:harness:all
 node --test harness/tests/container.smoke.mjs
+sh harness/container/run.sh npm run test:e2e
 ```
 
 The first command runs the existing full normal/fault suite inside the virtual display.
 Fault tests deliberately crash or terminate isolated processes; no host Electron is launched.
 The second runs an MCP client on the host against the real container server, including screenshot delivery, rebuild/restart, and cleanup.
 It requires the host project's npm dependencies to be installed.
+The third command runs the [product import/save/reopen E2E](../../e2e/README.md) with the supplied short audio fixture.
 
 ## MCP entry
 
@@ -73,4 +75,5 @@ Xvfb listens only inside the container; a supervisor receives termination throug
 This avoids competing Playwright SIGTERM handlers and keeps Runtime in charge of coordinated shutdown.
 Explicit container stop has a 15-second supervisor deadline; expiry is a reported nonzero exit, not a clean shutdown.
 Linux containers still share host compute resources, and this does not certify macOS window behavior, GPU performance or audio hardware.
-Native-dialog automation, audio-output verification, real transcription/model setup and complete product E2E flows remain separate work.
+Native file selection is replaced by purpose-matched one-shot replies for import/open/save; the real UI, import, cache and project persistence paths remain active.
+Audio-output verification, real transcription/model setup, editing E2E and native OS dialog interaction remain separate work.

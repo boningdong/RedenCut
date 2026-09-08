@@ -36,7 +36,7 @@ export class RunArtifacts {
       host: readProcessIdentity(process.pid),
       initialProvenance: observeBuildProvenance(repositoryRoot),
       scope:
-        'Gate B empty-state only; native dialogs and product editing workflows are not enabled.',
+        'Isolated UI harness with prepared import/open/save dialogs; playback, transcription and export acceptance are not certified.',
     }
     this.update({})
   }
