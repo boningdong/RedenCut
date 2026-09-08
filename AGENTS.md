@@ -23,6 +23,7 @@ Use the repository's authoritative files instead of duplicating their contents h
 | File responsibility, naming and directory organization | [`docs/file-organization-standards.md`](docs/file-organization-standards.md) |
 | Architecture standards | [`docs/architecture-standards.md`](docs/architecture-standards.md) |
 | Keyboard interaction contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
+| Agent-driven UI acceptance | [agent-testing skill](.agents/skills/agent-testing/SKILL.md) and [scenario index](e2e/scenarios/README.md) |
 | Product direction | [`ROADMAP.md`](ROADMAP.md) |
 | Shared project model and schemas | [`src/shared/project.types.ts`](src/shared/project.types.ts) |
 | IPC contract | [`src/shared/ipc.types.ts`](src/shared/ipc.types.ts) |
@@ -37,5 +38,7 @@ When an authoritative repository file defines a policy or contract, link to it i
 - Propose changes and explain why before editing; wait for confirmation.
 - Keep explanations concise and name unfamiliar concepts so they can be researched independently.
 - Follow the verification workflow in the coding standards and report any manual behavior that was not verified.
+- Before handing off a user-visible feature or behavior fix, use `agent-testing` to run the baseline scenario and checks for the approved changed behavior through Docker MCP; link the evidence-backed report and disclose failed or blocked checks.
+- Documentation-only and mechanical changes may exclude product UI acceptance with a stated reason; changes to the agent-testing instructions themselves require a workflow trial.
 - Treat ESLint and Knip output as investigation candidates; trace dynamic IPC, worklet, CSS, build-tool, and runtime-package references before deleting code.
 - Keep mechanical formatting separate from semantic changes.
