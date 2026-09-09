@@ -64,7 +64,8 @@ SpeechAnalysisCoordinator (Electron main)
         .podcut/project.json ── SpeechArtifactRef
                                     │ path + SHA-256
                                     ▼
-                          .podcut/speech/<sha256>.json
+                 .podcut/speech/<audio-source-id>/
+                   revision-<analysis-revision-id>.json
 ```
 
 The renderer never receives filesystem paths and never assembles authoritative engine provenance. The main process owns source resolution, process execution, validation, and publication.
@@ -285,7 +286,7 @@ type SpeechArtifact = {
 }
 ```
 
-The large payload is stored at `.podcut/speech/<artifactSha256>.json`. `ProjectFile` stores only one compact reference per currently analyzed source:
+The large payload is stored at `.podcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`. `ProjectFile` stores only one compact reference per currently analyzed source:
 
 ```ts
 type SpeechArtifactRef = {
@@ -306,7 +307,9 @@ type SpeechArtifactRef = {
 }
 ```
 
-`ProjectFile` gains `speechArtifacts: SpeechArtifactRef[]` and `speakerLabelOverrides: SpeakerLabelOverride[]`. Every nested machine artifact for one source is published and replaced together by changing one reference. The artifact filename is its lowercase SHA-256 digest, its path must be exactly `speech/<artifactSha256>.json`, and referenced artifacts are immutable.
+`ProjectFile` gains `speechArtifacts: SpeechArtifactRef[]` and `speakerLabelOverrides: SpeakerLabelOverride[]`. Every nested machine artifact for one source is published and replaced together by changing one reference. The path is derived from the validated source and analysis-revision IDs, not from display text or the content digest, so it is stable, collision-resistant, and easier to inspect. Referenced artifacts are immutable.
+
+The full SHA-256 remains in `project.json` as `artifactSha256`. It protects integrity and binds the reference to exact bytes; it does not need to be the filename or the user-facing identity. Source display names are not used in paths because users may rename them and distinct imports may share the same display name.
 
 User-modified speaker display names are a small mutable overlay in `project.json`, keyed by the current artifact reference and `SpeakerId`. Machine speaker IDs, raw diarization labels, turns, and attribution remain in `SpeechArtifact`. Renaming a speaker therefore uses the normal atomic project-file save without rewriting the full transcript. An override for an older artifact is invalid and is removed only as part of a confirmed reanalysis replacement.
 
@@ -590,7 +593,7 @@ Renderer code never appends `audioSourceId` or `trackId` to engine results and n
 
 ### 10.1 Durable standard artifacts
 
-The first version stores the following complete immutable payload in `.podcut/speech/<sha256>.json`:
+The first version stores the following complete immutable payload in `.podcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`:
 
 - `TranscriptArtifact` and `TranscriptUnit[]`.
 - `AlignmentArtifact` and `AcousticEditUnit[]`.
@@ -661,8 +664,8 @@ Inside the serialized transition, main:
 2. Resolves the authoritative `AudioSource` from the current project.
 3. Revalidates the original source fingerprint immediately before commit.
 4. Verifies that the prepared `SpeechArtifact` targets that source and fingerprint.
-5. Serializes the artifact in canonical form, computes its byte length and SHA-256, and constructs its final `speech/<sha256>.json` path.
-6. Writes a uniquely named file under `speech/.staging/`, closes it, verifies the bytes and schema from disk, and atomically renames it to the immutable final path. An existing file at that digest must have identical bytes.
+5. Serializes the artifact in canonical form, computes its byte length and SHA-256, and constructs its final `speech/<audioSourceId>/revision-<analysisRevisionId>.json` path.
+6. Writes a uniquely named file under `speech/.staging/`, closes it, verifies the bytes and schema from disk, and atomically renames it to the immutable final path. Analysis revision IDs are fresh, so a final-path collision is an integrity error rather than an overwrite opportunity.
 7. Constructs a candidate project containing the new `SpeechArtifactRef` and removing speaker-name overrides that the confirmed reanalysis invalidates.
 8. Parses the candidate with `ProjectFileSchema` and validates the reference against the final artifact.
 9. Atomically saves `project.json` through `ProjectWorkspace.save`.
