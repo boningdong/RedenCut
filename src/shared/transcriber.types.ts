@@ -10,7 +10,7 @@
 //   • (future) CloudTranscriber — e.g. OpenAI Whisper API, AssemblyAI
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Transcript } from './project.types'
+import type { EngineProvenance } from './speech.types'
 
 export type TranscriptionJobId = string & { readonly __brand: 'TranscriptionJobId' }
 export type TranscriptionCancellationResult = 'cancelled' | 'not-found'
@@ -28,6 +28,28 @@ export interface TranscribeOptions {
    * If omitted, the implementation chooses a sensible default.
    */
   model?: string
+}
+
+export interface TranscriptionEvidenceToken {
+  text: string
+  sourceStart?: number
+  sourceEnd?: number
+  confidence?: number
+}
+
+export interface TranscriptionEvidenceSegment {
+  text: string
+  sourceStart?: number
+  sourceEnd?: number
+  tokens?: TranscriptionEvidenceToken[]
+}
+
+export interface TranscriptionResult {
+  text: string
+  detectedLanguage: string
+  verbatimCapability: 'verbatim' | 'best-effort-verbatim'
+  evidence: TranscriptionEvidenceSegment[]
+  provenance: EngineProvenance
 }
 
 export interface ITranscriber {
@@ -50,7 +72,8 @@ export interface ITranscriber {
 
   /**
    * Transcribes the given audio file.
-   * Returns a Transcript with word-level timestamps.
+   * Returns ordered verbatim text evidence. Timing evidence is diagnostic input,
+   * not canonical alignment and must never be exposed as editable boundaries.
    * May take minutes for long files — callers should show a progress indicator.
    */
   transcribe(
@@ -58,5 +81,5 @@ export interface ITranscriber {
     options: TranscribeOptions,
     signal: AbortSignal,
     onProgress?: (status: string) => void,
-  ): Promise<Transcript>
+  ): Promise<TranscriptionResult>
 }

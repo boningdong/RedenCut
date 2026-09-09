@@ -22,7 +22,32 @@ export function registerTranscriptIpc(
   jobs: SessionJobRegistry,
   diagnosticSink: DiagnosticSink = console.error,
 ): void {
-  const coordinator = new TranscriptionCoordinator(whisperTranscriber)
+  const coordinator = new TranscriptionCoordinator({
+    async transcribe(path, options, signal, onProgress) {
+      const result = await whisperTranscriber.transcribe(path, options, signal, onProgress)
+      return {
+        engine: result.provenance.engineId,
+        model: result.provenance.modelId,
+        speakers: {},
+        words: result.evidence.flatMap((segment, segmentIndex) =>
+          (segment.tokens ?? []).flatMap((token, tokenIndex) =>
+            token.sourceStart === undefined || token.sourceEnd === undefined
+              ? []
+              : [
+                  {
+                    id: `raw-${segmentIndex}-${tokenIndex}`,
+                    text: token.text.trim(),
+                    start: token.sourceStart,
+                    end: token.sourceEnd,
+                    confidence: token.confidence,
+                    muted: false,
+                  },
+                ],
+          ),
+        ),
+      }
+    },
+  })
   const cancellationOutcomes = new Map<string, TranscriptionCancellationResult>()
   const cancellationWaiters = new Map<string, number>()
 

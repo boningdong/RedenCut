@@ -209,4 +209,47 @@ describe('WhisperTranscriber cancellation', () => {
     await expect(transcription).rejects.toMatchObject({ name: 'AbortError' })
     expect(whisper.kill).not.toHaveBeenCalled()
   })
+
+  it('returns verbatim evidence without fabricating smaller timestamp units', async () => {
+    mocks.readFile.mockResolvedValueOnce(
+      JSON.stringify({
+        transcription: [
+          {
+            text: ' 觉得。',
+            timestamps: { from: '00:00:00,750', to: '00:00:01,180' },
+            offsets: { from: 750, to: 1180 },
+            tokens: [
+              {
+                id: 1,
+                text: ' 觉得',
+                p: 0.91,
+                timestamps: { from: '00:00:00,750', to: '00:00:01,180' },
+              },
+            ],
+          },
+        ],
+        result: { language: 'zh' },
+      }),
+    )
+    const controller = new AbortController()
+    const { whisper, transcription } = await advanceToWhisper(controller.signal)
+    whisper.emit('close', 0)
+
+    await expect(transcription).resolves.toMatchObject({
+      text: '觉得。',
+      detectedLanguage: 'zh',
+      verbatimCapability: 'best-effort-verbatim',
+      evidence: [
+        {
+          text: ' 觉得。',
+          sourceStart: 0.75,
+          sourceEnd: 1.18,
+          tokens: [
+            { text: ' 觉得', sourceStart: 0.75, sourceEnd: 1.18, confidence: 0.91 },
+          ],
+        },
+      ],
+      provenance: { engineId: 'whisper.cpp', modelId: 'ggml-base.bin' },
+    })
+  })
 })

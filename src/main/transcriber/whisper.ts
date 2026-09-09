@@ -35,9 +35,13 @@ import { join } from 'path'
 import { tmpdir, homedir } from 'os'
 import { StringDecoder } from 'string_decoder'
 import { existsSync } from 'fs'
+import { createHash } from 'crypto'
 import { getWhisperPath, getFfmpegPath } from '../audio/binaries'
-import type { ITranscriber, TranscribeOptions } from '../../shared/transcriber.types'
-import type { Transcript, Word } from '../../shared/project.types'
+import type {
+  ITranscriber,
+  TranscribeOptions,
+  TranscriptionResult,
+} from '../../shared/transcriber.types'
 
 // ── Model discovery ───────────────────────────────────────────────────────────
 // Checked in priority order — smaller models are faster, larger are more accurate.
@@ -75,57 +79,6 @@ function parseTimestamp(ts: string): number {
   return h * 3600 + m * 60 + s + parseInt(ms || '0') / 1000
 }
 
-// ── CJK detection and splitting ───────────────────────────────────────────────
-
-/** Returns true if the code point is a CJK ideograph or related character. */
-function isCJKCodePoint(cp: number): boolean {
-  return (
-    (cp >= 0x2e80 && cp <= 0x2fff) || // CJK Radicals Supplement, Kangxi Radicals
-    (cp >= 0x3000 && cp <= 0x303f) || // CJK Symbols and Punctuation
-    (cp >= 0x3040 && cp <= 0x318f) || // Hiragana, Katakana, Bopomofo
-    (cp >= 0x3400 && cp <= 0x4dbf) || // CJK Extension A
-    (cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs (core)
-    (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compatibility Ideographs
-    (cp >= 0xfe30 && cp <= 0xfe4f) || // CJK Compatibility Forms
-    (cp >= 0xff00 && cp <= 0xffef) // Halfwidth and Fullwidth Forms
-  )
-}
-
-/**
- * Split a token string into display units:
- *   • CJK characters → one unit each (individual character selection)
- *   • Non-CJK runs  → one unit per contiguous run (whole word for Latin)
- *
- * Leading whitespace is stripped before splitting. Examples:
- *   " Hello"   → ["Hello"]
- *   " 你好世界"  → ["你", "好", "世", "界"]
- *   " Hi你好"   → ["Hi", "你", "好"]
- */
-function tokenToUnits(rawText: string): string[] {
-  const text = rawText.replace(/^\s+/, '') // strip leading whitespace
-  if (!text) return []
-
-  const units: string[] = []
-  let latinRun = ''
-
-  for (const ch of text) {
-    // iterates by Unicode code point (handles surrogates)
-    const cp = ch.codePointAt(0) ?? 0
-    if (isCJKCodePoint(cp)) {
-      if (latinRun) {
-        units.push(latinRun)
-        latinRun = ''
-      }
-      units.push(ch)
-    } else {
-      latinRun += ch
-    }
-  }
-  if (latinRun.trim()) units.push(latinRun)
-
-  return units.filter((u) => u.trim().length > 0)
-}
-
 // ── Whisper JSON types ────────────────────────────────────────────────────────
 interface WhisperToken {
   id: number
@@ -145,91 +98,6 @@ interface WhisperSegment {
 interface WhisperJson {
   transcription: WhisperSegment[]
   result?: { language?: string }
-}
-
-// ── Word extraction ───────────────────────────────────────────────────────────
-let _wordIdCounter = 0
-function nextId(): string {
-  return `w${++_wordIdCounter}`
-}
-
-/**
- * Extracts word-level entries from a single whisper segment.
- *
- * Token-level path (preferred):
- *   Each token is split into CJK characters + Latin runs. Every resulting
- *   unit gets its own Word with proportionally sliced timestamps.
- *
- * Fallback (no token timestamps):
- *   Split the segment text: CJK chars become individual words; Latin words
- *   are split on whitespace. All distributed evenly over the segment time.
- */
-function extractWords(segment: WhisperSegment): Word[] {
-  const segStart = parseTimestamp(segment.timestamps.from)
-  const segEnd = parseTimestamp(segment.timestamps.to)
-
-  // ── Token-level path ─────────────────────────────────────────────────────
-  const tokens = segment.tokens?.filter((t) => !t.text.startsWith('[') && t.text.trim().length > 0)
-
-  if (tokens && tokens.length > 0 && tokens[0].timestamps) {
-    const words: Word[] = []
-
-    for (const token of tokens) {
-      const tStart = token.timestamps?.from ? parseTimestamp(token.timestamps.from) : segStart
-      const tEnd = token.timestamps?.to ? parseTimestamp(token.timestamps.to) : segEnd
-
-      const units = tokenToUnits(token.text)
-      if (units.length === 0) continue
-
-      const unitDur = (tEnd - tStart) / units.length
-      units.forEach((unit, i) => {
-        words.push({
-          id: nextId(),
-          text: unit,
-          start: tStart + i * unitDur,
-          end: tStart + (i + 1) * unitDur,
-          confidence: token.p,
-          muted: false,
-        })
-      })
-    }
-
-    return words
-  }
-
-  // ── Fallback: no token timestamps — distribute evenly ────────────────────
-  // Build units: CJK characters individually, Latin words split on space.
-  const allUnits: string[] = []
-  for (const ch of segment.text.trim()) {
-    const cp = ch.codePointAt(0) ?? 0
-    if (isCJKCodePoint(cp)) {
-      if (ch.trim()) allUnits.push(ch)
-    } else if (ch === ' ' || ch === '\t') {
-      // space: don't add as a unit, just a boundary
-    } else {
-      // Accumulate Latin into the last unit or start a new one
-      const last = allUnits[allUnits.length - 1]
-      if (last && !isCJKCodePoint(last.codePointAt(0) ?? 0)) {
-        allUnits[allUnits.length - 1] = last + ch
-      } else {
-        allUnits.push(ch)
-      }
-    }
-  }
-
-  const filtered = allUnits.filter((u) => u.trim())
-  if (filtered.length === 0) return []
-
-  const duration = segEnd - segStart
-  const sliceDur = duration / filtered.length
-
-  return filtered.map((text, i) => ({
-    id: nextId(),
-    text,
-    start: segStart + i * sliceDur,
-    end: segStart + (i + 1) * sliceDur,
-    muted: false,
-  }))
 }
 
 // ── Leading silence detection ─────────────────────────────────────────────────
@@ -359,7 +227,7 @@ export class WhisperTranscriber implements ITranscriber {
     options: TranscribeOptions = {},
     signal: AbortSignal,
     onProgress?: (status: string) => void,
-  ): Promise<Transcript> {
+  ): Promise<TranscriptionResult> {
     throwIfAborted(signal)
     const binary = getWhisperPath()
     if (!binary) throw new Error((await this.unavailableReason()) ?? 'whisper-cli not found')
@@ -371,7 +239,7 @@ export class WhisperTranscriber implements ITranscriber {
     const tmpDir = await mkdtemp(join(tmpdir(), 'podcut-whisper-'))
     const outputPrefix = join(tmpDir, 'out')
 
-    let result: Transcript | undefined
+    let result: TranscriptionResult | undefined
     let operationError: unknown
     try {
       throwIfAborted(signal)
@@ -437,19 +305,36 @@ export class WhisperTranscriber implements ITranscriber {
       const raw = await readFile(jsonPath, 'utf-8')
       const parsed: WhisperJson = JSON.parse(raw)
 
-      // Reset word ID counter for this transcription
-      _wordIdCounter = 0
-
-      const words: Word[] = parsed.transcription.flatMap(extractWords)
       const language = parsed.result?.language ?? options.language ?? 'unknown'
 
       result = {
-        engine: 'whisper.cpp',
-        model: model.split('/').pop() ?? model,
-        words,
-        speakers: {},
-        ...({ language } as object),
-      } as Transcript
+        text: parsed.transcription.map((segment) => segment.text).join(' ').trim(),
+        detectedLanguage: language,
+        verbatimCapability: 'best-effort-verbatim',
+        evidence: parsed.transcription.map((segment) => ({
+          text: segment.text,
+          sourceStart: parseTimestamp(segment.timestamps.from),
+          sourceEnd: parseTimestamp(segment.timestamps.to),
+          tokens: segment.tokens?.map((token) => ({
+            text: token.text,
+            sourceStart: token.timestamps?.from
+              ? parseTimestamp(token.timestamps.from)
+              : undefined,
+            sourceEnd: token.timestamps?.to ? parseTimestamp(token.timestamps.to) : undefined,
+            confidence: token.p,
+          })),
+        })),
+        provenance: {
+          engineId: 'whisper.cpp',
+          engineVersion: 'system',
+          modelId: model.split('/').pop() ?? model,
+          configHash: createHash('sha256')
+            .update(JSON.stringify({ language: options.language ?? 'auto' }))
+            .digest('hex'),
+          artifactSchemaVersion: 1,
+          createdAt: new Date().toISOString(),
+        },
+      }
     } catch (error) {
       operationError = error
     }
