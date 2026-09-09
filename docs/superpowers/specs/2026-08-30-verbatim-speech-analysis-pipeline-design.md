@@ -188,6 +188,14 @@ The artifact is replaced as a whole. Individual acoustic edit units are never pa
 Diarization and speaker attribution remain separate artifacts even when WhisperX exposes both from one package.
 
 ```ts
+type Speaker = {
+  id: SpeakerId
+  analysisRevisionId: AnalysisRevisionId
+  diarizationLabel: string
+  displayName: string
+  displayNameOrigin: 'generated' | 'user'
+}
+
 type DiarizationTurn = {
   speakerId: SpeakerId
   audioSourceId: AudioSourceId
@@ -222,9 +230,11 @@ type SpeakerAttributionArtifact = {
 }
 ```
 
-Speaker IDs are anonymous and local to one analysis revision. Overlap is allowed in diarization turns. Attribution uses overlap duration and deterministic tie rules, but records unsupported or ambiguous assignments instead of inventing certainty.
+Speaker IDs are anonymous and local to one analysis revision. The diarization adapter's raw label, such as `SPEAKER_00`, becomes the immutable `diarizationLabel`; normalization creates the corresponding `Speaker` and rewrites turns and attributions to its `SpeakerId`. Overlap is allowed in diarization turns. Attribution uses overlap duration and deterministic tie rules, but records unsupported or ambiguous assignments instead of inventing certainty.
 
-User-edited labels are a separate overlay keyed by the local `SpeakerId` and stored durably with the bundle. Reanalysis may produce different speaker IDs. The first version must require explicit confirmation before replacing an analysis that has user-edited labels; it does not silently transfer or discard labels without a verified mapping.
+`displayName` is the user-facing, editable speaker name and defaults to a generated value such as `Speaker 1`. A user who knows the participant may enter a real name, but PodCut does not infer or verify real-world identity from the voice. User edits change only `displayName` and `displayNameOrigin`; they never mutate the speaker ID, raw diarization label, turns, or attribution.
+
+The `Speaker[]` catalog is durable project state stored with the bundle. Reanalysis may produce different speaker IDs. The first version must require explicit confirmation before replacing an analysis containing user-named speakers; it does not silently transfer or discard names without a verified mapping.
 
 ### 3.7 Engine provenance
 
@@ -261,7 +271,7 @@ type SpeechAnalysisBundle = {
   diarization: DiarizationArtifact
   speakerAttribution: SpeakerAttributionArtifact
 
-  speakerLabels: Record<SpeakerId, string>
+  speakers: Speaker[]
 }
 ```
 
@@ -279,10 +289,12 @@ type SpeechAnalysisBundle = {
 6. `sourceStart` and `sourceEnd` are finite, non-negative source times and `sourceStart < sourceEnd`.
 7. Transcript, alignment, diarization, and speaker-attribution artifacts in a bundle share one `analysisRevisionId`, `audioSourceId`, and `sourceFingerprint`.
 8. `AlignmentArtifact.transcriptArtifactId` and `transcriptRevision` exactly match the contained transcript artifact.
-9. Each speaker attribution references an acoustic edit unit from the contained alignment artifact and a speaker from the contained diarization artifact when a speaker is assigned.
-10. At most one current `SpeechAnalysisBundle` exists for an `AudioSourceId`.
-11. Re-alignment replaces the entire alignment artifact as part of a full bundle publication.
-12. Acoustic edit unit source ranges are not required to be globally disjoint. Overlapping speech can legitimately create overlapping ranges.
+9. Every `Speaker.id` is unique within the bundle and every `Speaker.analysisRevisionId` matches the bundle.
+10. Every diarization turn references a `Speaker` in the bundle.
+11. Each speaker attribution references an acoustic edit unit from the contained alignment artifact; every assigned or candidate speaker ID references a `Speaker` in the bundle.
+12. At most one current `SpeechAnalysisBundle` exists for an `AudioSourceId`.
+13. Re-alignment replaces the entire alignment artifact as part of a full bundle publication.
+14. Acoustic edit unit source ranges are not required to be globally disjoint. Overlapping speech can legitimately create overlapping ranges.
 
 Some speech units may remain unaligned when evidence is insufficient. This is represented by their absence from every acoustic edit unit, not by fabricated timing.
 
@@ -376,6 +388,34 @@ The first version rejects a single text selection spanning incompatible source p
 `ResolvedAcousticSelection` is transient runtime state. It is not stored in `project.json`.
 
 After confirmation, only the resulting non-destructive mute, split, clip, and related timeline state is persisted. Transcript-unit selection IDs are not required to replay the edit.
+
+### 6.7 UI editability projection
+
+Text selection and audio editability are related but distinct UI states. The renderer derives a disposable state for every visible transcript unit from the validated transcript, reverse index, and acoustic edit units:
+
+```ts
+type TranscriptUnitEditability =
+  | {
+      state: 'editable'
+      acousticEditUnitId: AcousticEditUnitId
+      groupUnitIds: TranscriptUnitId[]
+    }
+  | {
+      state: 'not-editable'
+      reason: 'punctuation' | 'unaligned'
+    }
+```
+
+The presentation follows the same semantics as `AcousticSelectionResolver`:
+
+- A speech unit in a single-unit acoustic edit unit receives the normal audio-edit affordance.
+- Every speech unit in a multi-unit acoustic edit unit receives a linked-group affordance. Hovering or selecting one unit previews the complete group, and an edit uses the resolver's expanded confirmation flow.
+- Punctuation remains cursor-selectable as text but exposes no audio-edit affordance. A punctuation-only selection disables audio edit commands with a non-error explanation.
+- Unaligned speech remains selectable but exposes a distinct unavailable state and an actionable alignment explanation; it must not look equivalent to punctuation.
+
+Committed audio-edit styling follows the resolved operation, not the browser selection. For example, strike-through or deleted styling applies only to speech units covered by committed source ranges in the edited clip projection. Punctuation receives that styling only when an explicit text-editing policy also removes it; merely selecting adjacent punctuation or muting adjacent audio cannot mark it as edited.
+
+Requested selection, resolved acoustic preview, unavailable state, and committed edit state are visually distinct. None of these presentation states is persisted; they are reconstructed from canonical artifacts and durable non-destructive edits.
 
 ## 7. Transcriber and engine boundaries
 
@@ -502,11 +542,11 @@ The first version stores these in `.podcut/project.json`:
 - `TranscriptArtifact` and `TranscriptUnit[]`.
 - `AlignmentArtifact` and `AcousticEditUnit[]`.
 - Diarization and speaker attribution.
-- User-modified speaker labels.
+- The `Speaker[]` catalog and user-modified display names.
 - Engine, model, and configuration provenance.
 - Source fingerprint and analysis revision.
 
-These are project data, not cache. Cleaning `.podcut/cache` must not remove the canonical transcript, acoustic edit units, speaker labels, or user edits.
+These are project data, not cache. Cleaning `.podcut/cache` must not remove the canonical transcript, acoustic edit units, speakers, user-modified display names, or user edits.
 
 `ProjectWorkspace.save` already writes a temporary project file and renames it atomically. The speech-analysis transaction uses this same persistence boundary.
 
@@ -551,6 +591,10 @@ There is no persisted partial status such as “transcript ready, diarization pe
 Publication uses `WorkspaceController.runTransition` and a dedicated transaction operation such as `commitSpeechAnalysis`, modeled on `commitImport`.
 
 It must not call `ProjectMutationCoordinator.begin`, because that coordinator cancels and settles jobs before save/open mutations and would cause the analysis job to cancel itself.
+
+The current project-open path is a higher-level composition: `ProjectTransitionCoordinator` coordinates open/save/discard, uses `ProjectMutationCoordinator` for user-requested saves, and waits on `SessionSwitchBarrier` before replacing the visible workspace. A save or project switch marks the current workspace token as closing and cancels and settles its registered speech-analysis jobs before mutation or replacement proceeds.
+
+A successful speech-analysis publication advances the current workspace revision but does not switch workspaces, so it does not use `SessionSwitchBarrier` or emit a workspace-switch notification. Renderer reconciliation installs the returned same-token, newer-revision session.
 
 Inside the serialized transition, main:
 
@@ -605,23 +649,24 @@ The existing manual operation that shifts timing fields on individual words is i
 
 ### 13.1 Conflict matrix
 
-| Current mechanism                                                                                | Assessment                                                     | Required design consequence                                                                                                               |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `ProjectFileSchema.transcript.words` combines text, time, speaker, track, source, and mute state | Conflicts                                                      | Replace it with durable speech-analysis bundles and split responsibilities across transcript, alignment, attribution, and timeline edits. |
-| `ProjectFileSchema` version is literal `1`                                                       | Conflicts                                                      | Bump the schema version; reject old files without migration because backwards compatibility is explicitly out of scope.                   |
-| `ITranscriber` returns persisted `Transcript`                                                    | Conflicts                                                      | Return a transcriber result DTO; main constructs the canonical artifact and records verbatim capability/provenance.                       |
-| `transcript.generate` returns a loose `Transcript`                                               | Conflicts                                                      | Replace with a full speech-analysis job that atomically commits and returns `RendererSession`.                                            |
-| Renderer adds `audioSourceId`/`trackId`, merges words, and marks the draft dirty                 | Conflicts                                                      | Analyze by source in main; renderer receives read-only analysis projection and never authors machine artifacts.                           |
-| `ProjectDraft` currently carries transcript                                                      | Conflicts                                                      | Restrict the draft to user-editable data; machine artifacts are main-owned. Use explicit mutations for user speaker labels.               |
-| `SessionJobRegistry` keys jobs by sender/workspace/revision and settles them on switch/save      | Compatible with extension                                      | Add `speech-analysis`; make worker exit and temp cleanup part of settlement.                                                              |
-| `ProjectMutationCoordinator` cancels jobs before save/open                                       | Compatible for external mutations, unsafe for self-publication | Keep it for save/open cancellation, but publish analysis directly inside `WorkspaceController.runTransition`.                             |
-| `WorkspaceController.runTransition` serializes and checks session preconditions                  | Compatible                                                     | Add `commitSpeechAnalysis` and recheck fingerprint inside the transition.                                                                 |
-| `ProjectWorkspace.save` performs temporary-write plus rename                                     | Compatible                                                     | Reuse it as the atomic durable publication boundary.                                                                                      |
-| Import reconciliation preserves renderer edits made during a main-owned job                      | Partially reusable                                             | Generalize its edit ledger for analysis; lock target-source transcript operations and preserve independent timeline/export edits.         |
-| Word selection and `wordOutputTime` assume one timestamp per visible word                        | Conflicts                                                      | Resolve through acoustic edit units and clip projection; group-highlight shared spans and treat punctuation as timeless.                  |
-| Timeline edits persist clips but separately toggle `Word.muted`                                  | Conflicts                                                      | Persist only non-destructive timeline edits and derive transcript presentation from them.                                                 |
-| Analysis is currently generated for a chosen track and renderer attaches `trackId`               | Conflicts                                                      | Make analysis source-scoped; pass explicit clip occurrence separately when applying an edit.                                              |
-| Cache cleanup is separate from project save                                                      | Compatible                                                     | Keep only raw/intermediate engine output in cache; canonical artifacts stay in `project.json`.                                            |
+| Current mechanism                                                                                  | Assessment                                                     | Required design consequence                                                                                                                   |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ProjectFileSchema.transcript.words` combines text, time, speaker, track, source, and mute state   | Conflicts                                                      | Replace it with durable speech-analysis bundles and split responsibilities across transcript, alignment, attribution, and timeline edits.     |
+| `ProjectFileSchema` version is literal `1`                                                         | Conflicts                                                      | Bump the schema version; reject old files without migration because backwards compatibility is explicitly out of scope.                       |
+| `ITranscriber` returns persisted `Transcript`                                                      | Conflicts                                                      | Return a transcriber result DTO; main constructs the canonical artifact and records verbatim capability/provenance.                           |
+| `transcript.generate` returns a loose `Transcript`                                                 | Conflicts                                                      | Replace with a full speech-analysis job that atomically commits and returns `RendererSession`.                                                |
+| Renderer adds `audioSourceId`/`trackId`, merges words, and marks the draft dirty                   | Conflicts                                                      | Analyze by source in main; renderer receives read-only analysis projection and never authors machine artifacts.                               |
+| `ProjectDraft` currently carries transcript                                                        | Conflicts                                                      | Restrict the draft to user-editable data; machine artifacts are main-owned. Use explicit mutations for user speaker names.                    |
+| `SessionJobRegistry` keys jobs by sender/workspace/revision and settles them on switch/save        | Compatible with extension                                      | Add `speech-analysis`; make worker exit and temp cleanup part of settlement.                                                                  |
+| `ProjectMutationCoordinator` cancels jobs before save/open                                         | Compatible for external mutations, unsafe for self-publication | Keep it for save/open cancellation, but publish analysis directly inside `WorkspaceController.runTransition`.                                 |
+| `ProjectTransitionCoordinator` and `SessionSwitchBarrier` coordinate visible workspace replacement | Compatible with extension                                      | Let switch/save cancel and settle speech analysis; same-workspace analysis publication advances revision without entering the switch barrier. |
+| `WorkspaceController.runTransition` serializes and checks session preconditions                    | Compatible                                                     | Add `commitSpeechAnalysis` and recheck fingerprint inside the transition.                                                                     |
+| `ProjectWorkspace.save` performs temporary-write plus rename                                       | Compatible                                                     | Reuse it as the atomic durable publication boundary.                                                                                          |
+| Import reconciliation preserves renderer edits made during a main-owned job                        | Partially reusable                                             | Generalize its edit ledger for analysis; lock target-source transcript operations and preserve independent timeline/export edits.             |
+| Word selection and `wordOutputTime` assume one timestamp per visible word                          | Conflicts                                                      | Resolve through acoustic edit units and clip projection; group-highlight shared spans and treat punctuation as timeless.                      |
+| Timeline edits persist clips but separately toggle `Word.muted`                                    | Conflicts                                                      | Persist only non-destructive timeline edits and derive transcript presentation from them.                                                     |
+| Analysis is currently generated for a chosen track and renderer attaches `trackId`                 | Conflicts                                                      | Make analysis source-scoped; pass explicit clip occurrence separately when applying an edit.                                                  |
+| Cache cleanup is separate from project save                                                        | Compatible                                                     | Keep only raw/intermediate engine output in cache; canonical artifacts stay in `project.json`.                                                |
 
 ### 13.2 No hidden compatibility layer
 
@@ -635,7 +680,7 @@ Reanalysis is a new full pipeline job for one source.
 - A successful job creates a new `analysisRevisionId`, increments transcript revision, and atomically replaces the old bundle.
 - Source-range timeline edits remain valid because they do not depend on transcript-unit IDs.
 - Transient selections and runtime indexes are discarded and rebuilt.
-- User speaker labels require explicit reset confirmation unless a future verified speaker-mapping design is added.
+- User-modified speaker display names require explicit reset confirmation unless a future verified speaker-mapping design is added.
 - A source-fingerprint mismatch rejects publication rather than marking the new bundle current.
 
 The first version does not preserve hand-edited transcript text because transcript correction is not yet a defined artifact workflow. The UI must describe reanalysis as replacement of machine analysis before starting it.
@@ -646,6 +691,7 @@ The first version does not preserve hand-edited transcript text because transcri
 
 - Schema rejects empty, unordered, non-contiguous, punctuation-containing, duplicate-membership, cross-source, or invalid-time acoustic edit units.
 - Schema accepts overlapping source ranges across distinct acoustic edit units.
+- Schema rejects duplicate speakers, cross-revision speakers, and diarization or attribution references to unknown speaker IDs.
 - Reverse indexes rebuild deterministically from persisted artifacts.
 - Selection resolution expands partial acoustic units, ignores punctuation acoustically, blocks unaligned speech, and normalizes overlapping ranges.
 - Selection of a repeated source projection edits only the explicitly selected clip occurrence.
