@@ -128,7 +128,7 @@ describe('ProjectWorkspace', () => {
     const saved = await workspace.saveAs(destination, workspace.project)
 
     expect(saved.root).toBe(destination)
-    expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 2')
     const backupName = (await readdir(parent)).find((name) => name.endsWith('.backup'))
     expect(backupName).toBeDefined()
     const backup = join(parent, backupName!)
@@ -178,8 +178,8 @@ describe('ProjectWorkspace', () => {
     const second = join(parent, 'Second.podcut')
     const firstWorkspace = await workspace.saveAs(first, workspace.project)
     const secondWorkspace = await firstWorkspace.saveAs(second, firstWorkspace.project)
-    expect(await readFile(join(first, 'project.json'), 'utf8')).toContain('"version": 1')
-    expect(await readFile(join(second, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(first, 'project.json'), 'utf8')).toContain('"version": 2')
+    expect(await readFile(join(second, 'project.json'), 'utf8')).toContain('"version": 2')
     expect(firstWorkspace.root).toBe(first)
     expect(secondWorkspace.root).toBe(second)
   })
@@ -238,7 +238,7 @@ describe('ProjectWorkspace', () => {
 
     await saved.close()
 
-    expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(destination, 'project.json'), 'utf8')).toContain('"version": 2')
     expect(remove).not.toHaveBeenCalledWith(destination, expect.anything())
     expect(warningSink.record).not.toHaveBeenCalled()
   })

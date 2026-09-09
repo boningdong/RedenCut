@@ -39,16 +39,12 @@ const token = 'session-token' as WorkspaceToken
 
 function authoritativeProject(): ProjectFile {
   return ProjectFileSchema.parse({
-    version: 1,
+    version: 2,
     createdAt: '2026-08-14T00:00:00.000Z',
     audioSettings: { processingSampleRate: 48_000 },
     audioSources: [source],
-    transcript: {
-      engine: 'whisper',
-      words: [
-        { id: 'word-1', text: 'hello', start: 0, end: 1, muted: false, audioSourceId: source.id },
-      ],
-    },
+    speechArtifacts: [],
+    speakerLabelOverrides: [],
     adjustments: [{ id: 'gain-1', type: 'gain', start: 0, end: 1, valueDb: -3 }],
     markers: [{ id: 'marker-1', time: 1, type: 'note', label: 'Keep' }],
     export: { format: 'wav', targetLUFS: -14, truePeakDbTP: -1, sampleRate: 48_000 },
@@ -99,9 +95,9 @@ describe('toRendererSession', () => {
       ],
       draft: {
         tracks: project.tracks,
-        transcript: project.transcript,
         export: project.export,
       },
+      speechAnalyses: [],
     })
   })
 })
@@ -110,7 +106,6 @@ describe('mergeProjectDraft', () => {
   it('cannot replace an authoritative reference location or fingerprint with forged renderer fields', () => {
     const forgedDraft = {
       tracks: authoritativeProject().tracks,
-      transcript: authoritativeProject().transcript,
       export: authoritativeProject().export,
       audioSources: [
         {
@@ -130,7 +125,6 @@ describe('mergeProjectDraft', () => {
     const project = authoritativeProject()
     const draft: ProjectDraft = {
       tracks: [{ ...project.tracks[0], name: 'Edited main' }],
-      transcript: undefined,
       export: { ...project.export, format: 'flac' },
     }
 
@@ -147,7 +141,7 @@ describe('mergeProjectDraft', () => {
       tracks: draft.tracks,
       export: draft.export,
     })
-    expect(merged.transcript).toBeUndefined()
+    expect(merged.speechArtifacts).toEqual(project.speechArtifacts)
   })
 
   it.each([
@@ -165,7 +159,6 @@ describe('mergeProjectDraft', () => {
             ],
           },
         ],
-        transcript: project.transcript,
         export: project.export,
       }),
     },
@@ -178,7 +171,6 @@ describe('mergeProjectDraft', () => {
             clips: [{ ...project.tracks[0].clips[0], sourceEnd: 43 }],
           },
         ],
-        transcript: project.transcript,
         export: project.export,
       }),
     },

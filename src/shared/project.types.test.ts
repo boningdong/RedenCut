@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { ProjectFileSchema } from './project.types'
 
 const SOURCE_ID = '550e8400-e29b-41d4-a716-446655440000'
+const ANALYSIS_REVISION_ID = '550e8400-e29b-41d4-a716-446655440001'
 
-function managedProject() {
+function managedProject(): any {
   return {
-    version: 1,
+    version: 2,
     createdAt: '2026-08-15T00:00:00.000Z',
     audioSettings: { processingSampleRate: 48_000 },
     audioSources: [
@@ -23,6 +24,8 @@ function managedProject() {
         },
       },
     ],
+    speechArtifacts: [],
+    speakerLabelOverrides: [],
     tracks: [
       {
         id: 'track-1',
@@ -54,7 +57,7 @@ describe('ProjectFileSchema', () => {
   it('parses the first published managed-package schema and applies defaults', () => {
     const project = ProjectFileSchema.parse(managedProject())
 
-    expect(project.version).toBe(1)
+    expect(project.version).toBe(2)
     expect(project.audioSettings.processingSampleRate).toBe(48_000)
     expect(project.tracks[0].clips.map((clip) => clip.audioSourceId)).toEqual([
       SOURCE_ID,
@@ -76,6 +79,42 @@ describe('ProjectFileSchema', () => {
         source: { file: '/tmp/episode.mp3', sampleRate: 44_100, channels: 2, durationSeconds: 60 },
       }),
     ).toThrow()
+  })
+
+  it('rejects the former version-1 project schema without a compatibility adapter', () => {
+    expect(() => ProjectFileSchema.parse({ ...managedProject(), version: 1 })).toThrow()
+  })
+
+  it('accepts a readable speech artifact reference bound to its source and revision', () => {
+    const project = managedProject()
+    project.speechArtifacts.push({
+      audioSourceId: SOURCE_ID,
+      analysisRevisionId: ANALYSIS_REVISION_ID,
+      sourceFingerprint: project.audioSources[0].fingerprint,
+      artifactPath: `speech/${SOURCE_ID}/revision-${ANALYSIS_REVISION_ID}.json`,
+      artifactSha256: 'b'.repeat(64),
+      artifactByteLength: 4096,
+      artifactSchemaVersion: 1,
+      summary: { transcriptUnitCount: 12, acousticEditUnitCount: 8, speakerCount: 2 },
+    })
+
+    expect(ProjectFileSchema.parse(project).speechArtifacts).toHaveLength(1)
+  })
+
+  it('rejects a speech artifact path that does not match its stable IDs', () => {
+    const project = managedProject()
+    project.speechArtifacts.push({
+      audioSourceId: SOURCE_ID,
+      analysisRevisionId: ANALYSIS_REVISION_ID,
+      sourceFingerprint: project.audioSources[0].fingerprint,
+      artifactPath: 'speech/friendly-name/latest.json',
+      artifactSha256: 'b'.repeat(64),
+      artifactByteLength: 4096,
+      artifactSchemaVersion: 1,
+      summary: { transcriptUnitCount: 12, acousticEditUnitCount: 8, speakerCount: 2 },
+    })
+
+    expect(() => ProjectFileSchema.parse(project)).toThrow('source and analysis revision')
   })
 
   it.each(['../episode.mp3', '/tmp/episode.mp3', 'media\\episode.mp3', './episode.mp3'])(

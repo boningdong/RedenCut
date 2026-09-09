@@ -8,6 +8,7 @@ function session(revision: number): RendererSession {
     revision,
     workspace: { kind: 'temporary', displayName: 'Untitled', portable: true },
     sources: [],
+    speechAnalyses: [],
     draft: {
       tracks: [],
       export: { format: 'mp3', targetLUFS: -16, truePeakDbTP: -1.5, sampleRate: 48_000 },

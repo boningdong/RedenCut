@@ -96,7 +96,6 @@ function request(jobId = 'export-a', revision = 7) {
     revision,
     draft: {
       tracks: authoritative.tracks,
-      transcript: authoritative.transcript,
       export: authoritative.export,
     },
     format: 'mp3' as const,

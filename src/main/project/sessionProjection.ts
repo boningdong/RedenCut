@@ -24,9 +24,9 @@ export function toRendererSession(
     }),
     draft: {
       tracks: workspace.project.tracks,
-      transcript: workspace.project.transcript,
       export: workspace.project.export,
     },
+    speechAnalyses: [],
   }
 }
 
@@ -34,7 +34,6 @@ export function mergeProjectDraft(authoritative: ProjectFile, draft: ProjectDraf
   return ProjectFileSchema.parse({
     ...authoritative,
     tracks: draft.tracks,
-    transcript: draft.transcript,
     export: draft.export,
   })
 }

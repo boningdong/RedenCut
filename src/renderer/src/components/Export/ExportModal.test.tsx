@@ -24,9 +24,9 @@ function session(token = TOKEN_A, revision = 7): RendererSession {
     revision,
     workspace: { kind: 'saved', displayName: 'Episode', portable: true },
     sources: [],
+    speechAnalyses: [],
     draft: {
       tracks: project.tracks,
-      transcript: project.transcript,
       export: project.export,
     },
   }

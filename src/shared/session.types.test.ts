@@ -24,5 +24,6 @@ test('renderer session contracts expose only the path-free session shape', () =>
     export: ProjectDraft['export']
   }>()
   expectTypeOf<RendererSession>().toMatchTypeOf<SessionPrecondition>()
+  expectTypeOf<RendererSession['speechAnalyses']>().toBeArray()
   expectTypeOf<ProjectMutationRequest>().toMatchTypeOf<SessionPrecondition>()
 })

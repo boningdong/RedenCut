@@ -57,6 +57,7 @@ function importedSession(importedTrack: Track): RendererSession {
     revision: 2,
     workspace: { kind: 'temporary', displayName: 'Untitled', portable: true },
     sources: [source],
+    speechAnalyses: [],
     draft: draft([track('submitted', 'Submitted snapshot'), importedTrack]),
   }
 }

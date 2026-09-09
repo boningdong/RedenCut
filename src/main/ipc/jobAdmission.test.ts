@@ -79,13 +79,14 @@ function session(token: WorkspaceToken, revision: number): RendererSession {
     revision,
     workspace: { kind: 'saved', displayName: 'Episode', portable: true },
     sources: [],
+    speechAnalyses: [],
     draft: emptyDraft(),
   }
 }
 
 function emptyDraft(): ProjectDraft {
   const project = createEmptyProject()
-  return { tracks: project.tracks, transcript: project.transcript, export: project.export }
+  return { tracks: project.tracks, export: project.export }
 }
 
 function sender(id = 1) {

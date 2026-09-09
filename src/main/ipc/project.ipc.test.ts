@@ -38,6 +38,7 @@ const stayed: OpenProjectResult = {
     revision: 3,
     workspace: { kind: 'saved', displayName: 'Current', portable: true },
     sources: [],
+    speechAnalyses: [],
     draft: {
       tracks: [],
       export: { targetLUFS: -16, truePeakDbTP: -1.5, format: 'mp3', sampleRate: 48_000 },

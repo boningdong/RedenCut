@@ -15,6 +15,7 @@ const SESSION: RendererSession = {
   revision: 1,
   workspace: { kind: 'saved', displayName: 'Episode', portable: true },
   sources: [],
+  speechAnalyses: [],
   draft: {
     tracks: [],
     transcript: {

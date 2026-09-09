@@ -130,6 +130,7 @@ function session(
         },
       },
     ],
+    speechAnalyses: [],
     draft: {
       tracks: [
         {

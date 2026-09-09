@@ -1,25 +1,22 @@
 import { z } from 'zod'
+import {
+  AudioSourceFingerprintSchema,
+  AudioSourceIdSchema,
+  ProjectRelativePathSchema,
+  SHA256_PATTERN,
+} from './source.types'
+import { AnalysisRevisionIdSchema, SpeakerIdSchema } from './speech.types'
 
-const SHA256_PATTERN = /^[a-f0-9]{64}$/
-
-export const AudioSourceIdSchema = z.string().uuid().brand<'AudioSourceId'>()
-export type AudioSourceId = z.infer<typeof AudioSourceIdSchema>
-
-export const ProjectRelativePathSchema = z
-  .string()
-  .refine(
-    (value) =>
-      value.length > 0 &&
-      !value.startsWith('/') &&
-      !/^[A-Za-z]:/.test(value) &&
-      !value.includes('\\') &&
-      value
-        .split('/')
-        .every((segment) => segment.length > 0 && segment !== '.' && segment !== '..'),
-    'Expected a normalized project-relative path',
-  )
-  .brand<'ProjectRelativePath'>()
-export type ProjectRelativePath = z.infer<typeof ProjectRelativePathSchema>
+export {
+  AudioSourceFingerprintSchema,
+  AudioSourceIdSchema,
+  ProjectRelativePathSchema,
+} from './source.types'
+export type {
+  AudioSourceFingerprint,
+  AudioSourceId,
+  ProjectRelativePath,
+} from './source.types'
 
 export const AudioMetadataSchema = z
   .object({
@@ -31,14 +28,6 @@ export const AudioMetadataSchema = z
   })
   .strict()
 export type AudioMetadata = z.infer<typeof AudioMetadataSchema>
-
-const AudioSourceFingerprintSchema = z
-  .object({
-    byteLength: z.number().int().nonnegative(),
-    modifiedTimeMs: z.number().nonnegative(),
-    sha256: z.string().regex(SHA256_PATTERN),
-  })
-  .strict()
 
 const AudioSourceLocationSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('copy'), path: ProjectRelativePathSchema }).strict(),
@@ -156,13 +145,45 @@ const TrackSchema = z.object({
 })
 export type Track = z.infer<typeof TrackSchema>
 
+export const SpeechArtifactRefSchema = z
+  .object({
+    audioSourceId: AudioSourceIdSchema,
+    analysisRevisionId: AnalysisRevisionIdSchema,
+    sourceFingerprint: AudioSourceFingerprintSchema,
+    artifactPath: ProjectRelativePathSchema,
+    artifactSha256: z.string().regex(SHA256_PATTERN),
+    artifactByteLength: z.number().int().positive(),
+    artifactSchemaVersion: z.number().int().positive(),
+    summary: z
+      .object({
+        transcriptUnitCount: z.number().int().nonnegative(),
+        acousticEditUnitCount: z.number().int().nonnegative(),
+        speakerCount: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict()
+export type SpeechArtifactRef = z.infer<typeof SpeechArtifactRefSchema>
+
+export const SpeakerLabelOverrideSchema = z
+  .object({
+    audioSourceId: AudioSourceIdSchema,
+    analysisRevisionId: AnalysisRevisionIdSchema,
+    speechArtifactSha256: z.string().regex(SHA256_PATTERN),
+    speakerId: SpeakerIdSchema,
+    displayName: z.string().trim().min(1),
+  })
+  .strict()
+export type SpeakerLabelOverride = z.infer<typeof SpeakerLabelOverrideSchema>
+
 export const ProjectFileSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     createdAt: z.string(),
     audioSettings: z.object({ processingSampleRate: z.literal(48_000) }).strict(),
     audioSources: z.array(AudioSourceSchema),
-    transcript: TranscriptSchema.optional(),
+    speechArtifacts: z.array(SpeechArtifactRefSchema).default([]),
+    speakerLabelOverrides: z.array(SpeakerLabelOverrideSchema).default([]),
     adjustments: z.array(AdjustmentSchema).default([]),
     markers: z.array(MarkerSchema).default([]),
     export: ExportSettingsSchema.prefault({}),
@@ -220,24 +241,78 @@ export const ProjectFileSchema = z
         }
       })
     })
-    project.transcript?.words.forEach((word, wordIndex) => {
-      if (word.audioSourceId && !sources.has(word.audioSourceId)) {
+    const speechArtifactKeys = new Set<string>()
+    project.speechArtifacts.forEach((reference, referenceIndex) => {
+      const source = sources.get(reference.audioSourceId)
+      const key = `${reference.audioSourceId}:${reference.analysisRevisionId}`
+      if (speechArtifactKeys.has(key)) {
         context.addIssue({
           code: 'custom',
-          path: ['transcript', 'words', wordIndex, 'audioSourceId'],
-          message: 'Word references unknown AudioSource',
+          path: ['speechArtifacts', referenceIndex],
+          message: 'Only one speech artifact may exist for a source and analysis revision',
         })
       }
+      speechArtifactKeys.add(key)
+      if (!source) {
+        context.addIssue({
+          code: 'custom',
+          path: ['speechArtifacts', referenceIndex, 'audioSourceId'],
+          message: 'Speech artifact references unknown AudioSource',
+        })
+        return
+      }
+      if (JSON.stringify(reference.sourceFingerprint) !== JSON.stringify(source.fingerprint)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['speechArtifacts', referenceIndex, 'sourceFingerprint'],
+          message: 'Speech artifact fingerprint does not match AudioSource',
+        })
+      }
+      const expectedPath = `speech/${reference.audioSourceId}/revision-${reference.analysisRevisionId}.json`
+      if (reference.artifactPath !== expectedPath) {
+        context.addIssue({
+          code: 'custom',
+          path: ['speechArtifacts', referenceIndex, 'artifactPath'],
+          message: 'Speech artifact path must identify its source and analysis revision',
+        })
+      }
+    })
+    const overrides = new Set<string>()
+    project.speakerLabelOverrides.forEach((override, overrideIndex) => {
+      const reference = project.speechArtifacts.find(
+        (candidate) =>
+          candidate.audioSourceId === override.audioSourceId &&
+          candidate.analysisRevisionId === override.analysisRevisionId &&
+          candidate.artifactSha256 === override.speechArtifactSha256,
+      )
+      if (!reference) {
+        context.addIssue({
+          code: 'custom',
+          path: ['speakerLabelOverrides', overrideIndex],
+          message: 'Speaker label override is not bound to the current speech artifact',
+        })
+      }
+      const key = `${override.audioSourceId}:${override.analysisRevisionId}:${override.speakerId}`
+      if (overrides.has(key)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['speakerLabelOverrides', overrideIndex],
+          message: 'Duplicate speaker label override',
+        })
+      }
+      overrides.add(key)
     })
   })
 export type ProjectFile = z.infer<typeof ProjectFileSchema>
 
 export function createEmptyProject(createdAt = new Date().toISOString()): ProjectFile {
   return ProjectFileSchema.parse({
-    version: 1,
+    version: 2,
     createdAt,
     audioSettings: { processingSampleRate: 48_000 },
     audioSources: [],
+    speechArtifacts: [],
+    speakerLabelOverrides: [],
     tracks: [],
   })
 }

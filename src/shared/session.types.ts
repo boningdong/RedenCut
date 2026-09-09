@@ -1,5 +1,6 @@
 import type { AudioSourceCacheDescriptor, WorkspaceDescriptor } from './import.types'
 import type { AudioMetadata, AudioSourceId, ProjectFile, Track, Transcript } from './project.types'
+import type { RendererSpeechAnalysis } from './speech.types'
 
 export type WorkspaceToken = string & { readonly __brand: 'WorkspaceToken' }
 
@@ -25,6 +26,7 @@ export interface RendererSession extends SessionPrecondition {
   workspace: WorkspaceDescriptor
   sources: RendererAudioSource[]
   draft: ProjectDraft
+  speechAnalyses: RendererSpeechAnalysis[]
 }
 
 export interface ProjectMutationRequest extends SessionPrecondition {

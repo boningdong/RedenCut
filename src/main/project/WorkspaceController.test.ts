@@ -65,7 +65,7 @@ async function packageWithoutCache() {
   await mkdir(join(root, 'media', SOURCE_ID), { recursive: true })
   await writeFile(join(root, 'media', SOURCE_ID, 'source.wav'), bytes)
   const project = ProjectFileSchema.parse({
-    version: 1,
+    version: 2,
     createdAt: '2026-08-15T00:00:00.000Z',
     audioSettings: { processingSampleRate: 48_000 },
     audioSources: [
@@ -283,7 +283,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(second.revision).toBe(3)
     expect(second.workspaceToken).not.toBe(first.workspaceToken)
-    expect(await readFile(join(firstRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(firstRoot, 'project.json'), 'utf8')).toContain('"version": 2')
   })
 
   it('rejects Open through a symlink to the same temporary root without changing the session', async () => {
@@ -301,7 +301,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(controller.workspace.root).toBe(temporaryRoot)
     expect(() => controller.assertCurrent(session)).not.toThrow()
-    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 2')
   })
 
   it('rejects an Open alias lexically below the temporary root even when it targets an external project', async () => {
@@ -363,7 +363,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(controller.workspace.root).toBe(temporaryRoot)
     expect(() => controller.assertCurrent(session)).not.toThrow()
-    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 2')
   })
 
   it('rejects Save As through a symlink to the same temporary root before publication', async () => {
@@ -380,7 +380,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(controller.workspace.root).toBe(temporaryRoot)
     expect(() => controller.assertCurrent(session)).not.toThrow()
-    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 2')
   })
 
   it('rejects Save As below the temporary root before publication', async () => {

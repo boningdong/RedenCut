@@ -534,6 +534,6 @@ describe('ProjectTransitionCoordinator', () => {
     ])
     expect(controller.workspace.root).toBe(candidate)
     await expect(stat(oldTemporaryRoot)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect(await readFile(join(savedRoot, 'project.json'), 'utf8')).toContain('"version": 1')
+    expect(await readFile(join(savedRoot, 'project.json'), 'utf8')).toContain('"version": 2')
   })
 })
