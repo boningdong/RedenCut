@@ -28,7 +28,7 @@ The result remains editable after cache cleanup and remains stable when clips mo
 - Replaceable transcription capability and provenance.
 - WhisperX alignment and diarization through a job-scoped local CLI worker.
 - Canonical domain normalization and validation in Electron main.
-- Durable project storage in `.podcut/project.json`.
+- Compact speech references in `.podcut/project.json` and immutable canonical artifacts in `.podcut/speech/`.
 - Text-selection resolution to acoustically addressable source ranges.
 - Atomic publication, cancellation, and invalidation.
 - Path-free renderer projections and speaker-label editing.
@@ -40,7 +40,7 @@ The result remains editable after cache cleanup and remains stable when clips mo
 - A model-selection UI.
 - A general plugin framework.
 - Automatic migration of old `Word`, transcript, or project schemas.
-- A durable `analysis/` directory separate from `project.json`.
+- SQLite, database-backed, or chunked speech-artifact storage.
 - Claims that an acoustically addressable boundary is automatically a natural hard cut.
 
 ## 2. Architectural overview
@@ -61,8 +61,10 @@ SpeechAnalysisCoordinator (Electron main)
       └── atomic workspace publication
                     │
                     ▼
-        .podcut/project.json
-        SpeechAnalysisBundle
+        .podcut/project.json ── SpeechArtifactRef
+                                    │ path + SHA-256
+                                    ▼
+                          .podcut/speech/<sha256>.json
 ```
 
 The renderer never receives filesystem paths and never assembles authoritative engine provenance. The main process owns source resolution, process execution, validation, and publication.
@@ -192,8 +194,15 @@ type Speaker = {
   id: SpeakerId
   analysisRevisionId: AnalysisRevisionId
   diarizationLabel: string
+  defaultDisplayName: string
+}
+
+type SpeakerLabelOverride = {
+  audioSourceId: AudioSourceId
+  analysisRevisionId: AnalysisRevisionId
+  speechArtifactSha256: string
+  speakerId: SpeakerId
   displayName: string
-  displayNameOrigin: 'generated' | 'user'
 }
 
 type DiarizationTurn = {
@@ -232,9 +241,9 @@ type SpeakerAttributionArtifact = {
 
 Speaker IDs are anonymous and local to one analysis revision. The diarization adapter's raw label, such as `SPEAKER_00`, becomes the immutable `diarizationLabel`; normalization creates the corresponding `Speaker` and rewrites turns and attributions to its `SpeakerId`. Overlap is allowed in diarization turns. Attribution uses overlap duration and deterministic tie rules, but records unsupported or ambiguous assignments instead of inventing certainty.
 
-`displayName` is the user-facing, editable speaker name and defaults to a generated value such as `Speaker 1`. A user who knows the participant may enter a real name, but PodCut does not infer or verify real-world identity from the voice. User edits change only `displayName` and `displayNameOrigin`; they never mutate the speaker ID, raw diarization label, turns, or attribution.
+`defaultDisplayName` is the generated user-facing label, such as `Speaker 1`. A user who knows the participant may enter a real name through a `SpeakerLabelOverride`, but PodCut does not infer or verify real-world identity from the voice. User edits never mutate the speaker ID, raw diarization label, turns, or attribution.
 
-The `Speaker[]` catalog is durable project state stored with the bundle. Reanalysis may produce different speaker IDs. The first version must require explicit confirmation before replacing an analysis containing user-named speakers; it does not silently transfer or discard names without a verified mapping.
+The immutable `Speaker[]` catalog is stored in `SpeechArtifact`; the small mutable override array is stored in `project.json`. Reanalysis may produce different speaker IDs. The first version must require explicit confirmation before replacing an analysis containing user-named speakers; it does not silently transfer or discard names without a verified mapping.
 
 ### 3.7 Engine provenance
 
@@ -258,10 +267,11 @@ Transcription, alignment, diarization, disfluency detection, and speech generati
 
 ### 3.8 Atomic speech-analysis bundle
 
-The project stores one current bundle per analyzed audio source.
+The project stores one current immutable speech artifact per analyzed audio source. The artifact is a complete coherent bundle rather than a raw engine response.
 
 ```ts
-type SpeechAnalysisBundle = {
+type SpeechArtifact = {
+  schemaVersion: number
   analysisRevisionId: AnalysisRevisionId
   audioSourceId: AudioSourceId
   sourceFingerprint: AudioSourceFingerprint
@@ -275,11 +285,34 @@ type SpeechAnalysisBundle = {
 }
 ```
 
-`ProjectFile` gains the field `speechAnalyses: SpeechAnalysisBundle[]`. Every nested machine artifact for one source is published and replaced together.
+The large payload is stored at `.podcut/speech/<artifactSha256>.json`. `ProjectFile` stores only one compact reference per currently analyzed source:
+
+```ts
+type SpeechArtifactRef = {
+  audioSourceId: AudioSourceId
+  analysisRevisionId: AnalysisRevisionId
+  sourceFingerprint: AudioSourceFingerprint
+
+  artifactPath: ProjectRelativePath
+  artifactSha256: string
+  artifactByteLength: number
+  artifactSchemaVersion: number
+
+  summary: {
+    transcriptUnitCount: number
+    acousticEditUnitCount: number
+    speakerCount: number
+  }
+}
+```
+
+`ProjectFile` gains `speechArtifacts: SpeechArtifactRef[]` and `speakerLabelOverrides: SpeakerLabelOverride[]`. Every nested machine artifact for one source is published and replaced together by changing one reference. The artifact filename is its lowercase SHA-256 digest, its path must be exactly `speech/<artifactSha256>.json`, and referenced artifacts are immutable.
+
+User-modified speaker display names are a small mutable overlay in `project.json`, keyed by the current artifact reference and `SpeakerId`. Machine speaker IDs, raw diarization labels, turns, and attribution remain in `SpeechArtifact`. Renaming a speaker therefore uses the normal atomic project-file save without rewriting the full transcript. An override for an older artifact is invalid and is removed only as part of a confirmed reanalysis replacement.
 
 ## 4. Required invariants
 
-`ProjectFileSchema.superRefine` and domain construction enforce all of the following:
+`ProjectFileSchema.superRefine` validates reference shape, uniqueness, source membership, speaker-label overlays, and project-relative paths. `SpeechArtifactSchema` and domain construction enforce the artifact invariants below after the referenced file has passed length and SHA-256 verification:
 
 1. Each `AcousticEditUnit.transcriptUnitIds` array is non-empty.
 2. The referenced transcript units exist, are `speech` units, are consecutive in transcript order, and appear in that order in the array.
@@ -292,9 +325,11 @@ type SpeechAnalysisBundle = {
 9. Every `Speaker.id` is unique within the bundle and every `Speaker.analysisRevisionId` matches the bundle.
 10. Every diarization turn references a `Speaker` in the bundle.
 11. Each speaker attribution references an acoustic edit unit from the contained alignment artifact; every assigned or candidate speaker ID references a `Speaker` in the bundle.
-12. At most one current `SpeechAnalysisBundle` exists for an `AudioSourceId`.
-13. Re-alignment replaces the entire alignment artifact as part of a full bundle publication.
-14. Acoustic edit unit source ranges are not required to be globally disjoint. Overlapping speech can legitimately create overlapping ranges.
+12. At most one current `SpeechArtifactRef` exists for an `AudioSourceId`.
+13. A reference's source, fingerprint, revision, schema version, byte length, digest, and summary match the loaded artifact.
+14. A speaker-label override targets a speaker in the currently referenced artifact for the same source and revision.
+15. Re-alignment replaces the entire alignment artifact as part of a full artifact publication.
+16. Acoustic edit unit source ranges are not required to be globally disjoint. Overlapping speech can legitimately create overlapping ranges.
 
 Some speech units may remain unaligned when evidence is insufficient. This is represented by their absence from every acoustic edit unit, not by fabricated timing.
 
@@ -433,6 +468,8 @@ The later Hybrid Disfluency Detector consumes the published canonical transcript
 
 The initial adapter continues to use the existing local whisper.cpp installation and records `best-effort-verbatim`. A future native verbatim model can replace the adapter without changing alignment, selection, renderer, or project contracts.
 
+The dependency and model responsibilities, authentication rules, caches, and developer provisioning flows are maintained in [Speech Models and Dependencies](../../speech-models-and-dependencies.md). Runtime code consumes validated descriptors and must not infer a model from an undocumented developer-machine default.
+
 ### 7.2 Alignment and diarization interfaces
 
 Alignment and diarization have separate main-process-facing interfaces even though the first worker implementation may use WhisperX for both:
@@ -448,6 +485,13 @@ interface IDiarizationEngine {
 ```
 
 Engine results are adapter DTOs, not persisted project types. Main-process normalization assigns PodCut IDs, converts units and times, validates provenance, and constructs the canonical artifacts.
+
+The initial technology roles are named explicitly throughout code, diagnostics, and documentation:
+
+- whisper.cpp is the Transcriber (`best-effort-verbatim` transcription).
+- WhisperX is the Alignment Engine adapter (forced alignment).
+- pyannote.audio through the worker is the Diarization Engine (anonymous speaker separation).
+- The PodCut Python worker is the process host for alignment and diarization, not an engine or model itself.
 
 The first version uses fixed default engine and model descriptors. Configuration is centralized so a future UI can select transcription, alignment, diarization, disfluency, and generation models independently.
 
@@ -487,10 +531,19 @@ Worker discovery is independent of the Electron bundle. An availability check re
 - Executable not installed.
 - Unsupported protocol version.
 - Required Python/model dependencies unavailable.
+- Hugging Face token file unavailable when provisioning a gated model.
+- The current Hugging Face account has not accepted required model conditions.
 - Model files unavailable.
+- Requested execution backend unsupported on the current architecture.
 - Ready with engine/model descriptors.
 
 The UI presents actionable installation or upgrade guidance. The first version does not select among models in the UI.
+
+The worker's Python environment is independently installed and version-locked; Electron does not embed Python. Model provisioning is an explicit developer/user action, never an implicit download during application startup or an ordinary test. Secrets are read at runtime and are never copied into the worker environment, image, project, logs, provenance, or retained harness evidence.
+
+For the speech-enabled Docker harness, the launcher resolves the current developer's Hugging Face token location from `HF_TOKEN_PATH`, then `HF_HOME`, then the platform default. It mounts that one file read-only at `/run/secrets/hf_token`. The host username and Hugging Face account name are not part of the command or image. Each developer must still authenticate with their own account and accept the terms of every gated model used by the pinned manifest.
+
+Docker model files live in a dedicated persistent volume, separate from the token bind mount and ordinary harness dependencies. The worker reads the token only when authenticated provisioning is requested. Cached smoke tests run without forwarding the token whenever the pinned models are already complete and verified.
 
 ### 8.4 Cancellation and cleanup
 
@@ -537,18 +590,20 @@ Renderer code never appends `audioSourceId` or `trackId` to engine results and n
 
 ### 10.1 Durable standard artifacts
 
-The first version stores these in `.podcut/project.json`:
+The first version stores the following complete immutable payload in `.podcut/speech/<sha256>.json`:
 
 - `TranscriptArtifact` and `TranscriptUnit[]`.
 - `AlignmentArtifact` and `AcousticEditUnit[]`.
 - Diarization and speaker attribution.
-- The `Speaker[]` catalog and user-modified display names.
+- The machine `Speaker[]` catalog.
 - Engine, model, and configuration provenance.
 - Source fingerprint and analysis revision.
 
-These are project data, not cache. Cleaning `.podcut/cache` must not remove the canonical transcript, acoustic edit units, speakers, user-modified display names, or user edits.
+The compact `SpeechArtifactRef[]`, `SpeakerLabelOverride[]`, and non-destructive user edits remain in `.podcut/project.json`. These are all project data, not cache. Cleaning `.podcut/cache` must not remove `.podcut/speech`, canonical transcripts, acoustic edit units, speakers, display-name overrides, or user edits.
 
-`ProjectWorkspace.save` already writes a temporary project file and renames it atomically. The speech-analysis transaction uses this same persistence boundary.
+Speech artifacts use UTF-8 JSON with stable field ordering and no insignificant whitespace. One canonical encoder owns serialization for both hashing and disk writes; implementations must not independently stringify an equivalent object and assume identical bytes.
+
+Project open validates `project.json` first, resolves each speech path within the workspace, verifies byte length and SHA-256 before parsing, then validates cross-file invariants. Missing, corrupt, path-escaping, or mismatched speech artifacts fail project open with an actionable integrity error; they are never silently treated as cache misses.
 
 The project schema version is bumped for this intentionally incompatible data-model change. Old version-1 transcript/project files fail schema validation with a clear unsupported-version error. No migration adapter or backwards-compatible union is added.
 
@@ -565,15 +620,19 @@ The following may be stored under project cache or a job-temporary directory:
 
 First-version implementations should prefer task-temporary storage unless reuse has a measured benefit. Cache entries must be keyed by source fingerprint and exact engine/model/config provenance. Temporary paths and logs are never referenced by durable artifacts.
 
-### 10.3 Future size split
+### 10.3 Workspace copy and cleanup
 
-The first version does not introduce a durable `analysis/` directory. If measured long-form projects make `project.json` unacceptably large, a later design may move immutable artifact payloads into durable analysis files while keeping atomic references in the project file. That change is not pre-designed here.
+`ProjectWorkspace.saveAs` already stages a recursive workspace copy, so referenced files under `speech/` move with the project. Candidate validation must include all referenced artifact hashes before the staged workspace replaces the destination.
+
+Unreferenced immutable artifacts may remain after a crash before the project-file pointer swap. They do not affect correctness. Cleanup may remove them only after loading a valid `project.json`, retaining every referenced digest, and confirming that no speech publication is active. Cache cleanup never traverses `speech/`.
+
+One JSON artifact per source is the first-version storage unit. SQLite, lazy chunking, and incremental artifact mutation remain deferred until measured project sizes justify them.
 
 ## 11. Atomic preparation and publication
 
 ### 11.1 Preparation state
 
-During a job, every output lives in memory or a job-temporary directory. The current project keeps its previous `SpeechAnalysisBundle` unchanged.
+During a job, every output lives in memory or a job-temporary directory. The current project keeps its previous `SpeechArtifactRef` and referenced `SpeechArtifact` unchanged.
 
 The coordinator must finish all of the following before publication is eligible:
 
@@ -601,13 +660,17 @@ Inside the serialized transition, main:
 1. Revalidates workspace token and revision.
 2. Resolves the authoritative `AudioSource` from the current project.
 3. Revalidates the original source fingerprint immediately before commit.
-4. Verifies that the prepared bundle targets that source and fingerprint.
-5. Replaces the source's complete existing bundle in a candidate project.
-6. Parses the complete candidate with `ProjectFileSchema`.
-7. Saves through `ProjectWorkspace.save`.
-8. Advances the workspace revision and returns a new `RendererSession`.
+4. Verifies that the prepared `SpeechArtifact` targets that source and fingerprint.
+5. Serializes the artifact in canonical form, computes its byte length and SHA-256, and constructs its final `speech/<sha256>.json` path.
+6. Writes a uniquely named file under `speech/.staging/`, closes it, verifies the bytes and schema from disk, and atomically renames it to the immutable final path. An existing file at that digest must have identical bytes.
+7. Constructs a candidate project containing the new `SpeechArtifactRef` and removing speaker-name overrides that the confirmed reanalysis invalidates.
+8. Parses the candidate with `ProjectFileSchema` and validates the reference against the final artifact.
+9. Atomically saves `project.json` through `ProjectWorkspace.save`.
+10. Advances the workspace revision and returns a new `RendererSession` built from the committed project and artifact.
 
-The in-memory authoritative workspace changes only after the atomic save succeeds.
+Publication is ordered content first, pointer second. Failure before the project-file rename leaves the old reference authoritative and may leave only an unreferenced immutable artifact. Failure after the rename cannot expose a reference to a partially written artifact. The in-memory authoritative workspace changes only after the project-file save succeeds.
+
+This is a process-crash-consistent transaction using atomic rename and hash validation. If power-loss durability beyond the repository's current `ProjectWorkspace.save` behavior is required, file and directory `fsync` must be designed consistently for both the speech artifact and `project.json`; this subproject does not claim that stronger guarantee.
 
 ### 11.3 Concurrent renderer edits
 
@@ -623,7 +686,7 @@ If reconciliation cannot prove that later local edits are independent, the resul
 
 Cancellation, worker crash, malformed worker output, timeout, source-fingerprint change, project switch, sender destruction, stale workspace revision, validation failure, or save failure publishes nothing.
 
-The previous valid analysis bundle remains untouched. Runtime indexes continue to derive from that bundle.
+The previous valid speech artifact reference remains untouched. Runtime indexes continue to derive from that artifact.
 
 Changing source content invalidates analysis by fingerprint. Moving, splitting, muting, or reordering clips does not invalidate source-time analysis. Changing transcription, alignment, diarization, attribution algorithm, model, or relevant configuration requires a new full analysis revision.
 
@@ -661,12 +724,13 @@ The existing manual operation that shifts timing fields on individual words is i
 | `ProjectMutationCoordinator` cancels jobs before save/open                                         | Compatible for external mutations, unsafe for self-publication | Keep it for save/open cancellation, but publish analysis directly inside `WorkspaceController.runTransition`.                                 |
 | `ProjectTransitionCoordinator` and `SessionSwitchBarrier` coordinate visible workspace replacement | Compatible with extension                                      | Let switch/save cancel and settle speech analysis; same-workspace analysis publication advances revision without entering the switch barrier. |
 | `WorkspaceController.runTransition` serializes and checks session preconditions                    | Compatible                                                     | Add `commitSpeechAnalysis` and recheck fingerprint inside the transition.                                                                     |
-| `ProjectWorkspace.save` performs temporary-write plus rename                                       | Compatible                                                     | Reuse it as the atomic durable publication boundary.                                                                                          |
+| `ProjectWorkspace.save` atomically replaces only `project.json`                                    | Requires extension                                             | Add content-first speech publication: immutable artifact rename, validation, then the existing atomic project-reference swap.                 |
 | Import reconciliation preserves renderer edits made during a main-owned job                        | Partially reusable                                             | Generalize its edit ledger for analysis; lock target-source transcript operations and preserve independent timeline/export edits.             |
 | Word selection and `wordOutputTime` assume one timestamp per visible word                          | Conflicts                                                      | Resolve through acoustic edit units and clip projection; group-highlight shared spans and treat punctuation as timeless.                      |
 | Timeline edits persist clips but separately toggle `Word.muted`                                    | Conflicts                                                      | Persist only non-destructive timeline edits and derive transcript presentation from them.                                                     |
 | Analysis is currently generated for a chosen track and renderer attaches `trackId`                 | Conflicts                                                      | Make analysis source-scoped; pass explicit clip occurrence separately when applying an edit.                                                  |
-| Cache cleanup is separate from project save                                                        | Compatible                                                     | Keep only raw/intermediate engine output in cache; canonical artifacts stay in `project.json`.                                                |
+| `ProjectWorkspace.saveAs` recursively stages the workspace                                         | Compatible with validation extension                           | Include `speech/` naturally, then validate every staged reference before destination publication.                                             |
+| Cache cleanup is separate from project save                                                        | Compatible                                                     | Keep raw/intermediate output in cache; immutable canonical artifacts live in `speech/`, which cache cleanup never traverses.                  |
 
 ### 13.2 No hidden compatibility layer
 
@@ -699,16 +763,23 @@ The first version does not preserve hand-edited transcript text because transcri
 ### 15.2 Engine and worker tests
 
 - whisper.cpp result normalization creates deterministic transcript units for Chinese and English fixtures.
+- Dependency preflight distinguishes absent runtime, absent token, unaccepted gated-model terms, incomplete model cache, and unsupported backend.
 - Worker protocol rejects malformed JSON, wrong versions, oversized messages, duplicate terminals, and premature exit.
 - Cancellation waits for child exit and temporary cleanup.
 - Alignment never invents per-character times from phrase-level evidence.
 - Diarization overlap produces explicit ambiguous attribution where appropriate.
+- A real-model Docker smoke run uses a short conversation fixture and the pinned CPU configuration; it verifies alignment, diarization, normalization, persistence, reopen, and visible speaker attribution without claiming production quality.
+- A native macOS quality/performance run uses the product defaults and representative fixtures; it records model provenance, elapsed time, peak resource observations, and quality evidence.
+- CUDA remains a separate native Linux plus NVIDIA acceptance target; Linux ARM64 CPU success is not reported as CUDA or macOS acceleration coverage.
 
 ### 15.3 Transaction tests
 
 - No artifact is published when any pipeline step fails.
 - Existing analysis survives cancellation, crash, fingerprint change, stale revision, project switch, or failed save.
-- Successful publication changes every nested artifact to the same analysis revision in one project-file rename.
+- A crash before the project-reference swap cannot replace the prior speech artifact and may leave only an unreferenced immutable file.
+- A committed reference never targets a staging, absent, length-mismatched, hash-mismatched, or schema-invalid artifact.
+- Successful publication changes every nested artifact to the same analysis revision through one final project-file reference swap.
+- Save As copies and validates referenced speech artifacts; cache cleanup preserves them.
 - Save/open waits for the analysis job to settle and cannot race worker cleanup.
 - Local timeline edits made during analysis survive renderer reconciliation.
 - Renderer cannot forge paths, fingerprints, engine provenance, or acoustic units through `ProjectDraft`.
@@ -729,7 +800,6 @@ The following require separate future designs and do not block this subproject:
 
 - User correction of canonical transcript text and alignment invalidation.
 - Cross-reanalysis speaker identity mapping.
-- Durable analysis payload files outside `project.json`.
 - Model-selection UI and downloadable model lifecycle.
 - Cache-compatible reuse across engine or model versions.
 - Partial pipeline publication or alignment-only replacement.
