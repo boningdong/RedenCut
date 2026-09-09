@@ -1,0 +1,29 @@
+ARG PODCUT_HARNESS_BASE=podcut-harness:local
+FROM ${PODCUT_HARNESS_BASE}
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv libsndfile1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --no-cache-dir --break-system-packages uv==0.12.12
+
+COPY speech-worker/pyproject.toml speech-worker/uv.lock /opt/podcut-speech-worker/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd /opt/podcut-speech-worker \
+    && uv sync --frozen --no-dev --no-install-project
+COPY speech-worker/src /opt/podcut-speech-worker/src
+COPY speech-worker/models.json /opt/podcut-speech-worker/models.json
+RUN --mount=type=cache,target=/root/.cache/uv \
+    cd /opt/podcut-speech-worker \
+    && uv sync --frozen --no-dev \
+    && mkdir -p /models \
+    && chown -R node:node /opt/podcut-speech-worker /models
+
+ENV PATH="/opt/podcut-speech-worker/.venv/bin:${PATH}"
+ENV PYTHONPATH="/opt/podcut-speech-worker/src"
+ENV PODCUT_SPEECH_MANIFEST="/opt/podcut-speech-worker/models.json"
+ENV PODCUT_SPEECH_MODEL_CACHE="/models"
+ENV HF_HOME="/models/.huggingface"
+ENV HF_HUB_CACHE="/models/.huggingface/hub"
+
+USER node

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "transcription-smoke-multilingual-tiny",
+      "capability": "transcription-smoke",
+      "repository": "ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "expectedFiles": ["ggml-tiny.bin"],
+      "license": "MIT",
+      "access": "public",
+      "profiles": ["docker-linux-arm64-cpu"]
+    },
+    {
+      "id": "alignment-zh",
+      "capability": "alignment",
+      "repository": "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
+      "revision": "99ccb2737be22b8bb50dcfcc39ad4d567fb90cfd",
+      "expectedFiles": [
+        "config.json",
+        "preprocessor_config.json",
+        "pytorch_model.bin",
+        "special_tokens_map.json",
+        "vocab.json"
+      ],
+      "license": "Apache-2.0",
+      "access": "public",
+      "profiles": ["docker-linux-arm64-cpu", "native-macos"]
+    },
+    {
+      "id": "alignment-en",
+      "capability": "alignment",
+      "repository": "facebook/wav2vec2-base-960h",
+      "revision": "22aad52d435eb6dbaf354bdad9b0da84ce7d6156",
+      "expectedFiles": [
+        "config.json",
+        "model.safetensors",
+        "preprocessor_config.json",
+        "special_tokens_map.json",
+        "tokenizer_config.json",
+        "vocab.json"
+      ],
+      "license": "Apache-2.0",
+      "access": "public",
+      "profiles": ["docker-linux-arm64-cpu", "native-macos"]
+    },
+    {
+      "id": "diarization-default",
+      "capability": "diarization",
+      "repository": "pyannote/speaker-diarization-community-1",
+      "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+      "expectedFiles": [
+        "config.yaml",
+        "embedding/pytorch_model.bin",
+        "plda/plda.npz",
+        "plda/xvec_transform.npz",
+        "segmentation/pytorch_model.bin"
+      ],
+      "license": "CC-BY-4.0",
+      "access": "gated-auto",
+      "profiles": ["docker-linux-arm64-cpu", "native-macos", "native-linux-nvidia"]
+    }
+  ]
+}

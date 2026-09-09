@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "podcut-speech-worker"
+version = "0.1.0"
+description = "Job-scoped forced-alignment and diarization worker for PodCut"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "huggingface-hub==0.36.0",
+  "pyannote-audio==4.0.7",
+  "torch==2.8.0",
+  "torchaudio==2.8.0",
+  "torchvision==0.23.0",
+  "whisperx==3.8.6",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/podcut_speech_worker"]
+
+[tool.uv]
+override-dependencies = [
+  "torchcodec>=0.7.0,<0.8.0; sys_platform != 'linux' or platform_machine != 'aarch64'",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchaudio = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

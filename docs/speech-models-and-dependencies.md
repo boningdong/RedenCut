@@ -163,7 +163,45 @@ As of 2026-09-09, a developer-side access check established:
 - No model was downloaded and no repository code was changed by that check.
 - The Linux ARM64 container is a CPU target; CUDA acceptance requires native Linux plus NVIDIA hardware.
 
-This establishes credential forwarding and gated repository access only. It does not yet establish package compatibility, complete transitive model access, model download integrity, offline loading, diarization correctness, alignment correctness, runtime, memory use, or cancellation behavior. Those become explicit implementation and acceptance tasks.
+That side-conversation check established credential forwarding and gated repository access only. The implementation evidence below supersedes some of its remaining unknowns; alignment correctness, production diarization quality, representative runtime and memory, and cancellation behavior still require their later acceptance tasks.
+
+### Speech harness implementation evidence
+
+The first implementation pass on 2026-09-09 added a separate Linux ARM64 CPU image and verified the following locked environment:
+
+| Component      | Pinned version |
+| -------------- | -------------- |
+| Python         | 3.11           |
+| uv             | 0.12.12        |
+| PyTorch        | 2.8.0 CPU      |
+| torchaudio     | 2.8.0          |
+| WhisperX       | 3.8.6          |
+| pyannote.audio | 4.0.7          |
+
+The committed model manifest uses immutable revisions:
+
+| Capability                      | Repository                                            | Revision                                   |
+| ------------------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| whisper.cpp smoke transcription | `ggerganov/whisper.cpp`                               | `5359861c739e955e79d9a303bcbc70fb988958b1` |
+| Chinese alignment               | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` | `99ccb2737be22b8bb50dcfcc39ad4d567fb90cfd` |
+| English alignment               | `facebook/wav2vec2-base-960h`                         | `22aad52d435eb6dbaf354bdad9b0da84ce7d6156` |
+| Speaker diarization             | `pyannote/speaker-diarization-community-1`            | `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee` |
+
+Provisioning downloaded only the manifest's required files into the dedicated `podcut-speech-models` Docker volume. A subsequent container received no token mount and reported all four snapshots ready. Approximate snapshot sizes were 75 MB for whisper.cpp tiny, 1.2 GB for Chinese alignment, 361 MB for English alignment, and 32 MB for diarization.
+
+An offline load of the pinned pyannote pipeline succeeded. A real CPU smoke run on the first 20 seconds of `mandarin-conversation-mix.wav`, preloaded as an in-memory 48 kHz waveform, completed and returned nine turns across three anonymous speaker labels. This proves model loading and inference plumbing only; it is not a diarization-quality acceptance result.
+
+Linux ARM64 has no compatible `torchcodec` wheel in this stack. The worker must therefore decode or convert audio outside pyannote and pass `{"waveform": Tensor, "sample_rate": number}`. The container smoke used this supported in-memory path. The remaining `torchcodec` warning at pyannote import is expected; any attempt to pass a filename directly is an implementation error.
+
+Current developer commands are:
+
+```sh
+npm run speech:docker:build
+npm run speech:docker:provision
+npm run speech:docker:preflight
+```
+
+Only `speech:docker:provision` forwards the read-only Hugging Face token. `speech:docker:preflight` verifies the persistent model volume without credentials or downloads.
 
 ## Maintenance rule
 
