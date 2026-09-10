@@ -60,7 +60,11 @@ export const SpeechArtifactSchema = z
       artifact.speakerAttribution.alignmentArtifactId !== artifact.alignment.id ||
       artifact.speakerAttribution.diarizationArtifactId !== artifact.diarization.id
     )
-      issue(context, ['speakerAttribution'], 'Speaker attribution must reference contained artifacts')
+      issue(
+        context,
+        ['speakerAttribution'],
+        'Speaker attribution must reference contained artifacts',
+      )
 
     const transcriptIndex = new Map(
       artifact.transcript.units.map((unit, index) => [unit.id, { unit, index }]),
@@ -77,7 +81,11 @@ export const SpeechArtifactSchema = z
         issue(context, ['alignment'], 'TranscriptUnit membership must be consecutive and ordered')
       for (const id of acousticUnit.transcriptUnitIds) {
         if (membership.has(id))
-          issue(context, ['alignment'], 'A speech TranscriptUnit belongs to at most one AcousticEditUnit')
+          issue(
+            context,
+            ['alignment'],
+            'A speech TranscriptUnit belongs to at most one AcousticEditUnit',
+          )
         membership.add(id)
       }
     }

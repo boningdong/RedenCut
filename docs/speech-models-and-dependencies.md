@@ -11,9 +11,9 @@ The first implementation has fixed defaults and no model-selection UI. Future tr
 | Capability           | Product role                                 | Initial implementation                                                                                   | Runtime                        | Status                  |
 | -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------ | ----------------------- |
 | Transcription        | Transcriber (`best-effort-verbatim`)         | whisper.cpp                                                                                              | Native executable              | Existing                |
-| Alignment            | Alignment Engine (forced alignment)          | WhisperX alignment adapter with a language-compatible phoneme model                                      | Python worker                  | Planned in subproject 1 |
-| Speaker separation   | Diarization Engine (anonymous speakers)      | pyannote.audio `speaker-diarization-community-1`, invoked through the worker                             | Python/PyTorch worker          | Planned in subproject 1 |
-| Process hosting      | Job-scoped alignment and diarization process | PodCut speech worker                                                                                     | Independent Python environment | Planned in subproject 1 |
+| Alignment            | Alignment Engine (forced alignment)          | WhisperX alignment adapter with a manifest-pinned language model                                          | Python worker                  | Implemented             |
+| Speaker separation   | Diarization Engine (anonymous speakers)      | pyannote.audio `speaker-diarization-community-1`, invoked through the worker                              | Python/PyTorch worker          | Implemented             |
+| Process hosting      | Job-scoped alignment and diarization process | PodCut JSON Lines speech worker                                                                           | Independent Python environment | Implemented             |
 | Intended transcript  | Intended Transcript Model                    | Replaceable model; CrisperWhisper is research-only unless its distribution terms permit the intended use | Separate detector dependency   | Deferred                |
 | Disfluency detection | Hybrid Disfluency Detector                   | Transcript-diff evidence plus deterministic rules                                                        | Separate pipeline              | Deferred                |
 | Speech generation    | Speech Generation Engine                     | Not selected                                                                                             | Separate pipeline              | Deferred                |
@@ -202,6 +202,20 @@ npm run speech:docker:preflight
 ```
 
 Only `speech:docker:provision` forwards the read-only Hugging Face token. `speech:docker:preflight` verifies the persistent model volume without credentials or downloads.
+
+For native macOS development, dependency installation and model provisioning are also explicit:
+
+```sh
+npm run speech:native:setup
+npm run speech:native:provision
+npm run speech:native:preflight
+```
+
+The native launcher uses the same username-agnostic token lookup as Docker. Its default model location is `$HOME/Library/Caches/PodCut/speech-models` (or `$XDG_CACHE_HOME/PodCut/speech-models` when set). The app never installs or downloads anything at startup. `PODCUT_SPEECH_WORKER_ROOT`, `PODCUT_SPEECH_WORKER_PYTHON`, `PODCUT_SPEECH_MODEL_CACHE`, and `PODCUT_SPEECH_MANIFEST` can point a development or packaged build at an independently managed runtime.
+
+The implemented worker consumes exactly one versioned JSON Lines request, sends progress and one terminal response, writes diagnostics only to stderr, and exits. Normal analysis sets Hugging Face and Transformers offline modes and receives no token. The durable artifact records model repository IDs, immutable revisions, config hashes, schema versions, and timestamps; `project.json` stores a readable artifact path plus SHA-256 and byte length for integrity, never a hash as the user-facing filename.
+
+The new adapter verification added two real CPU checks in the speech container: the Chinese aligner produced a valid non-empty result for the 13.5-second Mandarin fixture with no unaligned requested unit, and the diarization adapter processed the mixed conversation into 33 turns across three anonymous speaker labels. These remain plumbing smoke evidence, not quality scores.
 
 ## Maintenance rule
 

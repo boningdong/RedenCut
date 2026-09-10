@@ -8,6 +8,8 @@ import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
 import { registerRenderIpc } from './ipc/render.ipc'
 import { registerTranscriptIpc } from './ipc/transcript.ipc'
+import { registerSpeechAnalysisIpc } from './ipc/speechAnalysis.ipc'
+import { registerSpeakerLabelIpc } from './ipc/speakerLabel.ipc'
 import {
   PendingProjectOpenRegistry,
   removePendingProjectOpensOnSenderDestroyed,
@@ -90,6 +92,8 @@ startApplicationLifecycle({
     )
     registerAudioIpc(controller, jobs, console.error, dialogs)
     registerTranscriptIpc(controller, jobs)
+    registerSpeechAnalysisIpc(controller, jobs)
+    registerSpeakerLabelIpc(controller)
     registerRenderIpc(
       controller,
       jobs,

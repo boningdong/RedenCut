@@ -3,10 +3,9 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IElectronAPI, SessionJobResult } from '@shared/ipc.types'
-import type { AudioSourceId, Transcript } from '@shared/project.types'
+import type { IElectronAPI, SessionJobResult, SpeechAnalysisJobId } from '@shared/ipc.types'
+import type { AudioSourceId } from '@shared/project.types'
 import type { RendererSession, WorkspaceToken } from '@shared/session.types'
-import type { TranscriptionJobId } from '@shared/transcriber.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from './stores/editor.store'
 import { useTimelineStore } from './stores/timeline.store'
@@ -154,50 +153,19 @@ function session(
           effects: [],
         },
       ],
-      transcript: {
-        engine: 'seed',
-        words: [
-          {
-            id: `seed-${displayName}`,
-            text: `seed-${displayName}`,
-            start: 0,
-            end: 1,
-            muted: false,
-            trackId: 'track-2',
-            audioSourceId: sourceId,
-          },
-        ],
-        speakers: {},
-      },
       export: { targetLUFS: -16, truePeakDbTP: -1.5, format: 'mp3', sampleRate: 48_000 },
-    },
-  }
-}
-
-function result(
-  request: { jobId: TranscriptionJobId; workspaceToken: WorkspaceToken; revision: number },
-  text: string,
-): SessionJobResult<Transcript, TranscriptionJobId> {
-  return {
-    jobId: request.jobId,
-    workspaceToken: request.workspaceToken,
-    revision: request.revision,
-    value: {
-      engine: 'test',
-      words: [{ id: text, text, start: 1, end: 2, muted: false }],
-      speakers: {},
     },
   }
 }
 
 function installApi(initial: RendererSession) {
   let importProgress!: Parameters<IElectronAPI['on']['importProgress']>[0]
-  let transcriptProgress!: Parameters<IElectronAPI['on']['transcriptProgress']>[0]
+  let speechAnalysisProgress!: Parameters<IElectronAPI['on']['speechAnalysisProgress']>[0]
   let projectWillSwitch!: Parameters<IElectronAPI['on']['projectWillSwitch']>[0]
   let pendingProjectOpen!: Parameters<IElectronAPI['on']['pendingProjectOpen']>[0]
   const requests: Array<{
-    request: Parameters<IElectronAPI['transcript']['generate']>[0]
-    deferred: ReturnType<typeof deferred<SessionJobResult<Transcript, TranscriptionJobId>>>
+    request: Parameters<IElectronAPI['speechAnalysis']['start']>[0]
+    deferred: ReturnType<typeof deferred<SessionJobResult<RendererSession, SpeechAnalysisJobId>>>
   }> = []
   const openDialog = vi.fn<IElectronAPI['project']['openDialog']>(async () => ({
     outcome: 'stayed',
@@ -227,12 +195,20 @@ function installApi(initial: RendererSession) {
     },
     transcript: {
       checkAvailability: vi.fn(async () => null),
-      generate: vi.fn((request) => {
-        const pending = deferred<SessionJobResult<Transcript, TranscriptionJobId>>()
+      generate: vi.fn(),
+      cancel: vi.fn(async () => 'not-found' as const),
+    },
+    speechAnalysis: {
+      checkAvailability: vi.fn(async () => null),
+      start: vi.fn((request) => {
+        const pending = deferred<SessionJobResult<RendererSession, SpeechAnalysisJobId>>()
         requests.push({ request, deferred: pending })
         return pending.promise
       }),
       cancel: vi.fn(async () => 'not-found' as const),
+    },
+    speakerLabel: {
+      rename: vi.fn(),
     },
     render: {
       startExport: vi.fn(),
@@ -244,7 +220,11 @@ function installApi(initial: RendererSession) {
         return vi.fn()
       }),
       transcriptProgress: vi.fn((callback) => {
-        transcriptProgress = callback
+        void callback
+        return vi.fn()
+      }),
+      speechAnalysisProgress: vi.fn((callback) => {
+        speechAnalysisProgress = callback
         return vi.fn()
       }),
       renderProgress: vi.fn(() => vi.fn()),
@@ -263,7 +243,7 @@ function installApi(initial: RendererSession) {
     api,
     requests,
     importProgress: () => importProgress,
-    progress: () => transcriptProgress,
+    progress: () => speechAnalysisProgress,
     willSwitch: () => projectWillSwitch,
     pendingOpen: () => pendingProjectOpen,
   }
@@ -291,6 +271,30 @@ describe('App transcription job identity', () => {
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
       () => ids.shift()! as `${string}-${string}-${string}-${string}-${string}`,
     )
+  })
+
+  it('applies the authoritative speech-analysis session without making analysis a local edit', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const published = session(TOKEN_A, 2, SOURCE_A, 'A')
+    published.speechAnalyses = [{ audioSourceId: SOURCE_A } as never]
+    const { requests, progress } = await renderInitialized(initial)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    act(() => progress()({ ...requests[0].request, stage: 'aligning', percent: 50 }))
+    expect(useTranscriptStore.getState().generatingStatus).toBe('aligning')
+    requests[0].deferred.resolve({
+      jobId: requests[0].request.jobId,
+      workspaceToken: requests[0].request.workspaceToken,
+      revision: requests[0].request.revision,
+      value: published,
+    })
+
+    await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
+    expect(requests[0].request.draft).not.toHaveProperty('transcript')
+    expect(useTranscriptStore.getState().analyses).toEqual(published.speechAnalyses)
+    expect(useTranscriptStore.getState().isGenerating).toBe(false)
+    expect(useEditorStore.getState().isDirty).toBe(false)
   })
 
   it.each([
@@ -402,167 +406,6 @@ describe('App transcription job identity', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
-  })
-
-  it('applies only the newest same-session result and merges current unrelated words', async () => {
-    const { requests, progress } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    expect(requests).toHaveLength(2)
-
-    act(() => {
-      useTranscriptStore.getState().setWords([
-        {
-          id: 'intervening',
-          text: 'intervening edit',
-          start: 4,
-          end: 5,
-          muted: false,
-          trackId: 'track-2',
-          audioSourceId: SOURCE_A,
-        },
-      ])
-      progress()({ ...requests[1].request, status: 'new job 50%' })
-    })
-    requests[1].deferred.resolve(result(requests[1].request, 'new'))
-    await waitFor(() => expect(useTranscriptStore.getState().isGenerating).toBe(false))
-    expect(useTranscriptStore.getState().words.map((word) => word.text)).toEqual([
-      'new',
-      'intervening edit',
-    ])
-    expect(useEditorStore.getState().localEditRevision).toBe(1)
-    const acceptedState = {
-      words: useTranscriptStore.getState().words,
-      visible: useTranscriptStore.getState().visibleTrackIds,
-      dirty: useEditorStore.getState().isDirty,
-      revision: useEditorStore.getState().localEditRevision,
-      draft: useEditorStore.getState().session?.draft,
-      status: useTranscriptStore.getState().generatingStatus,
-    }
-
-    requests[0].deferred.resolve(result(requests[0].request, 'old'))
-    await act(async () => Promise.resolve())
-    expect({
-      words: useTranscriptStore.getState().words,
-      visible: useTranscriptStore.getState().visibleTrackIds,
-      dirty: useEditorStore.getState().isDirty,
-      revision: useEditorStore.getState().localEditRevision,
-      draft: useEditorStore.getState().session?.draft,
-      status: useTranscriptStore.getState().generatingStatus,
-    }).toEqual(acceptedState)
-    expect(screen.queryByRole('alert')).toBeNull()
-  })
-
-  it('does not let an old finally or progress clear a newer running job', async () => {
-    const { requests, progress } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    act(() => progress()({ ...requests[1].request, status: 'new job running' }))
-
-    requests[0].deferred.reject(new Error('old failed'))
-    await act(async () => Promise.resolve())
-    act(() => progress()({ ...requests[0].request, status: 'old late progress' }))
-
-    expect(useTranscriptStore.getState().isGenerating).toBe(true)
-    expect(useTranscriptStore.getState().generatingStatus).toBe('new job running')
-    expect(screen.queryByRole('alert')).toBeNull()
-    requests[1].deferred.resolve(result(requests[1].request, 'new'))
-    await waitFor(() => expect(useTranscriptStore.getState().isGenerating).toBe(false))
-  })
-
-  it('invalidates the job as soon as a successor session load starts', async () => {
-    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
-    const successor = session(TOKEN_B, 2, SOURCE_B, 'B')
-    const { api, requests, progress } = await renderInitialized(initial)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    act(() => progress()({ ...requests[0].request, status: 'old running' }))
-    const prepareSuccessor = deferred<void>()
-    mocks.registerAudioSource.mockImplementationOnce(() => prepareSuccessor.promise)
-    api.project.openDialog.mockResolvedValueOnce({ outcome: 'switched', session: successor })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
-    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(mocks.registerAudioSource).toHaveBeenCalledTimes(2))
-    expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_A)
-
-    requests[0].deferred.resolve(result(requests[0].request, 'stale old'))
-    await act(async () => Promise.resolve())
-    expect(useTranscriptStore.getState().words.map((word) => word.text)).toEqual(['seed-A'])
-    expect(useEditorStore.getState().isDirty).toBe(false)
-    expect(useTranscriptStore.getState().visibleTrackIds).toEqual(['track-2'])
-    expect(useTranscriptStore.getState().isGenerating).toBe(false)
-    expect(useTranscriptStore.getState().generatingStatus).toBe('')
-    expect(screen.queryByRole('alert')).toBeNull()
-
-    prepareSuccessor.resolve()
-    await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
-    expect(useTranscriptStore.getState().words.map((word) => word.text)).toEqual(['seed-B'])
-  })
-
-  it.each([
-    { button: 'Save', token: TOKEN_A, name: 'same-token revision advance' },
-    { button: 'Save As', token: TOKEN_B, name: 'token replacement' },
-  ])('invalidates a deferred job after Save applies a $name', async ({ button, token }) => {
-    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
-    const saved = session(token, 2, SOURCE_A, 'Saved')
-    const { api, requests, progress } = await renderInitialized(initial)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    act(() => progress()({ ...requests[0].request, status: 'old running' }))
-    if (button === 'Save') api.project.save.mockResolvedValueOnce(saved)
-    else api.project.saveAs.mockResolvedValueOnce(saved)
-
-    fireEvent.click(screen.getByRole('button', { name: button }))
-    await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
-    expect(useEditorStore.getState().session?.workspaceToken).toBe(token)
-    expect(useTranscriptStore.getState().isGenerating).toBe(false)
-    expect(useTranscriptStore.getState().generatingStatus).toBe('')
-    const appliedState = {
-      words: useTranscriptStore.getState().words,
-      visible: useTranscriptStore.getState().visibleTrackIds,
-      dirty: useEditorStore.getState().isDirty,
-      revision: useEditorStore.getState().localEditRevision,
-      draft: useEditorStore.getState().session?.draft,
-    }
-
-    act(() => progress()({ ...requests[0].request, status: 'stale progress' }))
-    requests[0].deferred.reject(new Error('stale failure'))
-    await act(async () => Promise.resolve())
-
-    expect(useTranscriptStore.getState().isGenerating).toBe(false)
-    expect(useTranscriptStore.getState().generatingStatus).toBe('')
-    expect({
-      words: useTranscriptStore.getState().words,
-      visible: useTranscriptStore.getState().visibleTrackIds,
-      dirty: useEditorStore.getState().isDirty,
-      revision: useEditorStore.getState().localEditRevision,
-      draft: useEditorStore.getState().session?.draft,
-    }).toEqual(appliedState)
-    expect(screen.queryByRole('alert')).toBeNull()
-  })
-
-  it('stops playback and invalidates async ownership before acknowledging a switch without clearing the visible project', async () => {
-    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
-    const { api, requests, progress, willSwitch } = await renderInitialized(initial)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    act(() => progress()({ ...requests[0].request, status: 'running' }))
-
-    await act(async () => {
-      await willSwitch()({ transitionId: 'transition-a', workspaceToken: TOKEN_A, revision: 1 })
-    })
-
-    expect(useEditorStore.getState().session?.workspace.displayName).toBe('A')
-    expect(useTranscriptStore.getState().isGenerating).toBe(false)
-    expect(mocks.players[0].pause).toHaveBeenCalledTimes(1)
-    expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1)
-    expect(api.project.acknowledgeSwitch).toHaveBeenCalledWith({
-      transitionId: 'transition-a',
-      workspaceToken: TOKEN_A,
-      revision: 1,
-    })
-
-    requests[0].deferred.reject(new Error('late old failure'))
-    await act(async () => Promise.resolve())
-    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('acknowledges a switch only after player destruction settles', async () => {
@@ -686,60 +529,8 @@ describe('App transcription job identity', () => {
       workspaceToken: TOKEN_A,
       revision: 1,
       isDirty: true,
-      draft: initial.draft,
+      draft: { tracks: initial.draft.tracks, export: initial.draft.export },
     })
-  })
-
-  it('keeps a shifted transcript dirty through cancelled Open and saves the exact current draft', async () => {
-    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
-    const saved = session(TOKEN_A, 2, SOURCE_A, 'A')
-    saved.draft.transcript!.words[0] = {
-      ...saved.draft.transcript!.words[0],
-      start: 4,
-      end: 5,
-    }
-    const { api } = await renderInitialized(initial)
-    act(() => {
-      useTranscriptStore.getState().shiftTimestamps(4)
-      useEditorStore.getState().markEdited()
-    })
-    api.project.openDialog.mockResolvedValueOnce({
-      outcome: 'stayed',
-      reason: 'cancelled',
-      session: initial,
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
-
-    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
-    expect(api.project.openDialog).toHaveBeenCalledWith({
-      workspaceToken: TOKEN_A,
-      revision: 1,
-      isDirty: true,
-      draft: expect.objectContaining({
-        transcript: expect.objectContaining({
-          words: [expect.objectContaining({ start: 4, end: 5 })],
-        }),
-      }),
-    })
-    expect(useTranscriptStore.getState().words[0]).toMatchObject({ start: 4, end: 5 })
-    expect(useEditorStore.getState().isDirty).toBe(true)
-
-    api.project.save.mockResolvedValueOnce(saved)
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(api.project.save).toHaveBeenCalledTimes(1))
-    expect(api.project.save).toHaveBeenCalledWith({
-      workspaceToken: TOKEN_A,
-      revision: 1,
-      draft: expect.objectContaining({
-        transcript: expect.objectContaining({
-          words: [expect.objectContaining({ start: 4, end: 5 })],
-        }),
-      }),
-    })
-    await waitFor(() => expect(useEditorStore.getState().isDirty).toBe(false))
-    expect(useEditorStore.getState().session?.revision).toBe(2)
   })
 
   it('consumes opaque forwarded opens without receiving a project path', async () => {

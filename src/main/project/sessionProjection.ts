@@ -44,7 +44,13 @@ function toRendererSpeechAnalysis(
         override.analysisRevisionId === artifact.analysisRevisionId,
     )
     .map(({ speakerId, displayName }) => ({ speakerId, displayName }))
-  const { id: transcriptId, revision, units, mode, provenance: transcriptProvenance } = artifact.transcript
+  const {
+    id: transcriptId,
+    revision,
+    units,
+    mode,
+    provenance: transcriptProvenance,
+  } = artifact.transcript
   const {
     id: alignmentId,
     transcriptArtifactId,

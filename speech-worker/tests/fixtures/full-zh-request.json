@@ -1,0 +1,1 @@
+{"protocolVersion":1,"jobId":"real-smoke-zh","audioPath":"/fixtures/mandarin-short-female.wav","language":"zh","transcriptUnits":[{"id":"550e8400-e29b-41d4-a716-446655440001","text":"今天下午我準備去附近的公園走走。出門前，先檢查三樣東西：手機、鑰匙、還有耳機。如果天氣不錯，就順便買杯咖啡。好，現在可以出發了。","kind":"speech"}],"models":{"alignment":"alignment-zh","diarization":"diarization-default"},"config":{"device":"cpu"}}

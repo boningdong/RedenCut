@@ -29,3 +29,23 @@ test('forwards only the fixed private container audio endpoint, never arbitrary 
     {},
   )
 })
+
+test('forwards non-secret speech paths but never Hugging Face credentials', () => {
+  expect(
+    electronEnvironment({
+      PODCUT_SPEECH_WORKER_ROOT: '/opt/podcut-speech-worker',
+      PODCUT_SPEECH_WORKER_PYTHON: '/opt/podcut-speech-worker/.venv/bin/python',
+      PODCUT_SPEECH_MANIFEST: '/opt/podcut-speech-worker/models.json',
+      PODCUT_SPEECH_MODEL_CACHE: '/models',
+      PODCUT_WHISPER_MODEL_DIR: '/models/whisper',
+      HF_TOKEN: 'do-not-forward',
+      HF_TOKEN_PATH: '/run/secrets/hf_token',
+    }),
+  ).toEqual({
+    PODCUT_SPEECH_WORKER_ROOT: '/opt/podcut-speech-worker',
+    PODCUT_SPEECH_WORKER_PYTHON: '/opt/podcut-speech-worker/.venv/bin/python',
+    PODCUT_SPEECH_MANIFEST: '/opt/podcut-speech-worker/models.json',
+    PODCUT_SPEECH_MODEL_CACHE: '/models',
+    PODCUT_WHISPER_MODEL_DIR: '/models/whisper',
+  })
+})

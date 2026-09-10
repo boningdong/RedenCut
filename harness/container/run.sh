@@ -21,5 +21,11 @@ exec docker run --rm -i --stop-timeout 20 --shm-size 1g \
   --mount "type=bind,source=$git_directory,target=$git_directory,readonly" \
   --mount type=volume,target=/workspace/node_modules \
   --mount type=volume,target=/workspace/out \
+  --mount "type=volume,source=${PODCUT_SPEECH_MODEL_VOLUME:-podcut-speech-models},target=/models" \
   --mount "type=bind,source=$artifacts,target=/workspace/.harness-runs" \
+  --env PODCUT_SPEECH_WORKER_ROOT=/opt/podcut-speech-worker \
+  --env PODCUT_SPEECH_WORKER_PYTHON=/opt/podcut-speech-worker/.venv/bin/python \
+  --env PODCUT_SPEECH_MANIFEST=/opt/podcut-speech-worker/models.json \
+  --env PODCUT_SPEECH_MODEL_CACHE=/models \
+  --env PODCUT_WHISPER_MODEL_DIR=/models/transcription-smoke-multilingual-tiny/5359861c739e955e79d9a303bcbc70fb988958b1 \
   "${PODCUT_HARNESS_IMAGE:-podcut-harness:local}" "$@"

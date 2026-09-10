@@ -1,5 +1,5 @@
 import type { AudioSourceCacheDescriptor, WorkspaceDescriptor } from './import.types'
-import type { AudioMetadata, AudioSourceId, ProjectFile, Track, Transcript } from './project.types'
+import type { AudioMetadata, AudioSourceId, ProjectFile, Track } from './project.types'
 import type { RendererSpeechAnalysis } from './speech.types'
 
 export type WorkspaceToken = string & { readonly __brand: 'WorkspaceToken' }
@@ -18,7 +18,6 @@ export interface RendererAudioSource {
 
 export interface ProjectDraft {
   tracks: Track[]
-  transcript?: Transcript
   export: ProjectFile['export']
 }
 

@@ -6,7 +6,7 @@ import {
   type AudioSourceId,
 } from './source.types'
 
-const brandedUuid = <Brand extends string>(brand: Brand) => z.string().uuid().brand<Brand>()
+const brandedUuid = <Brand extends string>(_brand: Brand) => z.string().uuid().brand<Brand>()
 
 export const AnalysisRevisionIdSchema = brandedUuid('AnalysisRevisionId')
 export const TranscriptArtifactIdSchema = brandedUuid('TranscriptArtifactId')
@@ -158,7 +158,10 @@ export interface RendererSpeechAnalysis {
   audioSourceId: AudioSourceId
   analysisRevisionId: AnalysisRevisionId
   transcript: Pick<TranscriptArtifact, 'id' | 'revision' | 'units' | 'mode' | 'provenance'>
-  alignment: Pick<AlignmentArtifact, 'id' | 'transcriptArtifactId' | 'transcriptRevision' | 'acousticEditUnits' | 'provenance'>
+  alignment: Pick<
+    AlignmentArtifact,
+    'id' | 'transcriptArtifactId' | 'transcriptRevision' | 'acousticEditUnits' | 'provenance'
+  >
   diarization: Pick<DiarizationArtifact, 'id' | 'turns' | 'provenance'>
   speakerAttribution: SpeakerAttributionArtifact
   speakers: Speaker[]

@@ -36,8 +36,11 @@ function transcript(text: string): TranscriptionResult {
     verbatimCapability: 'best-effort-verbatim',
     evidence: [{ text, tokens: [{ text, sourceStart: 0, sourceEnd: 1 }] }],
     provenance: {
-      engineId: 'test', engineVersion: '1', modelId: 'test-model',
-      configHash: 'a'.repeat(64), artifactSchemaVersion: 1,
+      engineId: 'test',
+      engineVersion: '1',
+      modelId: 'test-model',
+      configHash: 'a'.repeat(64),
+      artifactSchemaVersion: 1,
       createdAt: '2026-09-09T00:00:00.000Z',
     },
   }

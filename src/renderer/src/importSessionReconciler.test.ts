@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { AudioSourceId, Track, Transcript } from '@shared/project.types'
+import type { AudioSourceId, Track } from '@shared/project.types'
 import type {
   ProjectDraft,
   RendererAudioSource,
@@ -25,10 +25,9 @@ function track(id: string, name: string): Track {
   }
 }
 
-function draft(tracks: Track[], transcript?: Transcript): ProjectDraft {
+function draft(tracks: Track[]): ProjectDraft {
   return {
     tracks,
-    transcript,
     export: { format: 'wav', targetLUFS: -14, truePeakDbTP: -2, sampleRate: 48_000 },
   }
 }
@@ -80,22 +79,7 @@ describe('import session reconciliation', () => {
 
   it('merges only new imported tracks into the latest draft and preserves raced edits', () => {
     const submitted = draft([track('submitted', 'Before edit')])
-    const transcript: Transcript = {
-      engine: 'whisper',
-      speakers: {},
-      words: [
-        {
-          id: 'word-1',
-          trackId: 'submitted',
-          text: 'latest',
-          start: 0,
-          end: 0.5,
-          confidence: 1,
-          muted: false,
-        },
-      ],
-    }
-    const latest = draft([track('submitted', 'Edited while importing')], transcript)
+    const latest = draft([track('submitted', 'Edited while importing')])
     latest.export.format = 'flac'
     const importedTrack = track('imported', 'Imported')
     const imported = importedSession(importedTrack)
@@ -104,7 +88,6 @@ describe('import session reconciliation', () => {
 
     expect(result.session.sources).toEqual(imported.sources)
     expect(result.session.draft.tracks).toEqual([...latest.tracks, importedTrack])
-    expect(result.session.draft.transcript).toEqual(transcript)
     expect(result.session.draft.export).toEqual(latest.export)
     expect(result.preserveDirty).toBe(true)
   })

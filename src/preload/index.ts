@@ -14,10 +14,14 @@ import type {
   SessionJobResult,
   TranscriptProgressEvent,
   TranscriptionJobRequest,
+  SpeechAnalysisJobRequest,
+  SpeechAnalysisJobId,
+  SpeechAnalysisProgressEvent,
 } from '../shared/ipc.types'
 import type { ImportSelection } from '../shared/import.types'
 import type { ImportCancellationResult } from '../shared/import.types'
 import type { Transcript } from '../shared/project.types'
+import type { RenameSpeakerRequest } from '../shared/speakerLabel.types'
 import type {
   TranscriptionCancellationResult,
   TranscriptionJobId,
@@ -78,6 +82,22 @@ const api = {
     cancel: (request: CancelSessionJobRequest<TranscriptionJobId>) =>
       invokeSafe<TranscriptionCancellationResult>(invoke, 'transcript:cancel', request),
   },
+  speechAnalysis: {
+    checkAvailability: () =>
+      invokeSafe<string | null>(invoke, 'speech-analysis:check-availability'),
+    start: (request: SpeechAnalysisJobRequest) =>
+      invokeSafe<SessionJobResult<RendererSession, SpeechAnalysisJobId>>(
+        invoke,
+        'speech-analysis:start',
+        request,
+      ),
+    cancel: (request: CancelSessionJobRequest<SpeechAnalysisJobId>) =>
+      invokeSafe<TranscriptionCancellationResult>(invoke, 'speech-analysis:cancel', request),
+  },
+  speakerLabel: {
+    rename: (request: RenameSpeakerRequest) =>
+      invokeSafe<RendererSession>(invoke, 'speaker-label:rename', request),
+  },
   render: {
     startExport: (request: ExportJobRequest) =>
       invokeSafe<SessionJobResult<boolean, ExportJobId>>(invoke, 'render:start-export', request),
@@ -96,6 +116,12 @@ const api = {
         callback(progress)
       ipcRenderer.on('transcript:progress', handler)
       return () => ipcRenderer.off('transcript:progress', handler)
+    },
+    speechAnalysisProgress: (callback: (progress: SpeechAnalysisProgressEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: SpeechAnalysisProgressEvent) =>
+        callback(progress)
+      ipcRenderer.on('speech-analysis:progress', handler)
+      return () => ipcRenderer.off('speech-analysis:progress', handler)
     },
     renderProgress: (callback: (progress: RenderProgressEvent) => void) => {
       const handler = (_event: IpcRendererEvent, progress: RenderProgressEvent) =>

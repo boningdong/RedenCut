@@ -12,11 +12,7 @@ export {
   AudioSourceIdSchema,
   ProjectRelativePathSchema,
 } from './source.types'
-export type {
-  AudioSourceFingerprint,
-  AudioSourceId,
-  ProjectRelativePath,
-} from './source.types'
+export type { AudioSourceFingerprint, AudioSourceId, ProjectRelativePath } from './source.types'
 
 export const AudioMetadataSchema = z
   .object({
@@ -71,7 +67,7 @@ const WordSchema = z
   .strict()
 export type Word = z.infer<typeof WordSchema>
 
-const TranscriptSchema = z
+export const TranscriptSchema = z
   .object({
     engine: z.string(),
     model: z.string().optional(),

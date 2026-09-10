@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { APP_NAME } from '@shared/constants'
-import type { AudioSourceId, Word } from '@shared/project.types'
+import type { AudioSourceId } from '@shared/project.types'
 import type { ImportMode } from '@shared/import.types'
 import type {
   OpenProjectRequest,
@@ -10,7 +10,7 @@ import type {
   SessionPrecondition,
   WorkspaceToken,
 } from '@shared/session.types'
-import type { TranscriptionJobId } from '@shared/transcriber.types'
+import type { SpeechAnalysisJobId } from '@shared/ipc.types'
 import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
 import { WorkletAudioPlayer } from './audio/WorkletAudioPlayer'
 import { ContinuousPcmSampleProvider } from './audio/samples/ContinuousPcmSampleProvider'
@@ -26,7 +26,6 @@ import { useEditorStore } from './stores/editor.store'
 import { usePlaybackStore } from './stores/playback.store'
 import { useTimelineStore } from './stores/timeline.store'
 import { useTranscriptStore } from './stores/transcript.store'
-import { mergeTrackWords } from './utils/transcript'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { createSessionLoadCoordinator, type SessionLoadCoordinator } from './sessionLoadCoordinator'
 import { reconcileImportedSession } from './importSessionReconciler'
@@ -41,7 +40,7 @@ interface ImportState {
 }
 
 interface TranscriptJobIdentity extends SessionPrecondition {
-  jobId: TranscriptionJobId
+  jobId: SpeechAnalysisJobId
 }
 
 interface PreparedRendererSession {
@@ -77,18 +76,8 @@ interface QueuedOpenOperation {
 function snapshotDraft(): ProjectDraft | null {
   const current = useEditorStore.getState().session
   if (!current) return null
-  const currentWords = useTranscriptStore.getState().words
   return {
     tracks: useTimelineStore.getState().tracks,
-    transcript:
-      currentWords.length > 0 || current.draft.transcript
-        ? {
-            engine: current.draft.transcript?.engine ?? 'whisper',
-            model: current.draft.transcript?.model,
-            speakers: current.draft.transcript?.speakers ?? {},
-            words: currentWords,
-          }
-        : undefined,
     export: current.draft.export,
   }
 }
@@ -117,7 +106,6 @@ export default function App() {
   const session = useEditorStore((state) => state.session)
   const isDirty = useEditorStore((state) => state.isDirty)
   const loadEditorSession = useEditorStore((state) => state.loadSession)
-  const markEdited = useEditorStore((state) => state.markEdited)
   const acknowledgeSave = useEditorStore((state) => state.acknowledgeSave)
   const tracks = useTimelineStore((state) => state.tracks)
   const isGenerating = useTranscriptStore((state) => state.isGenerating)
@@ -187,12 +175,8 @@ export default function App() {
         } else {
           useTimelineStore.getState().loadFromProject(result.sources, result.draft.tracks)
           useTranscriptStore.getState().reset()
-          useTranscriptStore.getState().setWords(result.draft.transcript?.words ?? [])
-          for (const track of result.draft.tracks) {
-            if (result.draft.transcript?.words.some((word) => word.trackId === track.id))
-              useTranscriptStore.getState().ensureTrackVisible(track.id)
-          }
         }
+        useTranscriptStore.getState().loadAnalyses(result.speechAnalyses)
         playerSubscriptions.current = prepared.subscriptions
         usePlaybackStore.getState().setDuration(prepared.player.getDuration())
         playerRef.current = prepared.player
@@ -288,6 +272,19 @@ export default function App() {
               }
             : current,
         )
+      }),
+    [],
+  )
+
+  useEffect(
+    () =>
+      window.electronAPI.on.speechAnalysisProgress((progress) => {
+        const current = useEditorStore.getState().session
+        if (
+          transcriptJobMatches(transcriptJob.current, progress) &&
+          sessionMatchesTranscriptJob(current, progress)
+        )
+          useTranscriptStore.getState().setGeneratingStatus(progress.stage.replace(/-/g, ' '))
       }),
     [],
   )
@@ -459,19 +456,6 @@ export default function App() {
     if (session) void drainOpenQueue()
   }, [drainOpenQueue, session])
 
-  useEffect(
-    () =>
-      window.electronAPI.on.transcriptProgress((progress) => {
-        const current = useEditorStore.getState().session
-        if (
-          transcriptJobMatches(transcriptJob.current, progress) &&
-          sessionMatchesTranscriptJob(current, progress)
-        )
-          useTranscriptStore.getState().setGeneratingStatus(progress.status)
-      }),
-    [],
-  )
-
   useEffect(() => {
     playerRef.current?.setTracks(tracks)
   }, [tracks])
@@ -619,7 +603,7 @@ export default function App() {
       const sourceId = track?.clips[0]?.audioSourceId
       const currentSession = useEditorStore.getState().session
       if (!track || !sourceId || !currentSession) return
-      const jobId = crypto.randomUUID() as TranscriptionJobId
+      const jobId = crypto.randomUUID() as SpeechAnalysisJobId
       const job = {
         jobId,
         workspaceToken: currentSession.workspaceToken,
@@ -630,11 +614,26 @@ export default function App() {
       useTranscriptStore.getState().setGeneratingStatus('')
       setError(null)
       try {
-        const generated = await window.electronAPI.transcript.generate({
+        const draft = snapshotDraft()
+        if (!draft) return
+        const existingAnalysis = useTranscriptStore
+          .getState()
+          .analyses.find((analysis) => analysis.audioSourceId === sourceId)
+        const confirmSpeakerLabelReset = Boolean(
+          existingAnalysis?.speakerLabelOverrides.length &&
+          window.confirm('Re-analysis will reset your custom speaker names. Continue?'),
+        )
+        if (existingAnalysis?.speakerLabelOverrides.length && !confirmSpeakerLabelReset) return
+        const unavailable = await window.electronAPI.speechAnalysis.checkAvailability()
+        if (unavailable) throw new Error(unavailable)
+        const generated = await window.electronAPI.speechAnalysis.start({
           workspaceToken: currentSession.workspaceToken,
           revision: currentSession.revision,
           jobId,
           audioSourceId: sourceId,
+          language: 'auto',
+          draft,
+          ...(confirmSpeakerLabelReset ? { confirmSpeakerLabelReset: true } : {}),
         })
         const latest = useEditorStore.getState().session
         if (
@@ -643,20 +642,7 @@ export default function App() {
           !sessionMatchesTranscriptJob(latest, job)
         )
           return
-        const currentTrack = useTimelineStore
-          .getState()
-          .tracks.find((candidate) => candidate.id === track.id)
-        if (!currentTrack?.clips.some((clip) => clip.audioSourceId === sourceId)) return
-        const incoming: Word[] = generated.value.words.map((word) => ({
-          ...word,
-          audioSourceId: sourceId,
-          trackId: track.id,
-        }))
-        const latestTranscript = useTranscriptStore.getState()
-        const merged = mergeTrackWords(latestTranscript.words, incoming, track.id, sourceId)
-        latestTranscript.setWords(merged)
-        latestTranscript.ensureTrackVisible(track.id)
-        markEdited()
+        await loadSession(generated.value, undefined, true)
       } catch (reason) {
         if (
           transcriptJobMatches(transcriptJob.current, job) &&
@@ -664,17 +650,14 @@ export default function App() {
         )
           setError((reason as Error).message)
       } finally {
-        if (
-          transcriptJobMatches(transcriptJob.current, job) &&
-          sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
-        ) {
+        if (transcriptJobMatches(transcriptJob.current, job)) {
           transcriptJob.current = null
           useTranscriptStore.getState().setIsGenerating(false)
           useTranscriptStore.getState().setGeneratingStatus('')
         }
       }
     },
-    [markEdited],
+    [loadSession],
   )
 
   const primarySource = session?.sources[0]

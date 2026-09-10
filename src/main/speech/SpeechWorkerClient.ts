@@ -11,10 +11,13 @@ interface ClientOptions {
   noProgressTimeoutMs?: number
   terminateGraceMs?: number
   maxLineBytes?: number
+  env?: NodeJS.ProcessEnv
+  cwd?: string
 }
 
 export class SpeechWorkerClient {
-  private readonly options: Required<ClientOptions>
+  private readonly options: Required<Omit<ClientOptions, 'env' | 'cwd'>> &
+    Pick<ClientOptions, 'env' | 'cwd'>
 
   constructor(
     private readonly command: string,
@@ -26,6 +29,8 @@ export class SpeechWorkerClient {
       noProgressTimeoutMs: options.noProgressTimeoutMs ?? 5 * 60_000,
       terminateGraceMs: options.terminateGraceMs ?? 2_000,
       maxLineBytes: options.maxLineBytes ?? 1024 * 1024,
+      env: options.env,
+      cwd: options.cwd,
     }
   }
 
@@ -36,7 +41,11 @@ export class SpeechWorkerClient {
   ): Promise<SpeechWorkerResult> {
     const request = SpeechWorkerRequestSchema.parse(requestInput)
     if (signal.aborted) return Promise.reject(abortError())
-    const child = spawn(this.command, this.args, { stdio: ['pipe', 'pipe', 'pipe'] })
+    const child = spawn(this.command, this.args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: this.options.cwd,
+      env: this.options.env,
+    })
     child.stderr.resume()
     return this.observe(child, request, signal, onProgress)
   }
@@ -96,7 +105,10 @@ export class SpeechWorkerClient {
             if (message.jobId !== request.jobId) throw new Error('Speech worker job ID mismatch')
             armNoProgress()
             if (message.type === 'progress')
-              onProgress?.({ stage: message.stage, ...(message.percent === undefined ? {} : { percent: message.percent }) })
+              onProgress?.({
+                stage: message.stage,
+                ...(message.percent === undefined ? {} : { percent: message.percent }),
+              })
             else if (message.type === 'result') {
               if (terminal) throw new Error('Speech worker emitted duplicate terminal messages')
               terminal = message.result
@@ -117,7 +129,8 @@ export class SpeechWorkerClient {
         if (killTimer) clearTimeout(killTimer)
         signal.removeEventListener('abort', onAbort)
         if (failure) reject(failure)
-        else if (buffer.toString('utf8').trim()) reject(new Error('Speech worker ended with a partial JSON line'))
+        else if (buffer.toString('utf8').trim())
+          reject(new Error('Speech worker ended with a partial JSON line'))
         else if (!terminal) reject(new Error(`Speech worker exited prematurely with code ${code}`))
         else if (code !== 0) reject(new Error(`Speech worker exited with code ${code}`))
         else resolve(terminal)

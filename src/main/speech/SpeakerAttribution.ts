@@ -51,8 +51,7 @@ export function attributeSpeakers(
           (overlapBySpeaker.get(turn.speakerLabel) ?? 0) + overlap,
         )
     }
-    if (overlapBySpeaker.size === 0)
-      return { acousticEditUnitId: unit.id, ambiguous: false }
+    if (overlapBySpeaker.size === 0) return { acousticEditUnitId: unit.id, ambiguous: false }
     const maximum = Math.max(...overlapBySpeaker.values())
     const candidateSpeakerIds = labelOrder
       .filter((label) => Math.abs((overlapBySpeaker.get(label) ?? 0) - maximum) < 1e-9)

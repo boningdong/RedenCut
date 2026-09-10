@@ -13,8 +13,13 @@
 
 import { create } from 'zustand'
 import type { Word } from '@shared/project.types'
+import type { RendererSpeechAnalysis } from '@shared/speech.types'
 
 interface TranscriptState {
+  analyses: RendererSpeechAnalysis[]
+  selectedTranscriptUnitIds: Set<string>
+  loadAnalyses: (analyses: RendererSpeechAnalysis[]) => void
+  setSelectedTranscriptUnitIds: (ids: Set<string>) => void
   // ── Data ───────────────────────────────────────────────────────────────────
   words: Word[]
 
@@ -88,6 +93,8 @@ interface TranscriptState {
 }
 
 const initialState = {
+  analyses: [] as RendererSpeechAnalysis[],
+  selectedTranscriptUnitIds: new Set<string>(),
   words: [] as Word[],
   selectedWordIds: new Set<string>(),
   showMutedWords: true,
@@ -98,6 +105,9 @@ const initialState = {
 
 export const useTranscriptStore = create<TranscriptState>()((set) => ({
   ...initialState,
+
+  loadAnalyses: (analyses) => set({ analyses, selectedTranscriptUnitIds: new Set() }),
+  setSelectedTranscriptUnitIds: (selectedTranscriptUnitIds) => set({ selectedTranscriptUnitIds }),
 
   setWords: (words) => set({ words }),
 

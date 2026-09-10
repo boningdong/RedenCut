@@ -29,6 +29,11 @@ import { getAudioPlayerInstance } from '@shared/player.types'
 import type { Word } from '@shared/project.types'
 import { getWordClipState, type WordClipState } from '../../utils/wordClipState'
 import { getWordOutputTime } from '../../utils/wordOutputTime'
+import type { RendererSpeechAnalysis, TranscriptUnit } from '@shared/speech.types'
+import {
+  AcousticSelectionResolver,
+  type ResolvedAcousticSelection,
+} from '../../domain/AcousticSelectionResolver'
 
 interface TranscriptPanelProps {
   /** Called when the user clicks "Generate Transcript". Optionally scoped to a track. */
@@ -39,7 +44,401 @@ interface TranscriptPanelProps {
   generatingStatus: string
 }
 
-export function TranscriptPanel({
+export function TranscriptPanel(props: TranscriptPanelProps) {
+  const analyses = useTranscriptStore((state) => state.analyses)
+  return analyses.length > 0 ? (
+    <CanonicalTranscriptPanel {...props} analyses={analyses} />
+  ) : (
+    <LegacyTranscriptPanel {...props} />
+  )
+}
+
+function CanonicalTranscriptPanel({
+  onGenerate,
+  isGenerating,
+  generatingStatus,
+  analyses,
+}: TranscriptPanelProps & { analyses: RendererSpeechAnalysis[] }) {
+  const tracks = useTimelineStore((state) => state.tracks)
+  const currentTime = usePlaybackStore((state) => state.currentTime)
+  const setSelection = useEditorStore((state) => state.setSelection)
+  const session = useEditorStore((state) => state.session)
+  const loadEditorSession = useEditorStore((state) => state.loadSession)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const unitElements = useRef(new Map<string, HTMLSpanElement>())
+  const [pending, setPending] = useState<ResolvedAcousticSelection | null>(null)
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [editingSpeaker, setEditingSpeaker] = useState<{ id: string; value: string } | null>(null)
+  const referencedSources = useMemo(
+    () => new Set(tracks.flatMap((track) => track.clips.map((clip) => clip.audioSourceId))),
+    [tracks],
+  )
+  const analysis =
+    analyses.find((candidate) => referencedSources.has(candidate.audioSourceId)) ?? analyses[0]
+  const acousticByUnit = useMemo(() => {
+    const index = new Map<
+      string,
+      RendererSpeechAnalysis['alignment']['acousticEditUnits'][number]
+    >()
+    for (const acousticUnit of analysis.alignment.acousticEditUnits)
+      for (const unitId of acousticUnit.transcriptUnitIds) index.set(unitId, acousticUnit)
+    return index
+  }, [analysis])
+  const resolver = useMemo(
+    () =>
+      new AcousticSelectionResolver(
+        analysis.transcript.units,
+        analysis.alignment.acousticEditUnits,
+      ),
+    [analysis],
+  )
+  const unitById = useMemo(
+    () => new Map<string, TranscriptUnit>(analysis.transcript.units.map((unit) => [unit.id, unit])),
+    [analysis],
+  )
+  const requestedText =
+    pending?.requestedUnitIds.map((id) => unitById.get(id)?.text ?? '').join('') ?? ''
+  const resolvedText =
+    pending?.resolvedUnitIds.map((id) => unitById.get(id)?.text ?? '').join('') ?? ''
+
+  const clipForRange = useCallback(
+    (range: { start: number; end: number }) => {
+      for (const track of tracks) {
+        const clip = track.clips.find(
+          (candidate) =>
+            candidate.audioSourceId === analysis.audioSourceId &&
+            candidate.sourceStart <= range.start &&
+            candidate.sourceEnd >= range.end,
+        )
+        if (clip) return { track, clip }
+      }
+      return null
+    },
+    [analysis.audioSourceId, tracks],
+  )
+
+  const applySelection = useCallback(
+    (selection: ResolvedAcousticSelection) => {
+      if (!selection.editable) return
+      const occurrences = selection.sourceRanges.map(clipForRange)
+      if (occurrences.some((occurrence) => !occurrence)) return
+      const first = occurrences[0]!
+      if (occurrences.some((occurrence) => occurrence!.clip.id !== first.clip.id)) return
+      for (const range of selection.sourceRanges)
+        useTimelineStore
+          .getState()
+          .muteRange(first.track.id, range.start, range.end, selection.resolvedUnitIds)
+      window.getSelection()?.removeAllRanges()
+      setSelection(null)
+      setPending(null)
+    },
+    [clipForRange, setSelection],
+  )
+
+  const resolveNativeSelection = useCallback(() => {
+    const nativeSelection = window.getSelection()
+    if (!nativeSelection || nativeSelection.isCollapsed || nativeSelection.rangeCount === 0)
+      return null
+    const range = nativeSelection.getRangeAt(0)
+    if (!containerRef.current?.contains(range.commonAncestorContainer)) return null
+    const selectedIds = analysis.transcript.units
+      .filter((unit) => {
+        const element = unitElements.current.get(unit.id)
+        return element ? range.intersectsNode(element) : false
+      })
+      .map((unit) => unit.id)
+    return resolver.resolve(selectedIds)
+  }, [analysis.transcript.units, resolver])
+
+  useEffect(() => {
+    const onSelectionChange = () => {
+      const resolved = resolveNativeSelection()
+      useTranscriptStore
+        .getState()
+        .setSelectedTranscriptUnitIds(new Set(resolved?.requestedUnitIds ?? []))
+      if (!resolved?.editable || resolved.sourceRanges.length === 0) setSelection(null)
+      else {
+        const occurrences = resolved.sourceRanges.map(clipForRange).filter(Boolean)
+        if (occurrences.length !== resolved.sourceRanges.length) setSelection(null)
+        else
+          setSelection({
+            start: Math.min(
+              ...occurrences.map(
+                (item) =>
+                  item!.clip.outputStart +
+                  resolved.sourceRanges[occurrences.indexOf(item)].start -
+                  item!.clip.sourceStart,
+              ),
+            ),
+            end: Math.max(
+              ...occurrences.map(
+                (item) =>
+                  item!.clip.outputStart +
+                  resolved.sourceRanges[occurrences.indexOf(item)].end -
+                  item!.clip.sourceStart,
+              ),
+            ),
+          })
+      }
+    }
+    document.addEventListener('selectionchange', onSelectionChange)
+    return () => document.removeEventListener('selectionchange', onSelectionChange)
+  }, [clipForRange, resolveNativeSelection, setSelection])
+
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) return
+      if (event.code === 'Delete' || event.code === 'Backspace') {
+        event.preventDefault()
+        const resolved = resolveNativeSelection()
+        if (!resolved) return
+        if (resolved.expanded || !resolved.editable) setPending(resolved)
+        else applySelection(resolved)
+      } else if (event.key.length === 1) event.preventDefault()
+    },
+    [applySelection, resolveNativeSelection],
+  )
+
+  const effectiveLabels = useMemo(
+    () =>
+      new Map(
+        analysis.speakers.map((speaker) => [
+          speaker.id,
+          analysis.speakerLabelOverrides.find((override) => override.speakerId === speaker.id)
+            ?.displayName ?? speaker.defaultDisplayName,
+        ]),
+      ),
+    [analysis],
+  )
+  const renameSpeaker = useCallback(
+    async (speakerId: RendererSpeechAnalysis['speakers'][number]['id'], displayName: string) => {
+      if (!session || isGenerating) return
+      const current = effectiveLabels.get(speakerId) ?? ''
+      displayName = displayName.trim()
+      if (!displayName || displayName === current) {
+        setEditingSpeaker(null)
+        return
+      }
+      try {
+        const updated = await window.electronAPI.speakerLabel.rename({
+          workspaceToken: session.workspaceToken,
+          revision: session.revision,
+          audioSourceId: analysis.audioSourceId,
+          analysisRevisionId: analysis.analysisRevisionId,
+          speakerId,
+          displayName,
+        })
+        loadEditorSession(updated, true)
+        useTranscriptStore.getState().loadAnalyses(updated.speechAnalyses)
+        setRenameError(null)
+        setEditingSpeaker(null)
+      } catch (error) {
+        setRenameError((error as Error).message)
+      }
+    },
+    [analysis, effectiveLabels, isGenerating, loadEditorSession, session],
+  )
+  const attributionByAcoustic = new Map(
+    analysis.speakerAttribution.attributions.map((attribution) => [
+      attribution.acousticEditUnitId,
+      attribution,
+    ]),
+  )
+
+  return (
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--color-bg-secondary)',
+      }}
+    >
+      <div
+        style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--color-border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            color: 'var(--color-text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '.08em',
+          }}
+        >
+          Verbatim transcript
+        </span>
+        <button disabled={isGenerating} onClick={() => onGenerate()} style={{ fontSize: 10 }}>
+          {isGenerating ? generatingStatus || 'Analyzing…' : 'Re-analyze'}
+        </button>
+      </div>
+      <div
+        style={{
+          padding: '8px 12px',
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          fontSize: 10,
+          color: 'var(--color-text-muted)',
+        }}
+      >
+        {analysis.speakers.map((speaker) =>
+          editingSpeaker?.id === speaker.id ? (
+            <span key={speaker.id} style={{ display: 'inline-flex', gap: 4 }}>
+              <input
+                aria-label={`Rename ${effectiveLabels.get(speaker.id)}`}
+                value={editingSpeaker.value}
+                autoFocus
+                onChange={(event) =>
+                  setEditingSpeaker({ id: speaker.id, value: event.currentTarget.value })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') void renameSpeaker(speaker.id, editingSpeaker.value)
+                  if (event.key === 'Escape') setEditingSpeaker(null)
+                }}
+                style={{ width: 90, fontSize: 'inherit' }}
+              />
+              <button onClick={() => void renameSpeaker(speaker.id, editingSpeaker.value)}>
+                Save
+              </button>
+              <button onClick={() => setEditingSpeaker(null)}>Cancel</button>
+            </span>
+          ) : (
+            <button
+              key={speaker.id}
+              disabled={isGenerating}
+              onDoubleClick={() =>
+                setEditingSpeaker({ id: speaker.id, value: effectiveLabels.get(speaker.id) ?? '' })
+              }
+              title={`Machine label ${speaker.diarizationLabel}. Double-click to rename.`}
+              style={{
+                border: 0,
+                background: 'transparent',
+                color: 'inherit',
+                fontSize: 'inherit',
+                cursor: 'text',
+              }}
+            >
+              ● {effectiveLabels.get(speaker.id)}
+            </button>
+          ),
+        )}
+      </div>
+      {renameError && (
+        <div
+          role="alert"
+          style={{ color: 'var(--color-danger)', padding: '0 12px 8px', fontSize: 11 }}
+        >
+          {renameError}
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        contentEditable
+        suppressContentEditableWarning
+        onBeforeInput={(event) => event.preventDefault()}
+        onKeyDown={onKeyDown}
+        data-testid="canonical-transcript"
+        style={{
+          padding: 12,
+          overflowY: 'auto',
+          lineHeight: 1.9,
+          outline: 'none',
+          userSelect: 'text',
+        }}
+      >
+        {analysis.transcript.units.map((unit: TranscriptUnit) => {
+          const acoustic = acousticByUnit.get(unit.id)
+          const attribution = acoustic ? attributionByAcoustic.get(acoustic.id) : undefined
+          const occurrence = acoustic
+            ? clipForRange({ start: acoustic.sourceStart, end: acoustic.sourceEnd })
+            : null
+          const isCurrent = Boolean(
+            occurrence &&
+            currentTime >=
+              occurrence.clip.outputStart + acoustic!.sourceStart - occurrence.clip.sourceStart &&
+            currentTime <=
+              occurrence.clip.outputStart + acoustic!.sourceEnd - occurrence.clip.sourceStart,
+          )
+          const muted = Boolean(occurrence?.clip.muted)
+          const editable = unit.kind === 'speech' && Boolean(acoustic)
+          const speaker = attribution?.speakerId
+            ? effectiveLabels.get(attribution.speakerId)
+            : undefined
+          return (
+            <span
+              key={unit.id}
+              ref={(element) => {
+                if (element) unitElements.current.set(unit.id, element)
+                else unitElements.current.delete(unit.id)
+              }}
+              data-unit-id={unit.id}
+              data-unit-kind={unit.kind}
+              data-acoustic-editable={editable}
+              title={
+                unit.kind === 'punctuation'
+                  ? 'Punctuation has no audio range'
+                  : !acoustic
+                    ? 'Speech could not be aligned and cannot be edited'
+                    : speaker
+              }
+              onClick={() => {
+                if (occurrence && acoustic)
+                  getAudioPlayerInstance()?.seekTo(
+                    occurrence.clip.outputStart +
+                      acoustic.sourceStart -
+                      occurrence.clip.sourceStart,
+                  )
+              }}
+              style={{
+                opacity: unit.kind === 'punctuation' ? 0.55 : !acoustic ? 0.65 : 1,
+                textDecoration:
+                  muted && editable
+                    ? 'line-through'
+                    : !acoustic && unit.kind === 'speech'
+                      ? 'underline dotted'
+                      : isCurrent
+                        ? 'underline'
+                        : 'none',
+                background: pending?.resolvedUnitIds.includes(unit.id)
+                  ? 'rgba(245,158,11,.25)'
+                  : isCurrent
+                    ? 'rgba(99,102,241,.2)'
+                    : undefined,
+                cursor: editable ? 'pointer' : 'text',
+              }}
+            >
+              {unit.text}
+              {/^[\p{L}\p{N}]+$/u.test(unit.text) && !/\p{Script=Han}/u.test(unit.text) ? ' ' : ''}
+            </span>
+          )
+        })}
+      </div>
+      {pending && (
+        <div
+          role="status"
+          style={{ margin: 10, padding: 10, border: '1px solid var(--color-border)', fontSize: 12 }}
+        >
+          {pending.expanded
+            ? `“${requestedText}” 必须按声学边界扩展为 “${resolvedText}”。`
+            : pending.unalignedUnitIds.length
+              ? '选择中包含无法可靠定位的语音，不能执行音频编辑。'
+              : '标点没有对应声音，不能单独执行音频编辑。'}
+          <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+            {pending.editable && <button onClick={() => applySelection(pending)}>确认编辑</button>}
+            <button onClick={() => setPending(null)}>取消</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LegacyTranscriptPanel({
   onGenerate,
   isGenerating,
   generatingStatus,

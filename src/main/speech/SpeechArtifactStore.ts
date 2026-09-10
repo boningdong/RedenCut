@@ -1,10 +1,7 @@
 import { createHash, randomUUID } from 'crypto'
 import { link, mkdir, readFile, rm, writeFile } from 'fs/promises'
 import { dirname, resolve, sep } from 'path'
-import {
-  SpeechArtifactRefSchema,
-  type SpeechArtifactRef,
-} from '../../shared/project.types'
+import { SpeechArtifactRefSchema, type SpeechArtifactRef } from '../../shared/project.types'
 import {
   SpeechArtifactSchema,
   validateSpeechArtifactReference,
@@ -61,7 +58,9 @@ export class SpeechArtifactStore {
       await link(staged.stagedPath, staged.finalPath)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST')
-        throw new Error(`Speech artifact already exists: ${staged.reference.artifactPath}`)
+        throw new Error(`Speech artifact already exists: ${staged.reference.artifactPath}`, {
+          cause: error,
+        })
       throw error
     }
     await rm(staged.stagedPath, { force: true })
@@ -76,7 +75,10 @@ export class SpeechArtifactStore {
     const artifactPath = this.resolveConfined(referenceInput.artifactPath)
     const reference = SpeechArtifactRefSchema.parse(referenceInput)
     const bytes = await readFile(artifactPath)
-    if (bytes.byteLength !== reference.artifactByteLength || sha256(bytes) !== reference.artifactSha256)
+    if (
+      bytes.byteLength !== reference.artifactByteLength ||
+      sha256(bytes) !== reference.artifactSha256
+    )
       throw new Error(`Speech artifact integrity check failed: ${reference.artifactPath}`)
     let decoded: unknown
     try {

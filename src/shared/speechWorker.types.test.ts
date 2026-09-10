@@ -22,13 +22,23 @@ describe('speech worker protocol', () => {
   })
 
   it('accepts correlated lifecycle messages and rejects malformed terminal results', () => {
-    expect(SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'ready', jobId: 'job-1' }))
-      .toMatchObject({ type: 'ready' })
-    expect(SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'progress', jobId: 'job-1',
-      stage: 'aligning', percent: 30 })).toMatchObject({ stage: 'aligning' })
-    expect(() => SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'result', jobId: 'job-1' }))
-      .toThrow()
-    expect(() => SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'mystery', jobId: 'job-1' }))
-      .toThrow()
+    expect(
+      SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'ready', jobId: 'job-1' }),
+    ).toMatchObject({ type: 'ready' })
+    expect(
+      SpeechWorkerResponseSchema.parse({
+        protocolVersion: 1,
+        type: 'progress',
+        jobId: 'job-1',
+        stage: 'aligning',
+        percent: 30,
+      }),
+    ).toMatchObject({ stage: 'aligning' })
+    expect(() =>
+      SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'result', jobId: 'job-1' }),
+    ).toThrow()
+    expect(() =>
+      SpeechWorkerResponseSchema.parse({ protocolVersion: 1, type: 'mystery', jobId: 'job-1' }),
+    ).toThrow()
   })
 })

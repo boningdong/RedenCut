@@ -54,6 +54,7 @@ const MODEL_NAMES = [
 ]
 
 const MODEL_SEARCH_DIRS = [
+  ...(process.env.PODCUT_WHISPER_MODEL_DIR ? [process.env.PODCUT_WHISPER_MODEL_DIR] : []),
   join(homedir(), '.cache', 'whisper'),
   join(homedir(), 'Library', 'Application Support', 'whisper.cpp', 'models'),
   '/opt/homebrew/share/whisper.cpp/models',
@@ -308,7 +309,10 @@ export class WhisperTranscriber implements ITranscriber {
       const language = parsed.result?.language ?? options.language ?? 'unknown'
 
       result = {
-        text: parsed.transcription.map((segment) => segment.text).join(' ').trim(),
+        text: parsed.transcription
+          .map((segment) => segment.text)
+          .join(' ')
+          .trim(),
         detectedLanguage: language,
         verbatimCapability: 'best-effort-verbatim',
         evidence: parsed.transcription.map((segment) => ({
@@ -317,9 +321,7 @@ export class WhisperTranscriber implements ITranscriber {
           sourceEnd: parseTimestamp(segment.timestamps.to),
           tokens: segment.tokens?.map((token) => ({
             text: token.text,
-            sourceStart: token.timestamps?.from
-              ? parseTimestamp(token.timestamps.from)
-              : undefined,
+            sourceStart: token.timestamps?.from ? parseTimestamp(token.timestamps.from) : undefined,
             sourceEnd: token.timestamps?.to ? parseTimestamp(token.timestamps.to) : undefined,
             confidence: token.p,
           })),

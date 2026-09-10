@@ -172,7 +172,9 @@ describe('validateSpeechArtifactReference', () => {
   }
 
   it('accepts matching digest-independent artifact metadata and summaries', () => {
-    expect(() => validateSpeechArtifactReference(reference, SpeechArtifactSchema.parse(artifact()))).not.toThrow()
+    expect(() =>
+      validateSpeechArtifactReference(reference, SpeechArtifactSchema.parse(artifact())),
+    ).not.toThrow()
   })
 
   it('rejects stale source bindings and inaccurate summaries', () => {

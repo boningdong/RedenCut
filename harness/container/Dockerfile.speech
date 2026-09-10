@@ -3,9 +3,17 @@ FROM ${PODCUT_HARNESS_BASE}
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-venv libsndfile1 \
+    python3 python3-pip python3-venv libsndfile1 build-essential cmake git \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --break-system-packages uv==0.12.12
+
+ARG WHISPER_CPP_REVISION=a8d002cfd879315632a579e73f0148d06959de36
+RUN git clone --filter=blob:none https://github.com/ggerganov/whisper.cpp.git /tmp/whisper.cpp \
+    && git -C /tmp/whisper.cpp checkout "$WHISPER_CPP_REVISION" \
+    && cmake -S /tmp/whisper.cpp -B /tmp/whisper.cpp/build -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON -DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8-a \
+    && cmake --build /tmp/whisper.cpp/build --target whisper-cli -j2 \
+    && install /tmp/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli \
+    && rm -rf /tmp/whisper.cpp
 
 COPY speech-worker/pyproject.toml speech-worker/uv.lock /opt/podcut-speech-worker/
 RUN --mount=type=cache,target=/root/.cache/uv \

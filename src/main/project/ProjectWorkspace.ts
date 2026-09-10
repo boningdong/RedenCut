@@ -66,7 +66,13 @@ export class ProjectWorkspace {
     const speechArtifacts = await Promise.all(
       project.speechArtifacts.map((reference) => artifactStore.load(reference)),
     )
-    return new ProjectWorkspace(root, project, speechArtifacts, false, workspaceDependencies(options))
+    return new ProjectWorkspace(
+      root,
+      project,
+      speechArtifacts,
+      false,
+      workspaceDependencies(options),
+    )
   }
 
   get descriptor(): WorkspaceDescriptor {

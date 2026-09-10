@@ -13,6 +13,9 @@ import type {
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 import { FfmpegAudioSourceCacheBuilder } from '../audio/import/FfmpegAudioSourceCacheBuilder'
 import { verifyAudioFingerprint } from '../audio/import/audioFingerprint'
+import type { SpeechArtifact } from '../../shared/speechArtifact.schema'
+import { SpeechArtifactStore } from '../speech/SpeechArtifactStore'
+import type { RenameSpeakerRequest } from '../../shared/speakerLabel.types'
 import { AsyncMutex } from './AsyncMutex'
 import { discardCleanupWarnings, type CleanupWarningSink } from './CleanupWarningSink'
 import { ProjectPathResolver } from './ProjectPathResolver'
@@ -34,6 +37,7 @@ export interface WorkspaceTransaction {
   prepareOpen(root: string): Promise<PreparedWorkspace>
   commitPreparedOpen(candidate: PreparedWorkspace): Promise<RendererSession>
   commitImport(authoritativeProject: ProjectFile): Promise<RendererSession>
+  commitSpeechAnalysis(artifact: SpeechArtifact, draft: ProjectDraft): Promise<RendererSession>
 }
 
 interface TransactionState {
@@ -114,6 +118,66 @@ export class WorkspaceController {
     return this.commitPreparedOpen(candidate, expected)
   }
 
+  async commitSpeechAnalysis(
+    expected: SessionPrecondition,
+    artifact: SpeechArtifact,
+    draft: ProjectDraft,
+  ): Promise<RendererSession> {
+    return this.runTransition(expected, (transaction) =>
+      transaction.commitSpeechAnalysis(artifact, draft),
+    )
+  }
+
+  async renameSpeaker(request: RenameSpeakerRequest): Promise<RendererSession> {
+    return this.runTransition(
+      { workspaceToken: request.workspaceToken as WorkspaceToken, revision: request.revision },
+      async (transaction) => {
+        const state = transaction.precondition
+        const workspace = this.workspace
+        const reference = workspace.project.speechArtifacts.find(
+          (candidate) =>
+            candidate.audioSourceId === request.audioSourceId &&
+            candidate.analysisRevisionId === request.analysisRevisionId,
+        )
+        const artifact = workspace.speechArtifacts.find(
+          (candidate) =>
+            candidate.audioSourceId === request.audioSourceId &&
+            candidate.analysisRevisionId === request.analysisRevisionId,
+        )
+        if (!reference || !artifact) throw new Error('Speaker label request is stale')
+        if (!artifact.speakers.some((speaker) => speaker.id === request.speakerId))
+          throw new Error('Speaker label references an unknown speaker')
+        const project = ProjectFileSchema.parse({
+          ...workspace.project,
+          speakerLabelOverrides: [
+            ...workspace.project.speakerLabelOverrides.filter(
+              (override) =>
+                override.audioSourceId !== request.audioSourceId ||
+                override.analysisRevisionId !== request.analysisRevisionId ||
+                override.speakerId !== request.speakerId,
+            ),
+            {
+              audioSourceId: request.audioSourceId,
+              analysisRevisionId: request.analysisRevisionId,
+              speechArtifactSha256: reference.artifactSha256,
+              speakerId: request.speakerId,
+              displayName: request.displayName,
+            },
+          ],
+        })
+        await workspace.save(project)
+        const captured = this.captureState()
+        if (
+          captured.workspaceToken !== state.workspaceToken ||
+          captured.revision !== state.revision
+        )
+          throw new Error('Stale workspace revision')
+        this.advanceRetainingWorkspace(captured, workspace)
+        return this.describeState(captured)
+      },
+    )
+  }
+
   assertCurrent(expected: SessionPrecondition): void {
     if (!this.current || !this.workspaceToken)
       throw new Error('Project workspace has not been initialized')
@@ -149,6 +213,8 @@ export class WorkspaceController {
         prepareOpen: (root) => this.prepareOpenState(state, root),
         commitPreparedOpen: (candidate) => this.commitPreparedOpenState(state, candidate),
         commitImport: (authoritativeProject) => this.commitImportState(state, authoritativeProject),
+        commitSpeechAnalysis: (artifact, draft) =>
+          this.commitSpeechAnalysisState(state, artifact, draft),
       }
       return operation(transaction)
     }, signal)
@@ -276,6 +342,50 @@ export class WorkspaceController {
     await workspace.save(project)
     this.advanceRetainingWorkspace(state, workspace)
     return toRendererSession(workspace, state.workspaceToken, state.revision, descriptors)
+  }
+
+  private async commitSpeechAnalysisState(
+    state: TransactionState,
+    artifact: SpeechArtifact,
+    draft: ProjectDraft,
+  ): Promise<RendererSession> {
+    const workspace = state.workspace
+    const source = workspace.project.audioSources.find(
+      (candidate) => candidate.id === artifact.audioSourceId,
+    )
+    if (!source) throw new Error('Speech analysis references an unknown AudioSource')
+    if (
+      source.fingerprint.byteLength !== artifact.sourceFingerprint.byteLength ||
+      source.fingerprint.modifiedTimeMs !== artifact.sourceFingerprint.modifiedTimeMs ||
+      source.fingerprint.sha256 !== artifact.sourceFingerprint.sha256
+    )
+      throw new Error('Speech analysis source fingerprint is stale')
+    const baseProject = mergeProjectDraft(workspace.project, draft)
+    const descriptors = await this.descriptors(workspace, baseProject, 'full')
+    const store = new SpeechArtifactStore(workspace.root)
+    const staged = await store.stage(store.prepare(artifact))
+    let published = false
+    try {
+      const reference = await store.publish(staged)
+      published = true
+      const project = ProjectFileSchema.parse({
+        ...baseProject,
+        speechArtifacts: [
+          ...baseProject.speechArtifacts.filter(
+            (candidate) => candidate.audioSourceId !== artifact.audioSourceId,
+          ),
+          reference,
+        ],
+        speakerLabelOverrides: baseProject.speakerLabelOverrides.filter(
+          (override) => override.audioSourceId !== artifact.audioSourceId,
+        ),
+      })
+      await workspace.save(project)
+      this.advanceRetainingWorkspace(state, workspace)
+      return toRendererSession(workspace, state.workspaceToken, state.revision, descriptors)
+    } finally {
+      if (!published) await store.discard(staged).catch(() => {})
+    }
   }
 
   private advanceRetainingWorkspace(state: TransactionState, workspace: ProjectWorkspace): void {

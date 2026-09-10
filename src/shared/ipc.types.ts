@@ -14,6 +14,7 @@ import type {
   RendererSession,
   SessionPrecondition,
 } from './session.types'
+import type { RenameSpeakerRequest } from './speakerLabel.types'
 
 export interface ProjectSwitchEvent extends SessionPrecondition {
   transitionId: string
@@ -32,6 +33,7 @@ export interface IpcError {
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: IpcError }
 
 export type ExportJobId = string & { readonly __brand: 'ExportJobId' }
+export type SpeechAnalysisJobId = string & { readonly __brand: 'SpeechAnalysisJobId' }
 export type ExportCancellationResult = 'cancelled' | 'commit-won' | 'not-found'
 
 interface SessionJobRequest<JobId extends string = string> extends SessionPrecondition {
@@ -49,6 +51,13 @@ export interface ImportJobRequest extends SessionJobRequest {
 export interface TranscriptionJobRequest extends SessionJobRequest<TranscriptionJobId> {
   audioSourceId: AudioSourceId
   language?: string
+}
+
+export interface SpeechAnalysisJobRequest extends SessionJobRequest<SpeechAnalysisJobId> {
+  audioSourceId: AudioSourceId
+  language: string
+  draft: ProjectDraft
+  confirmSpeakerLabelReset?: boolean
 }
 
 export interface ExportJobRequest extends SessionJobRequest<ExportJobId> {
@@ -71,6 +80,12 @@ export interface ImportProgressEvent extends SessionJobRequest {
 
 export interface TranscriptProgressEvent extends SessionJobRequest<TranscriptionJobId> {
   status: string
+}
+
+export interface SpeechAnalysisProgressEvent extends SessionJobRequest<SpeechAnalysisJobId> {
+  stage:
+    'transcribing' | 'aligning' | 'diarizing' | 'attributing-speakers' | 'validating' | 'publishing'
+  percent?: number
 }
 
 export interface RenderProgress {
@@ -104,6 +119,18 @@ export interface IElectronAPI {
       request: CancelSessionJobRequest<TranscriptionJobId>,
     ): Promise<TranscriptionCancellationResult>
   }
+  speechAnalysis: {
+    checkAvailability(): Promise<string | null>
+    start(
+      request: SpeechAnalysisJobRequest,
+    ): Promise<SessionJobResult<RendererSession, SpeechAnalysisJobId>>
+    cancel(
+      request: CancelSessionJobRequest<SpeechAnalysisJobId>,
+    ): Promise<TranscriptionCancellationResult>
+  }
+  speakerLabel: {
+    rename(request: RenameSpeakerRequest): Promise<RendererSession>
+  }
   render: {
     startExport(request: ExportJobRequest): Promise<SessionJobResult<boolean, ExportJobId>>
     cancelExport(request: CancelSessionJobRequest<ExportJobId>): Promise<ExportCancellationResult>
@@ -111,6 +138,7 @@ export interface IElectronAPI {
   on: {
     importProgress(callback: (progress: ImportProgressEvent) => void): () => void
     transcriptProgress(callback: (progress: TranscriptProgressEvent) => void): () => void
+    speechAnalysisProgress(callback: (progress: SpeechAnalysisProgressEvent) => void): () => void
     renderProgress(callback: (progress: RenderProgressEvent) => void): () => void
     projectWillSwitch(callback: (event: ProjectSwitchEvent) => void | Promise<void>): () => void
     pendingProjectOpen(

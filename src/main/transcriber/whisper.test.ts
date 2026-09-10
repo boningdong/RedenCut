@@ -244,9 +244,7 @@ describe('WhisperTranscriber cancellation', () => {
           text: ' 觉得。',
           sourceStart: 0.75,
           sourceEnd: 1.18,
-          tokens: [
-            { text: ' 觉得', sourceStart: 0.75, sourceEnd: 1.18, confidence: 0.91 },
-          ],
+          tokens: [{ text: ' 觉得', sourceStart: 0.75, sourceEnd: 1.18, confidence: 0.91 }],
         },
       ],
       provenance: { engineId: 'whisper.cpp', modelId: 'ggml-base.bin' },
