@@ -100,4 +100,99 @@ describe('canonical transcript editability', () => {
     expect(unaligned.title).toContain('could not be aligned')
     expect(screen.queryByRole('button', { name: 'Sync to playhead' })).toBeNull()
   })
+
+  it('underlines attributed transcript units with stable per-speaker colors', () => {
+    const analysis = useTranscriptStore.getState().analyses[0]
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        transcript: {
+          ...analysis.transcript,
+          units: [
+            { id: 'speaker-a-1', text: '你', kind: 'speech' },
+            { id: 'speaker-a-2', text: '好', kind: 'speech' },
+            { id: 'speaker-b-1', text: '嗯', kind: 'speech' },
+            { id: 'unattributed', text: '好', kind: 'speech' },
+          ],
+        },
+        alignment: {
+          ...analysis.alignment,
+          acousticEditUnits: [
+            {
+              id: 'acoustic-a-1',
+              transcriptUnitIds: ['speaker-a-1'],
+              audioSourceId: sourceId,
+              sourceStart: 0.1,
+              sourceEnd: 0.3,
+              granularity: 'character',
+            },
+            {
+              id: 'acoustic-a-2',
+              transcriptUnitIds: ['speaker-a-2'],
+              audioSourceId: sourceId,
+              sourceStart: 0.3,
+              sourceEnd: 0.5,
+              granularity: 'character',
+            },
+            {
+              id: 'acoustic-b-1',
+              transcriptUnitIds: ['speaker-b-1'],
+              audioSourceId: sourceId,
+              sourceStart: 0.5,
+              sourceEnd: 0.7,
+              granularity: 'character',
+            },
+            {
+              id: 'acoustic-unattributed',
+              transcriptUnitIds: ['unattributed'],
+              audioSourceId: sourceId,
+              sourceStart: 0.7,
+              sourceEnd: 0.9,
+              granularity: 'character',
+            },
+          ],
+        },
+        speakerAttribution: {
+          ...analysis.speakerAttribution,
+          attributions: [
+            {
+              acousticEditUnitId: 'acoustic-a-1',
+              speakerId: 'speaker-a',
+              ambiguous: false,
+            },
+            {
+              acousticEditUnitId: 'acoustic-a-2',
+              speakerId: 'speaker-a',
+              ambiguous: false,
+            },
+            {
+              acousticEditUnitId: 'acoustic-b-1',
+              speakerId: 'speaker-b',
+              ambiguous: false,
+            },
+          ],
+        },
+        speakers: [
+          { id: 'speaker-a', diarizationLabel: 'SPEAKER_00', defaultDisplayName: 'Speaker 1' },
+          { id: 'speaker-b', diarizationLabel: 'SPEAKER_01', defaultDisplayName: 'Speaker 2' },
+        ],
+      } as never,
+    ])
+
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const speakerA1 = document.querySelector('[data-unit-id="speaker-a-1"]') as HTMLElement
+    const speakerA2 = document.querySelector('[data-unit-id="speaker-a-2"]') as HTMLElement
+    const speakerB = document.querySelector('[data-unit-id="speaker-b-1"]') as HTMLElement
+    const unattributed = document.querySelector('[data-unit-id="unattributed"]') as HTMLElement
+
+    expect(speakerA1.style.borderBottomStyle).toBe('solid')
+    expect(speakerA1.style.borderBottomWidth).toBe('2px')
+    expect(speakerA1.style.borderBottomColor).not.toBe('')
+    expect(speakerA2.style.borderBottomColor).toBe(speakerA1.style.borderBottomColor)
+    expect(speakerB.style.borderBottomColor).not.toBe(speakerA1.style.borderBottomColor)
+    expect(unattributed.style.borderBottomStyle).toBe('')
+    expect(screen.getByTestId('speaker-swatch-speaker-a').style.color).toBe(
+      speakerA1.style.borderBottomColor,
+    )
+  })
 })

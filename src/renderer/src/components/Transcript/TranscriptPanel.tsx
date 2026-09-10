@@ -44,6 +44,17 @@ interface TranscriptPanelProps {
   generatingStatus: string
 }
 
+const SPEAKER_COLORS = [
+  '#60a5fa',
+  '#fb923c',
+  '#4ade80',
+  '#f472b6',
+  '#a78bfa',
+  '#22d3ee',
+  '#facc15',
+  '#f87171',
+] as const
+
 export function TranscriptPanel(props: TranscriptPanelProps) {
   const analyses = useTranscriptStore((state) => state.analyses)
   return analyses.length > 0 ? (
@@ -210,6 +221,16 @@ function CanonicalTranscriptPanel({
       ),
     [analysis],
   )
+  const speakerColors = useMemo(
+    () =>
+      new Map(
+        analysis.speakers.map((speaker, index) => [
+          speaker.id,
+          SPEAKER_COLORS[index % SPEAKER_COLORS.length],
+        ]),
+      ),
+    [analysis.speakers],
+  )
   const renameSpeaker = useCallback(
     async (speakerId: RendererSpeechAnalysis['speakers'][number]['id'], displayName: string) => {
       if (!session || isGenerating) return
@@ -323,7 +344,13 @@ function CanonicalTranscriptPanel({
                 cursor: 'text',
               }}
             >
-              ● {effectiveLabels.get(speaker.id)}
+              <span
+                data-testid={`speaker-swatch-${speaker.id}`}
+                style={{ color: speakerColors.get(speaker.id) }}
+              >
+                ●
+              </span>{' '}
+              {effectiveLabels.get(speaker.id)}
             </button>
           ),
         )}
@@ -366,9 +393,9 @@ function CanonicalTranscriptPanel({
           )
           const muted = Boolean(occurrence?.clip.muted)
           const editable = unit.kind === 'speech' && Boolean(acoustic)
-          const speaker = attribution?.speakerId
-            ? effectiveLabels.get(attribution.speakerId)
-            : undefined
+          const speakerId = attribution?.ambiguous ? undefined : attribution?.speakerId
+          const speaker = speakerId ? effectiveLabels.get(speakerId) : undefined
+          const speakerColor = speakerId ? speakerColors.get(speakerId) : undefined
           return (
             <span
               key={unit.id}
@@ -379,6 +406,7 @@ function CanonicalTranscriptPanel({
               data-unit-id={unit.id}
               data-unit-kind={unit.kind}
               data-acoustic-editable={editable}
+              data-speaker-id={speakerId}
               title={
                 unit.kind === 'punctuation'
                   ? 'Punctuation has no audio range'
@@ -410,6 +438,7 @@ function CanonicalTranscriptPanel({
                     ? 'rgba(99,102,241,.2)'
                     : undefined,
                 cursor: editable ? 'pointer' : 'text',
+                borderBottom: speakerColor ? `2px solid ${speakerColor}` : undefined,
               }}
             >
               {unit.text}
