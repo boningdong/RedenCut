@@ -49,6 +49,28 @@ class ProtocolTest(unittest.TestCase):
         self.assertNotEqual(0, code)
         self.assertEqual(["error"], [m["type"] for m in messages])
 
+    @patch("podcut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}})
+    @patch("podcut_speech_worker.__main__.align", return_value={"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}})
+    def test_accepts_a_long_audio_request_above_the_legacy_one_mibibyte_limit(self, _align, _diarize):
+        candidate = request()
+        candidate["transcriptUnits"] = [
+            {
+                "id": f"00000000-0000-4000-8000-{index:012d}",
+                "text": "说",
+                "kind": "speech",
+            }
+            for index in range(15_000)
+        ]
+        encoded = json.dumps(candidate, ensure_ascii=False) + "\n"
+        self.assertGreater(len(encoded.encode("utf-8")), 1_048_576)
+        output = io.StringIO()
+
+        code = run(io.StringIO(encoded), output)
+
+        messages = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(0, code)
+        self.assertEqual("result", messages[-1]["type"])
+
 
 if __name__ == "__main__":
     unittest.main()

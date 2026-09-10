@@ -1,4 +1,6 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
+import { spawn } from 'child_process'
+import type { EventEmitter } from 'events'
+import type { Readable, Writable } from 'stream'
 import {
   SpeechWorkerRequestSchema,
   SpeechWorkerResponseSchema,
@@ -13,11 +15,27 @@ interface ClientOptions {
   maxLineBytes?: number
   env?: NodeJS.ProcessEnv
   cwd?: string
+  spawn?: SpeechWorkerSpawn
 }
 
+interface SpeechWorkerChild extends EventEmitter {
+  stdin: Writable
+  stdout: Readable
+  stderr: Readable
+  kill(signal?: NodeJS.Signals | number): boolean
+}
+
+type SpeechWorkerSpawn = (
+  command: string,
+  args: string[],
+  options: { stdio: ['pipe', 'pipe', 'pipe']; cwd?: string; env?: NodeJS.ProcessEnv },
+) => SpeechWorkerChild
+
+const DEFAULT_MAX_JSONL_MESSAGE_BYTES = 32 * 1024 * 1024
+
 export class SpeechWorkerClient {
-  private readonly options: Required<Omit<ClientOptions, 'env' | 'cwd'>> &
-    Pick<ClientOptions, 'env' | 'cwd'>
+  private readonly options: Required<Omit<ClientOptions, 'env' | 'cwd' | 'spawn'>> &
+    Pick<ClientOptions, 'env' | 'cwd'> & { spawn: SpeechWorkerSpawn }
 
   constructor(
     private readonly command: string,
@@ -28,9 +46,10 @@ export class SpeechWorkerClient {
       overallTimeoutMs: options.overallTimeoutMs ?? 30 * 60_000,
       noProgressTimeoutMs: options.noProgressTimeoutMs ?? 5 * 60_000,
       terminateGraceMs: options.terminateGraceMs ?? 2_000,
-      maxLineBytes: options.maxLineBytes ?? 1024 * 1024,
+      maxLineBytes: options.maxLineBytes ?? DEFAULT_MAX_JSONL_MESSAGE_BYTES,
       env: options.env,
       cwd: options.cwd,
+      spawn: options.spawn ?? ((command, args, spawnOptions) => spawn(command, args, spawnOptions)),
     }
   }
 
@@ -41,7 +60,7 @@ export class SpeechWorkerClient {
   ): Promise<SpeechWorkerResult> {
     const request = SpeechWorkerRequestSchema.parse(requestInput)
     if (signal.aborted) return Promise.reject(abortError())
-    const child = spawn(this.command, this.args, {
+    const child = this.options.spawn(this.command, this.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: this.options.cwd,
       env: this.options.env,
@@ -51,7 +70,7 @@ export class SpeechWorkerClient {
   }
 
   private observe(
-    child: ChildProcessWithoutNullStreams,
+    child: SpeechWorkerChild,
     request: SpeechWorkerRequest,
     signal: AbortSignal,
     onProgress?: (event: { stage: 'aligning' | 'diarizing'; percent?: number }) => void,
@@ -122,6 +141,9 @@ export class SpeechWorkerClient {
           }
         }
       })
+      child.stdin.once('error', fail)
+      child.stdout.once('error', fail)
+      child.stderr.once('error', fail)
       child.once('error', fail)
       child.once('close', (code) => {
         clearTimeout(overallTimer)
@@ -135,7 +157,16 @@ export class SpeechWorkerClient {
         else if (code !== 0) reject(new Error(`Speech worker exited with code ${code}`))
         else resolve(terminal)
       })
-      child.stdin.end(`${JSON.stringify(request)}\n`)
+      try {
+        const line = `${JSON.stringify(request)}\n`
+        if (Buffer.byteLength(line) > this.options.maxLineBytes) {
+          fail(new Error('Speech worker input line exceeded maximum size'))
+          return
+        }
+        child.stdin.end(line)
+      } catch (error) {
+        fail(error)
+      }
     })
   }
 }

@@ -1,4 +1,6 @@
 import { join } from 'path'
+import { EventEmitter } from 'events'
+import { PassThrough, Writable } from 'stream'
 import { describe, expect, it, vi } from 'vitest'
 import { SpeechWorkerRequestSchema } from '../../shared/speechWorker.types'
 import { SpeechWorkerClient } from './SpeechWorkerClient'
@@ -13,6 +15,27 @@ const request = SpeechWorkerRequestSchema.parse({
   models: { alignment: 'alignment-en', diarization: 'diarization-default' },
   config: { device: 'cpu' },
 })
+
+class BrokenPipeChild extends EventEmitter {
+  readonly stdout = new PassThrough()
+  readonly stderr = new PassThrough()
+  readonly stdin: Writable
+  readonly kill = vi.fn(() => {
+    queueMicrotask(() => this.emit('close', null, 'SIGTERM'))
+    return true
+  })
+
+  constructor() {
+    super()
+    this.stdin = new Writable({
+      write: (_chunk, _encoding, callback) => {
+        const error = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })
+        setImmediate(() => this.emit('close', 1, null))
+        callback(error)
+      },
+    })
+  }
+}
 
 describe('SpeechWorkerClient', () => {
   it('runs one correlated JSONL job, reports progress, and ignores stderr diagnostics', async () => {
@@ -33,6 +56,37 @@ describe('SpeechWorkerClient', () => {
         new AbortController().signal,
       ),
     ).rejects.toThrow()
+  })
+
+  it('accepts a long-audio result above the legacy one-mibibyte limit', async () => {
+    const result = await new SpeechWorkerClient(process.execPath, [fixture, 'large-output']).run(
+      request,
+      new AbortController().signal,
+    )
+
+    expect(result.alignment.unalignedTranscriptUnitIds).toHaveLength(30_000)
+  })
+
+  it('rejects without an uncaught EPIPE when the worker cannot start', async () => {
+    await expect(
+      new SpeechWorkerClient('/definitely/missing/podcut-speech-worker', []).run(
+        request,
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects through the job promise when the worker input pipe closes', async () => {
+    const child = new BrokenPipeChild()
+    const spawn = vi.fn(() => child)
+
+    await expect(
+      new SpeechWorkerClient('speech-worker', [], { spawn }).run(
+        request,
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'EPIPE' })
+    expect(child.kill).toHaveBeenCalledOnce()
   })
 
   it('terminates and reaps the worker before cancellation settles', async () => {

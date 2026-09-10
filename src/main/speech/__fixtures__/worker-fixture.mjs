@@ -26,9 +26,17 @@ lines.once('line', (line) => {
   console.error('fixture diagnostic')
   emit({ ...envelope, type: 'ready' })
   emit({ ...envelope, type: 'progress', stage: 'aligning', percent: 50 })
-  emit({ ...envelope, type: 'result', result: {
-    alignment: { units: [], unalignedTranscriptUnitIds: request.transcriptUnits.map((unit) => unit.id), provenance: {} },
-    diarization: { turns: [], provenance: {} },
-  } })
+  const unalignedTranscriptUnitIds =
+    mode === 'large-output'
+      ? Array.from({ length: 30_000 }, () => request.transcriptUnits[0].id)
+      : request.transcriptUnits.map((unit) => unit.id)
+  emit({
+    ...envelope,
+    type: 'result',
+    result: {
+      alignment: { units: [], unalignedTranscriptUnitIds, provenance: {} },
+      diarization: { turns: [], provenance: {} },
+    },
+  })
   if (mode === 'duplicate') emit({ ...envelope, type: 'error', code: 'late', message: 'late' })
 })

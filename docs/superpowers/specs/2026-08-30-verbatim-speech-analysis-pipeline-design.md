@@ -521,7 +521,9 @@ result
 
 Every line includes a protocol version and job ID. The terminal message is exactly one of `result` or `error`. Human-readable logs use standard error so they cannot corrupt protocol parsing.
 
-The main process validates every message against a shared schema, rejects unknown protocol versions and duplicate terminal messages, enforces line and result size limits, and treats malformed output or premature exit as job failure.
+The main process validates every message against a shared schema, rejects unknown protocol versions and duplicate terminal messages, enforces line and result size limits, and treats malformed output or premature exit as job failure. Version 1 allows up to 32 MiB for one request or response line so hour-scale transcripts and their alignment units do not trip the former 1 MiB transport ceiling; messages beyond that bounded limit fail explicitly rather than exhausting memory. Both sides must change this limit together until a future chunked protocol replaces the single-line payload.
+
+All child-process streams are failure boundaries. In particular, an input-pipe `EPIPE` caused by an early worker exit is settled as the current job's failure after the worker is reaped; it must never surface as an uncaught Electron main-process exception or publish a partial artifact.
 
 The coordinator applies bounded overall and no-progress timeouts. A valid progress heartbeat resets only the no-progress deadline; it cannot extend the overall deadline indefinitely. Concrete timeout defaults are operational configuration, not project data.
 
