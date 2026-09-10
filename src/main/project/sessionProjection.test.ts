@@ -71,7 +71,12 @@ function authoritativeProject(): ProjectFile {
 describe('toRendererSession', () => {
   it('projects a reference-mode project without persisted paths or main-only metadata', () => {
     const project = authoritativeProject()
-    const session = toRendererSession({ project, descriptor: workspace }, token, 4, [descriptor])
+    const session = toRendererSession(
+      { project, descriptor: workspace, speechArtifacts: [] },
+      token,
+      4,
+      [descriptor],
+    )
     const serialized = JSON.stringify(session)
 
     expect(serialized).not.toContain('location')

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Transcript } from '../../shared/project.types'
+import type { TranscriptionResult } from '../../shared/transcriber.types'
 import type { WorkspaceToken } from '../../shared/session.types'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
 
@@ -29,11 +29,17 @@ import type { WorkspaceController } from '../project/WorkspaceController'
 const TOKEN = 'workspace-a' as WorkspaceToken
 const SOURCE = '00000000-0000-4000-8000-000000000001'
 
-function transcript(text: string): Transcript {
+function transcript(text: string): TranscriptionResult {
   return {
-    engine: 'test',
-    words: [{ id: text, text, start: 0, end: 1, muted: false }],
-    speakers: {},
+    text,
+    detectedLanguage: 'en',
+    verbatimCapability: 'best-effort-verbatim',
+    evidence: [{ text, tokens: [{ text, sourceStart: 0, sourceEnd: 1 }] }],
+    provenance: {
+      engineId: 'test', engineVersion: '1', modelId: 'test-model',
+      configHash: 'a'.repeat(64), artifactSchemaVersion: 1,
+      createdAt: '2026-09-09T00:00:00.000Z',
+    },
   }
 }
 
@@ -170,7 +176,7 @@ describe('transcript IPC', () => {
     let signal!: AbortSignal
     mocks.transcribe.mockImplementation(async (_path, _options, admittedSignal: AbortSignal) => {
       signal = admittedSignal
-      return new Promise<Transcript>((_resolve, reject) => {
+      return new Promise<TranscriptionResult>((_resolve, reject) => {
         admittedSignal.addEventListener(
           'abort',
           () => reject(new DOMException('cancelled', 'AbortError')),
@@ -224,7 +230,7 @@ describe('transcript IPC', () => {
     const signals: AbortSignal[] = []
     mocks.transcribe.mockImplementation(
       async (_path, _options, signal: AbortSignal) =>
-        new Promise<Transcript>((_resolve, reject) => {
+        new Promise<TranscriptionResult>((_resolve, reject) => {
           signals.push(signal)
           signal.addEventListener(
             'abort',
@@ -258,7 +264,7 @@ describe('transcript IPC', () => {
 
   it('awaits an old same-sender operation before starting its replacement', async () => {
     const controller = controllerStub()
-    const old = deferred<Transcript>()
+    const old = deferred<TranscriptionResult>()
     const signals: AbortSignal[] = []
     mocks.transcribe.mockImplementation(async (_path, _options, signal: AbortSignal) => {
       signals.push(signal)
@@ -286,7 +292,7 @@ describe('transcript IPC', () => {
 
   it('drops progress and result after the session envelope becomes stale', async () => {
     const controller = controllerStub()
-    const pending = deferred<Transcript>()
+    const pending = deferred<TranscriptionResult>()
     let progress!: (status: string) => void
     mocks.transcribe.mockImplementation(async (_path, _options, _signal, report) => {
       progress = report

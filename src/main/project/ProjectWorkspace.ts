@@ -14,6 +14,8 @@ import {
 import { basename, dirname, join } from 'path'
 import type { WorkspaceDescriptor } from '../../shared/import.types'
 import { createEmptyProject, ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
+import type { SpeechArtifact } from '../../shared/speechArtifact.schema'
+import { SpeechArtifactStore } from '../speech/SpeechArtifactStore'
 import {
   discardCleanupWarnings,
   recordCleanupWarning,
@@ -37,6 +39,7 @@ export class ProjectWorkspace {
   private constructor(
     public root: string,
     public project: ProjectFile,
+    public speechArtifacts: SpeechArtifact[],
     private temporary: boolean,
     private readonly dependencies: ProjectWorkspaceDependencies,
   ) {}
@@ -49,7 +52,7 @@ export class ProjectWorkspace {
     const root = await mkdtemp(join(temporaryParent, 'podcut-'))
     const project = createEmptyProject()
     await writeFile(join(root, 'project.json'), JSON.stringify(project, null, 2))
-    return new ProjectWorkspace(root, project, true, workspaceDependencies(options))
+    return new ProjectWorkspace(root, project, [], true, workspaceDependencies(options))
   }
 
   static async open(
@@ -59,7 +62,11 @@ export class ProjectWorkspace {
     const project = ProjectFileSchema.parse(
       JSON.parse(await readFile(join(root, 'project.json'), 'utf8')),
     )
-    return new ProjectWorkspace(root, project, false, workspaceDependencies(options))
+    const artifactStore = new SpeechArtifactStore(root)
+    const speechArtifacts = await Promise.all(
+      project.speechArtifacts.map((reference) => artifactStore.load(reference)),
+    )
+    return new ProjectWorkspace(root, project, speechArtifacts, false, workspaceDependencies(options))
   }
 
   get descriptor(): WorkspaceDescriptor {
@@ -72,11 +79,16 @@ export class ProjectWorkspace {
 
   async save(project: ProjectFile): Promise<void> {
     const validated = ProjectFileSchema.parse(project)
+    const store = new SpeechArtifactStore(this.root)
+    const speechArtifacts = await Promise.all(
+      validated.speechArtifacts.map((reference) => store.load(reference)),
+    )
     const temporaryFile = join(this.root, `.project-${randomUUID()}.json`)
     try {
       await writeFile(temporaryFile, JSON.stringify(validated, null, 2))
       await rename(temporaryFile, join(this.root, 'project.json'))
       this.project = validated
+      this.speechArtifacts = speechArtifacts
     } finally {
       await rm(temporaryFile, { force: true }).catch(() => {})
     }
