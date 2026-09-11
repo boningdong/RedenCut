@@ -253,7 +253,7 @@ export function CanonicalTranscriptPanel({
         <div className="transcript-generation">
           {missing.map((track) => (
             <button key={track.id} disabled={isGenerating} onClick={() => onGenerate(track.id)}>
-              {t('transcript.generate')} {track.name}
+              {t('transcript.generateTrack', { name: track.name })}
             </button>
           ))}
           <button disabled={isGenerating} onClick={() => onGenerate()}>

@@ -2,8 +2,8 @@ export const englishResources = {
   common: {
     retry: 'Retry',
     cancel: 'Cancel',
-    trackCount_one: '{{count}} track',
-    trackCount_other: '{{count}} tracks',
+    trackCount_one: '{{count, number}} track',
+    trackCount_other: '{{count, number}} tracks',
     save: 'Save',
     close: 'Close',
   },
@@ -77,6 +77,7 @@ export const englishResources = {
     channelCount: '{{count}} channels',
   },
   transcript: {
+    generateTrack: 'Generate {{name}}',
     allTracks: 'All tracks',
     allRemaining: 'All remaining',
 

@@ -9,11 +9,13 @@ import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { setAudioPlayerInstance } from '@shared/player.types'
 import { TranscriptPanel } from './TranscriptPanel'
+import { useLocaleStore } from '../../stores/locale.store'
 
 const sourceId = '550e8400-e29b-41d4-a716-446655440000'
 
 describe('canonical transcript editability', () => {
   beforeEach(() => {
+    useLocaleStore.setState({ resolvedLocale: 'en' })
     useEditorStore.getState().reset()
     useTimelineStore.getState().reset()
     useTranscriptStore.getState().reset()
@@ -89,8 +91,30 @@ describe('canonical transcript editability', () => {
   })
   afterEach(() => {
     cleanup()
+    useLocaleStore.setState({ resolvedLocale: 'en' })
     setAudioPlayerInstance(null)
     window.getSelection()?.removeAllRanges()
+  })
+
+  it('renders a complete named Generate action in both locales without changing the track', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        {
+          ...track,
+          name: '<My guest>',
+          clips: track.clips.map((clip) => ({ ...clip, audioSourceId: 'missing-source' as never })),
+        },
+      ],
+    })
+    const generate = vi.fn()
+    render(<TranscriptPanel onGenerate={generate} isGenerating={false} generatingStatus={null} />)
+    const button = screen.getByRole('button', { name: 'Generate <My guest>' })
+    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+    expect(screen.getByRole('button', { name: '生成 <My guest> 的转写' })).toBe(button)
+    fireEvent.click(button)
+    expect(generate).toHaveBeenCalledWith(track.id)
+    expect(useTimelineStore.getState().tracks[0].name).toBe('<My guest>')
   })
 
   it('visually distinguishes editable speech, punctuation, and unaligned speech consistently', () => {

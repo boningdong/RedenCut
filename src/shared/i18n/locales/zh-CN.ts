@@ -3,8 +3,8 @@ export const simplifiedChineseResources = {
   common: {
     retry: '重试',
     cancel: '取消',
-    trackCount_one: '{{count}} 个轨道',
-    trackCount_other: '{{count}} 个轨道',
+    trackCount_one: '{{count, number}} 个轨道',
+    trackCount_other: '{{count, number}} 个轨道',
     save: '保存',
     close: '关闭',
   },
@@ -78,6 +78,7 @@ export const simplifiedChineseResources = {
     channelCount: '{{count}} 个声道',
   },
   transcript: {
+    generateTrack: '生成 {{name}} 的转写',
     allTracks: '所有轨道',
     allRemaining: '所有剩余轨道',
 

@@ -43,6 +43,23 @@ describe('createTranslator', () => {
     expect(simplifiedChinese.t('common.trackCount', { count: 2 })).toBe('2 个轨道')
   })
 
+  it('formats large numeric counts by locale while keeping numeric plural selection', () => {
+    const english = createTranslator('en')
+    const chinese = createTranslator('zh-CN')
+    expect(english.t('common.trackCount', { count: 12345 })).toBe('12,345 tracks')
+    expect(chinese.t('common.trackCount', { count: 12345 })).toBe('12,345 个轨道')
+    expect(english.t('common.trackCount', { count: 1 })).toBe('1 track')
+  })
+
+  it('interpolates named Generate actions as complete translated messages', () => {
+    expect(createTranslator('en').t('transcript.generateTrack', { name: '<My guest>' })).toBe(
+      'Generate <My guest>',
+    )
+    expect(createTranslator('zh-CN').t('transcript.generateTrack', { name: '<My guest>' })).toBe(
+      '生成 <My guest> 的转写',
+    )
+  })
+
   it('falls back to English when an isolated Chinese test bundle is incomplete', () => {
     const translator = createTranslator('zh-CN')
     translator.removeResourceBundle('zh-CN', 'translation')
