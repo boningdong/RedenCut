@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n/useTranslation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 import {
@@ -28,6 +29,7 @@ function lanes(units: TranscriptOccurrence[]) {
   return [...rows.values()]
 }
 function Speaker({ unit }: { unit: TranscriptOccurrence }) {
+  const { t } = useTranslation()
   const colors = useSpeakerColors()
   const speaker = unit.speakerId ?? unit.contextSpeakerId
   const color = speaker
@@ -38,12 +40,14 @@ function Speaker({ unit }: { unit: TranscriptOccurrence }) {
       <span className="transcript-speaker-dot" style={{ background: color }} />
       <div>
         <span>
-          {speakerName(unit.analysis, unit.speakerId ?? unit.contextSpeakerId) ?? unit.track.name}
+          {speakerName(unit.analysis, unit.speakerId ?? unit.contextSpeakerId, (number) =>
+            t('transcript.speakerNumber', { number }),
+          ) ?? unit.track.name}
         </span>
         <small>
           {timestamp(unit.orderTime)} · {unit.track.name}
         </small>
-        {unit.ambiguous && <small>Speaker uncertain · same track</small>}
+        {unit.ambiguous && <small>{t('transcript.uncertain')}</small>}
       </div>
     </div>
   )
@@ -76,6 +80,7 @@ function OverlapCard({
   renderUnit: RenderUnit
   currentTime: number
 }) {
+  const { t } = useTranslation()
   const [aligned, setAligned] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(600)
@@ -106,24 +111,24 @@ function OverlapCard({
   return (
     <section
       className={`transcript-overlap${active ? ' is-live' : ''}`}
-      aria-label="Simultaneous speech"
+      aria-label={t('transcript.simultaneous')}
       data-overlap-start={start}
       data-overlap-end={end}
       ref={ref}
     >
       <div className="transcript-overlap-header" contentEditable={false}>
         <span>
-          Simultaneous speech{' '}
+          {t('transcript.simultaneous')}{' '}
           <small>
             {timestamp(start)}–{timestamp(end)}
           </small>
         </span>
         <div className="transcript-local-switch">
           <button aria-pressed={!aligned} onClick={() => setAligned(false)}>
-            Read
+            {t('transcript.read')}
           </button>
           <button aria-pressed={aligned} onClick={() => setAligned(true)}>
-            Align
+            {t('transcript.align')}
           </button>
         </div>
       </div>
@@ -177,7 +182,7 @@ function OverlapCard({
                           {selected.map(renderUnit)}
                           {boundary && (
                             <small className="transcript-boundary-note" contentEditable={false}>
-                              spans boundary
+                              {t('transcript.spansBoundary')}
                             </small>
                           )}
                           {!selected.length &&
@@ -185,8 +190,8 @@ function OverlapCard({
                               <span
                                 className="transcript-continuation"
                                 contentEditable={false}
-                                title="Earlier acoustic unit continues through this overlap"
-                                aria-label="Speech continues"
+                                title={t('transcript.continuesHint')}
+                                aria-label={t('transcript.continues')}
                               >
                                 ···
                               </span>

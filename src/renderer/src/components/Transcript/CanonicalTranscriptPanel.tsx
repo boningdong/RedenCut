@@ -1,3 +1,5 @@
+import { useTranslation } from '../../i18n/useTranslation'
+import { progressMessage } from '../../i18n/messages'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
@@ -26,6 +28,7 @@ export function CanonicalTranscriptPanel({
   generatingStatus,
   analyses,
 }: TranscriptPanelProps & { analyses: RendererSpeechAnalysis[] }) {
+  const { t } = useTranslation()
   const tracks = useTimelineStore((s) => s.tracks)
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const setSelection = useEditorStore((s) => s.setSelection)
@@ -42,7 +45,7 @@ export function CanonicalTranscriptPanel({
   const container = useRef<HTMLDivElement>(null)
   const elements = useRef(new Map<string, HTMLSpanElement>())
   const [pending, setPending] = useState<SessionSelection | null>(null)
-  const [scopeMessage, setScopeMessage] = useState('')
+  const [scopeMessage, setScopeMessage] = useState<'hiddenSpeaker' | 'changedClip' | null>(null)
   const resolveNative = useCallback(() => {
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || !selection.rangeCount) return null
@@ -98,7 +101,7 @@ export function CanonicalTranscriptPanel({
           .hiddenSpeakerKeys.includes(speakerKey(analysis, selectedSpeaker))
       ) {
         setPending(null)
-        setScopeMessage('The selected speaker is hidden. Show their text and select it again.')
+        setScopeMessage('hiddenSpeaker')
         return
       }
       const current = useTimelineStore
@@ -118,14 +121,14 @@ export function CanonicalTranscriptPanel({
         revision !== analysis.analysisRevisionId
       ) {
         setPending(null)
-        setScopeMessage('The selected clip changed. Select its current text again.')
+        setScopeMessage('changedClip')
         return
       }
       useTimelineStore.getState().muteClipRanges(track.id, clip.id, selected.sourceRanges)
       window.getSelection()?.removeAllRanges()
       setSelection(null)
       setPending(null)
-      setScopeMessage('')
+      setScopeMessage(null)
     },
     [setSelection],
   )
@@ -175,12 +178,15 @@ export function CanonicalTranscriptPanel({
         data-speaker-id={u.speakerId}
         title={
           u.unit.kind === 'punctuation'
-            ? 'Punctuation has no audio range'
+            ? t('transcript.punctuationHint')
             : !editable
-              ? 'Speech could not be aligned and cannot be edited'
+              ? t('transcript.unalignedHint')
               : u.ambiguous
-                ? 'Speaker uncertain · same-track separation unavailable'
-                : `${u.track.name} · ${u.outputStart!.toFixed(2)}s${u.partial ? ' · Partial acoustic unit: only the retained audio is editable' : ''}`
+                ? t('transcript.uncertainHint')
+                : t(u.partial ? 'transcript.partialUnitHint' : 'transcript.unitHint', {
+                    name: u.track.name,
+                    seconds: u.outputStart!.toFixed(2),
+                  })
         }
         onClick={() => {
           if (editable && window.getSelection()?.isCollapsed)
@@ -215,9 +221,9 @@ export function CanonicalTranscriptPanel({
           <sup
             contentEditable={false}
             className="transcript-partial-label"
-            title="Clip boundary cuts this acoustic unit; text is shown as context for the retained audio"
+            title={t('transcript.partialHint')}
           >
-            partial
+            {t('transcript.partial')}
           </sup>
         )}
       </span>
@@ -235,8 +241,8 @@ export function CanonicalTranscriptPanel({
     <div className="canonical-transcript-panel">
       <div className="transcript-controls">
         {workspaceControls}
-        <span className="feature-title">Transcript</span>
-        <span className="panel-count">{tracks.length} tracks</span>
+        <span className="feature-title">{t('transcript.title')}</span>
+        <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
         <div className="toolbar-spacer" />
         <SpeakerLabels
           analyses={analyses.filter((a) =>
@@ -245,19 +251,23 @@ export function CanonicalTranscriptPanel({
           isGenerating={isGenerating}
         />
         <div className="transcript-generation">
-          {missing.map((t) => (
-            <button key={t.id} disabled={isGenerating} onClick={() => onGenerate(t.id)}>
-              Generate {t.name}
+          {missing.map((track) => (
+            <button key={track.id} disabled={isGenerating} onClick={() => onGenerate(track.id)}>
+              {t('transcript.generate')} {track.name}
             </button>
           ))}
           <button disabled={isGenerating} onClick={() => onGenerate()}>
-            {isGenerating ? generatingStatus || 'Analyzing…' : 'Re-analyze'}
+            {isGenerating
+              ? generatingStatus
+                ? progressMessage(t, generatingStatus)
+                : t('transcript.analyzing')
+              : t('transcript.reanalyze')}
           </button>
         </div>
       </div>
       {isGenerating && (
         <div role="status" className="transcript-progress">
-          {generatingStatus || 'Generating transcript…'}
+          {generatingStatus ? progressMessage(t, generatingStatus) : t('transcript.generating')}
         </div>
       )}
       <div
@@ -265,7 +275,7 @@ export function CanonicalTranscriptPanel({
         contentEditable
         suppressContentEditableWarning
         role="region"
-        aria-label="Transcript"
+        aria-label={t('transcript.title')}
         data-testid="canonical-transcript"
         onBeforeInput={(e) => e.preventDefault()}
         onPaste={(e) => e.preventDefault()}
@@ -274,28 +284,31 @@ export function CanonicalTranscriptPanel({
         className="transcript-document"
       >
         <TranscriptDialogue units={units} renderUnit={renderUnit} currentTime={currentTime} />
-        {!units.length && <p>No transcript in the current timeline.</p>}
+        {!units.length && <p>{t('transcript.emptyTimeline')}</p>}
       </div>
-      <div className="transcript-footer">
-        Select text to redact audio · Click speech to seek · Overlap uses aligned audio boundaries
-      </div>
+      <div className="transcript-footer">{t('transcript.editHint')}</div>
       {scopeMessage && (
         <div role="status" className="transcript-confirmation">
-          {scopeMessage}
+          {t(`transcript.${scopeMessage}`)}
         </div>
       )}
       {pending && (
         <div role="status" className="transcript-confirmation">
           {pending.scopeConflict
-            ? 'Selection spans multiple tracks or clip occurrences. Select text from one track and clip to redact its audio.'
+            ? t('transcript.scopeConflict')
             : pending.expanded
-              ? `Redacting “${pendingText(pending.requestedUnitIds)}” requires including “${pendingText(pending.resolvedUnitIds)}” to preserve acoustic boundaries.`
+              ? t('transcript.expandedRedaction', {
+                  requested: pendingText(pending.requestedUnitIds),
+                  resolved: pendingText(pending.resolvedUnitIds),
+                })
               : pending.unalignedUnitIds.length
-                ? 'This selection includes speech that cannot be aligned reliably and cannot be redacted.'
-                : 'Punctuation has no corresponding audio and cannot be redacted on its own.'}
+                ? t('transcript.unalignedSelection')
+                : t('transcript.punctuationSelection')}
           <div>
-            {pending.editable && <button onClick={() => apply(pending)}>Confirm redaction</button>}
-            <button onClick={() => setPending(null)}>Cancel</button>
+            {pending.editable && (
+              <button onClick={() => apply(pending)}>{t('transcript.confirmRedaction')}</button>
+            )}
+            <button onClick={() => setPending(null)}>{t('common.cancel')}</button>
           </div>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/useTranslation'
 import type { AudioMetadata } from '@shared/project.types'
 import { Icon } from './ui/Icon'
 
@@ -8,6 +9,7 @@ export function FileInfoPanel({
   displayName: string
   metadata: AudioMetadata
 }) {
+  const { t } = useTranslation()
   const minutes = Math.floor(metadata.durationSeconds / 60)
   const seconds = Math.floor(metadata.durationSeconds % 60)
     .toString()
@@ -16,41 +18,41 @@ export function FileInfoPanel({
     <details className="file-details">
       <summary title={displayName}>
         <Icon name="wave" size={13} />
-        <span className="file-details-label">Audio details</span>
+        <span className="file-details-label">{t('waveform.details')}</span>
         <Icon name="chevron" size={13} />
       </summary>
       <dl>
         <div className="file-details-name">
-          <dt>File</dt>
+          <dt>{t('waveform.file')}</dt>
           <dd>{displayName}</dd>
         </div>
         <div>
-          <dt>Duration</dt>
+          <dt>{t('waveform.duration')}</dt>
           <dd>
             {minutes}:{seconds}
           </dd>
         </div>
         <div>
-          <dt>Sample rate</dt>
+          <dt>{t('waveform.sampleRate')}</dt>
           <dd>{(metadata.sampleRate / 1000).toFixed(1)} kHz</dd>
         </div>
         <div>
-          <dt>Channels</dt>
+          <dt>{t('waveform.channels')}</dt>
           <dd>
             {metadata.channels === 1
-              ? 'Mono'
+              ? t('waveform.mono')
               : metadata.channels === 2
-                ? 'Stereo'
-                : `${metadata.channels} channels`}
+                ? t('waveform.stereo')
+                : t('waveform.channelCount', { count: metadata.channels })}
           </dd>
         </div>
         <div>
-          <dt>Codec</dt>
+          <dt>{t('waveform.codec')}</dt>
           <dd>{metadata.codec.toUpperCase()}</dd>
         </div>
         {metadata.bitrateKbps > 0 && (
           <div>
-            <dt>Bitrate</dt>
+            <dt>{t('waveform.bitrate')}</dt>
             <dd>{metadata.bitrateKbps} kbps</dd>
           </div>
         )}

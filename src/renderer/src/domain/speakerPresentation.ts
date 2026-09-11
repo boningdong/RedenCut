@@ -5,11 +5,20 @@ import { TRACK_COLORS, trackPresentationColor } from '@shared/trackColors'
 export function speakerKey(analysis: RendererSpeechAnalysis, id: SpeakerId): string {
   return `${analysis.audioSourceId}:${analysis.analysisRevisionId}:${id}`
 }
-export function speakerName(analysis: RendererSpeechAnalysis, id?: SpeakerId): string | undefined {
-  return id
-    ? (analysis.speakerLabelOverrides.find((s) => s.speakerId === id)?.displayName ??
-        analysis.speakers.find((s) => s.id === id)?.defaultDisplayName)
-    : undefined
+export function speakerName(
+  analysis: RendererSpeechAnalysis,
+  id?: SpeakerId,
+  defaultName?: (number: number) => string,
+): string | undefined {
+  if (!id) return undefined
+  const override = analysis.speakerLabelOverrides.find((speaker) => speaker.speakerId === id)
+  if (override) return override.displayName
+  const index = analysis.speakers.findIndex((speaker) => speaker.id === id)
+  const storedDefault = analysis.speakers[index]?.defaultDisplayName
+  // Only our generated defaults are presentation copy. Preserve imported or historical names.
+  return defaultName && storedDefault === `Speaker ${index + 1}`
+    ? defaultName(index + 1)
+    : storedDefault
 }
 
 /** Stable identity-derived colors, with project-wide collision avoidance.

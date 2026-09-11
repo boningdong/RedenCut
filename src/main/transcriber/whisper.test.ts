@@ -1,8 +1,10 @@
+import { toIpcResult } from '../ipc/ipcResult'
 import { EventEmitter } from 'events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
+  whisperPath: vi.fn((): string | null => '/usr/bin/whisper-cli'),
   mkdtemp: vi.fn(async () => '/tmp/podcut-whisper-job'),
   readFile: vi.fn(async () => JSON.stringify({ transcription: [], result: { language: 'en' } })),
   rm: vi.fn(async (_path?: unknown, _options?: unknown): Promise<void> => {}),
@@ -17,7 +19,7 @@ vi.mock('fs/promises', () => ({
 }))
 vi.mock('fs', () => ({ existsSync: mocks.existsSync }))
 vi.mock('../audio/binaries', () => ({
-  getWhisperPath: () => '/usr/bin/whisper-cli',
+  getWhisperPath: mocks.whisperPath,
   getFfmpegPath: () => '/usr/bin/ffmpeg',
 }))
 
@@ -45,12 +47,29 @@ async function advanceToWhisper(signal: AbortSignal) {
 
 describe('WhisperTranscriber cancellation', () => {
   beforeEach(() => {
+    mocks.whisperPath.mockReturnValue('/usr/bin/whisper-cli')
+    mocks.existsSync.mockImplementation((path: string) => path.endsWith('ggml-base.bin'))
     mocks.spawn.mockReset()
     mocks.mkdtemp.mockClear()
     mocks.readFile.mockClear()
     mocks.rm.mockReset()
     mocks.rm.mockResolvedValue(undefined)
     mocks.existsSync.mockClear()
+  })
+
+  it('retains an actionable missing-engine reason on the legacy IPC error path', async () => {
+    mocks.whisperPath.mockReturnValue(null)
+    const engine = new WhisperTranscriber()
+    expect(await engine.unavailableReason()).toEqual({ reason: 'whisper-missing' })
+    const result = await toIpcResult(
+      () => engine.transcribe('/private/source.wav', {}, new AbortController().signal),
+      vi.fn(),
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'operation-failed', reason: 'whisper-missing' },
+    })
+    expect(JSON.stringify(result)).not.toContain('/private')
   })
 
   it('rejects an already-aborted request before creating temporary state', async () => {

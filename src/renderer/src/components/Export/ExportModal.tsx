@@ -1,3 +1,5 @@
+import type { PublicMessage } from '@shared/publicMessages'
+import { normalizePublicError, publicMessage } from '../../i18n/messages'
 // ─────────────────────────────────────────────────────────────────────────────
 // ExportModal
 //
@@ -22,7 +24,7 @@ type ExportState =
   | { status: 'idle' }
   | { status: 'exporting'; progress: RenderProgress }
   | { status: 'done' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: PublicMessage }
 
 interface ActiveExportIdentity extends SessionPrecondition {
   jobId: ExportJobId
@@ -101,7 +103,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
       )
         return
       shouldFinish = true
-      setExportState({ status: 'error', message: (err as Error).message })
+      setExportState({ status: 'error', message: normalizePublicError(err) })
     } finally {
       if (shouldFinish && activeJobMatches(activeJob.current, identity)) activeJob.current = null
     }
@@ -136,7 +138,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
       )
         return
       setIsCancelling(false)
-      setExportState({ status: 'error', message: (error as Error).message })
+      setExportState({ status: 'error', message: normalizePublicError(error) })
     }
   }, [onClose])
 
@@ -181,13 +183,13 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         </h2>
 
         <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-          Redacted sections are removed from the export. Overlapping retained audio is preserved.
+          {t('export.help')}
         </p>
 
         {/* Format */}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Format
+            {t('export.format')}
           </span>
           <select
             value={format}
@@ -212,10 +214,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         {/* LUFS (display only) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            Loudness target: {draft.export?.targetLUFS ?? -16} LUFS
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--color-text-muted)', opacity: 0.6 }}>
-            (Phase 4)
+            {t('export.loudness', { value: draft.export?.targetLUFS ?? -16 })}
           </span>
         </div>
 
@@ -248,7 +247,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
                 display: 'block',
               }}
             >
-              {exportState.status === 'done' ? 'Done!' : `${pct}%`}
+              {exportState.status === 'done' ? t('export.done') : `${pct}%`}
             </span>
           </div>
         )}
@@ -263,7 +262,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
               wordBreak: 'break-all',
             }}
           >
-            {exportState.message}
+            {publicMessage(t, exportState.message)}
           </p>
         )}
 
@@ -282,7 +281,11 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
               cursor: 'pointer',
             }}
           >
-            {isCancelling ? 'Cancelling…' : exportState.status === 'done' ? 'Close' : 'Cancel'}
+            {isCancelling
+              ? t('export.cancelling')
+              : exportState.status === 'done'
+                ? t('common.close')
+                : t('common.cancel')}
           </button>
           <button
             onClick={() => {
@@ -300,7 +303,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
               opacity: isExporting ? 0.5 : 1,
             }}
           >
-            {isExporting ? 'Exporting…' : t('export.title')}
+            {isExporting ? t('export.exporting') : t('export.title')}
           </button>
         </div>
       </div>

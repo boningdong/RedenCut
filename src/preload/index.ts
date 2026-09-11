@@ -1,3 +1,4 @@
+import type { PublicMessage } from '../shared/publicMessages'
 import type { AppPreferencesSnapshot } from '../shared/appPreferences.types'
 import type { LocalePreference } from '../shared/i18n/locale.types'
 import type { WorkspaceLayout, WorkspaceLayoutReadResult } from '../shared/workspaceLayout.types'
@@ -85,7 +86,8 @@ const api = {
       invokeSafe<RendererSession | null>(invoke, 'project:save-as', request),
   },
   transcript: {
-    checkAvailability: () => invokeSafe<string | null>(invoke, 'transcript:check-availability'),
+    checkAvailability: () =>
+      invokeSafe<PublicMessage | null>(invoke, 'transcript:check-availability'),
     generate: (request: TranscriptionJobRequest) =>
       invokeSafe<SessionJobResult<Transcript, TranscriptionJobId>>(
         invoke,
@@ -97,7 +99,7 @@ const api = {
   },
   speechAnalysis: {
     checkAvailability: () =>
-      invokeSafe<string | null>(invoke, 'speech-analysis:check-availability'),
+      invokeSafe<PublicMessage | null>(invoke, 'speech-analysis:check-availability'),
     start: (request: SpeechAnalysisJobRequest) =>
       invokeSafe<SessionJobResult<RendererSession, SpeechAnalysisJobId>>(
         invoke,

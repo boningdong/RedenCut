@@ -7,6 +7,8 @@ import { SessionJobRegistry } from '../project/SessionJobRegistry'
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<IpcResult<unknown>>>(),
   run: vi.fn(),
+  unavailableReason: vi.fn(),
+  existsSync: vi.fn(),
   prepare: vi.fn(),
 }))
 vi.mock('electron', () => ({
@@ -21,11 +23,16 @@ vi.mock('../speech/SpeechAnalysisCoordinator', () => ({
   },
 }))
 vi.mock('../speech/prepareSpeechAudio', () => ({ withSpeechAudio: mocks.prepare }))
-vi.mock('../transcriber/whisper', () => ({ whisperTranscriber: {} }))
+vi.mock('../transcriber/whisper', () => ({
+  whisperTranscriber: { unavailableReason: mocks.unavailableReason },
+}))
+vi.mock('fs', () => ({ existsSync: mocks.existsSync }))
 import { registerSpeechAnalysisIpc } from './speechAnalysis.ipc'
 
 beforeEach(() => {
   mocks.handlers.clear()
+  mocks.unavailableReason.mockResolvedValue(null)
+  mocks.existsSync.mockReturnValue(true)
   mocks.run.mockReset()
   mocks.prepare.mockReset()
 })
@@ -118,4 +125,16 @@ it('reports the failed speech stage and keeps cancellation distinct', async () =
   const cancelled = await start()
   if (cancelled.ok) throw new Error('Expected cancellation')
   expect(cancelled.error.code).toBe('cancelled')
+})
+
+it('returns stable availability reasons for missing engines, workers and models', async () => {
+  setup()
+  const availability = mocks.handlers.get('speech-analysis:check-availability')!
+  mocks.unavailableReason.mockResolvedValue({ reason: 'whisper-missing' })
+  expect(await availability()).toEqual({ ok: true, value: { reason: 'whisper-missing' } })
+  mocks.unavailableReason.mockResolvedValue(null)
+  mocks.existsSync.mockReturnValue(false)
+  expect(await availability()).toEqual({ ok: true, value: { reason: 'speech-worker-missing' } })
+  mocks.existsSync.mockReturnValueOnce(true).mockReturnValue(false)
+  expect(await availability()).toEqual({ ok: true, value: { reason: 'speech-models-missing' } })
 })

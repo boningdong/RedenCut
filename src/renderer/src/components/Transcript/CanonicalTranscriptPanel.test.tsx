@@ -94,7 +94,7 @@ describe('canonical transcript editability', () => {
   })
 
   it('visually distinguishes editable speech, punctuation, and unaligned speech consistently', () => {
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const speech = document.querySelector('[data-unit-id="speech"]') as HTMLElement
     const punctuation = document.querySelector('[data-unit-id="punctuation"]') as HTMLElement
     const unaligned = document.querySelector('[data-unit-id="unaligned"]') as HTMLElement
@@ -115,7 +115,7 @@ describe('canonical transcript editability', () => {
       clips: original.clips.map((clip) => ({ ...clip, muted: false })),
     }
     useTimelineStore.setState({ tracks: [mutedTrack] })
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const speech = document.querySelector('[data-unit-id="speech"]') as HTMLElement
     expect(speech.style.textDecoration).not.toBe('line-through')
     expect(speech.style.opacity).toBe('0.5')
@@ -201,7 +201,7 @@ describe('canonical transcript editability', () => {
       } as never,
     ])
 
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const speakerA1 = document.querySelector('[data-unit-id="speaker-a-1"]') as HTMLElement
     const speakerA2 = document.querySelector('[data-unit-id="speaker-a-2"]') as HTMLElement
     const speakerB = document.querySelector('[data-unit-id="speaker-b-1"]') as HTMLElement
@@ -237,7 +237,7 @@ describe('canonical transcript editability', () => {
       ],
     })
     const generate = vi.fn()
-    render(<TranscriptPanel onGenerate={generate} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={generate} isGenerating={false} generatingStatus={null} />)
     expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Generate Guest' }))
     expect(generate).toHaveBeenCalledWith('missing')
@@ -262,7 +262,7 @@ describe('canonical transcript editability', () => {
         },
       ],
     })
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     expect(screen.getByRole('button', { name: 'Align' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Align' }))
     expect(screen.getByRole('button', { name: 'Align' }).getAttribute('aria-pressed')).toBe('true')
@@ -289,7 +289,7 @@ describe('canonical transcript editability', () => {
     })
     const seekTo = vi.fn()
     setAudioPlayerInstance({ seekTo } as never)
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     window.getSelection()?.removeAllRanges()
     fireEvent.click(document.querySelector('[data-track-id="guest"][data-unit-id="speech"]')!)
     expect(seekTo).toHaveBeenCalledWith(8.5)
@@ -311,7 +311,7 @@ describe('canonical transcript editability', () => {
         },
       ],
     })
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const selected = document.querySelector('[data-clip-id="duplicate"][data-unit-id="speech"]')!
     const range = document.createRange()
     range.selectNodeContents(selected)
@@ -347,7 +347,7 @@ describe('canonical transcript editability', () => {
         },
       ],
     })
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const spans = document.querySelectorAll('[data-unit-id="speech"]')
     const range = document.createRange()
     range.setStart(spans[0].firstChild!, 0)
@@ -376,7 +376,7 @@ describe('canonical transcript editability', () => {
         },
       ],
     })
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     expect(
       fireEvent.keyDown(screen.getByRole('button', { name: 'Align' }), { key: ' ', code: 'Space' }),
     ).toBe(true)
@@ -395,7 +395,7 @@ describe('canonical transcript editability', () => {
         },
       } as never,
     ])
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const speech = document.querySelector('[data-unit-id="speech"]')!,
       punctuation = document.querySelector('[data-unit-id="punctuation"]')!
     expect(speech.closest('.transcript-paragraph')).toBe(
@@ -428,7 +428,7 @@ describe('canonical transcript editability', () => {
     useTimelineStore.setState({
       tracks: [{ ...track, clips: track.clips.map((c) => ({ ...c, muted: false })) }],
     })
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const range = document.createRange()
     range.selectNodeContents(document.querySelector('[data-unit-id="speech"]')!)
     window.getSelection()?.removeAllRanges()
@@ -443,7 +443,7 @@ describe('canonical transcript editability', () => {
     expect(screen.getByRole('status').textContent).toContain('changed')
   })
   it('refreshes the waveform selection when selected text moves with its clip', () => {
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const range = document.createRange()
     range.selectNodeContents(document.querySelector('[data-unit-id="speech"]')!)
     window.getSelection()?.removeAllRanges()
@@ -484,7 +484,7 @@ describe('canonical transcript editability', () => {
         },
       },
     ])
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const element = document.querySelector('[data-clip-id="clip"][data-unit-id="speech"]')!
     const range = document.createRange()
     range.selectNodeContents(element)
@@ -504,7 +504,7 @@ describe('canonical transcript editability', () => {
     expect(useTimelineStore.getState().undoStack).toHaveLength(1)
   })
   it('does not clear a waveform-owned range on a delayed native selectionchange', () => {
-    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     act(() => {
       window.getSelection()?.removeAllRanges()
       useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set())

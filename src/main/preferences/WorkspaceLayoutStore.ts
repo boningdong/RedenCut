@@ -32,7 +32,7 @@ export class WorkspaceLayoutStore {
       if (!(error instanceof SyntaxError)) throw error
       return {
         layout: WorkspaceLayoutSchema.parse(DEFAULT_WORKSPACE_LAYOUT),
-        warning: 'Workspace preferences could not be read. Default layout is in use.',
+        warning: { reason: 'workspace-invalid' },
       }
     }
     return decodeStoredWorkspaceLayout(input)

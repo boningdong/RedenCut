@@ -2,9 +2,9 @@ import type { WorkspaceLayout } from '@shared/workspaceLayout.types'
 import type { WorkspaceDropTarget, WorkspacePanelId } from './workspaceLayout.types'
 
 export const WORKSPACE_PANELS = {
-  transcript: { label: 'Transcript', minimumHeight: 120, placement: 'content' },
-  audio: { label: 'Audio', minimumHeight: 120, placement: 'content' },
-  transport: { label: 'Transport', minimumHeight: 60, placement: 'strip' },
+  transcript: { labelKey: 'transcript.title', minimumHeight: 120, placement: 'content' },
+  audio: { labelKey: 'waveform.audio', minimumHeight: 120, placement: 'content' },
+  transport: { labelKey: 'workspace.transport', minimumHeight: 60, placement: 'strip' },
 } as const
 
 export function constrainTranscriptRatio(ratio: number, height: number): number {

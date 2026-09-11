@@ -16,6 +16,7 @@ describe('IPC result sanitization', () => {
       ok: false,
       error: {
         code: 'operation-failed',
+        reason: 'operation-failed',
         message: 'The operation could not be completed.',
       },
     })
@@ -32,6 +33,7 @@ describe('IPC result sanitization', () => {
       ok: false,
       error: {
         code: 'stale-session',
+        reason: 'stale-session',
         message: 'This project session is no longer current.',
       },
     })

@@ -101,6 +101,22 @@ describe('ExportModal', () => {
     vi.restoreAllMocks()
   })
 
+  it('retranslates retained safe errors and never renders unknown private diagnostics', async () => {
+    const installed = installApi()
+    render(<ExportModal session={session()} draft={session().draft} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    await act(async () => {
+      installed.exports[0].result.reject(new Error('/private/episode.wav: disk error'))
+    })
+    expect(screen.queryByText(/private/)).toBeNull()
+    expect(screen.getByText('The operation could not be completed.')).toBeTruthy()
+    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+    expect(screen.getByText('无法完成此操作。')).toBeTruthy()
+    expect(screen.getByText('格式')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '取消' })).toBeTruthy()
+    expect(installed.exports).toHaveLength(1)
+  })
+
   it('switches an open modal without losing its chosen format or restarting an active export', async () => {
     const installed = installApi()
     render(<ExportModal session={session()} draft={session().draft} onClose={vi.fn()} />)
@@ -258,7 +274,7 @@ describe('ExportModal', () => {
       await Promise.resolve()
     })
 
-    expect(screen.getByText('Cancellation could not be completed.')).toBeTruthy()
+    expect(screen.getByText('The operation could not be completed.')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Export' }) as HTMLButtonElement).disabled).toBe(
       true,
     )

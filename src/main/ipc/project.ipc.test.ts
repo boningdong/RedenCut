@@ -138,7 +138,11 @@ describe('project IPC', () => {
       ),
     ).resolves.toEqual({
       ok: false,
-      error: { code: 'invalid-request', message: 'The request was invalid.' },
+      error: {
+        code: 'invalid-request',
+        reason: 'invalid-request',
+        message: 'The request was invalid.',
+      },
     })
   })
 

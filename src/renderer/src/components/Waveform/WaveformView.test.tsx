@@ -170,7 +170,7 @@ describe('WaveformView managed providers', () => {
     useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['unit']))
     render(
       <>
-        <TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />
+        <TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />
         <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />
       </>,
     )

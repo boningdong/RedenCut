@@ -7,6 +7,7 @@ describe('preload IPC result unwrapping', () => {
       ok: false as const,
       error: {
         code: 'operation-failed' as const,
+        reason: 'operation-failed' as const,
         message: 'The operation could not be completed.',
       },
     }

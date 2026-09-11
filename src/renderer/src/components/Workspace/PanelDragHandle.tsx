@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n/useTranslation'
 import { Icon } from '../ui/Icon'
 import type { PointerEventHandler } from 'react'
 
@@ -8,11 +9,12 @@ export function PanelDragHandle({
   label: string
   onPointerDown: PointerEventHandler<HTMLButtonElement>
 }) {
+  const { t } = useTranslation()
   return (
     <button
       className="workspace-handle"
-      aria-label={`Drag ${label} panel`}
-      title={`Drag ${label} panel`}
+      aria-label={t('workspace.drag', { label })}
+      title={t('workspace.drag', { label })}
       onPointerDown={onPointerDown}
     >
       <Icon name="grip" />

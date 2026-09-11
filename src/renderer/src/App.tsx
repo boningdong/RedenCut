@@ -1,3 +1,6 @@
+import type { PublicMessage } from '@shared/publicMessages'
+import type { ImportProgress } from '@shared/import.types'
+import { normalizePublicError, publicMessage, progressMessage } from './i18n/messages'
 import { useTranslation } from './i18n/useTranslation'
 import { LanguageSelector } from './components/LanguageSelector'
 import { LocaleNotice } from './components/LocaleNotice'
@@ -40,7 +43,7 @@ interface ImportState {
   workspaceToken: WorkspaceToken
   revision: number
   displayName: string
-  stage: string
+  stage: ImportProgress['stage']
   percent: number
 }
 
@@ -93,7 +96,7 @@ export default function App() {
     new Map(),
   )
   const [importState, setImportState] = useState<ImportState | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<PublicMessage | null>(null)
   const [showExport, setShowExport] = useState(false)
   const playerRef = useRef<IAudioPlayer | null>(null)
   const playerSubscriptions = useRef<(() => void)[]>([])
@@ -148,7 +151,7 @@ export default function App() {
               player.onPlayStateChange(usePlaybackStore.getState().setPlaying),
               player.onDurationChange(usePlaybackStore.getState().setDuration),
               player.onEnded(() => usePlaybackStore.getState().setPlaying(false)),
-              player.onError((playbackError) => setError(playbackError.message)),
+              player.onError((playbackError) => setError(normalizePublicError(playbackError))),
               attachRedactionPreview(player),
             ],
           }
@@ -201,7 +204,7 @@ export default function App() {
   const invalidateTranscriptJob = useCallback(() => {
     transcriptJob.current = null
     useTranscriptStore.getState().setIsGenerating(false)
-    useTranscriptStore.getState().setGeneratingStatus('')
+    useTranscriptStore.getState().setGeneratingStatus(null)
   }, [])
 
   const invalidateImportJob = useCallback(() => {
@@ -252,7 +255,7 @@ export default function App() {
       .initialize()
       .then(loadSession)
       .catch((reason: unknown) => {
-        setError((reason as Error).message)
+        setError(normalizePublicError(reason))
       })
     return () => {
       const invalidation = loadCoordinator.current?.invalidate() ?? Promise.resolve()
@@ -290,7 +293,9 @@ export default function App() {
           transcriptJobMatches(transcriptJob.current, progress) &&
           sessionMatchesTranscriptJob(current, progress)
         )
-          useTranscriptStore.getState().setGeneratingStatus(progress.stage.replace(/-/g, ' '))
+          useTranscriptStore
+            .getState()
+            .setGeneratingStatus({ stage: progress.stage, percent: progress.percent })
       }),
     [],
   )
@@ -394,7 +399,7 @@ export default function App() {
           usePlaybackStore.getState().reset()
           await window.electronAPI.project.acknowledgeSwitch(event)
         } catch (reason) {
-          setError((reason as Error).message)
+          setError(normalizePublicError(reason))
         }
       }),
     [destroyPlayer, invalidateImportJob, invalidateTranscriptJob],
@@ -420,7 +425,7 @@ export default function App() {
           await applyOpenResult(result, captured.ledger)
           operation.resolve()
         } catch (reason) {
-          setError((reason as Error).message)
+          setError(normalizePublicError(reason))
           operation.reject(reason)
         } finally {
           activeOpenRequests.current -= 1
@@ -494,7 +499,7 @@ export default function App() {
         setError(null)
       } catch (reason) {
         if (sameSession(useEditorStore.getState().session, currentSession))
-          setError((reason as Error).message)
+          setError(normalizePublicError(reason))
       }
     },
     [acknowledgeSave, invalidateImportJobForSession, invalidateTranscriptJobForSession, snapshot],
@@ -571,7 +576,7 @@ export default function App() {
           importJobMatches(importJob.current, identity) &&
           sameSession(useEditorStore.getState().session, identity)
         )
-          setError((reason as Error).message)
+          setError(normalizePublicError(reason))
       } finally {
         const identity = {
           jobId: id,
@@ -617,7 +622,7 @@ export default function App() {
       }
       transcriptJob.current = job
       useTranscriptStore.getState().setIsGenerating(true)
-      useTranscriptStore.getState().setGeneratingStatus('')
+      useTranscriptStore.getState().setGeneratingStatus(null)
       setError(null)
       try {
         const draft = snapshotDraft()
@@ -631,7 +636,7 @@ export default function App() {
         )
         if (existingAnalysis?.speakerLabelOverrides.length && !confirmSpeakerLabelReset) return
         const unavailable = await window.electronAPI.speechAnalysis.checkAvailability()
-        if (unavailable) throw new Error(unavailable)
+        if (unavailable) throw unavailable
         const generated = await window.electronAPI.speechAnalysis.start({
           workspaceToken: currentSession.workspaceToken,
           revision: currentSession.revision,
@@ -663,12 +668,12 @@ export default function App() {
           transcriptJobMatches(transcriptJob.current, job) &&
           sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
         )
-          setError((reason as Error).message)
+          setError(normalizePublicError(reason))
       } finally {
         if (transcriptJobMatches(transcriptJob.current, job)) {
           transcriptJob.current = null
           useTranscriptStore.getState().setIsGenerating(false)
-          useTranscriptStore.getState().setGeneratingStatus('')
+          useTranscriptStore.getState().setGeneratingStatus(null)
         }
       }
     },
@@ -698,25 +703,34 @@ export default function App() {
     >
       <header className="project-header">
         <div className="project-identity">
-          <span className="project-name" title={session?.workspace.displayName}>
-            {session?.workspace.displayName ?? 'Untitled project'}
+          <span
+            className="project-name"
+            title={
+              session?.workspace.kind === 'saved'
+                ? session.workspace.displayName
+                : t('app.untitled')
+            }
+          >
+            {session?.workspace.kind === 'saved'
+              ? session.workspace.displayName
+              : t('app.untitled')}
           </span>
         </div>
         <div className="project-actions">
           <LanguageSelector />
           <span className="project-save-state">
             <i data-dirty={isDirty} />
-            {isDirty ? 'Unsaved changes' : 'All changes saved'}
+            {isDirty ? t('app.unsaved') : t('app.saved')}
           </span>
           <Button
             size="sm"
             variant="ghost"
             disabled={Boolean(importState)}
             onClick={() =>
-              void openProject().catch((reason: unknown) => setError((reason as Error).message))
+              void openProject().catch((reason: unknown) => setError(normalizePublicError(reason)))
             }
           >
-            Open Project
+            {t('app.openProject')}
           </Button>
           <Button
             size="sm"
@@ -724,7 +738,7 @@ export default function App() {
             disabled={Boolean(importState)}
             onClick={() => void save(false)}
           >
-            Save
+            {t('common.save')}
           </Button>
           <Button
             size="sm"
@@ -732,7 +746,7 @@ export default function App() {
             disabled={Boolean(importState)}
             onClick={() => void save(true)}
           >
-            Save As
+            {t('app.saveAs')}
           </Button>
           <Button
             size="sm"
@@ -755,7 +769,7 @@ export default function App() {
             borderBottom: '1px solid var(--color-border)',
           }}
         >
-          {error}
+          {publicMessage(t, error)}
         </div>
       )}
       {importState && (
@@ -769,11 +783,20 @@ export default function App() {
           }}
         >
           <span style={{ flex: 1 }}>
-            Importing {importState.displayName}: {importState.stage} (
-            {Math.round(importState.percent * 100)}%)
+            {t('app.importing', {
+              name: importState.displayName,
+              stage: progressMessage(t, importState),
+              percent: Math.round(importState.percent * 100),
+            })}
           </span>
-          <Button size="sm" variant="ghost" onClick={() => void cancelImport()}>
-            Cancel
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              void cancelImport().catch((reason: unknown) => setError(normalizePublicError(reason)))
+            }
+          >
+            {t('common.cancel')}
           </Button>
         </div>
       )}
@@ -792,7 +815,11 @@ export default function App() {
             }
             duration={projectDuration}
             providersBySource={waveforms}
-            onAddTrack={() => void importAudio('copy')}
+            onAddTrack={() =>
+              void importAudio('copy').catch((reason: unknown) =>
+                setError(normalizePublicError(reason)),
+              )
+            }
             isImporting={Boolean(importState)}
           />
         )}
@@ -842,14 +869,9 @@ function importJobMatches(
   )
 }
 
-function openResultMessage(result: OpenProjectResult): string | null {
+function openResultMessage(result: OpenProjectResult): PublicMessage | null {
   if (result.outcome === 'switched' || result.reason === 'cancelled') return null
-  return {
-    'save-failed': 'The current project could not be saved.',
-    'candidate-invalid': 'The selected project could not be opened.',
-    'job-settlement-failed': 'Background work could not be stopped safely.',
-    'switch-unacknowledged': 'Playback could not be stopped safely.',
-  }[result.reason]
+  return { reason: result.reason }
 }
 
 function sameSession(left: SessionPrecondition | null, right: SessionPrecondition): boolean {

@@ -1,3 +1,5 @@
+import { TranscriberUnavailableError } from './TranscriberUnavailableError'
+import type { PublicMessage, TranscriptionProgress } from '../../shared/publicMessages'
 // ─────────────────────────────────────────────────────────────────────────────
 // WhisperTranscriber
 //
@@ -196,30 +198,9 @@ export class WhisperTranscriber implements ITranscriber {
     return (await this.unavailableReason()) === null
   }
 
-  async unavailableReason(): Promise<string | null> {
-    const binary = getWhisperPath()
-    if (!binary) {
-      return (
-        'whisper-cli not found.\n' +
-        'Install with: brew install whisper-cpp\n' +
-        'Then restart the app.'
-      )
-    }
-    const model = findModel()
-    if (!model) {
-      return (
-        'No Whisper model found.\n\n' +
-        'Run this in Terminal to download the base model (~142 MB):\n\n' +
-        '  mkdir -p ~/.cache/whisper\n' +
-        '  curl -L -o ~/.cache/whisper/ggml-base.bin \\\n' +
-        '    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin\n\n' +
-        'Other model sizes (larger = more accurate, slower):\n' +
-        '  tiny (~75 MB)  base (~142 MB)  small (~466 MB)  medium (~1.5 GB)  large-v3 (~2.9 GB)\n\n' +
-        'Browse all models: https://huggingface.co/ggerganov/whisper.cpp/tree/main\n' +
-        '(Replace "ggml-base.bin" in the curl command with any model filename from that page.)\n\n' +
-        'Then restart the app.'
-      )
-    }
+  async unavailableReason(): Promise<PublicMessage | null> {
+    if (!getWhisperPath()) return { reason: 'whisper-missing' }
+    if (!findModel()) return { reason: 'whisper-model-missing' }
     return null
   }
 
@@ -227,14 +208,14 @@ export class WhisperTranscriber implements ITranscriber {
     audioFilePath: string,
     options: TranscribeOptions = {},
     signal: AbortSignal,
-    onProgress?: (status: string) => void,
+    onProgress?: (status: TranscriptionProgress) => void,
   ): Promise<TranscriptionResult> {
     throwIfAborted(signal)
     const binary = getWhisperPath()
-    if (!binary) throw new Error((await this.unavailableReason()) ?? 'whisper-cli not found')
+    if (!binary) throw new TranscriberUnavailableError('whisper-missing')
 
     const model = options.model && existsSync(options.model) ? options.model : findModel()
-    if (!model) throw new Error((await this.unavailableReason()) ?? 'No Whisper model found')
+    if (!model) throw new TranscriberUnavailableError('whisper-model-missing')
 
     // Write output to a temp directory so we don't litter the audio folder
     const tmpDir = await mkdtemp(join(tmpdir(), 'podcut-whisper-'))
@@ -244,7 +225,7 @@ export class WhisperTranscriber implements ITranscriber {
     let operationError: unknown
     try {
       throwIfAborted(signal)
-      onProgress?.('Detecting silence…')
+      onProgress?.({ stage: 'detecting-silence' })
 
       // Detect leading silence so whisper's timestamps are correctly anchored.
       // whisper always starts its first timestamp at 0 (the chunk window start),
@@ -253,7 +234,7 @@ export class WhisperTranscriber implements ITranscriber {
       const leadingSilenceMs = await detectLeadingSilence(audioFilePath, signal)
 
       throwIfAborted(signal)
-      onProgress?.('Starting transcription…')
+      onProgress?.({ stage: 'starting-transcription' })
 
       const args = [
         '-m',
@@ -291,7 +272,7 @@ export class WhisperTranscriber implements ITranscriber {
         const pct = parseInt(match[1], 10)
         if (pct !== lastPct) {
           lastPct = pct
-          onProgress?.(`Transcribing… ${pct}%`)
+          onProgress?.({ stage: 'transcribing', percent: pct })
         }
       })
       await waitForProcess(proc, signal, {
@@ -300,7 +281,7 @@ export class WhisperTranscriber implements ITranscriber {
       })
 
       throwIfAborted(signal)
-      onProgress?.('Parsing transcript…')
+      onProgress?.({ stage: 'parsing-transcript' })
 
       const jsonPath = `${outputPrefix}.json`
       const raw = await readFile(jsonPath, 'utf-8')

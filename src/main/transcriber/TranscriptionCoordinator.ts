@@ -1,3 +1,4 @@
+import type { TranscriptionProgress } from '../../shared/publicMessages'
 import type {
   SessionJobResult,
   TranscriptProgressEvent,
@@ -12,7 +13,7 @@ interface TranscriptionEngine {
     audioFilePath: string,
     options: { language?: string },
     signal: AbortSignal,
-    onProgress?: (status: string) => void,
+    onProgress?: (status: TranscriptionProgress) => void,
   ): Promise<Transcript>
 }
 

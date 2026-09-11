@@ -40,7 +40,7 @@ describe('createTranslator', () => {
 
     expect(english.t('common.trackCount', { count: 1 })).toBe('1 track')
     expect(english.t('common.trackCount', { count: 2 })).toBe('2 tracks')
-    expect(simplifiedChinese.t('common.trackCount', { count: 2 })).toBe('2 个音轨')
+    expect(simplifiedChinese.t('common.trackCount', { count: 2 })).toBe('2 个轨道')
   })
 
   it('falls back to English when an isolated Chinese test bundle is incomplete', () => {

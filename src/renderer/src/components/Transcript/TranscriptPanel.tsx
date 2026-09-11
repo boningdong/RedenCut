@@ -1,3 +1,6 @@
+import { useTranslation } from '../../i18n/useTranslation'
+import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
+import { progressMessage } from '../../i18n/messages'
 // ─────────────────────────────────────────────────────────────────────────────
 // TranscriptPanel
 //
@@ -40,7 +43,7 @@ export interface TranscriptPanelProps {
   /** True while transcription is running. */
   isGenerating: boolean
   /** Status message during generation. */
-  generatingStatus: string
+  generatingStatus: SpeechProgress | TranscriptionProgress | null
 }
 
 export function TranscriptPanel(props: TranscriptPanelProps) {
@@ -58,6 +61,7 @@ function LegacyTranscriptPanel({
   isGenerating,
   generatingStatus,
 }: TranscriptPanelProps) {
+  const { t } = useTranslation()
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const duration = usePlaybackStore((s) => s.duration)
 
@@ -301,8 +305,8 @@ function LegacyTranscriptPanel({
     >
       <div className="feature-toolbar legacy-transcript-toolbar">
         {workspaceControls}
-        <span className="feature-title">Transcript</span>
-        <span className="panel-count">{tracks.length} tracks</span>
+        <span className="feature-title">{t('transcript.title')}</span>
+        <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
         <div className="toolbar-spacer" />
         {hasAnyWords && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -316,9 +320,9 @@ function LegacyTranscriptPanel({
                 cursor: 'pointer',
                 padding: '2px 4px',
               }}
-              title="Shift all word timestamps so the first word aligns with the current playhead position"
+              title={t('transcript.syncHint')}
             >
-              Sync to playhead
+              {t('transcript.sync')}
             </button>
             <span style={{ color: 'var(--color-border)', userSelect: 'none' }}>·</span>
             <button
@@ -331,9 +335,13 @@ function LegacyTranscriptPanel({
                 cursor: 'pointer',
                 padding: '2px 4px',
               }}
-              title={showMutedWords ? 'Hide redacted words' : 'Show redacted words'}
+              title={
+                showMutedWords
+                  ? t('transcript.hideRedactedWords')
+                  : t('transcript.showRedactedWords')
+              }
             >
-              {showMutedWords ? 'Hide redacted' : 'Show redacted'}
+              {showMutedWords ? t('transcript.hideRedacted') : t('transcript.showRedacted')}
             </button>
           </div>
         )}
@@ -351,7 +359,9 @@ function LegacyTranscriptPanel({
             >
               {tracksWithTranscript.length > 0 && (
                 <>
-                  <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>View:</span>
+                  <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>
+                    {t('transcript.view')}
+                  </span>
                   {tracksWithTranscript.map((track) => {
                     const isOn = visibleSet.has(track.id)
                     return (
@@ -403,7 +413,7 @@ function LegacyTranscriptPanel({
                 onClick={() => !allGenerated && setDropdownOpen((o) => !o)}
                 aria-expanded={dropdownOpen}
               >
-                Generate ▾
+                {t('transcript.generateMenu')}
               </button>
 
               {dropdownOpen && !allGenerated && (
@@ -488,7 +498,9 @@ function LegacyTranscriptPanel({
                       }
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                     >
-                      {tracksWithTranscript.length === 0 ? 'All tracks' : 'All remaining'}
+                      {tracksWithTranscript.length === 0
+                        ? t('transcript.allTracks')
+                        : t('transcript.allRemaining')}
                     </button>
                   </div>
                 </>
@@ -512,7 +524,7 @@ function LegacyTranscriptPanel({
           contentEditable
           suppressContentEditableWarning
           role="region"
-          aria-label="Transcript"
+          aria-label={t('transcript.title')}
           onBeforeInput={(e) => e.preventDefault()}
           onKeyDown={handleKeyDown}
           style={{
@@ -592,6 +604,7 @@ function LegacyTranscriptPanel({
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function EmptyTranscriptState({ noTracks = false }: { noTracks?: boolean }) {
+  const { t } = useTranslation()
   return (
     <div
       style={{
@@ -621,21 +634,17 @@ function EmptyTranscriptState({ noTracks = false }: { noTracks?: boolean }) {
         <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-        No transcript yet
+        {t('transcript.empty')}
       </p>
       <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 180 }}>
-        {noTracks ? 'Add a track to get started' : 'Use Generate above to transcribe a track'}
+        {noTracks ? t('transcript.addTrackHint') : t('transcript.generateHint')}
       </p>
     </div>
   )
 }
 
-function formatElapsed(s: number): string {
-  if (s < 60) return `${s}s`
-  return `${Math.floor(s / 60)}m ${s % 60}s`
-}
-
-function GeneratingState({ status }: { status: string }) {
+function GeneratingState({ status }: { status: SpeechProgress | TranscriptionProgress | null }) {
+  const { t } = useTranslation()
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
@@ -644,9 +653,8 @@ function GeneratingState({ status }: { status: string }) {
     return () => clearInterval(id)
   }, [])
 
-  // Extract percentage from status string to render a progress bar
-  const pctMatch = status.match(/(\d+)%/)
-  const pct = pctMatch ? parseInt(pctMatch[1], 10) : null
+  // Read progress independently of translated stage text.
+  const pct = status?.percent ?? null
 
   return (
     <div
@@ -663,7 +671,7 @@ function GeneratingState({ status }: { status: string }) {
     >
       <SpinnerIcon />
       <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-        Generating transcript…
+        {t('transcript.generating')}
       </p>
 
       {/* Progress bar — shown once whisper starts reporting percentages */}
@@ -699,9 +707,9 @@ function GeneratingState({ status }: { status: string }) {
         </div>
       )}
 
-      {status && !pctMatch && (
+      {status && pct === null && (
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 200 }}>
-          {status}
+          {progressMessage(t, status)}
         </p>
       )}
 
@@ -713,7 +721,15 @@ function GeneratingState({ status }: { status: string }) {
             fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {formatElapsed(elapsed)} elapsed
+          {t('transcript.elapsed', {
+            time:
+              elapsed < 60
+                ? t('transcript.seconds', { seconds: elapsed })
+                : t('transcript.minutesSeconds', {
+                    minutes: Math.floor(elapsed / 60),
+                    seconds: elapsed % 60,
+                  }),
+          })}
         </p>
       )}
     </div>

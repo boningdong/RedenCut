@@ -48,10 +48,9 @@ export function registerSpeechAnalysisIpc(
     toIpcResult(async () => {
       const whisperReason = await whisperTranscriber.unavailableReason()
       if (whisperReason) return whisperReason
-      if (!existsSync(python))
-        return 'Speech worker is not installed. Run: npm run speech:native:setup'
+      if (!existsSync(python)) return { reason: 'speech-worker-missing' as const }
       if (!existsSync(manifest) || !existsSync(modelCache))
-        return 'Speech models are not provisioned. See docs/speech-models-and-dependencies.md.'
+        return { reason: 'speech-models-missing' as const }
       return null
     }, diagnosticSink),
   )

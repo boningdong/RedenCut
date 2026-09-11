@@ -182,7 +182,7 @@ describe('EditorWorkspace', () => {
     setup()
     act(() =>
       useWorkspaceStore.setState({
-        error: 'Workspace layout could not be loaded.',
+        error: { reason: 'workspace-load' },
         errorKind: 'load',
       }),
     )
@@ -228,8 +228,10 @@ describe('EditorWorkspace', () => {
     expect(Number(divider.getAttribute('aria-valuenow'))).toBe(43)
     fireEvent.click(screen.getByRole('button', { name: 'Reset layout' }))
     expect(useWorkspaceStore.getState().layout).toEqual(DEFAULT_WORKSPACE_LAYOUT)
-    act(() => useWorkspaceStore.setState({ error: 'Could not save layout', errorKind: 'save' }))
-    expect(screen.getByRole('status').textContent).toBe('Could not save layout')
+    act(() =>
+      useWorkspaceStore.setState({ error: { reason: 'workspace-save' }, errorKind: 'save' }),
+    )
+    expect(screen.getByRole('status').textContent).toBe('Workspace layout could not be saved.')
     fireEvent.click(screen.getByRole('button', { name: 'Retry layout save' }))
     expect(useWorkspaceStore.getState().retrySave).toHaveBeenCalledTimes(1)
   })

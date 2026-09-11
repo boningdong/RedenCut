@@ -46,7 +46,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 it('strikes clip redactions even at the playhead, but never treats ordinary track mute as redaction', () => {
-  render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+  render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
   expect(screen.getByText('Hello').style.textDecoration).toBe('line-through')
   act(() =>
     useTimelineStore.setState({
@@ -58,7 +58,7 @@ it('strikes clip redactions even at the playhead, but never treats ordinary trac
   expect(screen.getByText('Hello').style.textDecoration).not.toBe('line-through')
 })
 it('uses shared redaction-aware playback for Space on legacy text', () => {
-  render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+  render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
   fireEvent.keyDown(screen.getByRole('region', { name: 'Transcript' }), { key: ' ', code: 'Space' })
   expect(togglePlayback).toHaveBeenCalledOnce()
 })

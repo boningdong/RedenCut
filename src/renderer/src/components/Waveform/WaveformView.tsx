@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n/useTranslation'
 // ─────────────────────────────────────────────────────────────────────────────
 // WaveformView — multi-track
 //
@@ -62,6 +63,7 @@ export function WaveformView({
   onAddTrack,
   isImporting = false,
 }: WaveformViewProps) {
+  const { t } = useTranslation()
   const tracks = useTimelineStore((s) => s.tracks)
   const removeTrack = useTimelineStore((s) => s.removeTrack)
   const moveClip = useTimelineStore((s) => s.moveClip)
@@ -84,7 +86,7 @@ export function WaveformView({
   const hasTranscriptSelection = useTranscriptStore(
     (state) => state.selectedTranscriptUnitIds.size > 0,
   )
-  const transcriptEditHint = 'Edit selected text in the transcript to preserve acoustic boundaries'
+  const transcriptEditHint = t('waveform.transcriptHint')
   const audioPanel = useRef<HTMLDivElement>(null)
   const focusTimeline = useCallback(() => {
     window.getSelection()?.removeAllRanges()
@@ -291,20 +293,20 @@ export function WaveformView({
     <div className="audio-panel-view" ref={audioPanel} tabIndex={-1}>
       <div className="feature-toolbar">
         {workspaceControls}
-        <span className="feature-title">Audio</span>
-        <span className="panel-count">{tracks.length} tracks</span>
+        <span className="feature-title">{t('waveform.audio')}</span>
+        <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
         <span className="transport-separator" />
         <button
-          aria-label="Split at playhead"
-          title={hasTranscriptSelection ? transcriptEditHint : 'Split at playhead (S)'}
+          aria-label={t('waveform.split')}
+          title={hasTranscriptSelection ? transcriptEditHint : t('waveform.splitHint')}
           disabled={hasTranscriptSelection || !canSplit}
           onClick={splitAtPlayhead}
         >
           <Icon name="split" />
         </button>
         <button
-          aria-label="Redact selection"
-          title={hasTranscriptSelection ? transcriptEditHint : 'Redact selection (M)'}
+          aria-label={t('waveform.redact')}
+          title={hasTranscriptSelection ? transcriptEditHint : t('waveform.redactHint')}
           disabled={hasTranscriptSelection || !selection}
           onMouseDown={(event) => event.preventDefault()}
           onClick={muteSelection}
@@ -312,8 +314,8 @@ export function WaveformView({
           <Icon name="mute" />
         </button>
         <button
-          aria-label="Delete selection"
-          title={hasTranscriptSelection ? transcriptEditHint : 'Delete selection (Delete)'}
+          aria-label={t('waveform.delete')}
+          title={hasTranscriptSelection ? transcriptEditHint : t('waveform.deleteHint')}
           disabled={hasTranscriptSelection || (!selectedClipId && !selection)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={deleteSelection}
@@ -321,11 +323,15 @@ export function WaveformView({
           <Icon name="trash" />
         </button>
         <div className="toolbar-spacer" />
-        <button onClick={handleZoomOut} disabled={zoomLevel <= MIN_ZOOM} title="Zoom out">
+        <button
+          onClick={handleZoomOut}
+          disabled={zoomLevel <= MIN_ZOOM}
+          title={t('waveform.zoomOut')}
+        >
           −
         </button>
         <span className="zoom-level">{Math.round(zoomLevel * 100)}%</span>
-        <button onClick={handleZoomIn} disabled={zoomLevel >= 32} title="Zoom in">
+        <button onClick={handleZoomIn} disabled={zoomLevel >= 32} title={t('waveform.zoomIn')}>
           +
         </button>
       </div>
@@ -342,7 +348,7 @@ export function WaveformView({
             }}
           >
             <div className="ruler-caption" style={{ height: RULER_HEIGHT }}>
-              Track / volume
+              {t('waveform.volume')}
             </div>
 
             {/* Track headers */}
@@ -577,12 +583,12 @@ export function WaveformView({
           </div>
         </div>
         <button className="audio-add-track" disabled={isImporting} onClick={onAddTrack}>
-          + Add Track
+          {t('waveform.addTrack')}
         </button>
       </div>
       <div className="audio-footer">
-        <span>{selectedClipId ? 'Clip selected' : 'No clip selected'}</span>
-        <span className="audio-footer-hint">Drag clips to move · S Split · M Redact</span>
+        <span>{selectedClipId ? t('waveform.clipSelected') : t('waveform.noClipSelected')}</span>
+        <span className="audio-footer-hint">{t('waveform.editHint')}</span>
         {audioDetails}
       </div>
     </div>

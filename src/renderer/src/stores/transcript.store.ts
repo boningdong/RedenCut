@@ -1,3 +1,4 @@
+import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
 // ─────────────────────────────────────────────────────────────────────────────
 // Transcript Store (Zustand)
 //
@@ -53,8 +54,8 @@ interface TranscriptState {
   /** True while a transcription job is running. */
   isGenerating: boolean
 
-  /** Status string pushed from the main process during transcription. */
-  generatingStatus: string
+  /** Structured stage pushed from main; translated only at presentation time. */
+  generatingStatus: SpeechProgress | TranscriptionProgress | null
 
   // ── Actions ────────────────────────────────────────────────────────────────
   setWords: (words: Word[]) => void
@@ -74,7 +75,7 @@ interface TranscriptState {
   toggleShowMutedWords: () => void
 
   setIsGenerating: (generating: boolean) => void
-  setGeneratingStatus: (status: string) => void
+  setGeneratingStatus: (status: SpeechProgress | TranscriptionProgress | null) => void
 
   /**
    * Shifts every word's start and end timestamps by `offsetSeconds`.
@@ -103,7 +104,7 @@ const initialState = {
   showMutedWords: true,
   visibleTrackIds: [] as string[],
   isGenerating: false,
-  generatingStatus: '',
+  generatingStatus: null,
 }
 
 export const useTranscriptStore = create<TranscriptState>()((set) => ({

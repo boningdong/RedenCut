@@ -1,3 +1,4 @@
+import { TranscriberUnavailableError } from '../transcriber/TranscriberUnavailableError'
 import type { IpcError, IpcResult } from '../../shared/ipc.types'
 import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
 import { ZodError } from 'zod'
@@ -33,20 +34,34 @@ export async function toIpcResult<T>(
 }
 
 function mapError(error: unknown): IpcError {
+  if (error instanceof TranscriberUnavailableError)
+    return { code: 'operation-failed', reason: error.reason, message: error.message }
   if (error instanceof SpeechAnalysisError)
-    return { code: 'operation-failed', message: error.message }
+    return { code: 'operation-failed', reason: `speech-${error.stage}`, message: error.message }
   if (error instanceof PublicIpcError)
-    return { code: error.code, message: SAFE_MESSAGES[error.code] }
+    return { code: error.code, reason: error.code, message: SAFE_MESSAGES[error.code] }
   if (error instanceof DOMException && error.name === 'AbortError')
-    return { code: 'cancelled', message: SAFE_MESSAGES.cancelled }
+    return { code: 'cancelled', reason: 'cancelled', message: SAFE_MESSAGES.cancelled }
   if (error instanceof ZodError)
-    return { code: 'invalid-request', message: SAFE_MESSAGES['invalid-request'] }
+    return {
+      code: 'invalid-request',
+      reason: 'invalid-request',
+      message: SAFE_MESSAGES['invalid-request'],
+    }
   if (
     error instanceof Error &&
     (error.message === 'Stale workspace token' || error.message === 'Stale workspace revision')
   )
-    return { code: 'stale-session', message: SAFE_MESSAGES['stale-session'] }
-  return { code: 'operation-failed', message: SAFE_MESSAGES['operation-failed'] }
+    return {
+      code: 'stale-session',
+      reason: 'stale-session',
+      message: SAFE_MESSAGES['stale-session'],
+    }
+  return {
+    code: 'operation-failed',
+    reason: 'operation-failed',
+    message: SAFE_MESSAGES['operation-failed'],
+  }
 }
 
 export function requireSessionPrecondition(value: unknown): SessionPrecondition {

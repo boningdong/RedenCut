@@ -1,3 +1,5 @@
+import { useTranslation } from '../../i18n/useTranslation'
+import { publicMessage } from '../../i18n/messages'
 import {
   useEffect,
   useLayoutEffect,
@@ -55,6 +57,7 @@ export function EditorWorkspace({
   audio: ReactNode | ((controls: ReactNode) => ReactNode)
   transport: ReactNode | ((controls: ReactNode) => ReactNode)
 }) {
+  const { t } = useTranslation()
   const { layout, warning, error, errorKind, hydrate, updateLayout, retrySave, resetLayout } =
     useWorkspaceStore()
   const root = useRef<HTMLDivElement>(null)
@@ -215,8 +218,8 @@ export function EditorWorkspace({
           id === 'transport' ? (
             <button
               className="workspace-command workspace-reset"
-              aria-label="Reset layout"
-              title="Reset layout"
+              aria-label={t('workspace.reset')}
+              title={t('workspace.reset')}
               onClick={() => {
                 restore.current = captureEditingSurface(root.current)
                 resetLayout()
@@ -262,7 +265,7 @@ export function EditorWorkspace({
   return (
     <main
       className="editor-workspace"
-      aria-label="Editor workspace"
+      aria-label={t('workspace.editor')}
       style={{ '--workspace-panel-gap': `${PANEL_GAP}px` } as CSSProperties}
     >
       {(error || warning) && (
@@ -274,10 +277,10 @@ export function EditorWorkspace({
           }}
           onMouseDown={(event) => event.preventDefault()}
         >
-          <span role="status">{error ?? warning}</span>
+          <span role="status">{publicMessage(t, (error ?? warning)!)}</span>
           {error && errorKind === 'save' && (
             <button className="workspace-command" onClick={() => void retrySave()}>
-              Retry layout save
+              {t('workspace.retrySave')}
             </button>
           )}
         </div>

@@ -1,3 +1,4 @@
+import type { PublicMessage } from '@shared/publicMessages'
 // @vitest-environment jsdom
 
 import React from 'react'
@@ -100,13 +101,13 @@ vi.mock('./components/Transcript/TranscriptPanel', () => ({
     workspaceControls?: React.ReactNode
     onGenerate: (trackId: string) => void
     isGenerating: boolean
-    generatingStatus: string
+    generatingStatus: { stage: string } | null
   }) => (
     <div>
       {workspaceControls}
       <button onClick={() => onGenerate('track-1')}>Generate transcript</button>
       <span data-testid="generation-state">
-        {String(isGenerating)}:{generatingStatus}
+        {String(isGenerating)}:{generatingStatus?.stage}
       </span>
     </div>
   ),
@@ -252,12 +253,12 @@ function installApi(initial: RendererSession) {
       cancelImport: vi.fn(async () => 'not-found' as const),
     },
     transcript: {
-      checkAvailability: vi.fn(async () => null),
+      checkAvailability: vi.fn(async (): Promise<PublicMessage | null> => null),
       generate: vi.fn(),
       cancel: vi.fn(async () => 'not-found' as const),
     },
     speechAnalysis: {
-      checkAvailability: vi.fn(async () => null),
+      checkAvailability: vi.fn(async (): Promise<PublicMessage | null> => null),
       start: vi.fn((request) => {
         const pending = deferred<SessionJobResult<RendererSession, SpeechAnalysisJobId>>()
         requests.push({ request, deferred: pending })
@@ -377,6 +378,23 @@ describe('App transcription job identity', () => {
     expect(mocks.players[0].pause).not.toHaveBeenCalled()
   })
 
+  it('retranslates a retained actionable availability error without changing the session or player', async () => {
+    const { api, requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+    vi.mocked(api.speechAnalysis.checkAvailability).mockResolvedValue({ reason: 'whisper-missing' })
+    const player = getAudioPlayerInstance()
+    const before = useEditorStore.getState().session
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain('whisper-cli not found'),
+    )
+    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+    expect(screen.getByRole('alert').textContent).toContain('找不到 whisper-cli')
+    expect(screen.getByRole('alert').textContent).toContain('brew install whisper-cpp')
+    expect(getAudioPlayerInstance()).toBe(player)
+    expect(useEditorStore.getState().session).toBe(before)
+    expect(requests).toHaveLength(0)
+  })
+
   it('keeps the active player, project state and timeline history when workspace panels move', async () => {
     const { api } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
     const player = getAudioPlayerInstance()
@@ -493,7 +511,10 @@ describe('App transcription job identity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
     await waitFor(() => expect(requests).toHaveLength(1))
     act(() => progress()({ ...requests[0].request, stage: 'aligning', percent: 50 }))
-    expect(useTranscriptStore.getState().generatingStatus).toBe('aligning')
+    expect(useTranscriptStore.getState().generatingStatus).toEqual({
+      stage: 'aligning',
+      percent: 50,
+    })
     requests[0].deferred.resolve({
       jobId: requests[0].request.jobId,
       workspaceToken: requests[0].request.workspaceToken,
@@ -712,7 +733,7 @@ describe('App transcription job identity', () => {
     })
 
     expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert').textContent).toContain('audio teardown failed')
+    expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.')
   })
 
   it('invalidates an awaited session commit before destroying its prepared player and acknowledging', async () => {

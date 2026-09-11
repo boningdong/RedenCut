@@ -1,6 +1,7 @@
+import { WORKSPACE_PANELS } from '../../workspace/workspaceLayout'
+import { useTranslation } from '../../i18n/useTranslation'
 import type { ReactNode, PointerEventHandler, CSSProperties } from 'react'
 import type { WorkspacePanelId } from '../../workspace/workspaceLayout.types'
-import { WORKSPACE_PANELS } from '../../workspace/workspaceLayout'
 import { PanelDragHandle } from './PanelDragHandle'
 
 export function WorkspacePanel({
@@ -16,7 +17,8 @@ export function WorkspacePanel({
   style?: CSSProperties
   onDrag: PointerEventHandler<HTMLButtonElement>
 }) {
-  const { label } = WORKSPACE_PANELS[id]
+  const { t } = useTranslation()
+  const label = t(WORKSPACE_PANELS[id].labelKey)
   const controls = (
     <div
       className="workspace-panel-controls"
@@ -32,7 +34,7 @@ export function WorkspacePanel({
   )
   return (
     <section
-      aria-label={`${label} panel`}
+      aria-label={t('workspace.panel', { label })}
       data-workspace-panel={id}
       className={`workspace-panel workspace-panel-${id}`}
       style={style}

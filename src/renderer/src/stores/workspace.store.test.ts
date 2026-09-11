@@ -38,7 +38,10 @@ describe('workspace store', () => {
   beforeEach(() => vi.restoreAllMocks())
 
   it('hydrates once and exposes a recovery warning', async () => {
-    const get = vi.fn(async () => ({ layout: audioFirst, warning: 'Recovered preferences.' }))
+    const get = vi.fn(async () => ({
+      layout: audioFirst,
+      warning: { reason: 'workspace-recovered' as const },
+    }))
     const store = await loadStore(createApi(get, vi.fn()))
 
     await Promise.all([store.getState().hydrate(), store.getState().hydrate()])
@@ -48,7 +51,7 @@ describe('workspace store', () => {
     expect(store.getState()).toMatchObject({
       layout: audioFirst,
       hydrated: true,
-      warning: 'Recovered preferences.',
+      warning: { reason: 'workspace-recovered' as const },
       error: null,
     })
   })
@@ -64,7 +67,10 @@ describe('workspace store', () => {
 
     const hydrating = store.getState().hydrate()
     store.getState().updateLayout(audioFirst)
-    hydration.resolve({ layout: DEFAULT_WORKSPACE_LAYOUT, warning: 'Old stored warning.' })
+    hydration.resolve({
+      layout: DEFAULT_WORKSPACE_LAYOUT,
+      warning: { reason: 'workspace-invalid' },
+    })
     await hydrating
 
     expect(store.getState().layout).toEqual(audioFirst)
@@ -88,7 +94,7 @@ describe('workspace store', () => {
       warning: null,
       errorKind: 'load',
     })
-    expect(store.getState().error).toContain('read denied')
+    expect(store.getState().error).toEqual({ reason: 'workspace-load' })
   })
 
   it('serializes saves and coalesces unsent changes to the latest layout', async () => {
@@ -189,7 +195,7 @@ describe('workspace store', () => {
     await vi.waitFor(() => expect(store.getState().saving).toBe(false))
 
     expect(store.getState().layout).toEqual(latest)
-    expect(store.getState().error).toContain('disk unavailable')
+    expect(store.getState().error).toEqual({ reason: 'workspace-save' })
     expect(store.getState().errorKind).toBe('save')
     expect(set).toHaveBeenCalledTimes(1)
 

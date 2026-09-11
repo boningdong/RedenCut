@@ -1,3 +1,4 @@
+import type { PublicMessage } from '@shared/publicMessages'
 import { create } from 'zustand'
 import {
   DEFAULT_WORKSPACE_LAYOUT,
@@ -9,8 +10,8 @@ interface WorkspaceState {
   layout: WorkspaceLayout
   hydrated: boolean
   saving: boolean
-  warning: string | null
-  error: string | null
+  warning: PublicMessage | null
+  error: PublicMessage | null
   errorKind: 'load' | 'save' | null
   hydrate: () => Promise<void>
   updateLayout: (layout: WorkspaceLayout) => void
@@ -23,11 +24,6 @@ let hydrationPromise: Promise<void> | null = null
 let pendingSave: WorkspaceLayout | null = null
 let saveLoopPromise: Promise<void> | null = null
 
-function errorMessage(action: 'loaded' | 'saved', error: unknown): string {
-  const detail = error instanceof Error && error.message ? ` ${error.message}` : ''
-  return `Workspace layout could not be ${action}.${detail}`
-}
-
 function startSaveLoop(set: (state: Partial<WorkspaceState>) => void): void {
   if (saveLoopPromise) return
 
@@ -38,9 +34,9 @@ function startSaveLoop(set: (state: Partial<WorkspaceState>) => void): void {
       pendingSave = null
       try {
         await window.electronAPI.workspaceLayout.set(saving)
-      } catch (error) {
+      } catch {
         pendingSave = null
-        set({ error: errorMessage('saved', error), errorKind: 'save' })
+        set({ error: { reason: 'workspace-save' }, errorKind: 'save' })
         break
       }
     }
@@ -75,11 +71,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
         }
         set({ layout, hydrated: true, warning, error: null, errorKind: null })
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         set({
           hydrated: true,
           ...(editGeneration === generationAtStart
-            ? { error: errorMessage('loaded', error), errorKind: 'load' as const }
+            ? { error: { reason: 'workspace-load' as const }, errorKind: 'load' as const }
             : {}),
         })
       })

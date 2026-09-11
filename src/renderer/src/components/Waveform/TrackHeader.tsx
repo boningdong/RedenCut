@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n/useTranslation'
 // ─────────────────────────────────────────────────────────────────────────────
 // TrackHeader
 //
@@ -23,6 +24,7 @@ interface TrackHeaderProps {
 }
 
 export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
+  const { t } = useTranslation()
   const updateTrack = useTimelineStore((s) => s.updateTrack)
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState(track.name)
@@ -44,7 +46,7 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
         {editing ? (
           <input
             autoFocus
-            aria-label="Track name"
+            aria-label={t('waveform.trackName')}
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
             onBlur={commitName}
@@ -60,7 +62,7 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
         ) : (
           <button
             className="track-name"
-            title={`Rename ${track.name}`}
+            title={t('waveform.rename', { name: track.name })}
             onDoubleClick={() => setEditing(true)}
             onClick={() => setEditing(true)}
           >
@@ -69,8 +71,8 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
         )}
         <button
           className="track-remove"
-          title="Remove track"
-          aria-label={`Remove ${track.name}`}
+          title={t('waveform.removeTrack')}
+          aria-label={t('waveform.remove', { name: track.name })}
           onClick={() => onRemove(track.id)}
         >
           <Icon name="close" size={12} />
@@ -78,31 +80,31 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
       </div>
       <div className="track-controls">
         <button
-          aria-label={`Mute ${track.name}`}
+          aria-label={t('waveform.muteName', { name: track.name })}
           aria-pressed={track.muted}
-          title={track.muted ? 'Unmute' : 'Mute'}
+          title={track.muted ? t('waveform.unmute') : t('waveform.mute')}
           onClick={() => updateTrack(track.id, { muted: !track.muted })}
         >
           M
         </button>
         <button
-          aria-label={`Solo ${track.name}`}
+          aria-label={t('waveform.soloName', { name: track.name })}
           aria-pressed={track.solo}
-          title={track.solo ? 'Un-solo' : 'Solo'}
+          title={track.solo ? t('waveform.unsolo') : t('waveform.solo')}
           onClick={() => updateTrack(track.id, { solo: !track.solo })}
         >
           S
         </button>
         <input
           type="range"
-          aria-label={`${track.name} volume`}
+          aria-label={t('waveform.volumeName', { name: track.name })}
           min={0}
           max={1}
           step={0.01}
           value={track.volume}
           onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
           style={{ accentColor: trackPresentationColor(track.color) }}
-          title={`Volume: ${Math.round(track.volume * 100)}%`}
+          title={t('waveform.volumePercent', { percent: Math.round(track.volume * 100) })}
         />
         <span>{Math.round(track.volume * 100)}%</span>
       </div>

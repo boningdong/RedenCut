@@ -1,3 +1,4 @@
+import type { PublicMessage, TranscriptionProgress, SpeechProgress } from './publicMessages'
 import type { AppPreferencesSnapshot } from './appPreferences.types'
 import type { LocalePreference } from './i18n/locale.types'
 import type { WorkspaceLayout, WorkspaceLayoutReadResult } from './workspaceLayout.types'
@@ -31,6 +32,7 @@ export interface PendingProjectOpenEvent {
 export interface IpcError {
   code: 'stale-session' | 'cancelled' | 'invalid-request' | 'operation-failed'
   message: string
+  reason: PublicMessage['reason']
 }
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: IpcError }
@@ -82,12 +84,11 @@ export interface ImportProgressEvent extends SessionJobRequest {
 }
 
 export interface TranscriptProgressEvent extends SessionJobRequest<TranscriptionJobId> {
-  status: string
+  status: TranscriptionProgress
 }
 
 export interface SpeechAnalysisProgressEvent extends SessionJobRequest<SpeechAnalysisJobId> {
-  stage:
-    'transcribing' | 'aligning' | 'diarizing' | 'attributing-speakers' | 'validating' | 'publishing'
+  stage: SpeechProgress['stage']
   percent?: number
 }
 
@@ -123,7 +124,7 @@ export interface IElectronAPI {
     saveAs(request: ProjectMutationRequest): Promise<RendererSession | null>
   }
   transcript: {
-    checkAvailability(): Promise<string | null>
+    checkAvailability(): Promise<PublicMessage | null>
     generate(
       request: TranscriptionJobRequest,
     ): Promise<SessionJobResult<Transcript, TranscriptionJobId>>
@@ -132,7 +133,7 @@ export interface IElectronAPI {
     ): Promise<TranscriptionCancellationResult>
   }
   speechAnalysis: {
-    checkAvailability(): Promise<string | null>
+    checkAvailability(): Promise<PublicMessage | null>
     start(
       request: SpeechAnalysisJobRequest,
     ): Promise<SessionJobResult<RendererSession, SpeechAnalysisJobId>>

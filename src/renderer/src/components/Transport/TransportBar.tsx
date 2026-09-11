@@ -1,3 +1,4 @@
+import { useTranslation } from '../../i18n/useTranslation'
 // ─────────────────────────────────────────────────────────────────────────────
 // TransportBar
 //
@@ -31,6 +32,7 @@ function formatTime(seconds: number): string {
 }
 
 export function TransportBar({ workspaceControls }: { workspaceControls?: React.ReactNode }) {
+  const { t } = useTranslation()
   const canUndo = useTimelineStore((s) => s.undoStack.length > 0)
   const canRedo = useTimelineStore((s) => s.redoStack.length > 0)
   const undo = useTimelineStore((s) => s.undo)
@@ -64,8 +66,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
           variant="ghost"
           disabled={!canUndo}
           onClick={undo}
-          aria-label="Undo"
-          title="Undo (⌘Z)"
+          aria-label={t('transport.undo')}
+          title={t('transport.undoHint')}
         >
           <Icon name="undo" />
         </Button>
@@ -74,8 +76,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
           variant="ghost"
           disabled={!canRedo}
           onClick={redo}
-          aria-label="Redo"
-          title="Redo (⇧⌘Z)"
+          aria-label={t('transport.redo')}
+          title={t('transport.redoHint')}
         >
           <Icon name="redo" />
         </Button>
@@ -91,8 +93,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
           variant="ghost"
           onClick={handleSkipToStart}
           disabled={!hasAudio}
-          aria-label="Skip to start"
-          title="Skip to start"
+          aria-label={t('transport.start')}
+          title={t('transport.start')}
         >
           <SkipBackIcon />
         </Button>
@@ -115,8 +117,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
             })
           }}
           disabled={!hasAudio}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+          aria-label={isPlaying ? t('transport.pause') : t('transport.play')}
+          title={isPlaying ? t('transport.pauseHint') : t('transport.playHint')}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </Button>
@@ -127,8 +129,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
           variant="ghost"
           onClick={handleSkipToEnd}
           disabled={!hasAudio}
-          aria-label="Skip to end"
-          title="Skip to end"
+          aria-label={t('transport.end')}
+          title={t('transport.end')}
         >
           <SkipForwardIcon />
         </Button>
@@ -138,8 +140,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
         <button
           onClick={togglePreviewMode}
           aria-pressed={previewMode}
-          aria-label="Preview"
-          title="Preview edits: skip redacted sections during playback"
+          aria-label={t('transport.preview')}
+          title={t('transport.previewHint')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -165,13 +167,13 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
               transition: 'background-color 0.15s',
             }}
           />
-          Preview edits
+          {t('transport.previewEdits')}
         </button>
 
         {/* Theme toggle */}
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          title={theme === 'dark' ? t('transport.lightTheme') : t('transport.darkTheme')}
           style={{
             background: 'none',
             border: '1px solid var(--color-border)',

@@ -1,3 +1,6 @@
+import { useTranslation } from '../../i18n/useTranslation'
+import type { PublicMessage } from '@shared/publicMessages'
+import { normalizePublicError, publicMessage } from '../../i18n/messages'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { TRACK_COLORS } from '@shared/trackColors'
@@ -27,9 +30,12 @@ function SpeakerTag({
   id: SpeakerId
   isGenerating: boolean
 }) {
+  const { t } = useTranslation()
   const colors = useSpeakerColors()
   const key = speakerKey(analysis, id)
-  const label = speakerName(analysis, id) ?? 'Speaker'
+  const label =
+    speakerName(analysis, id, (number) => t('transcript.speakerNumber', { number })) ??
+    t('transcript.speaker')
   const color = colors.get(key) ?? '#aaaaaa'
   const hidden = useTranscriptStore((s) => s.hiddenSpeakerKeys.includes(key))
   const toggleVisibility = useTranscriptStore((s) => s.toggleSpeakerVisibility)
@@ -42,7 +48,7 @@ function SpeakerTag({
   const [choosing, setChoosing] = useState(false)
   const [name, setName] = useState(label)
   const [draftColor, setDraftColor] = useState(color)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<PublicMessage | null>(null)
   const [saving, setSaving] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const beforeClickHidden = useRef(hidden)
@@ -88,14 +94,14 @@ function SpeakerTag({
         !popup.current?.contains(event.target as Node)
       ) {
         setChoosing(false)
-        setError('')
+        setError(null)
       }
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
         setChoosing(false)
-        setError('')
+        setError(null)
       }
     }
     document.addEventListener('pointerdown', outside)
@@ -109,11 +115,11 @@ function SpeakerTag({
     const session = useEditorStore.getState().session
     if (!session || saving || isGenerating) return
     if (!displayName.trim() || displayName.trim().length > 80) {
-      setError('Use a name between 1 and 80 characters.')
+      setError({ reason: 'speaker-name' })
       return
     }
     if (nextColor && !/^#[0-9a-f]{6}$/i.test(nextColor)) {
-      setError('Enter a six-digit hex color, such as #dc8b9c.')
+      setError({ reason: 'speaker-color' })
       return
     }
     if (
@@ -122,7 +128,7 @@ function SpeakerTag({
         ([other, used]) => other !== key && used.toLowerCase() === nextColor.toLowerCase(),
       )
     ) {
-      setError('That color is already used by another speaker.')
+      setError({ reason: 'speaker-color-used' })
       return
     }
     if (
@@ -130,7 +136,7 @@ function SpeakerTag({
       nextColor.toLowerCase() !== color.toLowerCase() &&
       TRACK_COLORS.includes(nextColor.toLowerCase())
     ) {
-      setError('That color is reserved for an audio track. Choose another color.')
+      setError({ reason: 'speaker-color-reserved' })
       return
     }
     setSaving(true)
@@ -151,9 +157,9 @@ function SpeakerTag({
       useTranscriptStore.getState().loadAnalyses(updated.speechAnalyses)
       setEditing(false)
       setChoosing(false)
-      setError('')
+      setError(null)
     } catch (reason) {
-      setError((reason as Error).message)
+      setError(normalizePublicError(reason))
     } finally {
       setSaving(false)
     }
@@ -163,15 +169,15 @@ function SpeakerTag({
     <div className={`speaker-tag${hidden ? ' is-hidden' : ''}`} ref={root}>
       <button
         className="speaker-color-button"
-        aria-label={`Change color for ${label}`}
+        aria-label={t('transcript.changeColor', { name: label })}
         aria-expanded={choosing}
         disabled={disabled}
-        title="Change speaker color"
+        title={t('transcript.changeSpeakerColor')}
         onClick={() => {
           cancelClick()
           setDraftColor(color)
           setChoosing(!choosing)
-          setError('')
+          setError(null)
         }}
       >
         <span data-testid={`speaker-swatch-${id}`} style={{ background: color }} />
@@ -185,7 +191,7 @@ function SpeakerTag({
           }}
         >
           <input
-            aria-label={`Rename ${label}`}
+            aria-label={t('transcript.rename', { name: label })}
             value={name}
             maxLength={80}
             autoFocus
@@ -194,29 +200,31 @@ function SpeakerTag({
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 setEditing(false)
-                setError('')
+                setError(null)
               }
             }}
           />
-          <button disabled={disabled}>Save</button>
+          <button disabled={disabled}>{t('common.save')}</button>
           <button
             type="button"
             disabled={saving}
             onClick={() => {
               setEditing(false)
-              setError('')
+              setError(null)
             }}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </form>
       ) : (
         <button
           className="speaker-name-button"
-          aria-label={`Show ${label}`}
+          aria-label={t('transcript.show', { name: label })}
           aria-pressed={!hidden}
           disabled={disabled}
-          title={`Machine label ${analysis.speakers.find((s) => s.id === id)?.diarizationLabel}. Click to show or hide · Double-click or F2 to rename`}
+          title={t('transcript.machineLabel', {
+            label: analysis.speakers.find((s) => s.id === id)?.diarizationLabel ?? '',
+          })}
           onClick={(e) => {
             cancelClick()
             if (e.detail === 0) toggle(key)
@@ -238,7 +246,7 @@ function SpeakerTag({
             setName(label)
             setEditing(true)
             setChoosing(false)
-            setError('')
+            setError(null)
           }}
           onKeyDown={(e) => {
             if (e.key === 'F2') {
@@ -257,25 +265,29 @@ function SpeakerTag({
             {choosing && (
               <form
                 className="speaker-color-popover"
-                aria-label={`Color for ${label}`}
+                aria-label={t('transcript.colorFor', { name: label })}
                 onSubmit={(e) => {
                   e.preventDefault()
-                  void save(label, draftColor)
+                  void save(
+                    speakerName(analysis, id) ??
+                      analysis.speakers.find((speaker) => speaker.id === id)!.defaultDisplayName,
+                    draftColor,
+                  )
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
                     setChoosing(false)
-                    setError('')
+                    setError(null)
                   }
                 }}
               >
-                <span className="speaker-color-heading">Speaker color</span>
+                <span className="speaker-color-heading">{t('transcript.speakerColor')}</span>
                 <div className="speaker-color-choices">
                   {choices.map((choice) => (
                     <button
                       type="button"
                       key={choice}
-                      aria-label={`Use ${choice}`}
+                      aria-label={t('transcript.useColor', { color: choice })}
                       title={choice}
                       disabled={
                         disabled ||
@@ -290,9 +302,9 @@ function SpeakerTag({
                   ))}
                 </div>
                 <label>
-                  Hex color{' '}
+                  {t('transcript.hexColor')}{' '}
                   <input
-                    aria-label="Hex color"
+                    aria-label={t('transcript.hexColor')}
                     value={draftColor}
                     maxLength={7}
                     disabled={disabled}
@@ -300,22 +312,22 @@ function SpeakerTag({
                   />
                 </label>
                 <div>
-                  <button disabled={disabled}>Apply color</button>
+                  <button disabled={disabled}>{t('transcript.applyColor')}</button>
                   <button
                     type="button"
                     onClick={() => {
                       setChoosing(false)
-                      setError('')
+                      setError(null)
                     }}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </form>
             )}
             {error && (
               <div role="alert" className="speaker-tag-error">
-                {error}
+                {publicMessage(t, error)}
               </div>
             )}
           </div>,

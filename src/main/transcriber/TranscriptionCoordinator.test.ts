@@ -1,3 +1,4 @@
+import type { TranscriptionProgress } from '../../shared/publicMessages'
 import { describe, expect, it, vi } from 'vitest'
 import type { AudioSourceId, Transcript } from '../../shared/project.types'
 import type { WorkspaceToken } from '../../shared/session.types'
@@ -43,9 +44,9 @@ describe('TranscriptionCoordinator', () => {
           _path: string,
           _options: unknown,
           _signal: AbortSignal,
-          onProgress: (status: string) => void,
+          onProgress: (status: TranscriptionProgress) => void,
         ) => {
-          onProgress('Transcribing… 30%')
+          onProgress({ stage: 'transcribing', percent: 30 })
           return transcript('hello')
         },
       ),
@@ -69,7 +70,7 @@ describe('TranscriptionCoordinator', () => {
       jobId: 'job-a',
       workspaceToken: TOKEN,
       revision: 7,
-      status: 'Transcribing… 30%',
+      status: { stage: 'transcribing', percent: 30 },
     })
   })
 

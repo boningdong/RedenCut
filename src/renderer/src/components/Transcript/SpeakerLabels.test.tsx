@@ -1,3 +1,4 @@
+import { useLocaleStore } from '../../stores/locale.store'
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -14,6 +15,7 @@ const analysis = {
   speakerLabelOverrides: [],
 } as unknown as RendererSpeechAnalysis
 beforeEach(() => {
+  useLocaleStore.setState({ resolvedLocale: 'en' })
   useTranscriptStore.getState().reset()
   useTimelineStore.getState().reset()
   useEditorStore.getState().reset()
@@ -21,6 +23,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  useLocaleStore.setState({ resolvedLocale: 'en' })
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
@@ -87,4 +90,34 @@ it('a slower native double click restores visibility before opening rename', () 
   fireEvent.doubleClick(label)
   expect(useTranscriptStore.getState().hiddenSpeakerKeys).toHaveLength(0)
   expect(screen.getByRole('textbox', { name: 'Rename Guest' })).toBeTruthy()
+})
+
+it('keeps a color-only edit independent of the display locale and preserves an open name draft', async () => {
+  const generated = {
+    ...analysis,
+    speakers: [{ ...analysis.speakers[0], defaultDisplayName: 'Speaker 1' }],
+  }
+  useEditorStore.setState({ session: { workspaceToken: 'test', revision: 1 } as never })
+  const rename = vi.fn(async (_request: unknown) => {
+    throw new Error('private diagnostic')
+  })
+  Object.defineProperty(window, 'electronAPI', {
+    configurable: true,
+    value: { speakerLabel: { rename } },
+  })
+  render(<SpeakerLabels analyses={[generated]} isGenerating={false} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Change color for Speaker 1' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Hex color' }), {
+    target: { value: '#abcdef' },
+  })
+  act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: '应用颜色' }))
+  })
+  expect(rename.mock.calls[0][0]).toMatchObject({ displayName: 'Speaker 1', color: '#abcdef' })
+  fireEvent.click(screen.getByRole('button', { name: '取消' }))
+  fireEvent.doubleClick(screen.getByRole('button', { name: '显示 说话人 1' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My custom guest' } })
+  act(() => useLocaleStore.setState({ resolvedLocale: 'en' }))
+  expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('My custom guest')
 })

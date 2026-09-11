@@ -1,3 +1,4 @@
+import type { PublicMessage } from './publicMessages'
 import { z } from 'zod'
 
 const ContentOrderSchema = z.union([
@@ -29,7 +30,7 @@ Object.freeze(DEFAULT_WORKSPACE_LAYOUT)
 
 export interface WorkspaceLayoutReadResult {
   layout: WorkspaceLayout
-  warning: string | null
+  warning: PublicMessage | null
 }
 
 export function decodeStoredWorkspaceLayout(input: unknown): WorkspaceLayoutReadResult {
@@ -39,13 +40,13 @@ export function decodeStoredWorkspaceLayout(input: unknown): WorkspaceLayoutRead
   if (!input || typeof input !== 'object' || Array.isArray(input))
     return {
       layout: defaults,
-      warning: 'Workspace preferences were invalid. Default layout is in use.',
+      warning: { reason: 'workspace-invalid' },
     }
   const record = input as Record<string, unknown>
   if (record.version !== 1)
     return {
       layout: defaults,
-      warning: 'Workspace preferences use an unsupported version. Default layout is in use.',
+      warning: { reason: 'workspace-version' },
     }
   const knownPanels = Array.isArray(record.contentOrder)
     ? record.contentOrder.filter((panel) => panel === 'audio' || panel === 'transcript')
@@ -62,6 +63,6 @@ export function decodeStoredWorkspaceLayout(input: unknown): WorkspaceLayoutRead
       transcriptRatio: ratio.success ? ratio.data : defaults.transcriptRatio,
       transportPosition: transport.success ? transport.data : defaults.transportPosition,
     },
-    warning: 'Some workspace preferences were invalid. Compatible settings have been recovered.',
+    warning: { reason: 'workspace-recovered' },
   }
 }

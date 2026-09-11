@@ -15,7 +15,10 @@ const messages: Record<SpeechFailureStage, string> = {
 
 /** Fixed public messages; the underlying engine/filesystem cause stays in main diagnostics. */
 export class SpeechAnalysisError extends Error {
-  constructor(stage: SpeechFailureStage, cause: unknown) {
+  constructor(
+    readonly stage: SpeechFailureStage,
+    cause: unknown,
+  ) {
     super(messages[stage], { cause })
     this.name = 'SpeechAnalysisError'
   }

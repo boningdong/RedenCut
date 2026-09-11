@@ -1,3 +1,4 @@
+import type { PublicMessage, TranscriptionProgress } from './publicMessages'
 // ─────────────────────────────────────────────────────────────────────────────
 // ITranscriber — Speech-to-Text abstraction
 //
@@ -64,11 +65,10 @@ export interface ITranscriber {
   isAvailable(): Promise<boolean>
 
   /**
-   * Returns an actionable error string if the engine is unavailable,
-   * e.g. "whisper-cli not found. Install with: brew install whisper-cpp"
+   * Returns a structured, actionable public reason if the engine is unavailable.
    * Returns null if available.
    */
-  unavailableReason(): Promise<string | null>
+  unavailableReason(): Promise<PublicMessage | null>
 
   /**
    * Transcribes the given audio file.
@@ -80,6 +80,6 @@ export interface ITranscriber {
     audioFilePath: string,
     options: TranscribeOptions,
     signal: AbortSignal,
-    onProgress?: (status: string) => void,
+    onProgress?: (status: TranscriptionProgress) => void,
   ): Promise<TranscriptionResult>
 }
