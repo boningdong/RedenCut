@@ -97,7 +97,7 @@ describe('CanvasWaveform', () => {
 
     expect(context.fillStyle).toBe('#bada55')
     expect(context.clearRect).toHaveBeenCalledWith(0, 0, 600, 80)
-    expect(context.fillRect).toHaveBeenCalledWith(0, 20, 600, 50)
+    expect(context.fillRect).toHaveBeenCalledWith(298.5, 20, 3, 50)
     expect(canvas?.getAttribute('data-waveform-ready')).toBe('true')
   })
 
@@ -133,7 +133,7 @@ describe('CanvasWaveform', () => {
       second.resolve({ buckets: [{ min: -0.25, max: 0.75 }] })
       await Promise.resolve()
     })
-    expect(context.fillRect).toHaveBeenCalledWith(0, 10, 600, 40)
+    expect(context.fillRect).toHaveBeenCalledWith(298.5, 10, 3, 40)
     expect(container.querySelector('canvas')?.getAttribute('data-waveform-ready')).toBe('true')
   })
 
@@ -149,20 +149,14 @@ describe('CanvasWaveform', () => {
     expect(context.fillRect).not.toHaveBeenCalled()
   })
 
-  it('uses the computed muted waveform color', async () => {
+  it('dims muted waveforms while preserving the track color', async () => {
     const provider: WaveformDataProvider = {
       readRange: vi.fn(() => Promise.resolve({ buckets: [{ min: -0.5, max: 0.5 }] })),
     }
-    const mutedColor = 'rgb(99, 88, 77)'
-    const getComputedStyle = vi.spyOn(window, 'getComputedStyle').mockReturnValue({
-      getPropertyValue: vi.fn((name: string) =>
-        name === '--waveform-color-muted' ? mutedColor : '',
-      ),
-    } as unknown as CSSStyleDeclaration)
     const { container } = render(<CanvasWaveform {...waveformProps({ muted: true, provider })} />)
 
-    await waitFor(() => expect(context.fillStyle).toBe(mutedColor))
+    await waitFor(() => expect(context.fillStyle).toBe('#bada55'))
 
-    expect(getComputedStyle).toHaveBeenCalledWith(container.querySelector('canvas'))
+    expect(container.querySelector('canvas')?.style.opacity).toBe('0.55')
   })
 })

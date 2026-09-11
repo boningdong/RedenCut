@@ -212,11 +212,15 @@ describe('EditorWorkspace', () => {
     setup()
     const divider = screen.getByRole('separator')
     fireEvent.keyDown(divider, { key: 'Home' })
-    expect(Number(divider.getAttribute('aria-valuenow'))).toBe(39)
-    expect(screen.getByRole('region', { name: 'Transcript panel' }).style.flexBasis).toBe('120px')
-    expect(screen.getByRole('region', { name: 'Audio panel' }).style.flexBasis).toBe('184px')
+    expect(Number(divider.getAttribute('aria-valuenow'))).toBe(38)
+    expect(
+      parseFloat(screen.getByRole('region', { name: 'Transcript panel' }).style.flexBasis),
+    ).toBeCloseTo(120)
+    expect(
+      parseFloat(screen.getByRole('region', { name: 'Audio panel' }).style.flexBasis),
+    ).toBeCloseTo(194)
     fireEvent.keyDown(divider, { key: 'ArrowDown' })
-    expect(Number(divider.getAttribute('aria-valuenow'))).toBe(44)
+    expect(Number(divider.getAttribute('aria-valuenow'))).toBe(43)
     fireEvent.click(screen.getByRole('button', { name: 'Reset layout' }))
     expect(useWorkspaceStore.getState().layout).toEqual(DEFAULT_WORKSPACE_LAYOUT)
     act(() => useWorkspaceStore.setState({ error: 'Could not save layout', errorKind: 'save' }))

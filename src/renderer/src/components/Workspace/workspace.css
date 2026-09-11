@@ -3,20 +3,26 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 12px 20px 14px;
 }
+
 .workspace-settings {
-  min-height: 28px;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 2px 12px;
   border-bottom: 1px solid var(--color-border);
-  font-size: var(--text-xs);
   color: var(--color-text-secondary);
+  border: 0;
+  padding-inline: 0;
+  min-height: 25px;
+  font-size: 10px;
 }
+
 .workspace-settings [role='status'] {
   flex: 1;
 }
+
 .workspace-regions {
   position: relative;
   flex: 1;
@@ -24,32 +30,24 @@
   display: flex;
   flex-direction: column;
 }
+
 .workspace-panel {
   display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-}
-.workspace-panel-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  flex-shrink: 0;
-  padding: 0 12px 0 6px;
-  border-bottom: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
   background: var(--color-bg-secondary);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
 }
-.workspace-panel-header > span {
-  flex: 1;
-}
+
 .workspace-panel-content {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  background: var(--color-bg-secondary);
+  overflow: hidden;
 }
+
 .workspace-command,
 .workspace-handle {
   color: var(--color-text-secondary);
@@ -60,38 +58,51 @@
   cursor: pointer;
   font-size: var(--text-xs);
 }
+
 .workspace-command:hover {
   background: var(--color-bg-primary);
   border-color: var(--color-border);
 }
+
 .workspace-handle {
   touch-action: none;
   cursor: grab;
   font-size: 18px;
   line-height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  color: var(--color-text-muted);
 }
+
 .workspace-divider {
   height: var(--workspace-panel-gap);
   flex-shrink: 0;
   cursor: row-resize;
   touch-action: none;
-  background: var(--color-border);
+  background: transparent;
+  display: grid;
+  place-items: center;
 }
+
 .workspace-divider:hover,
 .workspace-divider:focus-visible {
-  background: var(--color-accent);
+  background: transparent;
 }
+
 .workspace-command:focus-visible,
 .workspace-handle:focus-visible,
 .workspace-divider:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }
+
 .workspace-drop-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
+
 .workspace-drop-target {
   position: absolute;
   left: 8px;
@@ -104,81 +115,48 @@
   color: var(--color-text-primary);
   font-size: var(--text-sm);
 }
+
 .workspace-drop-target.is-upper {
   top: 4px;
 }
+
 .workspace-drop-target.is-lower {
   bottom: 4px;
 }
+
 .workspace-drop-target.is-active {
   border-style: solid;
   color: var(--color-accent);
   font-weight: 600;
 }
 
-.editor-workspace {
-  padding: 0 20px 14px;
-}
-.workspace-settings {
-  border: 0;
-  padding-inline: 0;
-  min-height: 28px;
-}
-.workspace-panel {
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-bg-secondary);
-}
-.workspace-panel-header {
-  padding-inline: 12px;
-  gap: 9px;
-  background: var(--color-bg-secondary);
-}
-.workspace-panel-header > span {
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: 12px;
-}
-.workspace-panel-content {
-  background: var(--color-bg-secondary);
-}
 .workspace-panel-transport {
   margin-top: var(--workspace-panel-gap);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
+
 .workspace-panel-transport:first-child {
   margin-top: 0;
   margin-bottom: var(--workspace-panel-gap);
 }
-.workspace-panel-transport .workspace-panel-header {
-  height: 24px;
-  border-bottom: 0;
-}
-.workspace-handle {
-  display: grid;
-  place-items: center;
-  padding: 2px;
-  color: var(--color-text-muted);
-}
+
 .workspace-command {
   border-radius: 5px;
 }
-.workspace-divider {
-  height: var(--workspace-panel-gap);
-  background: transparent;
-  display: grid;
-  place-items: center;
-}
+
 .workspace-divider::after {
   content: '';
   width: 35px;
   height: 3px;
   border-radius: 3px;
   background: var(--color-border);
+  transition:
+    width 0.2s,
+    background 0.2s;
 }
-.workspace-divider:hover,
-.workspace-divider:focus-visible {
-  background: transparent;
-}
+
 .workspace-divider:hover::after,
 .workspace-divider:focus-visible::after {
   background: var(--color-accent);
@@ -191,4 +169,42 @@
   .file-details {
     margin-inline: 12px;
   }
+}
+.workspace-panel-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex: none;
+  position: relative;
+}
+.workspace-move {
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 3px;
+  cursor: pointer;
+  opacity: 0;
+  width: 16px;
+  position: absolute;
+  left: 100%;
+  z-index: 2;
+  background: var(--color-bg-elevated);
+}
+.workspace-panel-controls:hover .workspace-move,
+.workspace-move:focus-visible {
+  opacity: 1;
+}
+.workspace-panel-transport .workspace-panel-content {
+  background: transparent;
+}
+.workspace-settings button {
+  font-size: 10px;
+}
+.workspace-divider:hover::after {
+  width: 62px;
+}
+
+.workspace-reset {
+  margin-left: 10px;
+  font-size: 16px;
 }

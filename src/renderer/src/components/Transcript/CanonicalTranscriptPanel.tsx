@@ -14,10 +14,12 @@ import type { TranscriptPanelProps } from './TranscriptPanel'
 import { TranscriptDialogue } from './TranscriptDialogue'
 import { SpeakerLabels, speakerColor } from './SpeakerLabels'
 import './transcript.css'
+import { trackPresentationColor } from '../../themes/trackColors'
 
 type SessionSelection = OccurrenceSelection & { workspaceToken: string | undefined }
 
 export function CanonicalTranscriptPanel({
+  workspaceControls,
   onGenerate,
   isGenerating,
   generatingStatus,
@@ -129,7 +131,7 @@ export function CanonicalTranscriptPanel({
       pending?.occurrence.scopeId === u.scopeId && pending.resolvedUnitIds.includes(u.unit.id)
     const color =
       tracks.length > 1
-        ? u.track.color
+        ? trackPresentationColor(u.track.color)
         : u.speakerId
           ? speakerColor(u.analysis, u.speakerId)
           : undefined
@@ -166,23 +168,27 @@ export function CanonicalTranscriptPanel({
             getAudioPlayerInstance()?.seekTo(u.outputStart!)
         }}
         className="transcript-unit"
-        style={{
-          textDecoration:
-            u.muted && editable
-              ? 'line-through'
-              : !editable && u.unit.kind === 'speech'
-                ? 'underline dotted'
-                : current
-                  ? 'underline'
-                  : 'none',
-          opacity: u.muted && editable ? 0.5 : u.unit.kind === 'punctuation' ? 0.65 : 1,
-          background: highlighted
-            ? 'var(--color-warning-muted)'
-            : current
-              ? 'var(--color-accent-subtle)'
-              : undefined,
-          borderBottom: color ? `2px solid ${color}` : undefined,
-        }}
+        style={
+          {
+            textDecoration:
+              u.muted && editable
+                ? 'line-through'
+                : !editable && u.unit.kind === 'speech'
+                  ? 'underline dotted'
+                  : current
+                    ? 'underline'
+                    : 'none',
+            opacity: u.muted && editable ? 0.5 : u.unit.kind === 'punctuation' ? 0.65 : 1,
+            background: highlighted
+              ? 'var(--color-warning-muted)'
+              : current
+                ? 'var(--color-accent-subtle)'
+                : undefined,
+            color: undefined,
+            '--track-color': color,
+            borderBottom: current && color ? `2px solid ${color}` : undefined,
+          } as React.CSSProperties
+        }
       >
         {u.leadingSpace ? ' ' : ''}
         {u.unit.text}
@@ -209,7 +215,16 @@ export function CanonicalTranscriptPanel({
   return (
     <div className="canonical-transcript-panel">
       <div className="transcript-controls">
-        <span className="transcript-mode-label">Verbatim · {tracks.length} tracks</span>
+        {workspaceControls}
+        <span className="feature-title">Transcript</span>
+        <span className="panel-count">{tracks.length} tracks</span>
+        <div className="toolbar-spacer" />
+        <SpeakerLabels
+          analyses={analyses.filter((a) =>
+            tracks.some((t) => t.clips.some((c) => c.audioSourceId === a.audioSourceId)),
+          )}
+          isGenerating={isGenerating}
+        />
         <div className="transcript-generation">
           {missing.map((t) => (
             <button key={t.id} disabled={isGenerating} onClick={() => onGenerate(t.id)}>
@@ -221,12 +236,6 @@ export function CanonicalTranscriptPanel({
           </button>
         </div>
       </div>
-      <SpeakerLabels
-        analyses={analyses.filter((a) =>
-          tracks.some((t) => t.clips.some((c) => c.audioSourceId === a.audioSourceId)),
-        )}
-        isGenerating={isGenerating}
-      />
       {isGenerating && (
         <div role="status" className="transcript-progress">
           {generatingStatus || 'Generating transcript…'}

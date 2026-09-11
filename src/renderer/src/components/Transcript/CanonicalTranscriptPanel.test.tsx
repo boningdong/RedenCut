@@ -107,7 +107,7 @@ describe('canonical transcript editability', () => {
     expect(screen.queryByRole('button', { name: 'Sync to playhead' })).toBeNull()
   })
 
-  it('underlines attributed transcript units with stable per-speaker colors', () => {
+  it('assigns stable per-speaker colors without underlining inactive text', () => {
     const analysis = useTranscriptStore.getState().analyses[0]
     useTranscriptStore.getState().loadAnalyses([
       {
@@ -191,15 +191,12 @@ describe('canonical transcript editability', () => {
     const speakerB = document.querySelector('[data-unit-id="speaker-b-1"]') as HTMLElement
     const unattributed = document.querySelector('[data-unit-id="unattributed"]') as HTMLElement
 
-    expect(speakerA1.style.borderBottomStyle).toBe('solid')
-    expect(speakerA1.style.borderBottomWidth).toBe('2px')
-    expect(speakerA1.style.borderBottomColor).not.toBe('')
-    expect(speakerA2.style.borderBottomColor).toBe(speakerA1.style.borderBottomColor)
-    expect(speakerB.style.borderBottomColor).not.toBe(speakerA1.style.borderBottomColor)
-    expect(unattributed.style.borderBottomStyle).toBe('')
-    expect(screen.getByTestId('speaker-swatch-speaker-a').style.color).toBe(
-      speakerA1.style.borderBottomColor,
-    )
+    const colorA = speakerA1.style.getPropertyValue('--track-color')
+    expect(colorA).not.toBe('')
+    expect(speakerA2.style.getPropertyValue('--track-color')).toBe(colorA)
+    expect(speakerB.style.getPropertyValue('--track-color')).not.toBe(colorA)
+    expect(unattributed.style.getPropertyValue('--track-color')).toBe('')
+    expect(speakerA1.style.borderBottomStyle).toBe('')
   })
   it('renders both duplicate occurrences and generates a missing track from the header', () => {
     const track = useTimelineStore.getState().tracks[0]

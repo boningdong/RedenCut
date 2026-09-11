@@ -22,11 +22,14 @@ function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const fraction = Math.floor((seconds % 1) * 100)
+    .toString()
+    .padStart(2, '0')
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${fraction}`
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${fraction}`
 }
 
-export function TransportBar() {
+export function TransportBar({ workspaceControls }: { workspaceControls?: React.ReactNode }) {
   const canUndo = useTimelineStore((s) => s.undoStack.length > 0)
   const canRedo = useTimelineStore((s) => s.redoStack.length > 0)
   const undo = useTimelineStore((s) => s.undo)
@@ -74,140 +77,137 @@ export function TransportBar() {
   }, [])
 
   return (
-    <div
-      className="transport-bar"
-      style={{
-        height: 48,
-        backgroundColor: 'var(--color-bg-secondary)',
-
-        display: 'flex',
-        alignItems: 'center',
-        paddingInline: 'var(--space-4)',
-        gap: 'var(--space-3)',
-        flexShrink: 0,
-        userSelect: 'none',
-      }}
-    >
-      {/* Skip to start */}
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={handleSkipToStart}
-        disabled={!hasAudio}
-        aria-label="Skip to start"
-        title="Skip to start"
-      >
-        <SkipBackIcon />
-      </Button>
-
-      {/* Play / Pause */}
-      <Button
-        size="sm"
-        variant="primary"
-        onClick={() => {
-          void handlePlayPause().catch((error: unknown) => {
-            console.error('[TransportBar] Failed to toggle playback:', error)
-          })
-        }}
-        disabled={!hasAudio}
-        aria-label={isPlaying ? 'Pause' : 'Play'}
-        title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-      >
-        {isPlaying ? <PauseIcon /> : <PlayIcon />}
-      </Button>
-
-      {/* Skip to end */}
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={handleSkipToEnd}
-        disabled={!hasAudio}
-        aria-label="Skip to end"
-        title="Skip to end"
-      >
-        <SkipForwardIcon />
-      </Button>
-
-      {/* Time display */}
-      <div
-        style={{
-          marginLeft: 'var(--space-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 'var(--text-sm)',
-          color: 'var(--color-text-secondary)',
-          fontVariantNumeric: 'tabular-nums',
-          display: 'flex',
-          gap: 4,
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ color: 'var(--color-text-primary)' }}>{formatTime(currentTime)}</span>
-        <span style={{ color: 'var(--color-text-muted)' }}>/</span>
-        <span>{formatTime(duration)}</span>
+    <div className="transport-bar">
+      <div className="transport-history">
+        {workspaceControls}
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!canUndo}
+          onClick={undo}
+          aria-label="Undo"
+          title="Undo (⌘Z)"
+        >
+          <Icon name="undo" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!canRedo}
+          onClick={redo}
+          aria-label="Redo"
+          title="Redo (⇧⌘Z)"
+        >
+          <Icon name="redo" />
+        </Button>
       </div>
+      <div className="transport-playback">
+        <div className="transport-time">
+          <span>{formatTime(currentTime)}</span>
+          <small>/ {formatTime(duration)}</small>
+        </div>
+        {/* Skip to start */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleSkipToStart}
+          disabled={!hasAudio}
+          aria-label="Skip to start"
+          title="Skip to start"
+        >
+          <SkipBackIcon />
+        </Button>
 
-      <span className="transport-separator" />
-      <Button size="sm" disabled={!canUndo} onClick={undo} aria-label="Undo" title="Undo (⌘Z)">
-        <Icon name="undo" />
-      </Button>
-      <Button size="sm" disabled={!canRedo} onClick={redo} aria-label="Redo" title="Redo (⇧⌘Z)">
-        <Icon name="redo" />
-      </Button>
-      {/* Spacer */}
-      <div style={{ flex: 1 }} />
-
-      {/* Preview Mode toggle */}
-      <button
-        onClick={togglePreviewMode}
-        aria-pressed={previewMode}
-        title="Preview Mode: skip muted regions during playback"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          background: 'none',
-          border: `1px solid ${previewMode ? 'var(--color-accent)' : 'var(--color-border)'}`,
-          borderRadius: 4,
-          color: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
-          fontSize: 'var(--text-xs)',
-          padding: '3px 8px',
-          cursor: 'pointer',
-          letterSpacing: '0.04em',
-          transition: 'color 0.15s, border-color 0.15s',
-        }}
-      >
-        <span
+        {/* Play / Pause */}
+        <Button
+          size="sm"
+          variant="primary"
+          className="transport-play"
           style={{
-            width: 6,
-            height: 6,
             borderRadius: '50%',
-            backgroundColor: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
-            flexShrink: 0,
-            transition: 'background-color 0.15s',
+            width: 43,
+            height: 43,
+            padding: 12,
+            border: '1px solid var(--color-accent)',
           }}
-        />
-        Preview
-      </button>
+          onClick={() => {
+            void handlePlayPause().catch((error: unknown) => {
+              console.error('[TransportBar] Failed to toggle playback:', error)
+            })
+          }}
+          disabled={!hasAudio}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+        >
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
+        </Button>
 
-      {/* Theme toggle */}
-      <button
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        style={{
-          background: 'none',
-          border: '1px solid var(--color-border)',
-          borderRadius: 6,
-          cursor: 'pointer',
-          padding: '0 10px',
-          height: 28,
-          fontSize: 14,
-          color: 'var(--color-text-muted)',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-      </button>
+        {/* Skip to end */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleSkipToEnd}
+          disabled={!hasAudio}
+          aria-label="Skip to end"
+          title="Skip to end"
+        >
+          <SkipForwardIcon />
+        </Button>
+      </div>
+      <div className="transport-options">
+        {/* Preview Mode toggle */}
+        <button
+          onClick={togglePreviewMode}
+          aria-pressed={previewMode}
+          title="Preview Mode: skip muted regions during playback"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'none',
+            border: `1px solid ${previewMode ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            borderRadius: 4,
+            color: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
+            fontSize: 'var(--text-xs)',
+            padding: '3px 8px',
+            cursor: 'pointer',
+            letterSpacing: '0.04em',
+            transition: 'color 0.15s, border-color 0.15s',
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              backgroundColor: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
+              flexShrink: 0,
+              transition: 'background-color 0.15s',
+            }}
+          />
+          Preview
+        </button>
+
+        {/* Theme toggle */}
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          style={{
+            background: 'none',
+            border: '1px solid var(--color-border)',
+            borderRadius: 6,
+            cursor: 'pointer',
+            padding: '0 10px',
+            height: 28,
+            fontSize: 14,
+            color: 'var(--color-text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+        </button>
+      </div>
     </div>
   )
 }

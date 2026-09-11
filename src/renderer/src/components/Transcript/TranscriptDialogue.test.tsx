@@ -52,6 +52,11 @@ it('wraps shared measured columns inside each speaker lane and preserves every u
   )
   fireEvent.click(screen.getByRole('button', { name: 'Align' }))
   act(() => resize?.([{ contentRect: { width: 260 } }]))
+  const anchors = [...document.querySelectorAll<HTMLElement>('.transcript-column-time')]
+  expect(anchors.length).toBeGreaterThan(0)
+  expect(
+    anchors.every((anchor) => anchor.textContent === '·' && /^\d+:\d+\.\d+$/.test(anchor.title)),
+  ).toBe(true)
   const lanes = document.querySelectorAll('[data-aligned-track]')
   expect([...lanes].map((l) => l.getAttribute('data-aligned-track'))).toEqual(['a', 'b'])
   expect(lanes[0].querySelectorAll('.transcript-content-line').length).toBeGreaterThan(1)

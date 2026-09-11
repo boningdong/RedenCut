@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { render } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RendererAudioSource } from '@shared/session.types'
+import { useEditorStore } from '../../stores/editor.store'
+import { useTranscriptStore } from '../../stores/transcript.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { WaveformView } from './WaveformView'
@@ -36,7 +38,10 @@ const source: RendererAudioSource = {
 }
 
 describe('WaveformView managed providers', () => {
+  afterEach(cleanup)
   beforeEach(() => {
+    useEditorStore.getState().reset()
+    useTranscriptStore.getState().reset()
     canvasSpy.mockClear()
     useTimelineStore.getState().reset()
     Object.defineProperty(globalThis, 'ResizeObserver', {
@@ -95,5 +100,59 @@ describe('WaveformView managed providers', () => {
     )
     expect(canvasSpy).toHaveBeenCalledTimes(2)
     expect(canvasSpy.mock.calls.every(([actual]) => actual === provider)).toBe(true)
+  })
+
+  it('keeps canonical text selection out of waveform actions even with a stale selected clip', () => {
+    const clip = {
+      id: 'clip',
+      trackId: 'track',
+      audioSourceId: source.id,
+      sourceStart: 0,
+      sourceEnd: 5,
+      outputStart: 0,
+      gain: 1,
+      muted: false,
+      effects: [],
+    }
+    useTimelineStore.getState().loadFromProject(
+      [source],
+      [
+        {
+          id: 'track',
+          name: 'One',
+          color: '#cf7ba6',
+          volume: 1,
+          muted: false,
+          solo: false,
+          effects: [],
+          clips: [clip, { ...clip, id: 'duplicate' }],
+        },
+      ],
+    )
+    useTimelineStore.getState().setSelectedClipId('clip')
+    useEditorStore.getState().setSelection({ start: 1, end: 2 })
+    useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['canonical-unit']))
+    render(<WaveformView duration={5} providersBySource={new Map()} onAddTrack={vi.fn()} />)
+    const before = useTimelineStore.getState().tracks
+    for (const name of ['Split at playhead', 'Mute selection', 'Delete selection']) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+      expect(button.title).toContain('transcript')
+      fireEvent.click(button)
+    }
+    expect(useTimelineStore.getState().tracks).toBe(before)
+    act(() => useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set()))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selection' }))
+    expect(useTimelineStore.getState().tracks[0].clips.map((item) => item.id)).toEqual([
+      'duplicate',
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Mute selection' }))
+    expect(
+      useTimelineStore
+        .getState()
+        .tracks[0].clips.some(
+          (item) => item.muted && item.sourceStart === 1 && item.sourceEnd === 2,
+        ),
+    ).toBe(true)
   })
 })

@@ -5,7 +5,7 @@
 **Goal:** Deliver the approved visual interface and single-column multitrack transcript with local overlap alignment using real project data.
 **Architecture:** Workspace retains layout ownership, existing production feature paths remain active, and a pure renderer projection maps source acoustic boundaries into clip occurrences on the output timeline.
 **Stack:** Existing React, TypeScript, Zustand, Electron IPC, CSS, Vitest and Docker MCP.
-**References:** [Workspace specification](../specs/2026-09-10-editor-workspace-design.md); enclosing workspace `docs/ui-mock/2026-09-10/podcut-ui-final.html` and English requirements.
+**References:** [Workspace specification](../specs/2026-09-10-editor-workspace-design.md); [approved mock](../../../ui-mock/2026-09-10/podcut-ui-final.html) and [English requirements](../../../ui-mock/2026-09-10/podcut-ui-requirements.md).
 
 ## Constraints
 

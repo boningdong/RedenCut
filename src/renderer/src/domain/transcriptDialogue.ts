@@ -150,9 +150,9 @@ export function layoutOverlapColumns(
       const texts = new Map<string, string>()
       for (const unit of selected) {
         const key = `${unit.scopeId}:${unit.speakerId ?? unit.contextSpeakerId ?? ''}`
-        texts.set(key, (texts.get(key) ?? '') + unit.unit.text + ' ')
+        texts.set(key, (texts.get(key) ?? '') + (unit.leadingSpace ? ' ' : '') + unit.unit.text)
       }
-      const contentWidth = Math.max(32, ...[...texts.values()].map(measure)) + 16
+      const contentWidth = Math.max(8, ...[...texts.values()].map(measure)) + 4
       const continuingTrackIds = [
         ...new Set(
           block.units

@@ -20,7 +20,7 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/timeline.store'
-import { useTranscriptStore } from '../stores/transcript.store'
+import { splitAtPlayhead, muteSelection, deleteSelection } from '../actions/timelineActions'
 import { getAudioPlayerInstance } from '@shared/player.types'
 
 interface Options {
@@ -108,9 +108,7 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         // ── S — Split clip at playhead ─────────────────────────────────────
         case 'KeyS': {
           e.preventDefault()
-          if (!player) break
-          const time = player.getCurrentTime()
-          useTimelineStore.getState().splitAt(time)
+          splitAtPlayhead()
           break
         }
 
@@ -118,15 +116,7 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         case 'KeyM': {
           if (!selection) break
           e.preventDefault()
-          const timeline = useTimelineStore.getState()
-          const trackId = timeline.selectedTrackId ?? timeline.tracks[0]?.id
-          if (!trackId) break
-          // Collect word IDs for transcript muting
-          const wordIds = useTranscriptStore.getState().selectedWordIds
-          useTimelineStore
-            .getState()
-            .muteRange(trackId, selection.start, selection.end, [...wordIds])
-          setSelection(null)
+          muteSelection()
           break
         }
 
@@ -160,29 +150,9 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         // If a drag-selection is active: add a mute.
         case 'Delete':
         case 'Backspace': {
-          const { selectedClipId, tracks, removeClip } = useTimelineStore.getState()
-          if (selectedClipId) {
-            e.preventDefault()
-            removeClip(selectedClipId)
-            break
-          }
-          if (!selection) break
+          if (!useTimelineStore.getState().selectedClipId && !selection) break
           e.preventDefault()
-          const trackId = useTimelineStore.getState().selectedTrackId ?? tracks[0]?.id
-          if (!trackId) break
-          const wordIds = useTranscriptStore.getState().selectedWordIds
-          // Mute overlapping clips
-          const hits = (tracks.find((track) => track.id === trackId)?.clips ?? []).filter((c) => {
-            if (c.muted) return false
-            const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-            return c.outputStart < selection.end && outputEnd > selection.start
-          })
-          if (hits.length > 0) {
-            useTimelineStore
-              .getState()
-              .muteRange(trackId, selection.start, selection.end, [...wordIds])
-          }
-          setSelection(null)
+          deleteSelection()
           break
         }
 

@@ -4,7 +4,7 @@ import type { WorkspaceDropTarget, WorkspacePanelId } from './workspaceLayout.ty
 export const WORKSPACE_PANELS = {
   transcript: { label: 'Transcript', minimumHeight: 120, placement: 'content' },
   audio: { label: 'Audio', minimumHeight: 120, placement: 'content' },
-  transport: { label: 'Transport', minimumHeight: 80, placement: 'strip' },
+  transport: { label: 'Transport', minimumHeight: 60, placement: 'strip' },
 } as const
 
 export function constrainTranscriptRatio(ratio: number, height: number): number {

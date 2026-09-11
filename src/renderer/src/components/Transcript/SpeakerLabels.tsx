@@ -2,16 +2,8 @@ import { useState } from 'react'
 import type { RendererSpeechAnalysis, SpeakerId } from '@shared/speech.types'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
-const colors = [
-  '#60a5fa',
-  '#fb923c',
-  '#4ade80',
-  '#f472b6',
-  '#a78bfa',
-  '#22d3ee',
-  '#facc15',
-  '#f87171',
-]
+import { useTimelineStore } from '../../stores/timeline.store'
+import { trackPresentationColor, TRACK_COLORS as colors } from '../../themes/trackColors'
 export function speakerColor(analysis: RendererSpeechAnalysis, id: SpeakerId): string {
   return colors[
     Math.max(
@@ -33,6 +25,7 @@ export function SpeakerLabels({
   analyses: RendererSpeechAnalysis[]
   isGenerating: boolean
 }) {
+  const tracks = useTimelineStore((s) => s.tracks)
   const session = useEditorStore((s) => s.session)
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(null)
   const [error, setError] = useState('')
@@ -92,7 +85,18 @@ export function SpeakerLabels({
                 >
                   <span
                     data-testid={`speaker-swatch-${speaker.id}`}
-                    style={{ color: speakerColor(analysis, speaker.id) }}
+                    style={{
+                      color:
+                        tracks.length > 1
+                          ? trackPresentationColor(
+                              tracks.find((track) =>
+                                track.clips.some(
+                                  (clip) => clip.audioSourceId === analysis.audioSourceId,
+                                ),
+                              )?.color ?? speakerColor(analysis, speaker.id),
+                            )
+                          : speakerColor(analysis, speaker.id),
+                    }}
                   >
                     ●
                   </span>{' '}

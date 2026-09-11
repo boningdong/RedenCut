@@ -21,6 +21,11 @@ Update the implementation and this document together whenever a mapping or its c
 | Command+Z or Control+Z | Undo | Undoes the last timeline operation. |
 | Command+Shift+Z or Control+Shift+Z | Redo | Redoes the last undone timeline operation. |
 
+## Audio Toolbar
+
+The audio toolbar exposes the same split, mute-selection and delete-selection actions as the corresponding keyboard shortcuts.
+Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.
+
 ## Focus Rules
 
 - Do not intercept shortcuts while focus is in an `input` or `textarea`.

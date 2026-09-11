@@ -60,10 +60,16 @@ vi.mock('./components/Waveform/BinaryWaveformDataProvider', () => ({
   BinaryWaveformDataProvider: class {},
 }))
 vi.mock('./components/Waveform/WaveformView', () => ({
-  WaveformView: () => <div data-testid="waveform" />,
+  WaveformView: ({ workspaceControls }: { workspaceControls?: React.ReactNode }) => (
+    <div data-testid="waveform">{workspaceControls}</div>
+  ),
 }))
 vi.mock('./components/FileInfoPanel', () => ({ FileInfoPanel: () => null }))
-vi.mock('./components/Transport/TransportBar', () => ({ TransportBar: () => null }))
+vi.mock('./components/Transport/TransportBar', () => ({
+  TransportBar: ({ workspaceControls }: { workspaceControls?: React.ReactNode }) => (
+    <div>{workspaceControls}</div>
+  ),
+}))
 vi.mock('./components/Export/ExportModal', () => ({ ExportModal: () => null }))
 vi.mock('./hooks/useKeyboardShortcuts', () => ({
   useKeyboardShortcuts: ({ onSave }: { onSave?: () => void }) => {
@@ -72,15 +78,18 @@ vi.mock('./hooks/useKeyboardShortcuts', () => ({
 }))
 vi.mock('./components/Transcript/TranscriptPanel', () => ({
   TranscriptPanel: ({
+    workspaceControls,
     onGenerate,
     isGenerating,
     generatingStatus,
   }: {
+    workspaceControls?: React.ReactNode
     onGenerate: (trackId: string) => void
     isGenerating: boolean
     generatingStatus: string
   }) => (
     <div>
+      {workspaceControls}
       <button onClick={() => onGenerate('track-1')}>Generate transcript</button>
       <span data-testid="generation-state">
         {String(isGenerating)}:{generatingStatus}

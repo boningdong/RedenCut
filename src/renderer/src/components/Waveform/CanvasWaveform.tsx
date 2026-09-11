@@ -38,16 +38,13 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
     const context = canvas?.getContext('2d')
     if (!canvas || !context) return
 
-    const waveformColor = muted
-      ? getComputedStyle(canvas).getPropertyValue('--waveform-color-muted') || `${color}cc`
-      : color
     void requestControllerRef.current?.request(
       provider,
       sourceStartSeconds,
       sourceEndSeconds,
       backingWidth,
       (range) => {
-        drawWaveform(context, range.buckets, backingWidth, backingHeight, waveformColor)
+        drawWaveform(context, range.buckets, backingWidth, backingHeight, color, devicePixelRatio)
         canvas.dataset.waveformReady = String(
           range.buckets.length > 0 && backingWidth > 0 && backingHeight > 0,
         )
@@ -58,7 +55,15 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
       canvas.dataset.waveformReady = 'false'
       requestControllerRef.current?.cancel()
     }
-  }, [backingHeight, backingWidth, color, muted, provider, sourceEndSeconds, sourceStartSeconds])
+  }, [
+    backingHeight,
+    backingWidth,
+    color,
+    devicePixelRatio,
+    provider,
+    sourceEndSeconds,
+    sourceStartSeconds,
+  ])
 
   return (
     <canvas
@@ -68,6 +73,8 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
       height={backingHeight}
       style={{
         position: 'absolute',
+        top: 16,
+        opacity: muted ? 0.55 : 1,
         left: leftInClipPx,
         width: widthPx,
         height: heightPx,

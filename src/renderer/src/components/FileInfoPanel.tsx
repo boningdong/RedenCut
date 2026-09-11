@@ -14,13 +14,16 @@ export function FileInfoPanel({
     .padStart(2, '0')
   return (
     <details className="file-details">
-      <summary>
+      <summary title={displayName}>
         <Icon name="wave" size={13} />
-        <span>{displayName}</span>
         <span className="file-details-label">Audio details</span>
         <Icon name="chevron" size={13} />
       </summary>
       <dl>
+        <div className="file-details-name">
+          <dt>File</dt>
+          <dd>{displayName}</dd>
+        </div>
         <div>
           <dt>Duration</dt>
           <dd>

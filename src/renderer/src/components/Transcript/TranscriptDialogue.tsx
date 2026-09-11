@@ -5,7 +5,9 @@ import {
   layoutOverlapColumns,
   type DialogueBlock,
 } from '../../domain/transcriptDialogue'
-import { speakerName } from './SpeakerLabels'
+import { trackPresentationColor } from '../../themes/trackColors'
+import { useTimelineStore } from '../../stores/timeline.store'
+import { speakerName, speakerColor } from './SpeakerLabels'
 
 function timestamp(time: number): string {
   return `${Math.floor(time / 60)
@@ -24,9 +26,15 @@ function lanes(units: TranscriptOccurrence[]) {
   return [...rows.values()]
 }
 function Speaker({ unit }: { unit: TranscriptOccurrence }) {
+  const trackCount = useTimelineStore((state) => state.tracks.length)
+  const speaker = unit.speakerId ?? unit.contextSpeakerId
+  const color =
+    trackCount > 1 || !speaker
+      ? trackPresentationColor(unit.track.color)
+      : speakerColor(unit.analysis, speaker)
   return (
     <div className="transcript-speaker" contentEditable={false}>
-      <span className="transcript-speaker-dot" style={{ background: unit.track.color }} />
+      <span className="transcript-speaker-dot" style={{ background: color }} />
       <div>
         <span>
           {speakerName(unit.analysis, unit.speakerId ?? unit.contextSpeakerId) ?? unit.track.name}
@@ -138,7 +146,7 @@ function OverlapCard({
                         .join(' '),
                     }}
                   >
-                    {line.columns.map((column, columnIndex) => {
+                    {line.columns.map((column) => {
                       const selected = column.units.filter((unit) =>
                         row.some((item) => item.id === unit.id),
                       )
@@ -163,7 +171,7 @@ function OverlapCard({
                             contentEditable={false}
                             title={timestamp(column.start)}
                           >
-                            {columnIndex === 0 ? timestamp(column.start) : '·'}
+                            ·
                           </small>
                           {selected.map(renderUnit)}
                           {boundary && (

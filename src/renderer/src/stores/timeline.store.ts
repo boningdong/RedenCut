@@ -183,7 +183,7 @@ interface TimelineState {
 
 // ── Implementation ─────────────────────────────────────────────────────────────
 
-const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
+import { TRACK_COLORS } from '../themes/trackColors'
 
 const initialState = {
   audioSources: [] as RendererAudioSource[],

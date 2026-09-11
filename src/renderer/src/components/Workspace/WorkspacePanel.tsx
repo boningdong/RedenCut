@@ -10,15 +10,33 @@ export function WorkspacePanel({
   moveLabel,
   onMove,
   onDrag,
+  commands,
 }: {
+  commands?: ReactNode
   id: WorkspacePanelId
-  children: ReactNode
+  children: ReactNode | ((controls: ReactNode) => ReactNode)
   style?: CSSProperties
   moveLabel: string
   onMove: () => void
   onDrag: PointerEventHandler<HTMLButtonElement>
 }) {
   const { label } = WORKSPACE_PANELS[id]
+  const controls = (
+    <div
+      className="workspace-panel-controls"
+      data-workspace-controls
+      onKeyDown={(event) => {
+        if (!event.metaKey && !event.ctrlKey) event.stopPropagation()
+      }}
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      <PanelDragHandle label={label} onPointerDown={onDrag} />
+      <button className="workspace-move" aria-label={moveLabel} title={moveLabel} onClick={onMove}>
+        ↕
+      </button>
+      {commands}
+    </div>
+  )
   return (
     <section
       aria-label={`${label} panel`}
@@ -26,21 +44,16 @@ export function WorkspacePanel({
       className={`workspace-panel workspace-panel-${id}`}
       style={style}
     >
-      <div
-        className="workspace-panel-header"
-        data-workspace-controls
-        onKeyDown={(event) => {
-          if (!event.metaKey && !event.ctrlKey) event.stopPropagation()
-        }}
-        onMouseDown={(event) => event.preventDefault()}
-      >
-        <PanelDragHandle label={label} onPointerDown={onDrag} />
-        <span>{label}</span>
-        <button className="workspace-command" onClick={onMove}>
-          {moveLabel}
-        </button>
+      <div className="workspace-panel-content">
+        {typeof children === 'function' ? (
+          children(controls)
+        ) : (
+          <>
+            {controls}
+            {children}
+          </>
+        )}
       </div>
-      <div className="workspace-panel-content">{children}</div>
     </section>
   )
 }

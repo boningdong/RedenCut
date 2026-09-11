@@ -791,14 +791,19 @@ export default function App() {
         </div>
       )}
 
-      {primarySource ? (
-        <FileInfoPanel displayName={primarySource.displayName} metadata={primarySource.metadata} />
-      ) : null}
-
       <EditorWorkspace
-        audio={
+        audio={(workspaceControls) =>
           tracks.length > 0 ? (
             <WaveformView
+              workspaceControls={workspaceControls}
+              audioDetails={
+                primarySource ? (
+                  <FileInfoPanel
+                    displayName={primarySource.displayName}
+                    metadata={primarySource.metadata}
+                  />
+                ) : null
+              }
               duration={projectDuration}
               providersBySource={waveforms}
               onAddTrack={() => void importAudio('copy')}
@@ -812,20 +817,22 @@ export default function App() {
                 color: 'var(--color-text-muted)',
               }}
             >
+              {workspaceControls}
               <Button variant="primary" onClick={() => void importAudio('copy')}>
                 Import your first audio file
               </Button>
             </div>
           )
         }
-        transcript={
+        transcript={(workspaceControls) => (
           <TranscriptPanel
+            workspaceControls={workspaceControls}
             onGenerate={(trackId) => void generateTranscript(trackId)}
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
           />
-        }
-        transport={<TransportBar />}
+        )}
+        transport={(workspaceControls) => <TransportBar workspaceControls={workspaceControls} />}
       />
       {showExport && exportDraft && session ? (
         <ExportModal session={session} draft={exportDraft} onClose={() => setShowExport(false)} />

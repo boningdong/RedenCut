@@ -10,6 +10,7 @@
 // with the global S = Split shortcut.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { trackPresentationColor } from '../../themes/trackColors'
 import { Icon } from '../ui/Icon'
 import React, { useState, useCallback } from 'react'
 import type { Track } from '@shared/project.types'
@@ -37,9 +38,9 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
   }, [nameInput, track.id, track.name, updateTrack])
 
   return (
-    <div className="track-header" style={{ borderLeftColor: track.color }}>
+    <div className="track-header" style={{ borderLeftColor: trackPresentationColor(track.color) }}>
       <div className="track-heading">
-        <span className="track-color" style={{ background: track.color }} />
+        <span className="track-color" style={{ background: trackPresentationColor(track.color) }} />
         {editing ? (
           <input
             autoFocus
@@ -100,7 +101,7 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
           step={0.01}
           value={track.volume}
           onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
-          style={{ accentColor: track.color }}
+          style={{ accentColor: trackPresentationColor(track.color) }}
           title={`Volume: ${Math.round(track.volume * 100)}%`}
         />
         <span>{Math.round(track.volume * 100)}%</span>

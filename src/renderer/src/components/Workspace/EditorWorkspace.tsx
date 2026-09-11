@@ -21,7 +21,7 @@ import { PanelDivider } from './PanelDivider'
 import { PanelDropIndicator } from './PanelDropIndicator'
 import './workspace.css'
 
-const PANEL_GAP = 8
+const PANEL_GAP = 13
 
 function captureEditingSurface(root: HTMLElement | null): () => void {
   const selection = window.getSelection()
@@ -51,22 +51,12 @@ export function EditorWorkspace({
   audio,
   transport,
 }: {
-  transcript: ReactNode
-  audio: ReactNode
-  transport: ReactNode
+  transcript: ReactNode | ((controls: ReactNode) => ReactNode)
+  audio: ReactNode | ((controls: ReactNode) => ReactNode)
+  transport: ReactNode | ((controls: ReactNode) => ReactNode)
 }) {
-  const {
-    layout,
-    hydrated,
-    saving,
-    warning,
-    error,
-    errorKind,
-    hydrate,
-    updateLayout,
-    retrySave,
-    resetLayout,
-  } = useWorkspaceStore()
+  const { layout, warning, error, errorKind, hydrate, updateLayout, retrySave, resetLayout } =
+    useWorkspaceStore()
   const root = useRef<HTMLDivElement>(null)
   const restore = useRef<(() => void) | null>(null)
   const cancelInteraction = useRef<(() => void) | null>(null)
@@ -225,6 +215,21 @@ export function EditorWorkspace({
         moveLabel={`Move ${WORKSPACE_PANELS[id].label} ${lower ? 'down' : 'up'}`}
         onMove={() => commit(applyWorkspaceDrop(layout, panelDropTarget(id, lower)))}
         onDrag={(event) => startDrag(id, event)}
+        commands={
+          id === 'transport' ? (
+            <button
+              className="workspace-command workspace-reset"
+              aria-label="Reset layout"
+              title="Reset layout"
+              onClick={() => {
+                restore.current = captureEditingSurface(root.current)
+                resetLayout()
+              }}
+            >
+              ↺
+            </button>
+          ) : undefined
+        }
       >
         {content[id]}
       </WorkspacePanel>
@@ -264,32 +269,23 @@ export function EditorWorkspace({
       aria-label="Editor workspace"
       style={{ '--workspace-panel-gap': `${PANEL_GAP}px` } as CSSProperties}
     >
-      <div
-        className="workspace-settings"
-        data-workspace-controls
-        onKeyDown={(event) => {
-          if (!event.metaKey && !event.ctrlKey) event.stopPropagation()
-        }}
-        onMouseDown={(event) => event.preventDefault()}
-      >
-        <span role="status">
-          {error ?? warning ?? (!hydrated ? 'Loading layout…' : saving ? 'Saving layout…' : '')}
-        </span>
-        {error && errorKind === 'save' && (
-          <button className="workspace-command" onClick={() => void retrySave()}>
-            Retry layout save
-          </button>
-        )}
-        <button
-          className="workspace-command"
-          onClick={() => {
-            restore.current = captureEditingSurface(root.current)
-            resetLayout()
+      {(error || warning) && (
+        <div
+          className="workspace-settings"
+          data-workspace-controls
+          onKeyDown={(event) => {
+            if (!event.metaKey && !event.ctrlKey) event.stopPropagation()
           }}
+          onMouseDown={(event) => event.preventDefault()}
         >
-          Reset layout
-        </button>
-      </div>
+          <span role="status">{error ?? warning}</span>
+          {error && errorKind === 'save' && (
+            <button className="workspace-command" onClick={() => void retrySave()}>
+              Retry layout save
+            </button>
+          )}
+        </div>
+      )}
       <div className="workspace-regions" ref={root}>
         {panels}
         {drag && (

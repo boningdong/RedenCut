@@ -24,6 +24,9 @@
 // Log prefix: [WaveformView]
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { splitAtPlayhead, muteSelection, deleteSelection } from '../../actions/timelineActions'
+import { Icon } from '../ui/Icon'
+import { trackPresentationColor } from '../../themes/trackColors'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { AudioSourceId, Clip } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
@@ -37,6 +40,8 @@ import { TrackHeader } from './TrackHeader'
 import { calculateVisibleWaveformRange } from './waveformRange'
 
 interface WaveformViewProps {
+  workspaceControls?: React.ReactNode
+  audioDetails?: React.ReactNode
   duration: number
   providersBySource: ReadonlyMap<AudioSourceId, WaveformDataProvider>
   onAddTrack(): void
@@ -45,10 +50,12 @@ interface WaveformViewProps {
 // Layout constants
 const HEADER_WIDTH = 190 // px — header column width
 const RULER_HEIGHT = 28 // px — ruler row height
-const LANE_HEIGHT = 76 // px — clip lane height
+const LANE_HEIGHT = 64 // px — clip lane height
 const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
 export function WaveformView({
+  workspaceControls,
+  audioDetails,
   duration: sourceDuration,
   providersBySource,
   onAddTrack,
@@ -72,6 +79,20 @@ export function WaveformView({
     .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
   const duration = Math.max(sourceDuration, maxClipEnd)
 
+  const hasTranscriptSelection = useTranscriptStore(
+    (state) => state.selectedTranscriptUnitIds.size > 0,
+  )
+  const transcriptEditHint = 'Edit selected text in the transcript to preserve acoustic boundaries'
+  const selection = useEditorStore((s) => s.selection)
+  const selectedClip = tracks
+    .flatMap((track) => track.clips)
+    .find((clip) => clip.id === selectedClipId)
+  const canSplit = Boolean(
+    getAudioPlayerInstance() &&
+    selectedClip &&
+    currentTime > selectedClip.outputStart &&
+    currentTime < selectedClip.outputStart + selectedClip.sourceEnd - selectedClip.sourceStart,
+  )
   const previewMode = useEditorStore((s) => s.previewMode)
   const setSelection = useEditorStore((s) => s.setSelection)
 
@@ -298,337 +319,298 @@ export function WaveformView({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'var(--color-bg-secondary)',
-        borderBottom: '1px solid var(--color-border)',
-      }}
-    >
-      {/* Main area: fixed headers column + scrollable timeline */}
-      <div style={{ display: 'flex', flexDirection: 'row' }}>
-        {/* ── Fixed headers column ──────────────────────────────────────── */}
-        <div
-          style={{
-            width: HEADER_WIDTH,
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
+    <div className="audio-panel-view">
+      <div className="feature-toolbar">
+        {workspaceControls}
+        <span className="feature-title">Audio</span>
+        <span className="panel-count">{tracks.length} tracks</span>
+        <span className="transport-separator" />
+        <button
+          aria-label="Split at playhead"
+          title={hasTranscriptSelection ? transcriptEditHint : 'Split at playhead (S)'}
+          disabled={hasTranscriptSelection || !canSplit}
+          onClick={splitAtPlayhead}
         >
-          {/* Ruler spacer — contains zoom controls */}
+          <Icon name="split" />
+        </button>
+        <button
+          aria-label="Mute selection"
+          title={hasTranscriptSelection ? transcriptEditHint : 'Mute selection (M)'}
+          disabled={hasTranscriptSelection || !selection}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={muteSelection}
+        >
+          <Icon name="mute" />
+        </button>
+        <button
+          aria-label="Delete selection"
+          title={hasTranscriptSelection ? transcriptEditHint : 'Delete selection (Delete)'}
+          disabled={hasTranscriptSelection || (!selectedClipId && !selection)}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={deleteSelection}
+        >
+          <Icon name="trash" />
+        </button>
+        <div className="toolbar-spacer" />
+        <button onClick={handleZoomOut} disabled={zoomLevel <= MIN_ZOOM} title="Zoom out">
+          −
+        </button>
+        <span className="zoom-level">{Math.round(zoomLevel * 100)}%</span>
+        <button onClick={handleZoomIn} disabled={zoomLevel >= 32} title="Zoom in">
+          +
+        </button>
+        <button className="toolbar-outline" onClick={onAddTrack}>
+          + Add Track
+        </button>
+      </div>
+      {/* Main area: fixed headers column + scrollable timeline */}
+      <div className="audio-scroll-body">
+        <div style={{ display: 'flex', flexDirection: 'row', minHeight: '100%' }}>
+          {/* ── Fixed headers column ──────────────────────────────────────── */}
           <div
             style={{
-              height: RULER_HEIGHT,
-              boxSizing: 'border-box',
-              borderRight: '1px solid var(--color-border)',
-              borderBottom: '1px solid var(--color-border-subtle)',
+              width: HEADER_WIDTH,
+              flexShrink: 0,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              padding: '0 4px',
-              gap: 2,
-              backgroundColor: 'var(--color-bg-secondary)',
+              flexDirection: 'column',
             }}
           >
-            <button
-              onClick={handleZoomOut}
-              disabled={zoomLevel <= MIN_ZOOM}
-              title="Zoom out"
-              style={{
-                background: 'none',
-                border: '1px solid var(--color-border)',
-                borderRadius: 2,
-                color:
-                  zoomLevel <= MIN_ZOOM ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
-                fontSize: 10,
-                lineHeight: 1,
-                cursor: zoomLevel <= MIN_ZOOM ? 'not-allowed' : 'pointer',
-                padding: '1px 3px',
-                opacity: zoomLevel <= MIN_ZOOM ? 0.4 : 1,
-              }}
-            >
-              −
-            </button>
-            <span
-              style={{
-                fontSize: 9,
-                color: 'var(--color-text-muted)',
-                minWidth: 22,
-                textAlign: 'center',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {zoomLevel === 1
-                ? 'fit'
-                : zoomLevel > 1
-                  ? `${zoomLevel}×`
-                  : `1/${Math.round(1 / zoomLevel)}×`}
-            </span>
-            <button
-              onClick={handleZoomIn}
-              disabled={zoomLevel >= 32}
-              title="Zoom in"
-              style={{
-                background: 'none',
-                border: '1px solid var(--color-border)',
-                borderRadius: 2,
-                color: zoomLevel >= 32 ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
-                fontSize: 10,
-                lineHeight: 1,
-                cursor: zoomLevel >= 32 ? 'not-allowed' : 'pointer',
-                padding: '1px 3px',
-                opacity: zoomLevel >= 32 ? 0.4 : 1,
-              }}
-            >
-              +
-            </button>
+            <div className="ruler-caption" style={{ height: RULER_HEIGHT }}>
+              Track / volume
+            </div>
+
+            {/* Track headers */}
+            {tracks.map((track) => (
+              <div
+                key={track.id}
+                style={{ height: LANE_HEIGHT, display: 'flex', alignItems: 'stretch' }}
+              >
+                <TrackHeader track={track} onRemove={handleRemoveTrack} />
+              </div>
+            ))}
           </div>
 
-          {/* Track headers */}
-          {tracks.map((track) => (
+          {/* ── Scrollable timeline viewport ──────────────────────────────── */}
+          <div ref={scrollViewportRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+            {/* Timeline content — width = zoomLevel × viewport width (min 100%) */}
             <div
-              key={track.id}
-              style={{ height: LANE_HEIGHT, display: 'flex', alignItems: 'stretch' }}
-            >
-              <TrackHeader track={track} onRemove={handleRemoveTrack} />
-            </div>
-          ))}
-        </div>
-
-        {/* ── Scrollable timeline viewport ──────────────────────────────── */}
-        <div ref={scrollViewportRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
-          {/* Timeline content — width = zoomLevel × viewport width (min 100%) */}
-          <div
-            style={{
-              minWidth: '100%',
-              width: duration > 0 ? `${pxPerSec * duration}px` : '100%',
-              position: 'relative',
-            }}
-          >
-            {/* Ruler row */}
-            <div
-              id="waveform-timeline"
-              onClick={handleLaneClick}
               style={{
-                height: RULER_HEIGHT,
-                width: '100%',
+                minWidth: '100%',
+                width: duration > 0 ? `${pxPerSec * duration}px` : '100%',
                 position: 'relative',
-                boxSizing: 'border-box',
-                borderBottom: '1px solid var(--color-border-subtle)',
-                cursor: 'crosshair',
-                overflow: 'hidden',
               }}
             >
-              <TimelineRuler duration={duration} pxPerSec={pxPerSec} scaleFactor={scaleFactor} />
-            </div>
+              {/* Ruler row */}
+              <div
+                id="waveform-timeline"
+                onClick={handleLaneClick}
+                style={{
+                  height: RULER_HEIGHT,
+                  width: '100%',
+                  position: 'relative',
+                  boxSizing: 'border-box',
+                  borderBottom: '1px solid var(--color-border-subtle)',
+                  cursor: 'crosshair',
+                  overflow: 'hidden',
+                }}
+              >
+                <TimelineRuler duration={duration} pxPerSec={pxPerSec} scaleFactor={scaleFactor} />
+              </div>
 
-            {/* Track lanes */}
-            {tracks.map((track) => {
-              return (
-                <div
-                  key={track.id}
-                  data-lane={track.id}
-                  data-trackid={track.id}
-                  data-track-name={track.name}
-                  style={{
-                    height: LANE_HEIGHT,
-                    position: 'relative',
-                    cursor: 'crosshair',
-                    overflow: 'hidden',
-                    borderBottom: '1px solid var(--color-border)',
-                    borderLeft:
-                      track.id === selectedTrackId
-                        ? '2px solid var(--color-accent)'
-                        : '2px solid transparent',
-                  }}
-                  onClick={(e) => handleLaneClick(e, track.id)}
-                  onPointerMove={handleClipPointerMove}
-                  onPointerUp={handleClipPointerUp}
-                >
-                  {/* Clip blocks */}
-                  {track.clips.map((clip) => {
-                    const waveformProvider = providersBySource.get(clip.audioSourceId)
-                    const clipDur = clip.sourceEnd - clip.sourceStart
-                    const leftPct =
-                      duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
-                    const widthPct = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
-                    const isDragging = dragRef.current?.clipId === clip.id
-                    const visible = waveformProvider
-                      ? calculateVisibleWaveformRange({
-                          outputStart: clip.outputStart,
-                          sourceStart: clip.sourceStart,
-                          sourceEnd: clip.sourceEnd,
-                          pxPerSec,
-                          viewportStartPx: viewport.scrollLeft,
-                          viewportWidthPx: viewport.width,
-                        })
-                      : null
-                    return (
-                      <div
-                        key={clip.id}
-                        data-clip-id={clip.id}
-                        data-audio-source-id={clip.audioSourceId}
-                        data-source-start={clip.sourceStart}
-                        data-source-end={clip.sourceEnd}
-                        onPointerDown={(e) => handleClipPointerDown(e, clip)}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedTrackId(track.id)
-                          setSelectedClipId(clip.id === selectedClipId ? null : clip.id)
-                          setSelection({ start: clip.outputStart, end: clip.outputStart + clipDur })
-                        }}
-                        style={{
-                          position: 'absolute',
-                          left: `${leftPct}%`,
-                          width: `${widthPct}%`,
-                          top: 4,
-                          bottom: 4,
-                          borderRadius: 6,
-                          border:
-                            clip.id === selectedClipId
-                              ? '1px solid var(--color-accent)'
-                              : `1px solid color-mix(in srgb, ${track.color} 50%, transparent)`,
-                          backgroundColor: clip.muted
-                            ? 'var(--color-danger-clip-bg)'
-                            : `color-mix(in srgb, ${track.color} 9%, var(--color-bg-primary))`,
-                          opacity: isDragging ? 0.4 : 1,
-                          cursor: 'grab',
-                          pointerEvents: 'all',
-                          zIndex: isDragging ? 0 : 5,
-                          boxSizing: 'border-box',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {waveformProvider && visible && (
-                          <CanvasWaveform
-                            provider={waveformProvider}
-                            sourceStartSeconds={visible.sourceStartSeconds}
-                            sourceEndSeconds={visible.sourceEndSeconds}
-                            leftInClipPx={visible.leftInClipPx}
-                            widthPx={visible.widthPx}
-                            heightPx={LANE_HEIGHT - 8}
-                            color={track.color}
-                            muted={clip.muted}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {/* Drag ghost */}
-                  {ghostState &&
-                    dragRef.current &&
-                    track.clips.some((c) => c.id === dragRef.current!.clipId) && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: `${ghostState.pct}%`,
-                          width: `${ghostState.widthPct}%`,
-                          top: 4,
-                          bottom: 4,
-                          borderRadius: 6,
-                          border: '1px dashed var(--color-accent)',
-                          backgroundColor: 'var(--color-accent-ghost)',
-                          pointerEvents: 'none',
-                          zIndex: 20,
-                        }}
-                      />
-                    )}
-
-                  {/* Gap overlays — cover waveform between clips */}
-                  {(() => {
-                    const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
-                    return sorted.slice(0, -1).flatMap((clip, i) => {
-                      const clipEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
-                      const nextStart = sorted[i + 1].outputStart
-                      if (nextStart <= clipEnd + 0.001) return []
-                      const leftPct = duration > 0 ? (clipEnd / duration) * scaleFactor * 100 : 0
-                      const widthPct =
-                        duration > 0 ? ((nextStart - clipEnd) / duration) * scaleFactor * 100 : 0
-                      return [
+              {/* Track lanes */}
+              {tracks.map((track) => {
+                return (
+                  <div
+                    key={track.id}
+                    data-lane={track.id}
+                    data-trackid={track.id}
+                    data-track-name={track.name}
+                    style={{
+                      height: LANE_HEIGHT,
+                      position: 'relative',
+                      cursor: 'crosshair',
+                      overflow: 'hidden',
+                      borderBottom: '1px solid var(--color-border)',
+                      borderLeft:
+                        track.id === selectedTrackId
+                          ? '2px solid var(--color-accent)'
+                          : '2px solid transparent',
+                    }}
+                    onClick={(e) => handleLaneClick(e, track.id)}
+                    onPointerMove={handleClipPointerMove}
+                    onPointerUp={handleClipPointerUp}
+                  >
+                    {/* Clip blocks */}
+                    {track.clips.map((clip) => {
+                      const waveformProvider = providersBySource.get(clip.audioSourceId)
+                      const clipDur = clip.sourceEnd - clip.sourceStart
+                      const leftPct =
+                        duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
+                      const widthPct = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
+                      const isDragging = dragRef.current?.clipId === clip.id
+                      const visible = waveformProvider
+                        ? calculateVisibleWaveformRange({
+                            outputStart: clip.outputStart,
+                            sourceStart: clip.sourceStart,
+                            sourceEnd: clip.sourceEnd,
+                            pxPerSec,
+                            viewportStartPx: viewport.scrollLeft,
+                            viewportWidthPx: viewport.width,
+                          })
+                        : null
+                      return (
                         <div
-                          key={`gap-${clip.id}`}
+                          key={clip.id}
+                          className="waveform-clip"
+                          data-selected={clip.id === selectedClipId}
+                          data-muted={clip.muted}
+                          data-clip-id={clip.id}
+                          data-audio-source-id={clip.audioSourceId}
+                          data-source-start={clip.sourceStart}
+                          data-source-end={clip.sourceEnd}
+                          onPointerDown={(e) => handleClipPointerDown(e, clip)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedTrackId(track.id)
+                            setSelectedClipId(clip.id === selectedClipId ? null : clip.id)
+                            setSelection({
+                              start: clip.outputStart,
+                              end: clip.outputStart + clipDur,
+                            })
+                          }}
+                          style={
+                            {
+                              position: 'absolute',
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              top: 8,
+                              bottom: 8,
+                              borderRadius: 6,
+                              '--track-color': trackPresentationColor(track.color),
+                              opacity: isDragging ? 0.4 : undefined,
+                              cursor: 'grab',
+                              pointerEvents: 'all',
+                              zIndex: isDragging ? 0 : 5,
+                              boxSizing: 'border-box',
+                              overflow: 'hidden',
+                            } as React.CSSProperties
+                          }
+                        >
+                          <span
+                            className="clip-label"
+                            style={{ color: trackPresentationColor(track.color) }}
+                          >
+                            {track.name}
+                          </span>
+                          {waveformProvider && visible && (
+                            <CanvasWaveform
+                              provider={waveformProvider}
+                              sourceStartSeconds={visible.sourceStartSeconds}
+                              sourceEndSeconds={visible.sourceEndSeconds}
+                              leftInClipPx={visible.leftInClipPx}
+                              widthPx={visible.widthPx}
+                              heightPx={LANE_HEIGHT - 35}
+                              color={trackPresentationColor(track.color)}
+                              muted={clip.muted}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    {/* Drag ghost */}
+                    {ghostState &&
+                      dragRef.current &&
+                      track.clips.some((c) => c.id === dragRef.current!.clipId) && (
+                        <div
                           style={{
                             position: 'absolute',
-                            left: `${leftPct}%`,
-                            width: `${widthPct}%`,
-                            top: 0,
-                            bottom: 0,
-                            backgroundColor: 'var(--color-bg-secondary)',
+                            left: `${ghostState.pct}%`,
+                            width: `${ghostState.widthPct}%`,
+                            top: 8,
+                            bottom: 8,
+                            borderRadius: 6,
+                            border: '1px dashed var(--color-accent)',
+                            backgroundColor: 'var(--color-accent-ghost)',
                             pointerEvents: 'none',
-                            zIndex: 6,
+                            zIndex: 20,
                           }}
-                        />,
-                      ]
-                    })
-                  })()}
+                        />
+                      )}
 
-                  {/* Split markers */}
-                  {track.clips.slice(1).map((clip) => (
-                    <div
-                      key={`split-${clip.id}`}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left:
-                          duration > 0
-                            ? `calc(${(clip.outputStart / duration) * scaleFactor * 100}% - 1px)`
-                            : '0',
-                        width: 2,
-                        backgroundColor: 'var(--color-accent-split)',
-                        pointerEvents: 'none',
-                        zIndex: 10,
-                      }}
-                    />
-                  ))}
-                </div>
-              )
-            })}
+                    {/* Gap overlays — cover waveform between clips */}
+                    {(() => {
+                      const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
+                      return sorted.slice(0, -1).flatMap((clip, i) => {
+                        const clipEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
+                        const nextStart = sorted[i + 1].outputStart
+                        if (nextStart <= clipEnd + 0.001) return []
+                        const leftPct = duration > 0 ? (clipEnd / duration) * scaleFactor * 100 : 0
+                        const widthPct =
+                          duration > 0 ? ((nextStart - clipEnd) / duration) * scaleFactor * 100 : 0
+                        return [
+                          <div
+                            key={`gap-${clip.id}`}
+                            style={{
+                              position: 'absolute',
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              top: 0,
+                              bottom: 0,
+                              backgroundColor: 'var(--color-bg-secondary)',
+                              pointerEvents: 'none',
+                              zIndex: 6,
+                            }}
+                          />,
+                        ]
+                      })
+                    })()}
 
-            {/* Global playhead — inside scrollable content so it scrolls with clips */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: `${playheadPct}%`,
-                width: 1,
-                backgroundColor: 'var(--color-playhead)',
-                pointerEvents: 'none',
-                zIndex: 30,
-              }}
-            />
+                    {/* Split markers */}
+                    {track.clips.slice(1).map((clip) => (
+                      <div
+                        key={`split-${clip.id}`}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left:
+                            duration > 0
+                              ? `calc(${(clip.outputStart / duration) * scaleFactor * 100}% - 1px)`
+                              : '0',
+                          width: 2,
+                          backgroundColor: 'var(--color-accent-split)',
+                          pointerEvents: 'none',
+                          zIndex: 10,
+                        }}
+                      />
+                    ))}
+                  </div>
+                )
+              })}
+
+              {/* Global playhead — inside scrollable content so it scrolls with clips */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: `${playheadPct}%`,
+                  width: 1,
+                  backgroundColor: 'var(--color-playhead)',
+                  pointerEvents: 'none',
+                  zIndex: 30,
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
-
-      {/* + Add Track row */}
-      <button
-        type="button"
-        onClick={() => {
-          onAddTrack()
-        }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '6px 12px',
-          cursor: 'pointer',
-          color: 'var(--color-text-muted)',
-          fontSize: 'var(--text-xs)',
-          borderTop: '1px solid var(--color-border)',
-        }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLButtonElement).style.color = 'var(--color-accent)')
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)')
-        }
-      >
-        + Add Track
-      </button>
+      <div className="audio-footer">
+        <span>{selectedClipId ? 'Clip selected' : 'No clip selected'}</span>
+        <span className="audio-footer-hint">Drag clips to move · S Split · M Mute</span>
+        {audioDetails}
+      </div>
     </div>
   )
 }

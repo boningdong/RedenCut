@@ -35,9 +35,9 @@ describe('drawWaveform', () => {
     expect(clearRectCalls).toEqual([{ x: 0, y: 0, width: 30, height: 80 }])
     expect(fillRectCalls).toHaveLength(3)
     expect(fillRectCalls).toEqual([
-      { x: 0, y: 20, width: 10, height: 60 },
-      { x: 10, y: 30, width: 10, height: 20 },
-      { x: 20, y: 0, width: 10, height: 70 },
+      { x: 4.25, y: 20, width: 1.5, height: 60 },
+      { x: 14.25, y: 30, width: 1.5, height: 20 },
+      { x: 24.25, y: 0, width: 1.5, height: 70 },
     ])
   })
 
@@ -46,7 +46,7 @@ describe('drawWaveform', () => {
 
     drawWaveform(context, [{ min: -0.5, max: 0.25 }], 40, 80, '#abc')
 
-    expect(fillRectCalls).toEqual([{ x: 0, y: 30, width: 40, height: 30 }])
+    expect(fillRectCalls).toEqual([{ x: 19.25, y: 30, width: 1.5, height: 30 }])
   })
 
   it('clamps out-of-range and non-finite amplitudes to bounded coordinates', () => {
@@ -65,10 +65,35 @@ describe('drawWaveform', () => {
     )
 
     expect(fillRectCalls).toEqual([
-      { x: 0, y: 0, width: 10, height: 80 },
-      { x: 10, y: 40, width: 10, height: 1 },
-      { x: 20, y: 40, width: 10, height: 1 },
+      { x: 4.25, y: 0, width: 1.5, height: 80 },
+      { x: 14.25, y: 40, width: 1.5, height: 1 },
+      { x: 24.25, y: 40, width: 1.5, height: 1 },
     ])
     expect(fillRectCalls.every(({ y, height }) => y >= 0 && y + height <= 80)).toBe(true)
   })
+})
+
+it('aggregates dense buckets without losing short peaks and scales spacing for retina', () => {
+  const { context, fillRectCalls } = recordingContext()
+  const buckets = Array.from({ length: 100 }, () => ({ min: -0.1, max: 0.1 }))
+  buckets[7] = { min: -1, max: 1 }
+  drawWaveform(context, buckets, 60, 40, '#abc', 2)
+  expect(fillRectCalls).toHaveLength(10)
+  expect(fillRectCalls[0]).toEqual({ x: 1.5, y: 0, width: 3, height: 40 })
+  expect(fillRectCalls.every((bar) => bar.width === 3 && bar.x + bar.width <= 60)).toBe(true)
+})
+
+it('uses rounded bars when a browser drawing context supports paths', () => {
+  const { context, fillRectCalls } = recordingContext()
+  const rounded: number[][] = []
+  let filled = 0
+  Object.assign(context, {
+    beginPath: () => undefined,
+    roundRect: (...args: number[]) => rounded.push(args),
+    fill: () => filled++,
+  })
+  drawWaveform(context, [{ min: -1, max: 1 }], 6, 20, '#abc')
+  expect(rounded).toEqual([[2.25, 0, 1.5, 20, 0.75]])
+  expect(filled).toBe(1)
+  expect(fillRectCalls).toHaveLength(0)
 })
