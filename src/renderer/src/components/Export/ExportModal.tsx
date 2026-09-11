@@ -10,6 +10,8 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import type { ExportJobId, RenderProgress } from '@shared/ipc.types'
 import type { ProjectDraft, RendererSession, SessionPrecondition } from '@shared/session.types'
 
+import { useTranslation } from '../../i18n/useTranslation'
+
 interface ExportModalProps {
   session: RendererSession
   draft: ProjectDraft
@@ -27,6 +29,7 @@ interface ActiveExportIdentity extends SessionPrecondition {
 }
 
 export function ExportModal({ session, draft, onClose }: ExportModalProps) {
+  const { t } = useTranslation()
   const [format, setFormat] = useState<ProjectDraft['export']['format']>('mp3')
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
   const [isCancelling, setIsCancelling] = useState(false)
@@ -174,7 +177,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         }}
       >
         <h2 style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>
-          Export Audio
+          {t('export.modalTitle')}
         </h2>
 
         <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
@@ -297,7 +300,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
               opacity: isExporting ? 0.5 : 1,
             }}
           >
-            {isExporting ? 'Exporting…' : 'Export'}
+            {isExporting ? 'Exporting…' : t('export.title')}
           </button>
         </div>
       </div>

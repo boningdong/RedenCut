@@ -1,3 +1,4 @@
+import { createTranslator } from '../shared/i18n/createTranslator'
 import { AppPreferencesStore } from './preferences/AppPreferencesStore'
 import { registerAppPreferencesIpc } from './ipc/appPreferences.ipc'
 import { WorkspaceLayoutStore } from './preferences/WorkspaceLayoutStore'
@@ -31,7 +32,6 @@ import { createFileRangeResponse } from './protocol/fileRangeResponse'
 
 // Isolation must precede the single-instance lock and all workspace initialization.
 const harnessMode = configureHarnessStartup(app, process.env)
-const dialogs = createProjectDialogs(harnessMode, process.env)
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -75,6 +75,15 @@ startApplicationLifecycle({
     )
     await appPreferences.read().catch(console.error)
     registerAppPreferencesIpc(appPreferences)
+    const translators = {
+      en: createTranslator('en').getFixedT('en'),
+      'zh-CN': createTranslator('zh-CN').getFixedT('zh-CN'),
+    }
+    const dialogs = createProjectDialogs(
+      harnessMode,
+      process.env,
+      () => translators[appPreferences.getSnapshot().resolvedLocale],
+    )
     const cleanupWarnings = new CleanupWarningStore()
     const controller = new WorkspaceController(
       undefined,

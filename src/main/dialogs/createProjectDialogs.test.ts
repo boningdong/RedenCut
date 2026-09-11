@@ -10,6 +10,7 @@ const native = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({ dialog: native }))
 import { createProjectDialogs } from './createProjectDialogs'
+import { createTranslator } from '../../shared/i18n/createTranslator'
 
 const roots: string[] = []
 afterEach(() => {
@@ -74,3 +75,95 @@ test.each([undefined, '0', '../1', '1.2'])(
     )
   },
 )
+
+test('native dialogs resolve the committed language at invocation and retain response mapping', async () => {
+  let translator = createTranslator('en').getFixedT('en')
+  const dialogs = createProjectDialogs(false, {}, () => translator)
+  native.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/voice.wav'] })
+  native.showSaveDialog.mockResolvedValue({ canceled: false, filePath: '/episode' })
+  native.showMessageBox.mockResolvedValue({ response: 0 })
+  await dialogs.importAudio(window)
+  expect(native.showOpenDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({
+      title: 'Import Audio',
+      filters: [
+        { name: 'Audio Files', extensions: ['wav', 'mp3', 'flac', 'aac', 'm4a', 'ogg', 'aiff'] },
+      ],
+    }),
+  )
+  await dialogs.saveProject(window)
+  expect(native.showSaveDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({ title: 'Save PodCut Project', defaultPath: 'Untitled.podcut' }),
+  )
+  await dialogs.openProject(window)
+  expect(native.showOpenDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({ title: 'Open PodCut Project' }),
+  )
+  await dialogs.exportAudio(window, 'wav')
+  expect(native.showSaveDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({
+      title: 'Export Audio',
+      defaultPath: 'export.wav',
+      filters: [{ name: 'WAV', extensions: ['wav'] }],
+    }),
+  )
+  expect(await dialogs.dirtyProject(window)).toBe('save')
+  expect(native.showMessageBox).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({
+      message: 'Save changes before opening another project?',
+      buttons: ['Save', "Don't Save", 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+    }),
+  )
+  translator = createTranslator('zh-CN').getFixedT('zh-CN')
+  await dialogs.importAudio(window)
+  expect(native.showOpenDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({
+      title: '导入音频',
+      filters: [
+        { name: '音频文件', extensions: ['wav', 'mp3', 'flac', 'aac', 'm4a', 'ogg', 'aiff'] },
+      ],
+    }),
+  )
+  expect(await dialogs.saveProject(window)).toBe('/episode.podcut')
+  expect(native.showSaveDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({ title: '保存 PodCut 项目', defaultPath: '未命名.podcut' }),
+  )
+  await dialogs.openProject(window)
+  expect(native.showOpenDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({ title: '打开 PodCut 项目' }),
+  )
+  expect(await dialogs.exportAudio(window, 'flac')).toBe('/episode')
+  expect(native.showSaveDialog).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({
+      title: '导出音频',
+      defaultPath: 'export.flac',
+      filters: [{ name: 'FLAC', extensions: ['flac'] }],
+    }),
+  )
+  expect(await dialogs.dirtyProject(window)).toBe('save')
+  expect(native.showMessageBox).toHaveBeenLastCalledWith(
+    window,
+    expect.objectContaining({
+      message: '打开其他项目前要保存更改吗？',
+      buttons: ['保存', '不保存', '取消'],
+      defaultId: 0,
+      cancelId: 2,
+    }),
+  )
+  native.showMessageBox
+    .mockResolvedValueOnce({ response: 1 })
+    .mockResolvedValueOnce({ response: 2 })
+  expect(await dialogs.dirtyProject(window)).toBe('discard')
+  expect(await dialogs.dirtyProject(window)).toBe('cancel')
+})

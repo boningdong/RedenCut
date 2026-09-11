@@ -13,6 +13,7 @@ import type {
 import { createEmptyProject } from '@shared/project.types'
 import type { RendererSession, WorkspaceToken } from '@shared/session.types'
 import { ExportModal } from './ExportModal'
+import { useLocaleStore } from '../../stores/locale.store'
 
 const TOKEN_A = 'workspace-a' as WorkspaceToken
 const TOKEN_B = 'workspace-b' as WorkspaceToken
@@ -88,6 +89,7 @@ function result(
 
 describe('ExportModal', () => {
   beforeEach(() => {
+    useLocaleStore.setState({ preference: 'en', resolvedLocale: 'en' })
     const ids = ['export-a', 'export-b']
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
       () => ids.shift()! as `${string}-${string}-${string}-${string}-${string}`,
@@ -97,6 +99,40 @@ describe('ExportModal', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('switches an open modal without losing its chosen format or restarting an active export', async () => {
+    const installed = installApi()
+    render(<ExportModal session={session()} draft={session().draft} onClose={vi.fn()} />)
+    const format = screen.getByRole('combobox') as HTMLSelectElement
+    fireEvent.change(format, { target: { value: 'flac' } })
+    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+    expect(screen.getByRole('heading', { name: '导出音频' })).toBeTruthy()
+    expect(screen.getByRole('combobox')).toBe(format)
+    expect(format.value).toBe('flac')
+    fireEvent.click(screen.getByRole('button', { name: '导出' }))
+    await waitFor(() => expect(installed.exports).toHaveLength(1))
+    act(() => {
+      installed.progress()({
+        jobId: 'export-a' as ExportJobId,
+        workspaceToken: TOKEN_A,
+        revision: 7,
+        percent: 0.5,
+        currentSeconds: 15,
+        totalSeconds: 30,
+      })
+      useLocaleStore.setState({ resolvedLocale: 'en' })
+    })
+    expect(screen.getByRole('heading', { name: 'Export Audio' })).toBeTruthy()
+    expect(screen.getByText('50%')).toBeTruthy()
+    expect(installed.exports).toHaveLength(1)
+    expect(installed.exports[0].request).toMatchObject({
+      format: 'flac',
+      jobId: 'export-a',
+      workspaceToken: TOKEN_A,
+      revision: 7,
+    })
+    expect(installed.cancellations).toHaveLength(0)
   })
 
   it('filters progress and results by the complete active job and session identity', async () => {

@@ -1,11 +1,16 @@
 import { join } from 'node:path'
 import { HarnessDialogMailbox } from './HarnessDialogMailbox'
-import { nativeProjectDialogs } from './nativeProjectDialogs'
+import type { TFunction } from 'i18next'
+import { createNativeProjectDialogs } from './nativeProjectDialogs'
 import type { ProjectDialogs } from './ProjectDialogs'
 
 // Called only after configureHarnessStartup has validated the run identity.
-export function createProjectDialogs(harnessMode: boolean, env: NodeJS.ProcessEnv): ProjectDialogs {
-  if (!harnessMode) return nativeProjectDialogs
+export function createProjectDialogs(
+  harnessMode: boolean,
+  env: NodeJS.ProcessEnv,
+  getTranslator?: () => TFunction,
+): ProjectDialogs {
+  if (!harnessMode) return createNativeProjectDialogs(getTranslator)
   const generation = env.PODCUT_HARNESS_GENERATION
   if (!generation || !/^[1-9]\d*$/.test(generation)) throw new Error('INVALID_HARNESS_GENERATION')
   const mailbox = new HarnessDialogMailbox(

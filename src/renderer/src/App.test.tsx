@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
+import { useLocaleStore } from './stores/locale.store'
 import { useWorkspaceStore } from './stores/workspace.store'
 import { DEFAULT_WORKSPACE_LAYOUT } from '@shared/workspaceLayout.types'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -315,6 +316,7 @@ async function renderInitialized(initial: RendererSession) {
 
 describe('App transcription job identity', () => {
   beforeEach(() => {
+    useLocaleStore.setState({ preference: 'en', resolvedLocale: 'en' })
     useEditorStore.getState().reset()
     useTimelineStore.getState().reset()
     useTranscriptStore.getState().reset()
@@ -343,6 +345,36 @@ describe('App transcription job identity', () => {
       [...header.querySelectorAll('button')].map((button) => button.textContent?.trim()),
     ).toEqual(['Open Project', 'Save', 'Save As', 'Export'])
     expect(header.querySelector('.project-brand')).toBeNull()
+  })
+
+  it('changes header language without resetting playback, project edits, or timeline history', async () => {
+    const { api, requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    act(() => {
+      useTimelineStore.getState().setSelectedClipId('clip-A')
+      useTimelineStore.getState().splitAt(5)
+      usePlaybackStore.getState().setCurrentTime(4)
+      usePlaybackStore.getState().setPlaying(true)
+    })
+    const player = getAudioPlayerInstance()
+    const editor = useEditorStore.getState()
+    const timeline = useTimelineStore.getState()
+    const playback = usePlaybackStore.getState()
+    const transcript = useTranscriptStore.getState()
+    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+    expect(screen.getByRole('button', { name: '导出' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: '语言' })).toBeTruthy()
+    expect(getAudioPlayerInstance()).toBe(player)
+    expect(mocks.players).toHaveLength(1)
+    expect(mocks.destroyPlayer).not.toHaveBeenCalled()
+    expect(useEditorStore.getState()).toBe(editor)
+    expect(useTimelineStore.getState()).toBe(timeline)
+    expect(usePlaybackStore.getState()).toBe(playback)
+    expect(useTranscriptStore.getState()).toBe(transcript)
+    expect(requests).toHaveLength(1)
+    expect(api.speechAnalysis.cancel).not.toHaveBeenCalled()
+    expect(mocks.players[0].pause).not.toHaveBeenCalled()
   })
 
   it('keeps the active player, project state and timeline history when workspace panels move', async () => {
@@ -378,6 +410,78 @@ describe('App transcription job identity', () => {
     expect(useEditorStore.getState()).toBe(editor)
     expect(useTimelineStore.getState()).toBe(timeline)
     await waitFor(() => expect(api.workspaceLayout.set).toHaveBeenCalled())
+  })
+
+  it('resolves the speaker-reset confirmation in the current language at invocation', async () => {
+    const { requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+    const provenance = {
+      engineId: 'test',
+      engineVersion: '1',
+      modelId: 'test',
+      configHash: '0'.repeat(64),
+      artifactSchemaVersion: 1,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    }
+    act(() =>
+      useTranscriptStore.getState().loadAnalyses([
+        {
+          audioSourceId: SOURCE_A,
+          analysisRevisionId: 'revision' as never,
+          transcript: {
+            id: 'transcript' as never,
+            revision: 1,
+            mode: 'verbatim',
+            units: [],
+            provenance,
+          },
+          alignment: {
+            id: 'alignment' as never,
+            transcriptArtifactId: 'transcript' as never,
+            transcriptRevision: 1,
+            acousticEditUnits: [],
+            provenance,
+          },
+          diarization: { id: 'diarization' as never, turns: [], provenance },
+          speakerAttribution: {
+            analysisRevisionId: 'revision' as never,
+            alignmentArtifactId: 'alignment' as never,
+            diarizationArtifactId: 'diarization' as never,
+            attributions: [],
+            provenance: {
+              algorithmId: 'test',
+              algorithmVersion: '1',
+              configHash: '0'.repeat(64),
+              artifactSchemaVersion: 1,
+              createdAt: '2026-01-01T00:00:00.000Z',
+            },
+          },
+          speakers: [
+            {
+              id: 'speaker' as never,
+              analysisRevisionId: 'revision' as never,
+              diarizationLabel: 'SPEAKER_00',
+              defaultDisplayName: 'Speaker 1',
+            },
+          ],
+          speakerLabelOverrides: [{ speakerId: 'speaker' as never, displayName: 'Custom name' }],
+        },
+      ]),
+    )
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    expect(confirm).toHaveBeenLastCalledWith(
+      'Re-analysis will reset your custom speaker names. Continue?',
+    )
+    expect(requests).toHaveLength(0)
+    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    expect(confirm).toHaveBeenLastCalledWith('重新分析将重置自定义说话人名称。是否继续？')
+    expect(requests).toHaveLength(0)
+    confirm.mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0].request.confirmSpeakerLabelReset).toBe(true)
+    confirm.mockRestore()
   })
 
   it('applies the authoritative speech-analysis session without making analysis a local edit', async () => {

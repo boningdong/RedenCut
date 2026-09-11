@@ -41,6 +41,7 @@ Other chords, composition events, and key releases restore normal menu shortcut 
 ## Focus Rules
 
 - Do not intercept shortcuts while focus is in an `input` or `textarea`.
+- While the language selector is focused, native keys (letters, arrows, Space, and Escape) stay within the selector; Command/Control project shortcuts retain their editor meanings.
 - Preserve unmodified Space activation for native buttons, selects, and disclosure summaries; these controls must not toggle playback instead of their own action.
 - Save, Undo, and Redo remain project commands while focus is in the read-only transcript surface; they prevent native DOM editing history.
 - Other unmodified keys in content-editable elements remain local to that surface. Canonical transcript M, Delete, and Backspace share occurrence-aware editing and expansion confirmation; S does not split a stale waveform clip from transcript focus.

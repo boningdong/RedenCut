@@ -1,3 +1,6 @@
+import { useTranslation } from './i18n/useTranslation'
+import { LanguageSelector } from './components/LanguageSelector'
+import { LocaleNotice } from './components/LocaleNotice'
 import { attachRedactionPreview } from './actions/playbackActions'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { AudioSourceId } from '@shared/project.types'
@@ -85,6 +88,7 @@ function snapshotDraft(): ProjectDraft | null {
 }
 
 export default function App() {
+  const { t } = useTranslation()
   const [waveforms, setWaveforms] = useState<ReadonlyMap<AudioSourceId, WaveformDataProvider>>(
     new Map(),
   )
@@ -623,7 +627,7 @@ export default function App() {
           .analyses.find((analysis) => analysis.audioSourceId === sourceId)
         const confirmSpeakerLabelReset = Boolean(
           existingAnalysis?.speakerLabelOverrides.length &&
-          window.confirm('Re-analysis will reset your custom speaker names. Continue?'),
+          window.confirm(t('dialogs.resetSpeakerNames')),
         )
         if (existingAnalysis?.speakerLabelOverrides.length && !confirmSpeakerLabelReset) return
         const unavailable = await window.electronAPI.speechAnalysis.checkAvailability()
@@ -668,7 +672,7 @@ export default function App() {
         }
       }
     },
-    [invalidateImportJobForSession, loadEditorSession],
+    [invalidateImportJobForSession, loadEditorSession, t],
   )
 
   const primarySource = session?.sources[0]
@@ -699,6 +703,7 @@ export default function App() {
           </span>
         </div>
         <div className="project-actions">
+          <LanguageSelector />
           <span className="project-save-state">
             <i data-dirty={isDirty} />
             {isDirty ? 'Unsaved changes' : 'All changes saved'}
@@ -735,11 +740,12 @@ export default function App() {
             onClick={() => setShowExport(true)}
             disabled={!tracks.length}
           >
-            <Icon name="upload" /> Export
+            <Icon name="upload" /> {t('export.title')}
           </Button>
         </div>
       </header>
 
+      <LocaleNotice />
       {error && (
         <div
           role="alert"
