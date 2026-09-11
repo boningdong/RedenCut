@@ -100,7 +100,7 @@ test('imported short audio survives project save and a full application restart'
       ...identity,
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },
     })
-    await call('browser_click', { ...identity, target: 'button:text-is("Import Audio")' })
+    await call('browser_click', { ...identity, target: 'button:text-is("+ Add Track")' })
     const importedTrack = await readyTrack()
     await screenshot('imported')
 

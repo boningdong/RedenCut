@@ -20,6 +20,7 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/timeline.store'
+import { useTranscriptStore } from '../stores/transcript.store'
 import { splitAtPlayhead, muteSelection, deleteSelection } from '../actions/timelineActions'
 import { getAudioPlayerInstance } from '@shared/player.types'
 
@@ -34,7 +35,8 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
 
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
+      if (e.isComposing || !(e.target instanceof HTMLElement)) return
+      const target = e.target
 
       // Don't intercept while typing in a real input field.
       // contentEditable (transcript panel) gets a carve-out for Space so the
@@ -42,9 +44,9 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
       const isTypingField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
       const isContentEditable = target.isContentEditable
       if (isTypingField) return
-      if (isContentEditable && e.code !== 'Space') return
 
       const isMeta = e.metaKey || e.ctrlKey
+      if (isMeta && e.altKey) return
       const player = getAudioPlayerInstance()
 
       // ── Cmd+S — Save ────────────────────────────────────────────────────
@@ -69,6 +71,13 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
       }
 
       if (isMeta) return
+      if (isContentEditable && e.code !== 'Space') return
+      // Canonical text edits are resolved by the transcript, never as a broad timeline range.
+      if (
+        useTranscriptStore.getState().selectedTranscriptUnitIds.size > 0 &&
+        ['KeyS', 'KeyM', 'KeyU', 'Delete', 'Backspace'].includes(e.code)
+      )
+        return
       // Space activates native controls on keyup. Leave its default action intact.
       if (
         e.code === 'Space' &&

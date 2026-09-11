@@ -119,3 +119,41 @@ it('preserves sequential audible conversational turns despite repeated occurrenc
     ['a-return'],
   ])
 })
+
+function fragment(id: string, start: number, end: number, muted = false): TranscriptOccurrence {
+  return {
+    ...unit(id, 'a', start, end),
+    scopeId: id,
+    analysis: { audioSourceId: 'source', analysisRevisionId: 'revision' },
+    clip: { id, audioSourceId: 'source', sourceStart: start, sourceEnd: end, outputStart: start },
+    sourceStart: start,
+    sourceEnd: end,
+    muted,
+  } as TranscriptOccurrence
+}
+
+it('keeps a sentence inline across contiguous audio edit fragments without losing occurrence identity', () => {
+  const units = [
+    fragment('before', 0, 0.5),
+    fragment('deleted', 0.5, 1, true),
+    fragment('after', 1, 1.5),
+  ]
+  const blocks = buildDialogueBlocks(units)
+  expect(blocks).toHaveLength(1)
+  expect(blocks[0].units).toEqual(units)
+  expect(blocks[0].units.map((u) => u.scopeId)).toEqual(['before', 'deleted', 'after'])
+})
+
+it('does not merge moved, repeated, or unrelated source occurrences into the original sentence', () => {
+  const before = fragment('before', 0, 0.5)
+  const after = fragment('after', 0.5, 1)
+  for (const clip of [
+    { ...after.clip, outputStart: 0.7 },
+    { ...after.clip, sourceStart: 0, sourceEnd: 0.5 },
+    { ...after.clip, audioSourceId: 'other' },
+  ]) {
+    expect(
+      buildDialogueBlocks([before, { ...after, clip: clip as TranscriptOccurrence['clip'] }]),
+    ).toHaveLength(2)
+  }
+})

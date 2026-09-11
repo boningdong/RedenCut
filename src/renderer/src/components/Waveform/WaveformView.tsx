@@ -44,6 +44,7 @@ interface WaveformViewProps {
   audioDetails?: React.ReactNode
   duration: number
   providersBySource: ReadonlyMap<AudioSourceId, WaveformDataProvider>
+  isImporting?: boolean
   onAddTrack(): void
 }
 
@@ -59,6 +60,7 @@ export function WaveformView({
   duration: sourceDuration,
   providersBySource,
   onAddTrack,
+  isImporting = false,
 }: WaveformViewProps) {
   const tracks = useTimelineStore((s) => s.tracks)
   const removeTrack = useTimelineStore((s) => s.removeTrack)
@@ -83,6 +85,13 @@ export function WaveformView({
     (state) => state.selectedTranscriptUnitIds.size > 0,
   )
   const transcriptEditHint = 'Edit selected text in the transcript to preserve acoustic boundaries'
+  const audioPanel = useRef<HTMLDivElement>(null)
+  const focusTimeline = useCallback(() => {
+    window.getSelection()?.removeAllRanges()
+    useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set())
+    useEditorStore.getState().setSelection(null)
+    audioPanel.current?.focus({ preventScroll: true })
+  }, [])
   const selection = useEditorStore((s) => s.selection)
   const selectedClip = tracks
     .flatMap((track) => track.clips)
@@ -212,13 +221,14 @@ export function WaveformView({
   // Dividing by scaleFactor maps click position back to the correct time.
   const handleLaneClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>, trackId?: string) => {
+      focusTimeline()
       if (trackId) setSelectedTrackId(trackId)
       const rect = e.currentTarget.getBoundingClientRect()
       const pct = (e.clientX - rect.left) / rect.width
       const t = Math.min(duration, Math.max(0, (pct / scaleFactor) * duration))
       getAudioPlayerInstance()?.seekTo(t)
     },
-    [duration, scaleFactor, setSelectedTrackId],
+    [duration, focusTimeline, scaleFactor, setSelectedTrackId],
   )
 
   // ── Remove track ─────────────────────────────────────────────────────────
@@ -244,6 +254,7 @@ export function WaveformView({
   const handleClipPointerDown = useCallback(
     (e: React.PointerEvent, clip: Clip) => {
       e.preventDefault()
+      focusTimeline()
       e.currentTarget.setPointerCapture(e.pointerId)
       const sf = Math.min(1, zoomLevel)
       dragRef.current = {
@@ -258,7 +269,7 @@ export function WaveformView({
         duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * sf * 100 : 0
       setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0, widthPct })
     },
-    [duration, zoomLevel],
+    [duration, focusTimeline, zoomLevel],
   )
 
   const handleClipPointerMove = useCallback(
@@ -319,7 +330,7 @@ export function WaveformView({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="audio-panel-view">
+    <div className="audio-panel-view" ref={audioPanel} tabIndex={-1}>
       <div className="feature-toolbar">
         {workspaceControls}
         <span className="feature-title">Audio</span>
@@ -359,13 +370,10 @@ export function WaveformView({
         <button onClick={handleZoomIn} disabled={zoomLevel >= 32} title="Zoom in">
           +
         </button>
-        <button className="toolbar-outline" onClick={onAddTrack}>
-          + Add Track
-        </button>
       </div>
       {/* Main area: fixed headers column + scrollable timeline */}
       <div className="audio-scroll-body">
-        <div style={{ display: 'flex', flexDirection: 'row', minHeight: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'row' }}>
           {/* ── Fixed headers column ──────────────────────────────────────── */}
           <div
             style={{
@@ -605,6 +613,9 @@ export function WaveformView({
             </div>
           </div>
         </div>
+        <button className="audio-add-track" disabled={isImporting} onClick={onAddTrack}>
+          + Add Track
+        </button>
       </div>
       <div className="audio-footer">
         <span>{selectedClipId ? 'Clip selected' : 'No clip selected'}</span>

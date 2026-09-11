@@ -9,6 +9,7 @@ import { useTranscriptStore } from '../../stores/transcript.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { WaveformView } from './WaveformView'
+import { TranscriptPanel } from '../Transcript/TranscriptPanel'
 
 const canvasSpy = vi.fn()
 vi.mock('./CanvasWaveform', () => ({
@@ -154,5 +155,34 @@ describe('WaveformView managed providers', () => {
           (item) => item.muted && item.sourceStart === 1 && item.sourceEnd === 2,
         ),
     ).toBe(true)
+  })
+  it('transfers keyboard ownership from transcript to an explicitly clicked waveform', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const transcript = document.createElement('div')
+    transcript.contentEditable = 'true'
+    transcript.tabIndex = 0
+    transcript.textContent = 'selected transcript'
+    document.body.append(transcript)
+    transcript.focus()
+    const range = document.createRange()
+    range.selectNodeContents(transcript)
+    window.getSelection()!.addRange(range)
+    useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['unit']))
+    render(
+      <>
+        <TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />
+        <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />
+      </>,
+    )
+    const clip = document.querySelector<HTMLElement>('.waveform-clip')!
+    clip.setPointerCapture = vi.fn()
+    fireEvent.pointerDown(clip, { pointerId: 1, button: 0, clientX: 5 })
+    expect(document.activeElement).toBe(document.querySelector('.audio-panel-view'))
+    expect(window.getSelection()!.isCollapsed).toBe(true)
+    expect(useTranscriptStore.getState().selectedTranscriptUnitIds.size).toBe(0)
+    fireEvent.click(clip)
+    fireEvent(document, new Event('selectionchange'))
+    expect(useEditorStore.getState().selection).toEqual({ start: 0, end: 10 })
+    transcript.remove()
   })
 })

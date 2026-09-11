@@ -9,9 +9,9 @@ Update the implementation and this document together whenever a mapping or its c
 | --- | --- | --- |
 | Space | Play or pause | Requires an active player. In preview mode, starting playback while the playhead is inside a muted clip first seeks to that clip's output end. |
 | S | Split at playhead | Requires an active player and a selected clip; the playhead must be strictly inside that clip's output range. |
-| M | Mute selection | Requires a waveform drag selection and a primary source file. Associates selected transcript word IDs with the mute, then clears the selection. |
-| U | Unmute | Unmutes the selected clip when one is selected; otherwise unmutes every muted clip overlapping the waveform drag selection and clears that selection. |
-| Delete or Backspace | Remove selected clip or mute selection | Removes the selected clip when one is selected. Otherwise, a waveform drag selection mutes overlapping unmuted audio, associates selected transcript word IDs, and clears the selection. |
+| M | Mute selection | For a waveform selection, mutes its range on the selected track and clears it. In canonical transcript text, resolves the exact clip occurrence and asks for confirmation when acoustic boundaries expand the text selection. |
+| U | Unmute | Unmutes the selected clip when one is selected; otherwise unmutes every muted clip overlapping the waveform selection and clears that selection. |
+| Delete or Backspace | Remove selected clip or mute selection | Removes the selected clip when one is selected. Otherwise, a waveform selection mutes overlapping unmuted audio, associates selected transcript word IDs, and clears the selection. |
 | Escape | Clear selection | Clears the waveform selection and selected clip. |
 | Left Arrow | Nudge backward | Seeks one second backward, clamped to zero. |
 | Right Arrow | Nudge forward | Seeks one second forward, clamped to the player duration. |
@@ -23,14 +23,25 @@ Update the implementation and this document together whenever a mapping or its c
 
 ## Audio Toolbar
 
+Clicking a waveform clip selects its whole output-time range.
 The audio toolbar exposes the same split, mute-selection and delete-selection actions as the corresponding keyboard shortcuts.
 Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.
+
+## Native Menu Routing
+
+Main uses `before-input-event` to bypass Electron's default menu accelerators only for Command/Control+S and Command/Control+Z (including Shift+Z).
+It leaves DOM key events intact; real text inputs keep native editing, while the transcript/editor renderer prevents the default action when handling project commands.
+Other chords, composition events, and key releases restore normal menu shortcut handling.
 
 ## Focus Rules
 
 - Do not intercept shortcuts while focus is in an `input` or `textarea`.
 - Preserve unmodified Space activation for native buttons, selects, and disclosure summaries; these controls must not toggle playback instead of their own action.
-- In content-editable elements, do not intercept editor shortcuts other than Space.
+- Save, Undo, and Redo remain project commands while focus is in the read-only transcript surface; they prevent native DOM editing history.
+- Other unmodified keys in content-editable elements remain local to that surface. Canonical transcript M, Delete, and Backspace share occurrence-aware editing and expansion confirmation; S does not split a stale waveform clip from transcript focus.
+- Ignore shortcuts while an input-method composition is in progress.
+- While canonical text selection is active, document-level S, M, U, Delete, and Backspace must not reinterpret it as a waveform range after focus moves to another control.
+- Clicking or dragging the waveform explicitly transfers keyboard focus to Audio and clears native/canonical text selection; S and M then operate on the selected waveform clip/range.
 - Space remains available for play or pause while focus is in the transcript's content-editable surface.
 - After handling Command or Control shortcuts, ignore other editor mappings while that modifier remains pressed.
 

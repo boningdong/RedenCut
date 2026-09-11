@@ -75,3 +75,32 @@ it('wraps shared measured columns inside each speaker lane and preserves every u
   ).toHaveLength(1)
   expect(document.querySelectorAll('[data-rendered-unit]')).toHaveLength(3)
 })
+
+it('renders deleted words inline with a single speaker label across audio fragments', () => {
+  const units = [0, 1, 2].map(
+    (index) =>
+      ({
+        ...occurrence(`word-${index}`, 'a', index * 0.5, (index + 1) * 0.5),
+        scopeId: `clip-${index}`,
+        clip: {
+          id: `clip-${index}`,
+          audioSourceId: 'source',
+          sourceStart: index * 0.5,
+          sourceEnd: (index + 1) * 0.5,
+          outputStart: index * 0.5,
+        },
+        muted: index === 1,
+      }) as TranscriptOccurrence,
+  )
+  render(
+    <TranscriptDialogue
+      units={units}
+      currentTime={0}
+      renderUnit={(u) => (u.muted ? <s>{u.unit.text}</s> : <span>{u.unit.text}</span>)}
+    />,
+  )
+  expect(document.querySelectorAll('.transcript-paragraph')).toHaveLength(1)
+  expect(document.querySelectorAll('.transcript-speaker')).toHaveLength(1)
+  expect(document.querySelector('.transcript-words')?.textContent).toBe('word-0word-1word-2')
+  expect(document.querySelector('s')?.textContent).toBe('word-1')
+})

@@ -51,11 +51,12 @@ export function CanonicalTranscriptPanel({
   useEffect(() => {
     const change = () => {
       const selected = resolveNative()
+      const ownedSelection = useTranscriptStore.getState().selectedTranscriptUnitIds.size > 0
       useTranscriptStore
         .getState()
         .setSelectedTranscriptUnitIds(new Set(selected?.requestedUnitIds ?? []))
       if (!selected?.editable || !selected.sourceRanges.length) {
-        setSelection(null)
+        if (selected || ownedSelection) setSelection(null)
         return
       }
       const { clip, track } = selected.occurrence
@@ -108,13 +109,14 @@ export function CanonicalTranscriptPanel({
     [setSelection],
   )
   const keyDown = (event: React.KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) return
     if ((event.target as HTMLElement).closest('button, input, select, textarea')) return
     if (event.metaKey || event.ctrlKey) return
     if (event.code === 'Space') {
       event.preventDefault()
       return
     }
-    if (event.code === 'Delete' || event.code === 'Backspace') {
+    if (['KeyM', 'Delete', 'Backspace'].includes(event.code)) {
       event.preventDefault()
       event.stopPropagation()
       const selected = resolveNative()

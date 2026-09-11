@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 import {
   buildDialogueBlocks,
+  dialogueScopes,
   layoutOverlapColumns,
   type DialogueBlock,
 } from '../../domain/transcriptDialogue'
@@ -16,9 +17,10 @@ function timestamp(time: number): string {
 }
 type RenderUnit = (unit: TranscriptOccurrence) => ReactNode
 function lanes(units: TranscriptOccurrence[]) {
+  const scopes = dialogueScopes(units)
   const rows = new Map<string, TranscriptOccurrence[]>()
   for (const unit of units) {
-    const id = `${unit.scopeId}:${unit.speakerId ?? unit.contextSpeakerId ?? 'unknown'}`
+    const id = `${scopes.get(unit.scopeId)}:${unit.speakerId ?? unit.contextSpeakerId ?? 'unknown'}`
     const row = rows.get(id) ?? []
     row.push(unit)
     rows.set(id, row)

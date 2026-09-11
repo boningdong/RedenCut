@@ -433,4 +433,64 @@ describe('canonical transcript editability', () => {
     act(() => useTimelineStore.getState().moveClip('clip', 8))
     expect(useEditorStore.getState().selection).toEqual({ start: 8.5, end: 9 })
   })
+  it('routes M through acoustic confirmation and changes only its selected occurrence', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    const chosen = { ...track.clips[0], muted: false }
+    const duplicate = { ...chosen, id: 'duplicate' }
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: [chosen, duplicate] }],
+      selectedClipId: 'duplicate',
+    })
+    const analysis = useTranscriptStore.getState().analyses[0]
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        transcript: {
+          ...analysis.transcript,
+          units: [
+            { id: 'speech' as never, text: '你', kind: 'speech' },
+            { id: 'second' as never, text: '好', kind: 'speech' },
+          ],
+        },
+        alignment: {
+          ...analysis.alignment,
+          acousticEditUnits: [
+            {
+              ...analysis.alignment.acousticEditUnits[0],
+              transcriptUnitIds: ['speech' as never, 'second' as never],
+              granularity: 'word',
+            },
+          ],
+        },
+      },
+    ])
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const element = document.querySelector('[data-clip-id="clip"][data-unit-id="speech"]')!
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    window.getSelection()!.addRange(range)
+    fireEvent.keyDown(screen.getByTestId('canonical-transcript'), { key: 'm', code: 'KeyM' })
+    expect(useTimelineStore.getState().undoStack).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: '确认编辑' }))
+    expect(
+      useTimelineStore.getState().tracks[0].clips.find((clip) => clip.id === 'duplicate'),
+    ).toEqual(duplicate)
+    expect(
+      useTimelineStore
+        .getState()
+        .tracks[0].clips.filter((clip) => clip.muted)
+        .map((clip) => [clip.sourceStart, clip.sourceEnd]),
+    ).toEqual([[0.5, 1]])
+    expect(useTimelineStore.getState().undoStack).toHaveLength(1)
+  })
+  it('does not clear a waveform-owned range on a delayed native selectionchange', () => {
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    act(() => {
+      window.getSelection()?.removeAllRanges()
+      useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set())
+      useEditorStore.getState().setSelection({ start: 0.2, end: 0.4 })
+    })
+    fireEvent(document, new Event('selectionchange'))
+    expect(useEditorStore.getState().selection).toEqual({ start: 0.2, end: 0.4 })
+  })
 })

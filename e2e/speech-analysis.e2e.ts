@@ -22,7 +22,7 @@ test('real speech analysis publishes an editable durable transcript and survives
       selection: { type: 'file', filename: 'mandarin-short-female.wav' },
     },
   })
-  await session.call('browser_click', { target: 'button:text-is("Import Audio")' })
+  await session.call('browser_click', { target: 'button:text-is("+ Add Track")' })
   await expect
     .poll(() => session!.page.locator('text=mandarin-short-female.wav').count(), {
       timeout: 40_000,

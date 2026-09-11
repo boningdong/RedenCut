@@ -60,8 +60,21 @@ vi.mock('./components/Waveform/BinaryWaveformDataProvider', () => ({
   BinaryWaveformDataProvider: class {},
 }))
 vi.mock('./components/Waveform/WaveformView', () => ({
-  WaveformView: ({ workspaceControls }: { workspaceControls?: React.ReactNode }) => (
-    <div data-testid="waveform">{workspaceControls}</div>
+  WaveformView: ({
+    workspaceControls,
+    onAddTrack,
+    isImporting,
+  }: {
+    workspaceControls?: React.ReactNode
+    isImporting?: boolean
+    onAddTrack: () => void
+  }) => (
+    <div data-testid="waveform">
+      {workspaceControls}
+      <button onClick={onAddTrack} disabled={isImporting}>
+        Add Track
+      </button>
+    </div>
   ),
 }))
 vi.mock('./components/FileInfoPanel', () => ({ FileInfoPanel: () => null }))
@@ -308,6 +321,20 @@ describe('App transcription job identity', () => {
     )
   })
 
+  it('keeps the audio workspace mounted when empty and limits header actions to project controls', async () => {
+    const empty = session(TOKEN_A, 1, SOURCE_A, 'Empty')
+    empty.sources = []
+    empty.draft.tracks = []
+    await renderInitialized(empty)
+    expect(screen.getByTestId('waveform')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add Track' })).toBeTruthy()
+    const header = document.querySelector('.project-header')!
+    expect(
+      [...header.querySelectorAll('button')].map((button) => button.textContent?.trim()),
+    ).toEqual(['Open Project', 'Save', 'Save As', 'Export'])
+    expect(header.querySelector('.project-brand')).toBeNull()
+  })
+
   it('keeps the active player, project state and timeline history when workspace panels move', async () => {
     const { api } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
     const player = getAudioPlayerInstance()
@@ -450,8 +477,13 @@ describe('App transcription job identity', () => {
     })
     api.audio.startImport.mockReturnValueOnce(importing.promise)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Import Audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
     await waitFor(() => expect(api.audio.startImport).toHaveBeenCalledTimes(1))
+    expect((screen.getByRole('button', { name: 'Add Track' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
+    expect(api.audio.startImport).toHaveBeenCalledTimes(1)
     expect(mocks.keyboardSave).toBeUndefined()
     saving.resolve(saved)
 
@@ -573,7 +605,7 @@ describe('App transcription job identity', () => {
       return true
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Import Audio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
     await waitFor(() => expect(mocks.players).toHaveLength(2))
     await waitFor(() => expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1))
     expect(getAudioPlayerInstance()).toBeNull()

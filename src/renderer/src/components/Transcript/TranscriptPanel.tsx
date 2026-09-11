@@ -77,6 +77,7 @@ function LegacyTranscriptPanel({
   const currentWordRef = useRef<HTMLSpanElement | null>(null)
   /** Map from word.id → the rendered <span> element, for selection intersection. */
   const wordEls = useRef<Map<string, HTMLSpanElement>>(new Map())
+  const ownedSelection = useRef<{ start: number; end: number } | null>(null)
 
   // ── Track color map — used for per-track underlines in "All" view ────────
   const trackColorMap = useMemo(() => {
@@ -135,7 +136,12 @@ function LegacyTranscriptPanel({
     const onSelectionChange = () => {
       const sel = window.getSelection()
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-        setSelection(null)
+        if (
+          ownedSelection.current &&
+          useEditorStore.getState().selection === ownedSelection.current
+        )
+          setSelection(null)
+        ownedSelection.current = null
         return
       }
       const range = sel.getRangeAt(0)
@@ -150,10 +156,12 @@ function LegacyTranscriptPanel({
         setSelection(null)
         return
       }
-      setSelection({
+      const next = {
         start: Math.min(...selected.map((w) => w.start)),
         end: Math.max(...selected.map((w) => w.end)),
-      })
+      }
+      ownedSelection.current = next
+      setSelection(next)
     }
 
     document.addEventListener('selectionchange', onSelectionChange)

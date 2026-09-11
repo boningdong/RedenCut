@@ -101,36 +101,27 @@ summary:focus-visible,
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 12px 20px 12px 84px;
+  gap: 12px;
+  padding: 6px 16px 6px 84px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
   -webkit-app-region: drag;
-  min-height: 66px;
-  padding-block: 10px;
+  height: 44px;
+  min-height: 44px;
 }
 .project-identity {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
-  flex: 1;
-}
-.project-brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font: 600 22px var(--font-display);
-  letter-spacing: -0.8px;
-  padding-right: 22px;
-  border-right: 1px solid var(--color-border);
+  flex: 0 1 auto;
 }
 .project-name {
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
+  max-width: 320px;
 }
 .project-save-state {
   display: flex;
@@ -198,23 +189,6 @@ summary:focus-visible,
   width: 1px;
   background: var(--color-border);
   margin: 0 5px;
-}
-@media (max-width: 1250px) {
-  .project-header {
-    flex-wrap: wrap;
-    gap: 9px;
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
-  .project-identity {
-    flex-basis: 100%;
-  }
-  .project-actions {
-    margin-left: auto;
-  }
-  .project-save-state {
-    margin-left: auto;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -434,14 +408,6 @@ summary:focus-visible,
   padding: 12px;
   border: 1px solid var(--color-accent);
 }
-@media (min-width: 1050px) {
-  .project-header {
-    flex-wrap: nowrap;
-  }
-  .project-identity {
-    flex-basis: auto;
-  }
-}
 @media (max-width: 1050px) {
   .transport-bar {
     gap: 8px;
@@ -552,4 +518,23 @@ summary:focus-visible,
 .file-details-name {
   flex-basis: 100%;
   overflow-wrap: anywhere;
+}
+
+.audio-add-track {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 16px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.audio-add-track:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

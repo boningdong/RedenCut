@@ -62,7 +62,7 @@ for (const shutdown of ['EOF', 'docker stop']) {
         runId = started.runId
         let identity = { runId, generation: started.generation }
         const snapshot = await call('browser_snapshot', identity)
-        assert.match(JSON.stringify(snapshot.content), /Import your first audio file/)
+        assert.match(JSON.stringify(snapshot.content), /Add Track/)
         await call('browser_click', {
           ...identity,
           target: 'button:has-text("☀"), button:has-text("🌙")',

@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { APP_NAME } from '@shared/constants'
 import type { AudioSourceId } from '@shared/project.types'
 import type { ImportMode } from '@shared/import.types'
 import type {
@@ -693,10 +692,6 @@ export default function App() {
     >
       <header className="project-header">
         <div className="project-identity">
-          <span className="project-brand">
-            <Icon name="wave" size={26} />
-            {APP_NAME}
-          </span>
           <span className="project-name" title={session?.workspace.displayName}>
             {session?.workspace.displayName ?? 'Untitled project'}
           </span>
@@ -715,22 +710,6 @@ export default function App() {
             }
           >
             Open Project
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={Boolean(importState)}
-            onClick={() => void importAudio('copy')}
-          >
-            Import Audio
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={Boolean(importState)}
-            onClick={() => void importAudio('reference')}
-          >
-            Import as Reference
           </Button>
           <Button
             size="sm"
@@ -792,38 +771,23 @@ export default function App() {
       )}
 
       <EditorWorkspace
-        audio={(workspaceControls) =>
-          tracks.length > 0 ? (
-            <WaveformView
-              workspaceControls={workspaceControls}
-              audioDetails={
-                primarySource ? (
-                  <FileInfoPanel
-                    displayName={primarySource.displayName}
-                    metadata={primarySource.metadata}
-                  />
-                ) : null
-              }
-              duration={projectDuration}
-              providersBySource={waveforms}
-              onAddTrack={() => void importAudio('copy')}
-            />
-          ) : (
-            <div
-              style={{
-                height: '100%',
-                display: 'grid',
-                placeItems: 'center',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              {workspaceControls}
-              <Button variant="primary" onClick={() => void importAudio('copy')}>
-                Import your first audio file
-              </Button>
-            </div>
-          )
-        }
+        audio={(workspaceControls) => (
+          <WaveformView
+            workspaceControls={workspaceControls}
+            audioDetails={
+              primarySource ? (
+                <FileInfoPanel
+                  displayName={primarySource.displayName}
+                  metadata={primarySource.metadata}
+                />
+              ) : null
+            }
+            duration={projectDuration}
+            providersBySource={waveforms}
+            onAddTrack={() => void importAudio('copy')}
+            isImporting={Boolean(importState)}
+          />
+        )}
         transcript={(workspaceControls) => (
           <TranscriptPanel
             workspaceControls={workspaceControls}

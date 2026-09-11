@@ -5,6 +5,7 @@ import { join } from 'path'
 import { createProjectDialogs } from './dialogs/createProjectDialogs'
 import { startApplicationLifecycle } from './applicationLifecycle'
 import { configureHarnessStartup } from './harnessStartup'
+import { routeProjectShortcuts } from './projectShortcutRouting'
 import { ExportCoordinator } from './audio/export/ExportCoordinator'
 import { registerAudioIpc } from './ipc/audio.ipc'
 import { registerProjectIpc } from './ipc/project.ipc'
@@ -38,8 +39,10 @@ function createWindow(): BrowserWindow {
     minHeight: 600,
     backgroundColor: '#0f0f0f',
     titleBarStyle: 'hiddenInset',
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 18 } } : {}),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false },
   })
+  routeProjectShortcuts(window.webContents)
   if (process.env['ELECTRON_RENDERER_URL'] && !harnessMode) {
     void window.loadURL(process.env['ELECTRON_RENDERER_URL'])
     window.webContents.openDevTools()

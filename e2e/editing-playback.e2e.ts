@@ -85,7 +85,7 @@ test('split and drag survive save and reopen as visible clips with audible playb
     await ui.call('podcut_prepare_dialog', {
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },
     })
-    await ui.call('browser_click', { target: 'button:text-is("Import Audio")' })
+    await ui.call('browser_click', { target: 'button:text-is("+ Add Track")' })
     await drawnWaveforms(ui.page, 1)
 
     // Select the clip, position the playhead near 5 seconds and split with the real shortcut.
@@ -180,7 +180,7 @@ test('play pause seek and resume control visible time and real container audio',
     await ui.call('podcut_prepare_dialog', {
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },
     })
-    await ui.call('browser_click', { target: 'button:text-is("Import Audio")' })
+    await ui.call('browser_click', { target: 'button:text-is("+ Add Track")' })
     await drawnWaveforms(ui.page, 1)
 
     // Start recording before Play; verify the button, advancing time and sustained audio.

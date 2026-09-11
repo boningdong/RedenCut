@@ -20,7 +20,41 @@ export interface AlignmentLine {
   columns: AlignmentColumn[]
 }
 
+/** Reading continuity is separate from the exact clip identity required for safe edits. */
+export function dialogueScopes(units: TranscriptOccurrence[]): Map<string, string> {
+  const scopes = new Map<string, string>()
+  const clips = [...new Map(units.map((unit) => [unit.scopeId, unit])).values()].sort(
+    (a, b) => (a.clip?.outputStart ?? a.orderTime) - (b.clip?.outputStart ?? b.orderTime),
+  )
+  const previousBySource = new Map<string, TranscriptOccurrence>()
+  for (const unit of clips) {
+    scopes.set(unit.scopeId, unit.scopeId)
+    if (!unit.clip || !unit.analysis) continue
+    const key = JSON.stringify([
+      unit.track.id,
+      unit.clip.audioSourceId,
+      unit.analysis.analysisRevisionId,
+    ])
+    const previous = previousBySource.get(key)
+    if (
+      previous &&
+      Math.abs(previous.clip.sourceEnd - unit.clip.sourceStart) < 1e-7 &&
+      Math.abs(
+        previous.clip.outputStart +
+          previous.clip.sourceEnd -
+          previous.clip.sourceStart -
+          unit.clip.outputStart,
+      ) < 1e-7
+    ) {
+      scopes.set(unit.scopeId, scopes.get(previous.scopeId)!)
+    }
+    previousBySource.set(key, unit)
+  }
+  return scopes
+}
+
 export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBlock[] {
+  const scopes = dialogueScopes(units)
   const overlaps = findTranscriptOverlaps(units)
   let regions: Array<{ start: number; end: number; overlaps: TranscriptOverlap[] }> = []
   for (const overlap of overlaps) {
@@ -59,12 +93,13 @@ export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBloc
   const previousByScope = new Map<string, { block: DialogueBlock; band: number }>()
   let lastAudibleScope: string | undefined
   for (const unit of units) {
+    const scope = scopes.get(unit.scopeId)!
     // Only suppressed interleaving may be skipped when joining natural text.
     // A different audible occurrence begins a real conversational turn.
     if (!unit.muted) {
-      if (lastAudibleScope !== undefined && lastAudibleScope !== unit.scopeId)
+      if (lastAudibleScope !== undefined && lastAudibleScope !== scope)
         previousByScope.delete(lastAudibleScope)
-      lastAudibleScope = unit.scopeId
+      lastAudibleScope = scope
     }
     const hit = unit.muted
       ? -1
@@ -75,7 +110,7 @@ export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBloc
         )
     if (hit >= 0) {
       cards[hit].units.push(unit)
-      previousByScope.delete(unit.scopeId)
+      previousByScope.delete(scope)
       continue
     }
     // Interleaved muted/solo-suppressed occurrences still form one source paragraph.
@@ -85,11 +120,11 @@ export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBloc
         count + Number(unit.orderTime >= region.start) + Number(unit.orderTime >= region.end),
       0,
     )
-    const candidate = previousByScope.get(unit.scopeId)
+    const candidate = previousByScope.get(scope)
     const previous = candidate?.band === band ? candidate.block : undefined
     if (
       previous &&
-      previous.units[previous.units.length - 1].scopeId === unit.scopeId &&
+      scopes.get(previous.units[previous.units.length - 1].scopeId) === scope &&
       (previous.units[previous.units.length - 1].speakerId ??
         previous.units[previous.units.length - 1].contextSpeakerId) ===
         (unit.speakerId ?? unit.contextSpeakerId) &&
@@ -98,7 +133,7 @@ export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBloc
       previous.units.push(unit)
     else {
       const block = { id: unit.id, units: [unit], overlaps: [], start: unit.orderTime }
-      previousByScope.set(unit.scopeId, { block, band })
+      previousByScope.set(scope, { block, band })
       natural.push(block)
     }
   }
@@ -122,6 +157,7 @@ export function layoutOverlapColumns(
   availableWidth: number,
   measure: (text: string) => number,
 ): AlignmentLine[] {
+  const scopes = dialogueScopes(block.units)
   const width = Math.max(40, availableWidth),
     assigned = new Set<string>(),
     columns: AlignmentColumn[] = []
@@ -149,7 +185,7 @@ export function layoutOverlapColumns(
       selected.forEach((u) => assigned.add(u.id))
       const texts = new Map<string, string>()
       for (const unit of selected) {
-        const key = `${unit.scopeId}:${unit.speakerId ?? unit.contextSpeakerId ?? ''}`
+        const key = `${scopes.get(unit.scopeId)}:${unit.speakerId ?? unit.contextSpeakerId ?? ''}`
         texts.set(key, (texts.get(key) ?? '') + (unit.leadingSpace ? ' ' : '') + unit.unit.text)
       }
       const contentWidth = Math.max(8, ...[...texts.values()].map(measure)) + 4
