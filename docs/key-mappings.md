@@ -52,12 +52,12 @@ Other chords, composition events, and key releases restore normal menu shortcut 
 
 ## Workspace Layout Controls
 
-- Tab reaches panel move buttons, drag handles, the divider, and reset/retry controls in their visible order.
+- Tab reaches drag handles, the divider, and reset/retry controls in their visible order.
 - Enter or Space activates a focused layout button without toggling audio playback.
 - With the divider focused, Up and Down move the divider by five percentage points within the available panel limits.
 - With the divider focused, Home minimizes the Transcript region and End maximizes it within the available panel limits.
 - Escape cancels an active panel drag or divider resize without clearing the audio selection.
-- Panel move buttons provide keyboard equivalents for swapping Transcript/Audio and placing Transport above or below them.
+- Reorder panels by dragging the six-dot handle onto an upper or lower drop target; clicking the handle does not reorder panels.
 - Command/Control shortcuts retain their editor meanings when focus is on a layout control and no pointer layout interaction is active.
 
 ## Speaker Labels

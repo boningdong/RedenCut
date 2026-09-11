@@ -7,8 +7,6 @@ export function WorkspacePanel({
   id,
   children,
   style,
-  moveLabel,
-  onMove,
   onDrag,
   commands,
 }: {
@@ -16,8 +14,6 @@ export function WorkspacePanel({
   id: WorkspacePanelId
   children: ReactNode | ((controls: ReactNode) => ReactNode)
   style?: CSSProperties
-  moveLabel: string
-  onMove: () => void
   onDrag: PointerEventHandler<HTMLButtonElement>
 }) {
   const { label } = WORKSPACE_PANELS[id]
@@ -31,9 +27,6 @@ export function WorkspacePanel({
       onMouseDown={(event) => event.preventDefault()}
     >
       <PanelDragHandle label={label} onPointerDown={onDrag} />
-      <button className="workspace-move" aria-label={moveLabel} title={moveLabel} onClick={onMove}>
-        ↕
-      </button>
       {commands}
     </div>
   )

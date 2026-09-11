@@ -198,8 +198,6 @@ export function EditorWorkspace({
 
   const content = { transcript, audio, transport }
   const panel = (id: WorkspacePanelId) => {
-    const lower =
-      id === 'transport' ? layout.transportPosition === 'top' : layout.contentOrder[0] === id
     return (
       <WorkspacePanel
         key={id}
@@ -212,8 +210,6 @@ export function EditorWorkspace({
                 minHeight: 0,
               }
         }
-        moveLabel={`Move ${WORKSPACE_PANELS[id].label} ${lower ? 'down' : 'up'}`}
-        onMove={() => commit(applyWorkspaceDrop(layout, panelDropTarget(id, lower)))}
         onDrag={(event) => startDrag(id, event)}
         commands={
           id === 'transport' ? (

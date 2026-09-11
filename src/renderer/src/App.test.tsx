@@ -340,8 +340,28 @@ describe('App transcription job identity', () => {
     const player = getAudioPlayerInstance()
     const editor = useEditorStore.getState()
     const timeline = useTimelineStore.getState()
-    fireEvent.click(screen.getByRole('button', { name: 'Move Transcript down' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Move Transport up' }))
+    const regions = document.querySelector('.workspace-regions')!
+    vi.spyOn(regions, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      right: 900,
+      top: 0,
+      bottom: 400,
+      width: 900,
+      height: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    const drop = (label: string, y: number) => {
+      const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 })
+      Object.defineProperty(down, 'pointerId', { value: 1 })
+      fireEvent(screen.getByRole('button', { name: `Drag ${label} panel` }), down)
+      const up = new MouseEvent('pointerup', { bubbles: true, clientX: 400, clientY: y })
+      Object.defineProperty(up, 'pointerId', { value: 1 })
+      fireEvent(window, up)
+    }
+    drop('Transcript', 390)
+    drop('Transport', 10)
     expect(getAudioPlayerInstance()).toBe(player)
     expect(mocks.players).toHaveLength(1)
     expect(mocks.destroyPlayer).not.toHaveBeenCalled()

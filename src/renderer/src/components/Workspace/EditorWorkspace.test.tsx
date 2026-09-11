@@ -91,12 +91,14 @@ describe('EditorWorkspace', () => {
     transcript.parentElement!.scrollTop = 72
     window.getSelection()!.setBaseAndExtent(text, 2, text, 8)
     const selected = window.getSelection()!.toString()
-    fireEvent.click(screen.getByRole('button', { name: 'Move Transcript down' }))
+    pointer(screen.getByRole('button', { name: 'Drag Transcript panel' }), 'pointerdown', 10, 20)
+    pointer(window, 'pointerup', 400, 390)
     expect(order()).toEqual(['audio', 'transcript', 'transport'])
     expect(screen.getByTestId('transcript')).toBe(transcript)
     expect(window.getSelection()!.toString()).toBe(selected)
     expect(transcript.parentElement!.scrollTop).toBe(72)
-    fireEvent.click(screen.getByRole('button', { name: 'Move Transport up' }))
+    pointer(screen.getByRole('button', { name: 'Drag Transport panel' }), 'pointerdown', 10, 390)
+    pointer(window, 'pointerup', 400, 10)
     expect(order()).toEqual(['transport', 'audio', 'transcript'])
     expect(mounted).toEqual(['transcript', 'audio', 'transport'])
   })
@@ -105,7 +107,10 @@ describe('EditorWorkspace', () => {
     setup()
     pointer(screen.getByTestId('transcript'), 'pointerdown', 10, 100)
     expect(document.querySelector('.workspace-drop-overlay')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Move (Audio|Transcript|Transport)/ })).toBeNull()
     const handle = screen.getByRole('button', { name: 'Drag Transcript panel' })
+    fireEvent.click(handle)
+    expect(update).not.toHaveBeenCalled()
     pointer(handle, 'pointerdown', 10, 20)
     expect(screen.getByText('Audio first')).toBeTruthy()
     pointer(window, 'pointerup', 400, 200)
@@ -192,7 +197,7 @@ describe('EditorWorkspace', () => {
     document.addEventListener('keydown', handler)
     const divider = screen.getByRole('separator')
     fireEvent.keyDown(divider, { key: 's', code: 'KeyS', metaKey: true })
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Move Audio up' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Drag Audio panel' }), {
       key: 'z',
       code: 'KeyZ',
       ctrlKey: true,

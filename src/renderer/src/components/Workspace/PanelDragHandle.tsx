@@ -12,7 +12,7 @@ export function PanelDragHandle({
     <button
       className="workspace-handle"
       aria-label={`Drag ${label} panel`}
-      title={`Drag ${label} panel; use Move button to reorder with keyboard`}
+      title={`Drag ${label} panel`}
       onPointerDown={onPointerDown}
     >
       <Icon name="grip" />
