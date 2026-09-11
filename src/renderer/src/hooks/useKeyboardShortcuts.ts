@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react'
+import { togglePlayback } from '../actions/playbackActions'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/timeline.store'
 import { useTranscriptStore } from '../stores/transcript.store'
@@ -93,24 +94,7 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
           e.preventDefault()
           if (!player) break
 
-          // Preview Mode: if playhead is inside a muted clip, skip to its end first
-          if (!player.isPlaying()) {
-            const { previewMode } = useEditorStore.getState()
-            if (previewMode) {
-              const t = player.getCurrentTime()
-              const clips = useTimelineStore.getState().tracks.flatMap((tr) => tr.clips)
-              const inside = clips.find((c) => {
-                if (!c.muted) return false
-                const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-                return t >= c.outputStart && t < outputEnd
-              })
-              if (inside) {
-                const outputEnd = inside.outputStart + (inside.sourceEnd - inside.sourceStart)
-                player.seekTo(outputEnd)
-              }
-            }
-          }
-          player.playPause().catch(console.error)
+          togglePlayback().catch(console.error)
           break
         }
 

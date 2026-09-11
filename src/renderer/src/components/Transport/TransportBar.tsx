@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useCallback } from 'react'
+import { togglePlayback } from '../../actions/playbackActions'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useEditorStore } from '../../stores/editor.store'
 import { getAudioPlayerInstance } from '@shared/player.types'
@@ -44,28 +45,6 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
 
   const theme = useThemeStore((s) => s.theme)
   const setTheme = useThemeStore((s) => s.setTheme)
-
-  const handlePlayPause = useCallback(async () => {
-    const player = getAudioPlayerInstance()
-    if (!player) return
-
-    if (!player.isPlaying() && previewMode) {
-      // Preview Mode: if playhead is inside a muted clip, skip to its end before playing
-      const time = player.getCurrentTime()
-      const clips = useTimelineStore.getState().tracks.flatMap((t) => t.clips)
-      const inside = clips.find((c) => {
-        if (!c.muted) return false
-        const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-        return time >= c.outputStart && time < outputEnd
-      })
-      if (inside) {
-        const outputEnd = inside.outputStart + (inside.sourceEnd - inside.sourceStart)
-        player.seekTo(outputEnd)
-      }
-    }
-
-    await player.playPause()
-  }, [previewMode])
 
   const handleSkipToStart = useCallback(() => {
     getAudioPlayerInstance()?.seekTo(0)
@@ -131,7 +110,7 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
             border: '1px solid var(--color-accent)',
           }}
           onClick={() => {
-            void handlePlayPause().catch((error: unknown) => {
+            void togglePlayback().catch((error: unknown) => {
               console.error('[TransportBar] Failed to toggle playback:', error)
             })
           }}
@@ -159,7 +138,8 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
         <button
           onClick={togglePreviewMode}
           aria-pressed={previewMode}
-          title="Preview Mode: skip muted regions during playback"
+          aria-label="Preview"
+          title="Preview edits: skip redacted sections during playback"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -185,7 +165,7 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
               transition: 'background-color 0.15s',
             }}
           />
-          Preview
+          Preview edits
         </button>
 
         {/* Theme toggle */}

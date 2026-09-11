@@ -3,10 +3,9 @@ import type { Word, Track } from '@shared/project.types'
 /**
  * Describes the relationship between a transcript word and its clip on the timeline.
  *
- *  normal     — the word falls within a non-muted clip; it will play as expected.
+ *  normal     — the word falls within a retained clip (track audibility is separate).
  *  clip-muted — the word's covering clip has clip.muted=true (pressed 'M' on the
- *               waveform). The whole clip is silenced. Distinct from text-edit mutes
- *               because word.muted remains false.
+ *               waveform). This is a clip redaction even when word.muted is false.
  *  no-clip    — no clip on the word's track covers word.start. The clip was deleted
  *               (Delete key) or the track was removed. The word produces no audio.
  */

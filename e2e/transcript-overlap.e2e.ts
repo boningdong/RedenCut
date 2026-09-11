@@ -5,11 +5,11 @@ test('real track occurrences align locally and follow clip movement and undo', a
   const ui = new McpTestSession()
   try {
     await ui.start()
-    const importAudio = async (expectedTracks: number) => {
+    const importAudio = async (expectedTracks: number, filename = 'mandarin-short-female.wav') => {
       await ui.call('podcut_prepare_dialog', {
         request: {
           purpose: 'import-audio',
-          selection: { type: 'file', filename: 'mandarin-short-female.wav' },
+          selection: { type: 'file', filename },
         },
       })
       await ui.call('browser_click', { target: 'button:text-is("+ Add Track")' })
@@ -30,7 +30,7 @@ test('real track occurrences align locally and follow clip movement and undo', a
         timeout: 240_000,
       })
       .toBe(1)
-    await importAudio(2)
+    await importAudio(2, 'mandarin-short-female.m4a')
     await expect.poll(() => ui.page.locator('canvas').count()).toBe(2)
     const generateSecond = ui.page.getByRole('button', { name: 'Generate Track 2', exact: true })
     if (await generateSecond.count())

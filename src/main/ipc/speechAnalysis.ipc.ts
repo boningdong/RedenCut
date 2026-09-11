@@ -13,6 +13,8 @@ import type { TranscriptionCancellationResult } from '../../shared/transcriber.t
 import type { SessionJobRegistry } from '../project/SessionJobRegistry'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { SpeechAnalysisCoordinator } from '../speech/SpeechAnalysisCoordinator'
+import { withSpeechAudio } from '../speech/prepareSpeechAudio'
+import { SpeechAnalysisError, type SpeechFailureStage } from '../speech/SpeechAnalysisError'
 import { SpeechWorkerClient } from '../speech/SpeechWorkerClient'
 import { whisperTranscriber } from '../transcriber/whisper'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
@@ -72,7 +74,7 @@ export function registerSpeechAnalysisIpc(
           !request.confirmSpeakerLabelReset
         )
           throw new PublicIpcError('invalid-request')
-        const resolveOriginal = controller.captureOriginalResolver(request)
+        const resolvePcm = controller.captureSpeechPcmResolver(request)
         const identity = {
           kind: 'speech-analysis' as const,
           jobId: request.jobId,
@@ -82,31 +84,49 @@ export function registerSpeechAnalysisIpc(
         }
         const abortController = new AbortController()
         const settled = (async () => {
-          const audioPath = await resolveOriginal(request.audioSourceId)
-          const artifact = await coordinator.run(
-            {
+          let stage: SpeechFailureStage = 'preparing-audio'
+          try {
+            const pcm = await resolvePcm(request.audioSourceId)
+            const artifact = await withSpeechAudio(pcm, abortController.signal, (audioPath) =>
+              coordinator.run(
+                {
+                  jobId: request.jobId,
+                  audioPath,
+                  audioSource: source,
+                  language: request.language,
+                  alignmentModel: 'auto',
+                  diarizationModel: 'diarization-default',
+                },
+                abortController.signal,
+                (progress) => {
+                  stage = progress.stage
+                  if (!event.sender.isDestroyed())
+                    event.sender.send('speech-analysis:progress', { ...identity, ...progress })
+                },
+              ),
+            )
+            abortController.signal.throwIfAborted()
+            stage = 'publishing'
+            if (!event.sender.isDestroyed())
+              event.sender.send('speech-analysis:progress', { ...identity, stage: 'publishing' })
+            const session = await controller.commitSpeechAnalysis(request, artifact, request.draft)
+            return {
               jobId: request.jobId,
-              audioPath,
-              audioSource: source,
-              language: request.language,
-              alignmentModel: 'auto',
-              diarizationModel: 'diarization-default',
-            },
-            abortController.signal,
-            (progress) => {
-              if (!event.sender.isDestroyed())
-                event.sender.send('speech-analysis:progress', { ...identity, ...progress })
-            },
-          )
-          abortController.signal.throwIfAborted()
-          if (!event.sender.isDestroyed())
-            event.sender.send('speech-analysis:progress', { ...identity, stage: 'publishing' })
-          const session = await controller.commitSpeechAnalysis(request, artifact, request.draft)
-          return {
-            jobId: request.jobId,
-            workspaceToken: request.workspaceToken,
-            revision: request.revision,
-            value: session,
+              workspaceToken: request.workspaceToken,
+              revision: request.revision,
+              value: session,
+            }
+          } catch (error) {
+            if (abortController.signal.aborted) abortController.signal.throwIfAborted()
+            if (error instanceof DOMException && error.name === 'AbortError') throw error
+            if (
+              error instanceof PublicIpcError ||
+              (error instanceof Error &&
+                (error.message === 'Stale workspace token' ||
+                  error.message === 'Stale workspace revision'))
+            )
+              throw error
+            throw new SpeechAnalysisError(stage, error)
           }
         })()
         const unregister = jobs.register(identity, () => ({

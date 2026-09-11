@@ -710,3 +710,27 @@ describe('WorkspaceController cache recovery', () => {
     expect(builder.build).not.toHaveBeenCalled()
   })
 })
+
+it('resolves speech PCM only from the captured source cache and rejects stale or damaged inputs', async () => {
+  const root = await packageWithoutCache()
+  try {
+    await writeValidCache(root)
+    const controller = new WorkspaceController()
+    await controller.initialize(root)
+    const session = await controller.open(root)
+    const resolveSpeech = controller.captureSpeechPcmResolver(session)
+    expect(await resolveSpeech(SOURCE_ID)).toEqual({
+      path: await realpath(join(root, 'cache', SOURCE_ID, 'audio.f32le')),
+      sampleRate: 48000,
+      channels: 1,
+    })
+    expect(() =>
+      controller.captureSpeechPcmResolver({ ...session, revision: session.revision + 1 }),
+    ).toThrow('Stale workspace revision')
+    await expect(resolveSpeech('unknown' as AudioSourceId)).rejects.toThrow('Unknown audio source')
+    await writeFile(join(root, 'cache', SOURCE_ID, 'audio.f32le'), Buffer.alloc(4))
+    await expect(resolveSpeech(SOURCE_ID)).rejects.toThrow('Speech audio cache is invalid')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

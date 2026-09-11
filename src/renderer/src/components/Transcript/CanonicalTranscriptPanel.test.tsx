@@ -107,6 +107,22 @@ describe('canonical transcript editability', () => {
     expect(screen.queryByRole('button', { name: 'Sync to playhead' })).toBeNull()
   })
 
+  it('dims track-muted speech without marking it redacted', () => {
+    const original = useTimelineStore.getState().tracks[0]
+    const mutedTrack = {
+      ...original,
+      muted: true,
+      clips: original.clips.map((clip) => ({ ...clip, muted: false })),
+    }
+    useTimelineStore.setState({ tracks: [mutedTrack] })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const speech = document.querySelector('[data-unit-id="speech"]') as HTMLElement
+    expect(speech.style.textDecoration).not.toBe('line-through')
+    expect(speech.style.opacity).toBe('0.5')
+    act(() => useTimelineStore.setState({ tracks: [{ ...mutedTrack, clips: original.clips }] }))
+    expect(speech.style.textDecoration).toBe('line-through')
+  })
+
   it('assigns stable per-speaker colors without underlining inactive text', () => {
     const analysis = useTranscriptStore.getState().analyses[0]
     useTranscriptStore.getState().loadAnalyses([
@@ -339,7 +355,7 @@ describe('canonical transcript editability', () => {
       code: 'Backspace',
     })
     expect(screen.getByRole('status').textContent).toContain('multiple tracks or clip occurrences')
-    expect(screen.queryByRole('button', { name: '确认编辑' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Confirm redaction' })).toBeNull()
     expect(useTimelineStore.getState().tracks.every((t) => t.clips.every((c) => !c.muted))).toBe(
       true,
     )
@@ -418,7 +434,7 @@ describe('canonical transcript editability', () => {
       code: 'Backspace',
     })
     act(() => useEditorStore.setState({ session: { workspaceToken: 'second' } as never }))
-    fireEvent.click(screen.getByRole('button', { name: '确认编辑' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm redaction' }))
     expect(useTimelineStore.getState().tracks[0].clips.every((c) => !c.muted)).toBe(true)
     expect(screen.getByRole('status').textContent).toContain('changed')
   })
@@ -471,7 +487,7 @@ describe('canonical transcript editability', () => {
     window.getSelection()!.addRange(range)
     fireEvent.keyDown(screen.getByTestId('canonical-transcript'), { key: 'm', code: 'KeyM' })
     expect(useTimelineStore.getState().undoStack).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: '确认编辑' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm redaction' }))
     expect(
       useTimelineStore.getState().tracks[0].clips.find((clip) => clip.id === 'duplicate'),
     ).toEqual(duplicate)

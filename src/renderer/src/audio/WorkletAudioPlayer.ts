@@ -44,6 +44,9 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   private currentTime = 0
   private duration = 0
   private startedAt: number | null = null
+  private awaitingStart = false
+  private playIntent = 0
+  private playbackStartId = 0
   private positionAtStart = 0
   private animationFrame: number | null = null
   private rebuildToken = 0
@@ -95,29 +98,36 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   async play(): Promise<void> {
     if (this.destroyed) return
     if (this.playing) return
+    const playIntent = ++this.playIntent
+    this.startedAt = null
+    this.awaitingStart = false
     this.playing = true
     this.stateCallbacks.forEach((callback) => callback(true))
     const lifecycleToken = this.rebuildToken
     try {
       await this.ensureContext()
-      if (lifecycleToken !== this.rebuildToken || !this.playing) return
+      if (playIntent !== this.playIntent || lifecycleToken !== this.rebuildToken || !this.playing)
+        return
       if (this.queues.size === 0) {
         await this.rebuildQueues(this.currentTime)
         return
       }
       const rebuildToken = this.rebuildToken
       await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
-      if (rebuildToken !== this.rebuildToken || !this.playing) return
+      if (playIntent !== this.playIntent || rebuildToken !== this.rebuildToken || !this.playing)
+        return
       await Promise.all([...this.queues.values()].map((queue) => this.waitForPrefill(queue)))
-      if (rebuildToken !== this.rebuildToken || !this.playing) return
+      if (playIntent !== this.playIntent || rebuildToken !== this.rebuildToken || !this.playing)
+        return
       if (this.context!.state === 'suspended') await this.context!.resume()
-      if (rebuildToken !== this.rebuildToken || !this.playing) return
+      if (playIntent !== this.playIntent || rebuildToken !== this.rebuildToken || !this.playing)
+        return
       this.startedAt = null
       this.positionAtStart = this.currentTime
-      for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
+      this.postPlay()
       this.startClock()
     } catch (error) {
-      if (isAbortError(error)) return
+      if (playIntent !== this.playIntent || isAbortError(error)) return
       if (this.playing) {
         this.playing = false
         this.stateCallbacks.forEach((callback) => callback(false))
@@ -128,7 +138,10 @@ export class WorkletAudioPlayer implements IAudioPlayer {
 
   pause(): void {
     if (!this.playing) return
+    this.playIntent++
     this.updateTime()
+    this.startedAt = null
+    this.awaitingStart = false
     this.playing = false
     for (const queue of this.queues.values()) {
       this.cancelPrefill(queue)
@@ -257,6 +270,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
 
   private async rebuildQueues(fromTime: number): Promise<void> {
     const rebuildToken = ++this.rebuildToken
+    const playIntent = this.playIntent
     await this.ensureContext()
     if (rebuildToken !== this.rebuildToken) return
     for (const queue of this.queues.values()) {
@@ -307,21 +321,36 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       this.queues.set(track.id, queue)
     }
     await Promise.all([...this.queues.values()].map((queue) => this.fill(queue)))
-    if (rebuildToken !== this.rebuildToken || !this.playing) return
+    if (playIntent !== this.playIntent || rebuildToken !== this.rebuildToken || !this.playing)
+      return
     await Promise.all([...this.queues.values()].map((queue) => this.waitForPrefill(queue)))
-    if (rebuildToken === this.rebuildToken && this.playing) {
+    if (playIntent === this.playIntent && rebuildToken === this.rebuildToken && this.playing) {
       if (this.context!.state === 'suspended') await this.context!.resume()
-      if (rebuildToken !== this.rebuildToken || !this.playing) return
-      for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play' })
+      if (playIntent !== this.playIntent || rebuildToken !== this.rebuildToken || !this.playing)
+        return
+      this.postPlay()
       this.positionAtStart = this.currentTime
       this.startedAt = null
       this.startClock()
     }
   }
 
+  private postPlay(): void {
+    this.awaitingStart = true
+    const startId = ++this.playbackStartId
+    for (const queue of this.queues.values()) queue.node.port.postMessage({ type: 'play', startId })
+  }
+
   private onQueueMessage(queue: TrackQueue, data: Record<string, number | string>): void {
     if (data.generation !== queue.generation) return
-    if (data.type === 'started' && this.startedAt === null && this.context) {
+    if (
+      data.type === 'started' &&
+      data.startId === this.playbackStartId &&
+      this.playing &&
+      this.awaitingStart &&
+      this.context
+    ) {
+      this.awaitingStart = false
       this.startedAt = this.context.currentTime
     } else if (data.type === 'depth' || data.type === 'need-data') {
       queue.queuedFrames = Number(data.queuedFrames)
@@ -334,6 +363,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
           )
         }
         this.resolvePrefill(queue)
+        this.continuePrefill(queue)
       }
       this.diagnostics.maximumQueuedFrames = Math.max(
         this.diagnostics.maximumQueuedFrames,
@@ -411,8 +441,16 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       if (queue.segmentIndex === queue.plan.length) {
         queue.node.port.postMessage({ type: 'end', generation })
       }
+    } catch (error) {
+      const waiter = queue.prefillWaiter
+      if (waiter?.generation === generation) {
+        queue.prefillWaiter = null
+        waiter.reject(error instanceof Error ? error : new Error(String(error)))
+      }
+      throw error
     } finally {
       queue.filling = false
+      this.continuePrefill(queue)
     }
   }
 
@@ -433,6 +471,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     }
     this.positionAtStart = this.currentTime
     this.startedAt = null
+    this.awaitingStart = false
     this.stopClock()
   }
 
@@ -472,6 +511,26 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     if (this.isPrefilled(queue)) return Promise.resolve()
     return new Promise<void>((resolve, reject) => {
       queue.prefillWaiter = { generation: queue.generation, resolve, reject }
+      this.continuePrefill(queue)
+    })
+  }
+
+  private continuePrefill(queue: TrackQueue): void {
+    // Depth can arrive after playback consumed frames, leaving the paused queue above
+    // the worklet refill watermark but below our start target. Pump that gap explicitly.
+    if (
+      !queue.prefillWaiter ||
+      queue.filling ||
+      queue.segmentIndex === queue.plan.length ||
+      queue.queuedFrames + this.inFlightFrames(queue) >= TARGET_FRAMES
+    )
+      return
+    const waiter = queue.prefillWaiter
+    void this.fill(queue).catch((error: unknown) => {
+      if (queue.prefillWaiter === waiter) {
+        queue.prefillWaiter = null
+        waiter.reject(error instanceof Error ? error : new Error(String(error)))
+      }
     })
   }
 
@@ -490,7 +549,11 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   }
 
   private isPrefilled(queue: TrackQueue): boolean {
-    return queue.queuedFrames >= Math.min(TARGET_FRAMES, queue.plannedFrames)
+    // A resumed queue may already have consumed most of its original plan.
+    // Only remaining frames need prefill, but in-flight PCM still needs acknowledgement.
+    const consumedFrames = queue.acknowledgedFrames - queue.queuedFrames
+    const remainingFrames = Math.max(0, queue.plannedFrames - consumedFrames)
+    return queue.queuedFrames >= Math.min(TARGET_FRAMES, remainingFrames)
   }
 }
 

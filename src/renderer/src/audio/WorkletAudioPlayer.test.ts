@@ -55,7 +55,7 @@ class FakeContext {
   createGain() {
     return { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() }
   }
-  resume = vi.fn(async () => undefined)
+  resume = vi.fn(async (): Promise<void> => undefined)
   close = vi.fn(async () => undefined)
   constructor() {
     FakeContext.instances.push(this)
@@ -137,6 +137,212 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
   })
 
   afterEach(() => vi.unstubAllGlobals())
+
+  it.each([false, true])(
+    'settles paused prefill after delayed consumption acknowledgement (read failure: %s)',
+    async (failRead) => {
+      const player = new WorkletAudioPlayer()
+      const samples = provider()
+      await player.registerAudioSource(SOURCE_ID, samples)
+      player.setTracks([track('one', 0, 13.5)])
+      await player.play()
+      const node = FakeNode.instances[0]
+      const generation = node.port.messages.find(({ message }) => message.type === 'flush')!.message
+        .generation as number
+      FakePort.autoAcknowledge = false
+      node.port.setQueuedFrames(generation, 71999)
+      node.port.onmessage?.({
+        data: { type: 'need-data', generation, queuedFrames: 71999 },
+      } as MessageEvent)
+      // Pause/resume while that refill still has provider reads and acknowledgements in flight.
+      player.pause()
+      let resumed = false
+      let resumeError: unknown
+      const resume = player
+        .play()
+        .then(() => {
+          resumed = true
+        })
+        .catch((error) => {
+          resumeError = error
+        })
+      try {
+        await vi.waitFor(() => expect(sentPcmFrames(node)).toBe(120001))
+        // The processor consumed1000frames between the olddepth and accepting the lastPCM.
+        // 95000 is above REFILL, so a paused processor will never send another need-data.
+        const readError = new Error('PCM cache read failed')
+        if (failRead) vi.mocked(samples.readFrames).mockRejectedValue(readError)
+        node.port.onmessage?.({
+          data: { type: 'depth', generation, queuedFrames: 95000, acceptedFrames: 120001 },
+        } as MessageEvent)
+        if (failRead) {
+          await vi.waitFor(() => expect(resumeError).toBe(readError))
+          expect(player.isPlaying()).toBe(false)
+          return
+        }
+        await vi.waitFor(() => expect(sentPcmFrames(node)).toBe(121001))
+        expect(resumed).toBe(false)
+        node.port.onmessage?.({
+          data: { type: 'depth', generation, queuedFrames: 96000, acceptedFrames: 121001 },
+        } as MessageEvent)
+        await vi.waitFor(() => expect(resumed).toBe(true))
+        expect(node.port.messages.filter(({ message }) => message.type === 'play')).toHaveLength(2)
+      } finally {
+        await player.destroy()
+        await resume
+      }
+    },
+  )
+
+  it('does not revive an older play intent after pause and resume during context resume', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await player.play()
+    player.pause()
+    const context = FakeContext.instances[0]
+    context.state = 'suspended'
+    let release!: () => void
+    context.resume.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        }),
+    )
+    const first = player.play()
+    await vi.waitFor(() => expect(context.resume).toHaveBeenCalledTimes(1))
+    const releaseFirst = release
+    player.pause()
+    const second = player.play()
+    await vi.waitFor(() => expect(context.resume).toHaveBeenCalledTimes(2))
+    releaseFirst()
+    await first
+    const node = FakeNode.instances[0]
+    expect(node.port.messages.filter(({ message }) => message.type === 'play')).toHaveLength(1)
+    release()
+    await second
+    expect(node.port.messages.filter(({ message }) => message.type === 'play')).toHaveLength(2)
+    await player.destroy()
+  })
+
+  it('ignores a previous start acknowledgement delivered after a new play command', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await player.play()
+    const node = FakeNode.instances[0]
+    const context = FakeContext.instances[0]
+    const generation = node.port.messages.find(({ message }) => message.type === 'flush')!.message
+      .generation
+    const previousStart = node.port.messages.find(({ message }) => message.type === 'play')!.message
+      .startId
+    player.pause()
+    await player.play()
+    node.port.onmessage?.({
+      data: { type: 'started', generation, startId: previousStart },
+    } as MessageEvent)
+    context.currentTime = 2
+    expect(player.getCurrentTime()).toBe(0)
+    const currentStart = node.port.messages
+      .filter(({ message }) => message.type === 'play')
+      .slice(-1)[0]!.message.startId
+    node.port.onmessage?.({
+      data: { type: 'started', generation, startId: currentStart },
+    } as MessageEvent)
+    context.currentTime = 2.25
+    expect(player.getCurrentTime()).toBe(0.25)
+    await player.destroy()
+  })
+
+  it('freezes paused wall time before resume callbacks and asynchronous prefill', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one')])
+    await player.play()
+    const context = FakeContext.instances[0]
+    const node = FakeNode.instances[0]
+    const generation = node.port.messages.find(({ message }) => message.type === 'flush')!.message
+      .generation
+    context.currentTime = 10
+    node.port.onmessage?.({
+      data: {
+        type: 'started',
+        generation,
+        startId: node.port.messages.filter(({ message }) => message.type === 'play').slice(-1)[0]!
+          .message.startId,
+      },
+    } as MessageEvent)
+    context.currentTime = 11
+    player.pause()
+    expect(player.getCurrentTime()).toBe(1)
+    context.currentTime = 30
+    const resumedTimes: number[] = []
+    player.onPlayStateChange((playing) => {
+      if (playing) resumedTimes.push(player.getCurrentTime())
+    })
+    const resume = player.play()
+    node.port.onmessage?.({
+      data: {
+        type: 'started',
+        generation,
+        startId: node.port.messages.filter(({ message }) => message.type === 'play').slice(-1)[0]!
+          .message.startId,
+      },
+    } as MessageEvent)
+    context.currentTime = 30.5
+    expect(player.getCurrentTime()).toBe(1)
+    await resume
+    expect(resumedTimes).toEqual([1])
+    context.currentTime = 31
+    node.port.onmessage?.({
+      data: {
+        type: 'started',
+        generation,
+        startId: node.port.messages.filter(({ message }) => message.type === 'play').slice(-1)[0]!
+          .message.startId,
+      },
+    } as MessageEvent)
+    context.currentTime = 31.25
+    expect(player.getCurrentTime()).toBe(1.25)
+    await player.destroy()
+  })
+
+  it('resumes a consumed tail shorter than the original prefill target', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([track('one', 0, 1.5)])
+    await player.play()
+    const node = FakeNode.instances[0]
+    const context = FakeContext.instances[0]
+    const generation = node.port.messages.find(({ message }) => message.type === 'flush')!.message
+      .generation as number
+    node.port.onmessage?.({
+      data: {
+        type: 'started',
+        generation,
+        startId: node.port.messages.filter(({ message }) => message.type === 'play').slice(-1)[0]!
+          .message.startId,
+      },
+    } as MessageEvent)
+    // The processor has accepted the full1.5s plan, then consumed1s.
+    node.port.setQueuedFrames(generation, 24000)
+    node.port.onmessage?.({
+      data: { type: 'depth', generation, queuedFrames: 24000, acceptedFrames: 72000 },
+    } as MessageEvent)
+    context.currentTime = 1
+    player.pause()
+    let resumed = false
+    const resume = player.play().then(() => {
+      resumed = true
+    })
+    try {
+      await vi.waitFor(() => expect(resumed).toBe(true))
+      expect(node.port.messages.filter(({ message }) => message.type === 'play')).toHaveLength(2)
+    } finally {
+      await player.destroy()
+      await resume
+    }
+  })
 
   it('waits for every worklet prefill acknowledgement before posting play', async () => {
     FakePort.autoAcknowledge = false

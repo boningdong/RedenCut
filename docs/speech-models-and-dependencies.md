@@ -8,17 +8,19 @@ The first implementation has fixed defaults and no model-selection UI. Future tr
 
 ## Component roles
 
-| Capability           | Product role                                 | Initial implementation                                                                                   | Runtime                        | Status                  |
-| -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------ | ----------------------- |
-| Transcription        | Transcriber (`best-effort-verbatim`)         | whisper.cpp                                                                                              | Native executable              | Existing                |
-| Alignment            | Alignment Engine (forced alignment)          | WhisperX alignment adapter with a manifest-pinned language model                                          | Python worker                  | Implemented             |
-| Speaker separation   | Diarization Engine (anonymous speakers)      | pyannote.audio `speaker-diarization-community-1`, invoked through the worker                              | Python/PyTorch worker          | Implemented             |
-| Process hosting      | Job-scoped alignment and diarization process | PodCut JSON Lines speech worker                                                                           | Independent Python environment | Implemented             |
-| Intended transcript  | Intended Transcript Model                    | Replaceable model; CrisperWhisper is research-only unless its distribution terms permit the intended use | Separate detector dependency   | Deferred                |
-| Disfluency detection | Hybrid Disfluency Detector                   | Transcript-diff evidence plus deterministic rules                                                        | Separate pipeline              | Deferred                |
-| Speech generation    | Speech Generation Engine                     | Not selected                                                                                             | Separate pipeline              | Deferred                |
+| Capability           | Product role                                 | Initial implementation                                                                                   | Runtime                        | Status      |
+| -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------ | ----------- |
+| Transcription        | Transcriber (`best-effort-verbatim`)         | whisper.cpp                                                                                              | Native executable              | Existing    |
+| Alignment            | Alignment Engine (forced alignment)          | WhisperX alignment adapter with a manifest-pinned language model                                         | Python worker                  | Implemented |
+| Speaker separation   | Diarization Engine (anonymous speakers)      | pyannote.audio `speaker-diarization-community-1`, invoked through the worker                             | Python/PyTorch worker          | Implemented |
+| Process hosting      | Job-scoped alignment and diarization process | PodCut JSON Lines speech worker                                                                          | Independent Python environment | Implemented |
+| Intended transcript  | Intended Transcript Model                    | Replaceable model; CrisperWhisper is research-only unless its distribution terms permit the intended use | Separate detector dependency   | Deferred    |
+| Disfluency detection | Hybrid Disfluency Detector                   | Transcript-diff evidence plus deterministic rules                                                        | Separate pipeline              | Deferred    |
+| Speech generation    | Speech Generation Engine                     | Not selected                                                                                             | Separate pipeline              | Deferred    |
 
 WhisperX is not PodCut's canonical transcriber in the first version. whisper.cpp produces the canonical best-effort-verbatim text; WhisperX aligns that text and hosts the initial diarization integration.
+
+Speech analysis reads the imported source's validated Float32 PCM cache and prepares one temporary 16 kHz mono PCM WAV for both engines. This supports imported containers such as AAC/M4A even when the local whisper.cpp build cannot read them directly. The temporary WAV is removed on success, failure, or cancellation; artifacts retain the original source identity and fingerprint. Preparation and engine failures display a fixed, stage-specific recovery message, while underlying paths and engine diagnostics remain in the main-process log.
 
 ## Sources of truth
 

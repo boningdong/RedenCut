@@ -22,6 +22,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
     this.generation = 0
     this.playing = false
     this.started = false
+    this.startId = 0
     this.ended = false
     this.maxFrames = options.processorOptions.maxFrames
     this.targetFrames = options.processorOptions.targetFrames
@@ -54,6 +55,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
         this.ended = false
         this.requestOutstanding = false
       } else if (data.type === 'play') {
+        this.startId = data.startId
         this.playing = true
         this.started = false
       } else if (data.type === 'pause') {
@@ -85,7 +87,7 @@ class PodCutPlayerProcessor extends AudioWorkletProcessor {
       }
       if (filled > 0 && !this.started) {
         this.started = true
-        this.port.postMessage({ type: 'started', generation: this.generation })
+        this.port.postMessage({ type: 'started', generation: this.generation, startId: this.startId })
       }
       if (filled < blockSize && !this.ended) {
         this.port.postMessage({ type: 'underrun', generation: this.generation })

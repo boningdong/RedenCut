@@ -7,11 +7,11 @@ Update the implementation and this document together whenever a mapping or its c
 
 | Key | Action | Context and behavior |
 | --- | --- | --- |
-| Space | Play or pause | Requires an active player. In preview mode, starting playback while the playhead is inside a muted clip first seeks to that clip's output end. |
+| Space | Play or pause | Requires an active player. In preview mode, playback skips redacted sections. |
 | S | Split at playhead | Requires an active player and a selected clip; the playhead must be strictly inside that clip's output range. |
-| M | Mute selection | For a waveform selection, mutes its range on the selected track and clears it. In canonical transcript text, resolves the exact clip occurrence and asks for confirmation when acoustic boundaries expand the text selection. |
-| U | Unmute | Unmutes the selected clip when one is selected; otherwise unmutes every muted clip overlapping the waveform selection and clears that selection. |
-| Delete or Backspace | Remove selected clip or mute selection | Removes the selected clip when one is selected. Otherwise, a waveform selection mutes overlapping unmuted audio, associates selected transcript word IDs, and clears the selection. |
+| M | Redact selection | For a waveform selection, redacts its range on the selected track and clears it. In canonical transcript text, resolves the exact clip occurrence and asks for confirmation when acoustic boundaries expand the text selection. |
+| U | Restore redaction | Restores the selected redacted clip when one is selected; otherwise restores every redacted clip overlapping the waveform selection and clears that selection. |
+| Delete or Backspace | Remove selected clip or redact selection | Removes the selected clip when one is selected. Otherwise, a waveform selection redacts overlapping unredacted audio, associates selected transcript word IDs, and clears the selection. |
 | Escape | Clear selection | Clears the waveform selection and selected clip. |
 | Left Arrow | Nudge backward | Seeks one second backward, clamped to zero. |
 | Right Arrow | Nudge forward | Seeks one second forward, clamped to the player duration. |
@@ -24,8 +24,12 @@ Update the implementation and this document together whenever a mapping or its c
 ## Audio Toolbar
 
 Clicking a waveform clip selects its whole output-time range.
-The audio toolbar exposes the same split, mute-selection and delete-selection actions as the corresponding keyboard shortcuts.
+The audio toolbar exposes the same split, redact-selection and delete-selection actions as the corresponding keyboard shortcuts.
 Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.
+
+Track Mute and Solo control audibility only; they do not redact transcript text.
+The Preview edits toggle skips redacted sections during playback.
+For compatibility, project files retain `clip.muted` as the redaction marker; `track.muted` remains the ordinary track mute control.
 
 ## Native Menu Routing
 

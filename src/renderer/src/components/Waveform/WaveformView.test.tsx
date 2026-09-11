@@ -135,7 +135,7 @@ describe('WaveformView managed providers', () => {
     useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['canonical-unit']))
     render(<WaveformView duration={5} providersBySource={new Map()} onAddTrack={vi.fn()} />)
     const before = useTimelineStore.getState().tracks
-    for (const name of ['Split at playhead', 'Mute selection', 'Delete selection']) {
+    for (const name of ['Split at playhead', 'Redact selection', 'Delete selection']) {
       const button = screen.getByRole('button', { name }) as HTMLButtonElement
       expect(button.disabled).toBe(true)
       expect(button.title).toContain('transcript')
@@ -147,7 +147,7 @@ describe('WaveformView managed providers', () => {
     expect(useTimelineStore.getState().tracks[0].clips.map((item) => item.id)).toEqual([
       'duplicate',
     ])
-    fireEvent.click(screen.getByRole('button', { name: 'Mute selection' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Redact selection' }))
     expect(
       useTimelineStore
         .getState()

@@ -102,7 +102,6 @@ export function WaveformView({
     currentTime > selectedClip.outputStart &&
     currentTime < selectedClip.outputStart + selectedClip.sourceEnd - selectedClip.sourceStart,
   )
-  const previewMode = useEditorStore((s) => s.previewMode)
   const setSelection = useEditorStore((s) => s.setSelection)
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
@@ -174,47 +173,6 @@ export function WaveformView({
 
   // ── Shared playhead position ──────────────────────────────────────────────
   const playheadPct = duration > 0 ? (currentTime / duration) * scaleFactor * 100 : 0
-
-  // ── Preview mode skip ─────────────────────────────────────────────────────
-  const previewModeRef = useRef(previewMode)
-  useEffect(() => {
-    previewModeRef.current = previewMode
-  }, [previewMode])
-
-  useEffect(() => {
-    const player = getAudioPlayerInstance()
-    if (!player) return
-    return player.onTimeUpdate((t) => {
-      if (!previewModeRef.current) return
-      const { tracks: currentTracks } = useTimelineStore.getState()
-
-      // Skip only when ALL tracks are silent at t — i.e. no track has an
-      // unmuted clip whose output range covers the current time.
-      const anyAudible = currentTracks.some((tr) =>
-        tr.clips.some((c) => {
-          if (c.muted) return false
-          const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-          return t >= c.outputStart && t < outputEnd
-        }),
-      )
-      if (anyAudible) return
-
-      // All tracks silent — find the earliest future time any track resumes.
-      let nextAudible = Infinity
-      for (const tr of currentTracks) {
-        for (const c of tr.clips) {
-          if (!c.muted && c.outputStart > t) {
-            nextAudible = Math.min(nextAudible, c.outputStart)
-          }
-        }
-      }
-
-      if (nextAudible < Infinity) {
-        getAudioPlayerInstance()?.seekTo(nextAudible)
-      }
-      // If nextAudible === Infinity, no more audible content — play to end naturally.
-    })
-  }, [])
 
   // ── Seek on lane/ruler click ───────────────────────────────────────────────
   // At zoom < 1, clips occupy only scaleFactor * 100% of the content div.
@@ -345,8 +303,8 @@ export function WaveformView({
           <Icon name="split" />
         </button>
         <button
-          aria-label="Mute selection"
-          title={hasTranscriptSelection ? transcriptEditHint : 'Mute selection (M)'}
+          aria-label="Redact selection"
+          title={hasTranscriptSelection ? transcriptEditHint : 'Redact selection (M)'}
           disabled={hasTranscriptSelection || !selection}
           onMouseDown={(event) => event.preventDefault()}
           onClick={muteSelection}
@@ -619,7 +577,7 @@ export function WaveformView({
       </div>
       <div className="audio-footer">
         <span>{selectedClipId ? 'Clip selected' : 'No clip selected'}</span>
-        <span className="audio-footer-hint">Drag clips to move · S Split · M Mute</span>
+        <span className="audio-footer-hint">Drag clips to move · S Split · M Redact</span>
         {audioDetails}
       </div>
     </div>

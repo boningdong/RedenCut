@@ -46,7 +46,7 @@ describe('PodCut AudioWorklet queue', () => {
       channels: [new Float32Array([1, -1, 0.5, -0.5])],
       gain: 0.5,
     })
-    send(processor, { type: 'play' })
+    send(processor, { type: 'play', startId: 1 })
     const output = [[new Float32Array(4), new Float32Array(4)]]
     expect(processor.process([], output)).toBe(true)
     expect([...output[0][0]]).toEqual([0.5, -0.5, 0.25, -0.25])
@@ -57,7 +57,7 @@ describe('PodCut AudioWorklet queue', () => {
       queuedFrames: 4,
       acceptedFrames: 4,
     })
-    expect(processor.port.messages).toContainEqual({ type: 'started', generation: 2 })
+    expect(processor.port.messages).toContainEqual({ type: 'started', generation: 2, startId: 1 })
   })
 
   it('rejects overflow and ignores stale generations after a flush', () => {
@@ -93,7 +93,7 @@ describe('PodCut AudioWorklet queue', () => {
     const processor = createProcessor(8, 6, 2)
     send(processor, { type: 'flush', generation: 1 })
     send(processor, { type: 'pcm', generation: 1, channels: [new Float32Array(6)], gain: 1 })
-    send(processor, { type: 'play' })
+    send(processor, { type: 'play', startId: 1 })
     processor.process([], [[new Float32Array(2)]])
     expect(processor.port.messages.filter((message) => message.type === 'need-data')).toHaveLength(
       0,
@@ -110,7 +110,7 @@ describe('PodCut AudioWorklet queue', () => {
     const processor = createProcessor(8, 6, 2)
     send(processor, { type: 'flush', generation: 1 })
     send(processor, { type: 'pcm', generation: 1, channels: [new Float32Array(6)], gain: 1 })
-    send(processor, { type: 'play' })
+    send(processor, { type: 'play', startId: 1 })
     let handledRequests = 0
     for (let quantum = 0; quantum < 100; quantum++) {
       processor.process([], [[new Float32Array(1)]])
@@ -138,11 +138,15 @@ describe('PodCut AudioWorklet queue', () => {
       channels: [new Float32Array(8)],
       gain: 1,
     })
-    send(processor, { type: 'play' })
+    send(processor, { type: 'play', startId: 1 })
     processor.process([], [[new Float32Array(2)]])
     send(processor, { type: 'pause' })
-    send(processor, { type: 'play' })
+    send(processor, { type: 'play', startId: 2 })
     processor.process([], [[new Float32Array(2)]])
-    expect(processor.port.messages.filter((message) => message.type === 'started')).toHaveLength(2)
+    expect(
+      processor.port.messages
+        .filter((message) => message.type === 'started')
+        .map((message) => message.startId),
+    ).toEqual([1, 2])
   })
 })

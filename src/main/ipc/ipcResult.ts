@@ -1,6 +1,7 @@
 import type { IpcError, IpcResult } from '../../shared/ipc.types'
 import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
 import { ZodError } from 'zod'
+import { SpeechAnalysisError } from '../speech/SpeechAnalysisError'
 
 type IpcErrorCode = IpcError['code']
 
@@ -32,6 +33,8 @@ export async function toIpcResult<T>(
 }
 
 function mapError(error: unknown): IpcError {
+  if (error instanceof SpeechAnalysisError)
+    return { code: 'operation-failed', message: error.message }
   if (error instanceof PublicIpcError)
     return { code: error.code, message: SAFE_MESSAGES[error.code] }
   if (error instanceof DOMException && error.name === 'AbortError')

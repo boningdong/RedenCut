@@ -20,6 +20,7 @@
 //   Transcript selection → waveform   selectionchange → setSelection({ start, end })
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { togglePlayback } from '../../actions/playbackActions'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
@@ -259,7 +260,7 @@ function LegacyTranscriptPanel({
       if (e.code === 'Space') {
         e.preventDefault()
         e.stopPropagation()
-        getAudioPlayerInstance()?.playPause().catch(console.error)
+        togglePlayback().catch(console.error)
         return
       }
 
@@ -330,9 +331,9 @@ function LegacyTranscriptPanel({
                 cursor: 'pointer',
                 padding: '2px 4px',
               }}
-              title={showMutedWords ? 'Hide deleted words' : 'Show deleted words'}
+              title={showMutedWords ? 'Hide redacted words' : 'Show redacted words'}
             >
-              {showMutedWords ? 'Hide deleted' : 'Show deleted'}
+              {showMutedWords ? 'Hide redacted' : 'Show redacted'}
             </button>
           </div>
         )}
@@ -526,18 +527,13 @@ function LegacyTranscriptPanel({
           }}
         >
           {visibleWords.map((word) => {
-            const isCurrent = word.id === currentWordId
             const clipState = clipStateMap.get(word.id) ?? 'normal'
+            const isCurrent = !word.muted && clipState === 'normal' && word.id === currentWordId
             // In merged view (multiple tracks visible), show a colored underline per track
             const trackColor =
               visibleSet.size > 1 ? (trackColorMap.get(word.trackId ?? '') ?? null) : null
 
-            // Style precedence:
-            //   isCurrent → terminal highlight
-            //   word.muted (type a, text-edit) → red strikethrough
-            //   clip-muted (type b, 'M' on clip) → amber tint, no strikethrough
-            //   no-clip    (type c, clip deleted) → gray dim strikethrough
-            //   normal     → track color underline in All view
+            // Word edits and clip redactions share strikethrough; track mute is not redaction.
             let bg = 'transparent'
             let wordColor = 'var(--color-text-primary)'
             let decoration = 'none'
@@ -547,15 +543,11 @@ function LegacyTranscriptPanel({
             if (isCurrent) {
               bg = 'var(--color-accent)'
               wordColor = 'var(--color-text-on-accent)'
-            } else if (word.muted) {
-              // Type a: explicitly deleted via transcript editing
+            } else if (word.muted || clipState === 'clip-muted') {
+              // Clip.muted is the persisted marker for redacted audio.
               decoration = 'line-through'
               opacity = 0.45
               wordColor = 'var(--color-danger-word)'
-            } else if (clipState === 'clip-muted') {
-              // Type b: whole clip muted via 'M' key — audio is silenced as a block
-              bg = 'var(--color-warning-muted)'
-              wordColor = 'var(--color-warning)'
             } else if (clipState === 'no-clip') {
               // Type c: clip was deleted — word produces no audio at all
               decoration = 'line-through'

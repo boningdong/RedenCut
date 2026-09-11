@@ -246,6 +246,24 @@ export class WorkspaceController {
     }
   }
 
+  captureSpeechPcmResolver(expected: SessionPrecondition) {
+    this.assertCurrent(expected)
+    const workspace = this.workspace
+    const sources = new Map(workspace.project.audioSources.map((source) => [source.id, source]))
+    return async (audioSourceId: AudioSourceId) => {
+      const source = sources.get(audioSourceId)
+      if (!source) throw new Error(`Unknown audio source: ${audioSourceId}`)
+      const store = new AudioSourceCacheStore(workspace.root)
+      const manifest = await store.validate(source)
+      if (!manifest) throw new Error('Speech audio cache is invalid')
+      return {
+        path: await store.resolvePcm(source),
+        sampleRate: manifest.pcm.sampleRate,
+        channels: manifest.pcm.channels,
+      }
+    }
+  }
+
   private captureState(): TransactionState {
     if (!this.current || !this.workspaceToken)
       throw new Error('Project workspace has not been initialized')

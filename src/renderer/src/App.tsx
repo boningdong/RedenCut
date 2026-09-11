@@ -1,3 +1,4 @@
+import { attachRedactionPreview } from './actions/playbackActions'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { AudioSourceId } from '@shared/project.types'
 import type { ImportMode } from '@shared/import.types'
@@ -144,6 +145,7 @@ export default function App() {
               player.onDurationChange(usePlaybackStore.getState().setDuration),
               player.onEnded(() => usePlaybackStore.getState().setPlaying(false)),
               player.onError((playbackError) => setError(playbackError.message)),
+              attachRedactionPreview(player),
             ],
           }
         } catch (error) {

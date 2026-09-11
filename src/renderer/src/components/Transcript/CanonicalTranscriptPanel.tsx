@@ -173,7 +173,7 @@ export function CanonicalTranscriptPanel({
         style={
           {
             textDecoration:
-              u.muted && editable
+              u.clip.muted && editable
                 ? 'line-through'
                 : !editable && u.unit.kind === 'speech'
                   ? 'underline dotted'
@@ -260,7 +260,7 @@ export function CanonicalTranscriptPanel({
         {!units.length && <p>No transcript in the current timeline.</p>}
       </div>
       <div className="transcript-footer">
-        Select text to edit audio · Click speech to seek · Overlap uses aligned audio boundaries
+        Select text to redact audio · Click speech to seek · Overlap uses aligned audio boundaries
       </div>
       {scopeMessage && (
         <div role="status" className="transcript-confirmation">
@@ -270,15 +270,15 @@ export function CanonicalTranscriptPanel({
       {pending && (
         <div role="status" className="transcript-confirmation">
           {pending.scopeConflict
-            ? 'Selection spans multiple tracks or clip occurrences. Select text from one track and clip to edit its audio.'
+            ? 'Selection spans multiple tracks or clip occurrences. Select text from one track and clip to redact its audio.'
             : pending.expanded
-              ? `“${pendingText(pending.requestedUnitIds)}” 必须按声学边界扩展为 “${pendingText(pending.resolvedUnitIds)}”。`
+              ? `Redacting “${pendingText(pending.requestedUnitIds)}” requires including “${pendingText(pending.resolvedUnitIds)}” to preserve acoustic boundaries.`
               : pending.unalignedUnitIds.length
-                ? '选择中包含无法可靠定位的语音，不能执行音频编辑。'
-                : '标点没有对应声音，不能单独执行音频编辑。'}
+                ? 'This selection includes speech that cannot be aligned reliably and cannot be redacted.'
+                : 'Punctuation has no corresponding audio and cannot be redacted on its own.'}
           <div>
-            {pending.editable && <button onClick={() => apply(pending)}>确认编辑</button>}
-            <button onClick={() => setPending(null)}>取消</button>
+            {pending.editable && <button onClick={() => apply(pending)}>Confirm redaction</button>}
+            <button onClick={() => setPending(null)}>Cancel</button>
           </div>
         </div>
       )}

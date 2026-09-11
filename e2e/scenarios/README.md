@@ -9,6 +9,7 @@ Existing [fixed E2Es](../README.md) continue to own deterministic regression ass
 | Scenario | When to run | Required capabilities |
 | --- | --- | --- |
 | [Editing workflow](editing-workflow.md) | Baseline for user-visible changes, plus explicit workflow trials | Docker MCP, prepared fixture/project dialogs, snapshots and screenshots |
+| [Redact preview workflow](redact-preview-workflow.md) | Playback across redactions, Preview comparison and preservation of overlapping retained audio | Docker MCP, prepared dialogs and ordered playback snapshots |
 | [Keyboard editing workflow](keyboard-workflow.md) | Shortcut routing, keyboard editing, focus behavior and keyboard-driven save/persistence | Docker MCP with keyboard input, prepared fixture/project dialogs, speech-enabled transcript generation |
 | [Speech analysis workflow](speech-analysis-workflow.md) | Generate and edit a canonical aligned transcript with anonymous speakers | Speech-enabled Docker MCP, provisioned models, prepared audio/project dialogs |
 
