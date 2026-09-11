@@ -1,3 +1,5 @@
+import type { AppPreferencesSnapshot } from '../shared/appPreferences.types'
+import type { LocalePreference } from '../shared/i18n/locale.types'
 import type { WorkspaceLayout, WorkspaceLayoutReadResult } from '../shared/workspaceLayout.types'
 import type { IpcRendererEvent } from 'electron'
 import { contextBridge, ipcRenderer } from 'electron'
@@ -51,6 +53,16 @@ ipcRenderer.on('project:pending-open', (_event, value: PendingProjectOpenEvent) 
 })
 
 const api = {
+  appPreferences: {
+    get: () => invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:get'),
+    setLocale: (preference: LocalePreference) =>
+      invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:set-locale', preference),
+    onChanged: (listener: (value: AppPreferencesSnapshot) => void) => {
+      const handler = (_event: IpcRendererEvent, value: AppPreferencesSnapshot) => listener(value)
+      ipcRenderer.on('app-preferences:changed', handler)
+      return () => ipcRenderer.off('app-preferences:changed', handler)
+    },
+  },
   audio: {
     selectImportFile: (expected: SessionPrecondition) =>
       invokeSafe<ImportSelection | null>(invoke, 'audio:select-import-file', expected),

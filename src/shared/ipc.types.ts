@@ -1,3 +1,5 @@
+import type { AppPreferencesSnapshot } from './appPreferences.types'
+import type { LocalePreference } from './i18n/locale.types'
 import type { WorkspaceLayout, WorkspaceLayoutReadResult } from './workspaceLayout.types'
 import type {
   ImportCancellationResult,
@@ -98,6 +100,11 @@ export interface RenderProgress {
 export interface RenderProgressEvent extends SessionJobRequest<ExportJobId>, RenderProgress {}
 
 export interface IElectronAPI {
+  appPreferences: {
+    get(): Promise<AppPreferencesSnapshot>
+    setLocale(preference: LocalePreference): Promise<AppPreferencesSnapshot>
+    onChanged(listener: (value: AppPreferencesSnapshot) => void): () => void
+  }
   workspaceLayout: {
     get(): Promise<WorkspaceLayoutReadResult>
     set(layout: WorkspaceLayout): Promise<WorkspaceLayout>

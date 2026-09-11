@@ -55,3 +55,33 @@ test('workspace preferences forward exact channels and unwrap successful results
     code: 'operation-failed',
   })
 })
+
+test('app preferences unwrap get/set results and unsubscribe the exact changed listener', async () => {
+  const { ipcRenderer } = await import('electron')
+  const snapshot = {
+    preference: 'zh-CN' as const,
+    resolvedLocale: 'zh-CN' as const,
+    revision: 1,
+    warning: null,
+  }
+  vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: snapshot })
+  expect(await mocks.api!.appPreferences.get()).toEqual(snapshot)
+  expect(ipcRenderer.invoke).toHaveBeenLastCalledWith('app-preferences:get')
+  vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: snapshot })
+  expect(await mocks.api!.appPreferences.setLocale('zh-CN')).toEqual(snapshot)
+  expect(ipcRenderer.invoke).toHaveBeenLastCalledWith('app-preferences:set-locale', 'zh-CN')
+  const listener = vi.fn()
+  const unsubscribe = mocks.api!.appPreferences.onChanged(listener)
+  const handler = mocks.listeners.get('app-preferences:changed')!
+  handler({}, snapshot)
+  expect(listener).toHaveBeenCalledWith(snapshot)
+  unsubscribe()
+  expect(ipcRenderer.off).toHaveBeenLastCalledWith('app-preferences:changed', handler)
+  vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({
+    ok: false,
+    error: { code: 'operation-failed', message: 'Could not save.' },
+  })
+  await expect(mocks.api!.appPreferences.setLocale('en')).rejects.toMatchObject({
+    code: 'operation-failed',
+  })
+})

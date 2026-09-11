@@ -1,3 +1,5 @@
+import { AppPreferencesStore } from './preferences/AppPreferencesStore'
+import { registerAppPreferencesIpc } from './ipc/appPreferences.ipc'
 import { WorkspaceLayoutStore } from './preferences/WorkspaceLayoutStore'
 import { registerWorkspaceLayoutIpc } from './ipc/workspaceLayout.ipc'
 import { app, BrowserWindow, protocol } from 'electron'
@@ -67,6 +69,12 @@ startApplicationLifecycle({
     ])
   },
   initialize: async () => {
+    const appPreferences = new AppPreferencesStore(
+      join(app.getPath('userData'), 'app-preferences.json'),
+      () => app.getPreferredSystemLanguages(),
+    )
+    await appPreferences.read().catch(console.error)
+    registerAppPreferencesIpc(appPreferences)
     const cleanupWarnings = new CleanupWarningStore()
     const controller = new WorkspaceController(
       undefined,

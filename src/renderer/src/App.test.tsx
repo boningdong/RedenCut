@@ -220,6 +220,16 @@ function installApi(initial: RendererSession) {
   const saveProject = vi.fn<IElectronAPI['project']['save']>(async () => null)
   const saveProjectAs = vi.fn<IElectronAPI['project']['saveAs']>(async () => null)
   const api = {
+    appPreferences: {
+      get: vi.fn<IElectronAPI['appPreferences']['get']>(async () => ({
+        preference: 'system',
+        resolvedLocale: 'en',
+        revision: 0,
+        warning: null,
+      })),
+      setLocale: vi.fn<IElectronAPI['appPreferences']['setLocale']>(),
+      onChanged: vi.fn<IElectronAPI['appPreferences']['onChanged']>(() => vi.fn()),
+    },
     workspaceLayout: {
       get: vi.fn<IElectronAPI['workspaceLayout']['get']>(async () => ({
         layout: DEFAULT_WORKSPACE_LAYOUT,

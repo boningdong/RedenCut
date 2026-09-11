@@ -1,3 +1,5 @@
+import type { AppPreferencesSnapshot } from './appPreferences.types'
+import type { LocalePreference } from './i18n/locale.types'
 import { expectTypeOf, test } from 'vitest'
 import type { ImportCancellationResult, ImportMode, ImportSelection } from './import.types'
 import type { AudioSourceId, ProjectFile, Transcript } from './project.types'
@@ -104,4 +106,16 @@ test('preload methods use path-free session requests and results', () => {
   expectTypeOf<
     Parameters<IElectronAPI['render']['startExport']>[0]
   >().not.toMatchTypeOf<ProjectFile>()
+})
+
+test('app preference IPC carries revisioned snapshots and returns an unsubscribe callback', () => {
+  expectTypeOf<IElectronAPI['appPreferences']['get']>().toEqualTypeOf<
+    () => Promise<AppPreferencesSnapshot>
+  >()
+  expectTypeOf<IElectronAPI['appPreferences']['setLocale']>().toEqualTypeOf<
+    (preference: LocalePreference) => Promise<AppPreferencesSnapshot>
+  >()
+  expectTypeOf<IElectronAPI['appPreferences']['onChanged']>().toEqualTypeOf<
+    (listener: (snapshot: AppPreferencesSnapshot) => void) => () => void
+  >()
 })
