@@ -39,7 +39,7 @@ function createWindow(): BrowserWindow {
     minHeight: 600,
     backgroundColor: '#0f0f0f',
     titleBarStyle: 'hiddenInset',
-    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 18 } } : {}),
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 15 } } : {}),
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false },
   })
   routeProjectShortcuts(window.webContents)

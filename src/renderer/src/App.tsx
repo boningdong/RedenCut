@@ -695,12 +695,12 @@ export default function App() {
           <span className="project-name" title={session?.workspace.displayName}>
             {session?.workspace.displayName ?? 'Untitled project'}
           </span>
+        </div>
+        <div className="project-actions">
           <span className="project-save-state">
             <i data-dirty={isDirty} />
             {isDirty ? 'Unsaved changes' : 'All changes saved'}
           </span>
-        </div>
-        <div className="project-actions">
           <Button
             size="sm"
             variant="ghost"
