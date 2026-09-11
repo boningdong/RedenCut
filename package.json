@@ -65,6 +65,7 @@
   "dependencies": {
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
+    "i18next": "^26.4.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zod": "4.3.6",
