@@ -15,6 +15,7 @@ import { useEditorStore } from '../../stores/editor.store'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { Button } from '../ui/Button'
+import { Icon } from '../ui/Icon'
 import { useThemeStore } from '../../stores/theme.store'
 
 function formatTime(seconds: number): string {
@@ -26,6 +27,11 @@ function formatTime(seconds: number): string {
 }
 
 export function TransportBar() {
+  const canUndo = useTimelineStore((s) => s.undoStack.length > 0)
+  const canRedo = useTimelineStore((s) => s.redoStack.length > 0)
+  const undo = useTimelineStore((s) => s.undo)
+  const redo = useTimelineStore((s) => s.redo)
+  const hasAudio = useTimelineStore((s) => s.tracks.some((track) => track.clips.length > 0))
   const isPlaying = usePlaybackStore((s) => s.isPlaying)
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const duration = usePlaybackStore((s) => s.duration)
@@ -69,10 +75,11 @@ export function TransportBar() {
 
   return (
     <div
+      className="transport-bar"
       style={{
         height: 48,
         backgroundColor: 'var(--color-bg-secondary)',
-        borderTop: '1px solid var(--color-border)',
+
         display: 'flex',
         alignItems: 'center',
         paddingInline: 'var(--space-4)',
@@ -82,7 +89,14 @@ export function TransportBar() {
       }}
     >
       {/* Skip to start */}
-      <Button size="sm" variant="ghost" onClick={handleSkipToStart} title="Skip to start">
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={handleSkipToStart}
+        disabled={!hasAudio}
+        aria-label="Skip to start"
+        title="Skip to start"
+      >
         <SkipBackIcon />
       </Button>
 
@@ -95,13 +109,22 @@ export function TransportBar() {
             console.error('[TransportBar] Failed to toggle playback:', error)
           })
         }}
+        disabled={!hasAudio}
+        aria-label={isPlaying ? 'Pause' : 'Play'}
         title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
       >
         {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </Button>
 
       {/* Skip to end */}
-      <Button size="sm" variant="ghost" onClick={handleSkipToEnd} title="Skip to end">
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={handleSkipToEnd}
+        disabled={!hasAudio}
+        aria-label="Skip to end"
+        title="Skip to end"
+      >
         <SkipForwardIcon />
       </Button>
 
@@ -123,12 +146,20 @@ export function TransportBar() {
         <span>{formatTime(duration)}</span>
       </div>
 
+      <span className="transport-separator" />
+      <Button size="sm" disabled={!canUndo} onClick={undo} aria-label="Undo" title="Undo (⌘Z)">
+        <Icon name="undo" />
+      </Button>
+      <Button size="sm" disabled={!canRedo} onClick={redo} aria-label="Redo" title="Redo (⇧⌘Z)">
+        <Icon name="redo" />
+      </Button>
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
       {/* Preview Mode toggle */}
       <button
         onClick={togglePreviewMode}
+        aria-pressed={previewMode}
         title="Preview Mode: skip muted regions during playback"
         style={{
           display: 'flex',
@@ -175,7 +206,7 @@ export function TransportBar() {
           alignItems: 'center',
         }}
       >
-        {theme === 'dark' ? '☀' : '🌙'}
+        <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
       </button>
     </div>
   )

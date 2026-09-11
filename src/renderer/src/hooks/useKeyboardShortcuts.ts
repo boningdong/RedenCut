@@ -69,6 +69,14 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
       }
 
       if (isMeta) return
+      // Space activates native controls on keyup. Leave its default action intact.
+      if (
+        e.code === 'Space' &&
+        !e.altKey &&
+        !e.shiftKey &&
+        target.closest('button, summary, select')
+      )
+        return
 
       switch (e.code) {
         // ── Space — Play / Pause ───────────────────────────────────────────

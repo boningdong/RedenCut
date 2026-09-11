@@ -1,3 +1,4 @@
+import { Icon } from '../ui/Icon'
 import type { PointerEventHandler } from 'react'
 
 export function PanelDragHandle({
@@ -14,7 +15,7 @@ export function PanelDragHandle({
       title={`Drag ${label} panel; use Move button to reorder with keyboard`}
       onPointerDown={onPointerDown}
     >
-      ⠿
+      <Icon name="grip" />
     </button>
   )
 }

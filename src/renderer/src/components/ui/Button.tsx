@@ -23,21 +23,21 @@ export function Button({ variant = 'ghost', size = 'md', children, style, ...pro
     justifyContent: 'center',
     gap: 6,
     border: 'none',
-    borderRadius: 6,
+    borderRadius: 7,
     cursor: props.disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'var(--font-sans)',
     fontWeight: 500,
     letterSpacing: '0.01em',
     transition: 'background 0.1s, color 0.1s, opacity 0.1s',
     opacity: props.disabled ? 0.4 : 1,
-    outline: 'none',
+
     WebkitAppRegion: 'no-drag', // prevent drag interference in title bar
     ...(size === 'sm'
-      ? { fontSize: 'var(--text-xs)', padding: '4px 10px', height: 26 }
+      ? { fontSize: 'var(--text-xs)', padding: '5px 10px', height: 30 }
       : { fontSize: 'var(--text-sm)', padding: '6px 14px', height: 32 }),
     ...(variant === 'primary'
       ? {
-          backgroundColor: 'var(--color-accent)',
+          backgroundColor: 'var(--color-accent-fill)',
           color: 'var(--color-text-on-accent)',
         }
       : {

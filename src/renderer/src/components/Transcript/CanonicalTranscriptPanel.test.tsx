@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
+import { usePlaybackStore } from '../../stores/playback.store'
+import { setAudioPlayerInstance } from '@shared/player.types'
 import { TranscriptPanel } from './TranscriptPanel'
 
 const sourceId = '550e8400-e29b-41d4-a716-446655440000'
@@ -85,7 +87,11 @@ describe('canonical transcript editability', () => {
       } as never,
     ])
   })
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    setAudioPlayerInstance(null)
+    window.getSelection()?.removeAllRanges()
+  })
 
   it('visually distinguishes editable speech, punctuation, and unaligned speech consistently', () => {
     render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
@@ -194,5 +200,240 @@ describe('canonical transcript editability', () => {
     expect(screen.getByTestId('speaker-swatch-speaker-a').style.color).toBe(
       speakerA1.style.borderBottomColor,
     )
+  })
+  it('renders both duplicate occurrences and generates a missing track from the header', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        {
+          ...track,
+          clips: [...track.clips, { ...track.clips[0], id: 'duplicate', outputStart: 8 }],
+        },
+        {
+          ...track,
+          id: 'missing',
+          name: 'Guest',
+          clips: [
+            { ...track.clips[0], id: 'guest', audioSourceId: 'other' as never, trackId: 'missing' },
+          ],
+        },
+      ],
+    })
+    const generate = vi.fn()
+    render(<TranscriptPanel onGenerate={generate} isGenerating={false} generatingStatus="" />)
+    expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Guest' }))
+    expect(generate).toHaveBeenCalledWith('missing')
+    act(() => useTimelineStore.getState().removeClip('duplicate'))
+    expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(1)
+  })
+  it('offers a local Read / Align switch only for audible overlapping tracks', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        { ...track, clips: track.clips.map((c) => ({ ...c, muted: false })) },
+        {
+          ...track,
+          id: 'guest',
+          name: 'Guest',
+          clips: track.clips.map((c) => ({
+            ...c,
+            id: 'guest-clip',
+            trackId: 'guest',
+            muted: false,
+          })),
+        },
+      ],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    expect(screen.getByRole('button', { name: 'Align' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Align' }))
+    expect(screen.getByRole('button', { name: 'Align' }).getAttribute('aria-pressed')).toBe('true')
+    act(() => useTimelineStore.getState().updateTrack('guest', { muted: true }))
+    expect(screen.queryByRole('button', { name: 'Align' })).toBeNull()
+  })
+  it('seeks the clicked duplicate output time and highlights simultaneous tracks', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        { ...track, clips: track.clips.map((c) => ({ ...c, muted: false, outputStart: 8 })) },
+        {
+          ...track,
+          id: 'guest',
+          clips: track.clips.map((c) => ({
+            ...c,
+            id: 'guest',
+            trackId: 'guest',
+            muted: false,
+            outputStart: 8,
+          })),
+        },
+      ],
+    })
+    const seekTo = vi.fn()
+    setAudioPlayerInstance({ seekTo } as never)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    window.getSelection()?.removeAllRanges()
+    fireEvent.click(document.querySelector('[data-track-id="guest"][data-unit-id="speech"]')!)
+    expect(seekTo).toHaveBeenCalledWith(8.5)
+    act(() => usePlaybackStore.getState().setCurrentTime(8.75))
+    expect(document.querySelectorAll('[data-playing="true"]')).toHaveLength(2)
+    act(() => usePlaybackStore.getState().setCurrentTime(9))
+    expect(document.querySelectorAll('[data-playing="true"]')).toHaveLength(0)
+  })
+  it('deletes only the selected duplicate occurrence and recomputes through undo and redo', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        {
+          ...track,
+          clips: [
+            { ...track.clips[0], muted: false },
+            { ...track.clips[0], id: 'duplicate', muted: false, outputStart: 8 },
+          ],
+        },
+      ],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const selected = document.querySelector('[data-clip-id="duplicate"][data-unit-id="speech"]')!
+    const range = document.createRange()
+    range.selectNodeContents(selected)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    fireEvent.keyDown(screen.getByTestId('canonical-transcript'), {
+      key: 'Backspace',
+      code: 'Backspace',
+    })
+    expect(useTimelineStore.getState().tracks[0].clips.find((c) => c.id === 'clip')?.muted).toBe(
+      false,
+    )
+    expect(
+      useTimelineStore
+        .getState()
+        .tracks[0].clips.filter((c) => c.muted)
+        .map((c) => c.outputStart),
+    ).toEqual([8.5])
+    act(() => useTimelineStore.getState().undo())
+    expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
+    act(() => useTimelineStore.getState().redo())
+    expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(2)
+  })
+  it('rejects a native selection spanning tracks without muting either track', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        { ...track, clips: track.clips.map((c) => ({ ...c, muted: false })) },
+        {
+          ...track,
+          id: 'guest',
+          clips: track.clips.map((c) => ({ ...c, id: 'guest', trackId: 'guest', muted: false })),
+        },
+      ],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const spans = document.querySelectorAll('[data-unit-id="speech"]')
+    const range = document.createRange()
+    range.setStart(spans[0].firstChild!, 0)
+    range.setEnd(spans[1].firstChild!, 1)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    fireEvent.keyDown(screen.getByTestId('canonical-transcript'), {
+      key: 'Backspace',
+      code: 'Backspace',
+    })
+    expect(screen.getByRole('status').textContent).toContain('multiple tracks or clip occurrences')
+    expect(screen.queryByRole('button', { name: '确认编辑' })).toBeNull()
+    expect(useTimelineStore.getState().tracks.every((t) => t.clips.every((c) => !c.muted))).toBe(
+      true,
+    )
+  })
+  it('preserves native Space activation for the local mode controls', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        { ...track, clips: track.clips.map((c) => ({ ...c, muted: false })) },
+        {
+          ...track,
+          id: 'guest',
+          clips: track.clips.map((c) => ({ ...c, id: 'guest', trackId: 'guest', muted: false })),
+        },
+      ],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    expect(
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Align' }), { key: ' ', code: 'Space' }),
+    ).toBe(true)
+  })
+  it('keeps untimed punctuation in its attributed speaker paragraph', () => {
+    const analysis = useTranscriptStore.getState().analyses[0]
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        speakers: [{ id: 'speaker-a', defaultDisplayName: 'Host', diarizationLabel: 'A' }],
+        speakerAttribution: {
+          ...analysis.speakerAttribution,
+          attributions: [
+            { acousticEditUnitId: 'acoustic', speakerId: 'speaker-a', ambiguous: false },
+          ],
+        },
+      } as never,
+    ])
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const speech = document.querySelector('[data-unit-id="speech"]')!,
+      punctuation = document.querySelector('[data-unit-id="punctuation"]')!
+    expect(speech.closest('.transcript-paragraph')).toBe(
+      punctuation.closest('.transcript-paragraph'),
+    )
+    expect(punctuation.getAttribute('data-speaker-id')).toBeNull()
+  })
+  it('rejects a pending acoustic confirmation after reopening the same project in a new workspace', () => {
+    useEditorStore.setState({ session: { workspaceToken: 'first' } as never })
+    const analysis = useTranscriptStore.getState().analyses[0]
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        transcript: {
+          ...analysis.transcript,
+          units: [
+            { id: 'speech', text: 'A', kind: 'speech' },
+            { id: 'other', text: 'B', kind: 'speech' },
+          ],
+        },
+        alignment: {
+          ...analysis.alignment,
+          acousticEditUnits: [
+            { ...analysis.alignment.acousticEditUnits[0], transcriptUnitIds: ['speech', 'other'] },
+          ],
+        },
+      } as never,
+    ])
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: track.clips.map((c) => ({ ...c, muted: false })) }],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const range = document.createRange()
+    range.selectNodeContents(document.querySelector('[data-unit-id="speech"]')!)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    fireEvent.keyDown(screen.getByTestId('canonical-transcript'), {
+      key: 'Backspace',
+      code: 'Backspace',
+    })
+    act(() => useEditorStore.setState({ session: { workspaceToken: 'second' } as never }))
+    fireEvent.click(screen.getByRole('button', { name: '确认编辑' }))
+    expect(useTimelineStore.getState().tracks[0].clips.every((c) => !c.muted)).toBe(true)
+    expect(screen.getByRole('status').textContent).toContain('changed')
+  })
+  it('refreshes the waveform selection when selected text moves with its clip', () => {
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus="" />)
+    const range = document.createRange()
+    range.selectNodeContents(document.querySelector('[data-unit-id="speech"]')!)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    fireEvent(document, new Event('selectionchange'))
+    expect(useEditorStore.getState().selection).toEqual({ start: 0.5, end: 1 })
+    act(() => useTimelineStore.getState().moveClip('clip', 8))
+    expect(useEditorStore.getState().selection).toEqual({ start: 8.5, end: 9 })
   })
 })

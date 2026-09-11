@@ -22,6 +22,7 @@ import { EditorWorkspace } from './components/Workspace/EditorWorkspace'
 import { TransportBar } from './components/Transport/TransportBar'
 import { TranscriptPanel } from './components/Transcript/TranscriptPanel'
 import { ExportModal } from './components/Export/ExportModal'
+import { Icon } from './components/ui/Icon'
 import { Button } from './components/ui/Button'
 import { useEditorStore } from './stores/editor.store'
 import { usePlaybackStore } from './stores/playback.store'
@@ -642,7 +643,16 @@ export default function App() {
           !sessionMatchesTranscriptJob(latest, job)
         )
           return
-        await loadSession(generated.value, undefined, true)
+        // Analysis publishes metadata for existing sources. Keep the live graph and player:
+        // the returned draft was captured before edits made while recognition was running.
+        const published = {
+          ...generated.value,
+          draft: { ...generated.value.draft, tracks: useTimelineStore.getState().tracks },
+        }
+        invalidateImportJobForSession(published)
+        useTimelineStore.getState().refreshAudioSources(published.sources)
+        useTranscriptStore.getState().loadAnalyses(published.speechAnalyses)
+        loadEditorSession(published, true)
       } catch (reason) {
         if (
           transcriptJobMatches(transcriptJob.current, job) &&
@@ -657,7 +667,7 @@ export default function App() {
         }
       }
     },
-    [loadSession],
+    [invalidateImportJobForSession, loadEditorSession],
   )
 
   const primarySource = session?.sources[0]
@@ -681,25 +691,21 @@ export default function App() {
         background: 'var(--color-bg-primary)',
       }}
     >
-      <header
-        style={
-          {
-            height: 42,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '0 12px',
-            borderBottom: '1px solid var(--color-border)',
-            WebkitAppRegion: 'drag',
-          } as React.CSSProperties
-        }
-      >
-        <strong style={{ marginRight: 'auto' }}>
-          {APP_NAME}
-          {session ? ` — ${session.workspace.displayName}` : ''}
-          {isDirty ? ' •' : ''}
-        </strong>
-        <div style={{ display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <header className="project-header">
+        <div className="project-identity">
+          <span className="project-brand">
+            <Icon name="wave" size={26} />
+            {APP_NAME}
+          </span>
+          <span className="project-name" title={session?.workspace.displayName}>
+            {session?.workspace.displayName ?? 'Untitled project'}
+          </span>
+          <span className="project-save-state">
+            <i data-dirty={isDirty} />
+            {isDirty ? 'Unsaved changes' : 'All changes saved'}
+          </span>
+        </div>
+        <div className="project-actions">
           <Button
             size="sm"
             variant="ghost"
@@ -744,11 +750,11 @@ export default function App() {
           </Button>
           <Button
             size="sm"
-            variant="ghost"
+            variant="primary"
             onClick={() => setShowExport(true)}
             disabled={!tracks.length}
           >
-            Export
+            <Icon name="upload" /> Export
           </Button>
         </div>
       </header>

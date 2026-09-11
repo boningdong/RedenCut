@@ -126,7 +126,9 @@ test('split and drag survive save and reopen as visible clips with audible playb
     const selection = { type: 'project', name: 'edited-audio.podcut' }
     await ui.call('podcut_prepare_dialog', { request: { purpose: 'save-project', selection } })
     await ui.call('browser_click', { target: 'button:text-is("Save")' })
-    await expect.poll(() => ui.page.locator('header strong').innerText()).toContain('edited-audio')
+    await expect
+      .poll(() => ui.page.locator('header .project-name').innerText())
+      .toContain('edited-audio')
     await ui.restart()
     await ui.call('podcut_prepare_dialog', { request: { purpose: 'open-project', selection } })
     await ui.call('browser_click', { target: 'button:text-is("Open Project")' })

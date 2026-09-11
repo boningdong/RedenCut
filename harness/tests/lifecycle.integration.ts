@@ -39,7 +39,7 @@ test('runs real isolated Podcut, rebuilds the UI session on restart, and retains
       .map((item) => item.text)
       .join('\n')
     expect(text).toContain('Import your first audio file')
-    const themeRef = text.match(/button "☀"[^\n]*\[ref=([^\]]+)\]/)?.[1]
+    const themeRef = text.match(/button "Switch to light theme"[^\n]*\[ref=([^\]]+)\]/)?.[1]
     expect(themeRef).toBeTruthy()
     const clicked = await runtime.callUiTool('browser_click', { target: themeRef }, identity)
     expect(clicked.isError, JSON.stringify(clicked.content)).not.toBe(true)

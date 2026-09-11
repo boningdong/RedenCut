@@ -133,7 +133,7 @@ export class ElectronSession {
       ready: element.getAttribute('data-podcut-session-ready') === 'true',
       dirty: element.getAttribute('data-podcut-dirty') === 'true',
       busy: element.getAttribute('data-podcut-busy') === 'true',
-      title: element.querySelector('header strong')?.textContent ?? '',
+      title: element.querySelector('header .project-name')?.textContent ?? '',
       tracks: Array.from(element.querySelectorAll('[data-lane]')).map((lane) => ({
         id: lane.getAttribute('data-trackid') ?? '',
         name: lane.getAttribute('data-track-name') ?? '',

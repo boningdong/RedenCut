@@ -52,6 +52,14 @@
 - The current implementation is local whisper.cpp in [`src/main/transcriber/whisper.ts`](../src/main/transcriber/whisper.ts), reached through the main-process transcript IPC handler.
 - Keep availability failures actionable and preserve progress delivery through the typed IPC contract.
 
+## Transcript Presentation and Editing
+
+- Derive transcript occurrences from current clips and source acoustic boundaries; source, analysis revision, track, clip and text-unit identities must remain distinct.
+- Recompute output-time relationships from timeline state after moves, splits, mute changes and undo/redo; never persist display overlap as project truth.
+- Keep acoustic selection resolution independent of the Read/Align display mode and never infer source time from text pixel position.
+- Apply canonical text edits to an exact clip occurrence using `muteClipRanges`; ambiguous cross-occurrence selections must not silently select a track or duplicate clip.
+- Preserve coarse acoustic boundaries and disclose partial clipped units instead of inventing character timestamps.
+
 ## Product Evolution
 
 - Track future audio processing, intelligence, and plugin work in [`ROADMAP.md`](../ROADMAP.md), not as speculative interfaces in current architecture standards.

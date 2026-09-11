@@ -1,0 +1,76 @@
+import { expect, test } from 'vitest'
+import { McpTestSession } from './support/McpTestSession'
+
+test('real track occurrences align locally and follow clip movement and undo', async () => {
+  const ui = new McpTestSession()
+  try {
+    await ui.start()
+    const importAudio = async () => {
+      await ui.call('podcut_prepare_dialog', {
+        request: {
+          purpose: 'import-audio',
+          selection: { type: 'file', filename: 'mandarin-short-female.wav' },
+        },
+      })
+      await ui.call('browser_click', { target: 'button:text-is("Import Audio")' })
+    }
+    await importAudio()
+    await ui.call('browser_click', { target: 'button:has-text("Generate")' })
+    await ui.call('browser_click', {
+      target: 'section[aria-label="Transcript panel"] button:text-is("Track 1")',
+    })
+    await expect
+      .poll(() => ui.page.locator('[data-testid="canonical-transcript"]').count(), {
+        timeout: 240_000,
+      })
+      .toBe(1)
+    await importAudio()
+    await expect.poll(() => ui.page.locator('canvas').count()).toBe(2)
+    const generateSecond = ui.page.getByRole('button', { name: 'Generate Track 2', exact: true })
+    if (await generateSecond.count())
+      await ui.call('browser_click', { target: 'button:text-is("Generate Track 2")' })
+    const cards = ui.page.getByRole('region', { name: 'Simultaneous speech', exact: true })
+    await expect.poll(() => cards.count(), { timeout: 240_000 }).toBeGreaterThan(0)
+    const firstCard = cards.first()
+    const oldStart = Number(await firstCard.getAttribute('data-overlap-start'))
+    await ui.call('browser_click', {
+      target: 'section[aria-label="Simultaneous speech"] button:text-is("Align") >> nth=0',
+    })
+    expect(
+      await firstCard
+        .getByRole('button', { name: 'Align', exact: true })
+        .getAttribute('aria-pressed'),
+    ).toBe('true')
+    expect(
+      new Set(
+        await firstCard
+          .locator('[data-unit-kind="speech"]')
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-track-id'))),
+      ).size,
+    ).toBe(2)
+    await ui.screenshot('two-track-alignment')
+
+    const timeline = ui.page.locator('#waveform-timeline')
+    const zero = await timeline.getByText('0s', { exact: true }).boundingBox()
+    const one = await timeline.getByText('1s', { exact: true }).boundingBox()
+    const second = await ui.page.locator('canvas').nth(1).boundingBox()
+    if (!zero || !one || !second) throw new Error('VISIBLE_TIMELINE_GEOMETRY_MISSING')
+    await ui.call('browser_mouse_drag_xy', {
+      startX: second.x + 20,
+      startY: second.y + second.height / 2,
+      endX: second.x + 20 + 5 * (one.x - zero.x),
+      endY: second.y + second.height / 2,
+    })
+    await expect
+      .poll(async () => Number(await cards.first().getAttribute('data-overlap-start')))
+      .toBeGreaterThan(oldStart + 4)
+    await ui.screenshot('overlap-after-clip-move')
+    await ui.call('browser_click', { target: 'button[aria-label="Undo"]' })
+    await expect
+      .poll(async () => Number(await cards.first().getAttribute('data-overlap-start')))
+      .toBeCloseTo(oldStart, 2)
+    await ui.screenshot('overlap-after-undo')
+  } finally {
+    await ui.close()
+  }
+}, 300_000)

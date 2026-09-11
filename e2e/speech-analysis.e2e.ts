@@ -31,7 +31,9 @@ test('real speech analysis publishes an editable durable transcript and survives
     .toBeGreaterThan(0)
 
   await session.call('browser_click', { target: 'button:has-text("Generate")' })
-  await session.call('browser_click', { target: 'button:text-is("Track 1")' })
+  await session.call('browser_click', {
+    target: 'section[aria-label="Transcript panel"] button:text-is("Track 1")',
+  })
   await expect
     .poll(
       async () => {
@@ -47,8 +49,7 @@ test('real speech analysis publishes an editable durable transcript and survives
   const transcript = session.page.locator('[data-testid="canonical-transcript"]')
   expect(await transcript.locator('[data-unit-kind="speech"]').count()).toBeGreaterThan(0)
   expect(await transcript.locator('[data-acoustic-editable="true"]').count()).toBeGreaterThan(0)
-  const transcriptText = await transcript.innerText()
-  expect(transcriptText).not.toBe('')
+  expect(await transcript.innerText()).not.toBe('')
 
   await session.call('browser_click', {
     target: 'button[title^="Machine label"]',
@@ -68,6 +69,8 @@ test('real speech analysis publishes an editable durable transcript and survives
   await expect
     .poll(() => session!.page.getByText('● Host').count(), { timeout: 10_000, interval: 200 })
     .toBe(1)
+  const transcriptText = await transcript.innerText()
+  expect(transcriptText).toContain('Host')
   await session.screenshot('speech-analysis-complete')
 
   const selection = { type: 'project' as const, name: 'speech-analysis.podcut' }
@@ -76,7 +79,10 @@ test('real speech analysis publishes an editable durable transcript and survives
   })
   await session.call('browser_click', { target: 'button:text-is("Save")' })
   await expect
-    .poll(() => session!.page.locator('strong').innerText(), { timeout: 30_000, interval: 250 })
+    .poll(() => session!.page.locator('header .project-name').innerText(), {
+      timeout: 30_000,
+      interval: 250,
+    })
     .toContain('speech-analysis')
 
   const projectRoot = join(session.directory, 'projects', selection.name)

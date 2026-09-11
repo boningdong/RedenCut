@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import type { WorkspaceLayout } from '@shared/workspaceLayout.types'
@@ -19,6 +20,8 @@ import { WorkspacePanel } from './WorkspacePanel'
 import { PanelDivider } from './PanelDivider'
 import { PanelDropIndicator } from './PanelDropIndicator'
 import './workspace.css'
+
+const PANEL_GAP = 8
 
 function captureEditingSurface(root: HTMLElement | null): () => void {
   const selection = window.getSelection()
@@ -70,7 +73,10 @@ export function EditorWorkspace({
   const [height, setHeight] = useState(400)
   const [previewRatio, setPreviewRatio] = useState<number | null>(null)
   const [drag, setDrag] = useState<{ panel: WorkspacePanelId; lower: boolean | null } | null>(null)
-  const contentHeight = Math.max(1, height - WORKSPACE_PANELS.transport.minimumHeight - 8)
+  const contentHeight = Math.max(
+    1,
+    height - WORKSPACE_PANELS.transport.minimumHeight - 2 * PANEL_GAP,
+  )
   const ratio = constrainTranscriptRatio(previewRatio ?? layout.transcriptRatio, contentHeight)
 
   useEffect(() => {
@@ -210,8 +216,11 @@ export function EditorWorkspace({
         id={id}
         style={
           id === 'transport'
-            ? { height: 80, flexShrink: 0 }
-            : { flex: `${id === 'transcript' ? ratio : 1 - ratio} 1 0`, minHeight: 0 }
+            ? { height: WORKSPACE_PANELS.transport.minimumHeight, flexShrink: 0 }
+            : {
+                flex: `0 0 ${(id === 'transcript' ? ratio : 1 - ratio) * contentHeight}px`,
+                minHeight: 0,
+              }
         }
         moveLabel={`Move ${WORKSPACE_PANELS[id].label} ${lower ? 'down' : 'up'}`}
         onMove={() => commit(applyWorkspaceDrop(layout, panelDropTarget(id, lower)))}
@@ -250,7 +259,11 @@ export function EditorWorkspace({
   else panels.push(panel('transport'))
 
   return (
-    <main className="editor-workspace" aria-label="Editor workspace">
+    <main
+      className="editor-workspace"
+      aria-label="Editor workspace"
+      style={{ '--workspace-panel-gap': `${PANEL_GAP}px` } as CSSProperties}
+    >
       <div
         className="workspace-settings"
         data-workspace-controls

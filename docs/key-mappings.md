@@ -24,6 +24,7 @@ Update the implementation and this document together whenever a mapping or its c
 ## Focus Rules
 
 - Do not intercept shortcuts while focus is in an `input` or `textarea`.
+- Preserve unmodified Space activation for native buttons, selects, and disclosure summaries; these controls must not toggle playback instead of their own action.
 - In content-editable elements, do not intercept editor shortcuts other than Space.
 - Space remains available for play or pause while focus is in the transcript's content-editable surface.
 - After handling Command or Control shortcuts, ignore other editor mappings while that modifier remains pressed.

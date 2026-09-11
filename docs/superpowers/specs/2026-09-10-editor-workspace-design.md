@@ -1,13 +1,13 @@
 # Editor Workspace Layout Design
 
 Date: 2026-09-10.
-Status: Architecture and checkpoint 1 implementation plan approved in conversation; configuration and draggable workspace checkpoints are implemented and verified; full visual integration remains a subsequent checkpoint.
+Status: All implementation checkpoints approved in conversation; configuration, draggable workspace and visual integration are implemented. Final verification is recorded in the final editor UI plan.
 
 ## Goal and scope
 
 Introduce a repositionable editor workspace and apply the approved visual design while preserving existing audio and transcript behavior.
 The delivery has three review checkpoints: user layout configuration, draggable workspace integration, and visual integration.
-Multitrack transcript projection, overlap detection, and content-driven alignment are a subsequent subsystem and are not implemented by this specification.
+Multitrack transcript projection, overlap detection, and content-driven alignment are defined in the companion [transcript projection design](2026-09-10-transcript-projection-design.md).
 
 The approved mock and requirements are located in the enclosing workspace at `docs/ui-mock/2026-09-10/podcut-ui-final.html` and `podcut-ui-requirements.md`.
 From this repository's current checkout, the enclosing workspace is `/Users/boning/Workspaces/Podcut`.

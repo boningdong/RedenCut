@@ -712,3 +712,72 @@ describe('getAllClips', () => {
     expect(tl().getAllClips()).toHaveLength(2)
   })
 })
+
+describe('occurrence-scoped transcript muting', () => {
+  beforeEach(resetAll)
+
+  it('mutes only the selected moved clip and groups source ranges into one undo action', () => {
+    const source = managedSource(501, 20)
+    tl().addAudioSource(source)
+    const trackId = tl().addTrack(undefined, source.id)
+    const otherTrackId = tl().addTrack(undefined, source.id)
+    const original = tl().tracks[0].clips[0]
+    const chosen = { ...original, id: 'chosen', sourceStart: 4, sourceEnd: 12, outputStart: 30 }
+    useTimelineStore.setState({
+      tracks: tl().tracks.map((track) =>
+        track.id === trackId ? { ...track, clips: [original, chosen] } : track,
+      ),
+    })
+    const before = tl().tracks
+    tl().muteClipRanges(trackId, 'chosen', [
+      { start: 5, end: 6 },
+      { start: 8, end: 10 },
+    ])
+    expect(tl().tracks[0].clips.find((clip) => clip.id === original.id)).toBe(original)
+    expect(tl().tracks.find((track) => track.id === otherTrackId)).toBe(before[1])
+    expect(
+      tl()
+        .tracks[0].clips.filter((clip) => clip.muted)
+        .map((clip) => [clip.sourceStart, clip.sourceEnd, clip.outputStart]),
+    ).toEqual([
+      [5, 6, 31],
+      [8, 10, 34],
+    ])
+    expect(tl().undoStack).toHaveLength(1)
+    const edited = tl().tracks
+    tl().undo()
+    expect(tl().tracks).toEqual(before)
+    tl().redo()
+    expect(tl().tracks).toEqual(edited)
+  })
+
+  it('ignores stale identities and invalid ranges; clamps overlapping ranges to the chosen clip', () => {
+    const source = managedSource(502, 10)
+    tl().addAudioSource(source)
+    const trackId = tl().addTrack(undefined, source.id)
+    const clip = tl().tracks[0].clips[0]
+    for (const ranges of [
+      [],
+      [{ start: NaN, end: 2 }],
+      [{ start: 5, end: 2 }],
+      [{ start: 12, end: 15 }],
+    ])
+      tl().muteClipRanges(trackId, clip.id, ranges)
+    tl().muteClipRanges('missing', clip.id, [{ start: 0, end: 1 }])
+    tl().muteClipRanges(trackId, 'missing', [{ start: 0, end: 1 }])
+    expect(tl().undoStack).toHaveLength(0)
+    tl().muteClipRanges(trackId, clip.id, [
+      { start: -2, end: 2 },
+      { start: 1, end: 4 },
+    ])
+    expect(
+      tl()
+        .tracks[0].clips.filter((item) => item.muted)
+        .map((item) => [item.sourceStart, item.sourceEnd]),
+    ).toEqual([[0, 4]])
+    expect(tl().undoStack).toHaveLength(1)
+    const muted = tl().tracks[0].clips[0]
+    tl().muteClipRanges(trackId, muted.id, [{ start: 0, end: 4 }])
+    expect(tl().undoStack).toHaveLength(1)
+  })
+})

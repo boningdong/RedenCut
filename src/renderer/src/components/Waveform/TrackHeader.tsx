@@ -10,6 +10,7 @@
 // with the global S = Split shortcut.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { Icon } from '../ui/Icon'
 import React, { useState, useCallback } from 'react'
 import type { Track } from '@shared/project.types'
 import { useTimelineStore } from '../../stores/timeline.store'
@@ -36,144 +37,74 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
   }, [nameInput, track.id, track.name, updateTrack])
 
   return (
-    <div
-      style={{
-        width: 90,
-        flexShrink: 0,
-        borderRight: '1px solid var(--color-border)',
-        borderBottom: '1px solid var(--color-border)',
-        padding: '4px 6px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        backgroundColor: 'var(--color-bg-secondary)',
-        userSelect: 'none',
-      }}
-    >
-      {/* Track name */}
-      {editing ? (
-        <input
-          autoFocus
-          value={nameInput}
-          onChange={(e) => setNameInput(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitName()
-            if (e.key === 'Escape') {
-              setNameInput(track.name)
-              setEditing(false)
-            }
-            e.stopPropagation() // prevent global keyboard shortcuts
-          }}
-          style={{
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-accent)',
-            borderRadius: 3,
-            color: 'var(--color-text-primary)',
-            fontSize: 'var(--text-xs)',
-            padding: '1px 4px',
-            width: '100%',
-            outline: 'none',
-          }}
-        />
-      ) : (
-        <div
-          onDoubleClick={() => setEditing(true)}
-          style={{
-            fontSize: 'var(--text-xs)',
-            color: 'var(--color-text-primary)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            cursor: 'default',
-            padding: '1px 0',
-          }}
-          title={track.name}
-        >
-          {track.name}
-        </div>
-      )}
-
-      {/* Color swatch */}
-      <div
-        style={{
-          width: 16,
-          height: 4,
-          borderRadius: 2,
-          backgroundColor: track.color,
-          alignSelf: 'flex-start',
-        }}
-      />
-
-      {/* Mute / Solo */}
-      <div style={{ display: 'flex', gap: 3 }}>
+    <div className="track-header" style={{ borderLeftColor: track.color }}>
+      <div className="track-heading">
+        <span className="track-color" style={{ background: track.color }} />
+        {editing ? (
+          <input
+            autoFocus
+            aria-label="Track name"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitName()
+              if (e.key === 'Escape') {
+                setNameInput(track.name)
+                setEditing(false)
+              }
+              e.stopPropagation()
+            }}
+          />
+        ) : (
+          <button
+            className="track-name"
+            title={`Rename ${track.name}`}
+            onDoubleClick={() => setEditing(true)}
+            onClick={() => setEditing(true)}
+          >
+            {track.name}
+          </button>
+        )}
         <button
-          onClick={() => updateTrack(track.id, { muted: !track.muted })}
+          className="track-remove"
+          title="Remove track"
+          aria-label={`Remove ${track.name}`}
+          onClick={() => onRemove(track.id)}
+        >
+          <Icon name="close" size={12} />
+        </button>
+      </div>
+      <div className="track-controls">
+        <button
+          aria-label={`Mute ${track.name}`}
+          aria-pressed={track.muted}
           title={track.muted ? 'Unmute' : 'Mute'}
-          style={{
-            flex: 1,
-            fontSize: 9,
-            padding: '1px 0',
-            border: '1px solid var(--color-border)',
-            borderRadius: 2,
-            cursor: 'pointer',
-            backgroundColor: track.muted
-              ? 'var(--color-danger-track-btn)'
-              : 'var(--color-bg-elevated)',
-            color: track.muted ? 'var(--color-danger)' : 'var(--color-text-muted)',
-          }}
+          onClick={() => updateTrack(track.id, { muted: !track.muted })}
         >
           M
         </button>
         <button
-          onClick={() => updateTrack(track.id, { solo: !track.solo })}
+          aria-label={`Solo ${track.name}`}
+          aria-pressed={track.solo}
           title={track.solo ? 'Un-solo' : 'Solo'}
-          style={{
-            flex: 1,
-            fontSize: 9,
-            padding: '1px 0',
-            border: '1px solid var(--color-border)',
-            borderRadius: 2,
-            cursor: 'pointer',
-            backgroundColor: track.solo
-              ? 'var(--color-accent-track-btn)'
-              : 'var(--color-bg-elevated)',
-            color: track.solo ? 'var(--color-accent)' : 'var(--color-text-muted)',
-          }}
+          onClick={() => updateTrack(track.id, { solo: !track.solo })}
         >
           S
         </button>
+        <input
+          type="range"
+          aria-label={`${track.name} volume`}
+          min={0}
+          max={1}
+          step={0.01}
+          value={track.volume}
+          onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
+          style={{ accentColor: track.color }}
+          title={`Volume: ${Math.round(track.volume * 100)}%`}
+        />
+        <span>{Math.round(track.volume * 100)}%</span>
       </div>
-
-      {/* Volume slider */}
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={track.volume}
-        onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
-        style={{ width: '100%', accentColor: track.color, cursor: 'pointer' }}
-        title={`Volume: ${Math.round(track.volume * 100)}%`}
-      />
-
-      {/* Remove */}
-      <button
-        onClick={() => onRemove(track.id)}
-        title="Remove track"
-        style={{
-          alignSelf: 'flex-end',
-          background: 'none',
-          border: 'none',
-          color: 'var(--color-text-muted)',
-          fontSize: 14,
-          lineHeight: 1,
-          cursor: 'pointer',
-          padding: '0 2px',
-        }}
-      >
-        ×
-      </button>
     </div>
   )
 }

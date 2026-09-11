@@ -120,6 +120,12 @@ interface TimelineState {
    * @param wordIds  Transcript word IDs muted together with this operation.
    */
   muteRange(trackId: string, startTime: number, endTime: number, wordIds?: string[]): void
+  /** Mute source-time ranges in one exact clip occurrence as a single undoable edit. */
+  muteClipRanges(
+    trackId: string,
+    clipId: string,
+    ranges: Array<{ start: number; end: number }>,
+  ): void
 
   /**
    * Remove a specific clip by ID from its track.
@@ -339,6 +345,60 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (wordIds.length > 0) {
       useTranscriptStore.getState().muteWords(wordIds)
     }
+  },
+
+  muteClipRanges(trackId, clipId, ranges) {
+    const { tracks } = get()
+    const track = tracks.find((item) => item.id === trackId)
+    const clip = track?.clips.find((item) => item.id === clipId)
+    if (!track || !clip || clip.muted || ranges.length === 0) return
+    if (
+      ranges.some(
+        (range) =>
+          !Number.isFinite(range.start) || !Number.isFinite(range.end) || range.end <= range.start,
+      )
+    )
+      return
+    const bounded = ranges
+      .map((range) => ({
+        start: Math.max(clip.sourceStart, range.start),
+        end: Math.min(clip.sourceEnd, range.end),
+      }))
+      .filter((range) => range.end > range.start)
+      .sort((left, right) => left.start - right.start)
+    const merged: Array<{ start: number; end: number }> = []
+    for (const range of bounded) {
+      const last = merged[merged.length - 1]
+      if (last && range.start <= last.end) last.end = Math.max(last.end, range.end)
+      else merged.push({ ...range })
+    }
+    if (!merged.length) return
+    let replacement = [clip]
+    for (const range of merged) {
+      replacement = splitAndMute(
+        replacement,
+        clip.outputStart + range.start - clip.sourceStart,
+        clip.outputStart + range.end - clip.sourceStart,
+        trackId,
+      )
+    }
+    const before = cloneTracks(tracks)
+    set((state) => ({
+      tracks: state.tracks.map((item) =>
+        item.id === trackId
+          ? {
+              ...item,
+              clips: item.clips.flatMap((candidate) =>
+                candidate.id === clipId ? replacement : [candidate],
+              ),
+            }
+          : item,
+      ),
+      undoStack: [...state.undoStack, { before, wordIds: [], label: 'Mute transcript selection' }],
+      redoStack: [],
+      selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId,
+    }))
+    markTimelineEdited()
   },
 
   // ── removeClip ──────────────────────────────────────────────────────────────

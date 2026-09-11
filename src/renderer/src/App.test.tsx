@@ -6,11 +6,12 @@ import { DEFAULT_WORKSPACE_LAYOUT } from '@shared/workspaceLayout.types'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IElectronAPI, SessionJobResult, SpeechAnalysisJobId } from '@shared/ipc.types'
-import type { AudioSourceId } from '@shared/project.types'
+import type { AudioSourceId, Track } from '@shared/project.types'
 import type { RendererSession, WorkspaceToken } from '@shared/session.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from './stores/editor.store'
 import { useTimelineStore } from './stores/timeline.store'
+import { usePlaybackStore } from './stores/playback.store'
 import { useTranscriptStore } from './stores/transcript.store'
 
 const mocks = vi.hoisted(() => ({
@@ -27,11 +28,26 @@ vi.mock('./audio/WorkletAudioPlayer', () => ({
     }
     registerAudioSource = mocks.registerAudioSource
     pause = vi.fn()
-    setTracks = vi.fn()
-    getDuration = vi.fn(() => 10)
+    duration = 10
+    durationCallbacks: ((duration: number) => void)[] = []
+    setTracks = vi.fn((tracks: Track[]) => {
+      this.duration = tracks
+        .flatMap((track) => track.clips)
+        .reduce(
+          (end, clip) => Math.max(end, clip.outputStart + clip.sourceEnd - clip.sourceStart),
+          0,
+        )
+      this.durationCallbacks.forEach((callback) => callback(this.duration))
+    })
+    getDuration = vi.fn(() => this.duration)
     onTimeUpdate = vi.fn(() => vi.fn())
     onPlayStateChange = vi.fn(() => vi.fn())
-    onDurationChange = vi.fn(() => vi.fn())
+    onDurationChange = vi.fn((callback: (duration: number) => void) => {
+      this.durationCallbacks.push(callback)
+      return () => {
+        this.durationCallbacks = this.durationCallbacks.filter((entry) => entry !== callback)
+      }
+    })
     onEnded = vi.fn(() => vi.fn())
     onError = vi.fn(() => vi.fn())
     destroy = vi.fn(() => mocks.destroyPlayer())
@@ -320,6 +336,49 @@ describe('App transcription job identity', () => {
     expect(useTranscriptStore.getState().analyses).toEqual(published.speechAnalyses)
     expect(useTranscriptStore.getState().isGenerating).toBe(false)
     expect(useEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('publishes analysis without replacing playback or reverting edits made during recognition', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    initial.draft.tracks[0].clips[0].sourceEnd = 13
+    const { requests } = await renderInitialized(initial)
+    const player = getAudioPlayerInstance()!
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    act(() => {
+      useTimelineStore.getState().setSelectedClipId('clip-A')
+      useTimelineStore.getState().splitAt(5)
+      const second = useTimelineStore.getState().tracks[0].clips[1]
+      useTimelineStore.getState().moveClip(second.id, 7)
+      usePlaybackStore.getState().setCurrentTime(4)
+      usePlaybackStore.getState().setPlaying(true)
+    })
+    const tracks = useTimelineStore.getState().tracks
+    const history = useTimelineStore.getState().undoStack
+    expect(player.getDuration()).toBe(15)
+    const published = {
+      ...initial,
+      revision: 2,
+      speechAnalyses: [{ audioSourceId: SOURCE_A } as never],
+    }
+    requests[0].deferred.resolve({ ...requests[0].request, value: published })
+    await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
+    expect(getAudioPlayerInstance()).toBe(player)
+    expect(mocks.players).toHaveLength(1)
+    expect(mocks.players[0].pause).not.toHaveBeenCalled()
+    expect(mocks.destroyPlayer).not.toHaveBeenCalled()
+    expect(player.setTracks).toHaveBeenLastCalledWith(tracks)
+    expect(player.getDuration()).toBe(15)
+    expect(usePlaybackStore.getState()).toMatchObject({
+      currentTime: 4,
+      isPlaying: true,
+      duration: 15,
+    })
+    expect(useTimelineStore.getState().tracks).toBe(tracks)
+    expect(useTimelineStore.getState().undoStack).toBe(history)
+    expect(useEditorStore.getState().session?.draft.tracks).toBe(tracks)
+    expect(useEditorStore.getState().isDirty).toBe(true)
+    expect(useTranscriptStore.getState().analyses).toEqual(published.speechAnalyses)
   })
 
   it.each([

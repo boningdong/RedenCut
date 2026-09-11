@@ -43,9 +43,9 @@ interface WaveformViewProps {
 }
 
 // Layout constants
-const HEADER_WIDTH = 90 // px — header column width
+const HEADER_WIDTH = 190 // px — header column width
 const RULER_HEIGHT = 28 // px — ruler row height
-const LANE_HEIGHT = 96 // px — clip lane height
+const LANE_HEIGHT = 76 // px — clip lane height
 const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
 export function WaveformView({
@@ -485,14 +485,14 @@ export function WaveformView({
                           width: `${widthPct}%`,
                           top: 4,
                           bottom: 4,
-                          borderRadius: 3,
+                          borderRadius: 6,
                           border:
                             clip.id === selectedClipId
                               ? '1px solid var(--color-accent)'
-                              : '1px solid var(--color-accent-clip-border)',
+                              : `1px solid color-mix(in srgb, ${track.color} 50%, transparent)`,
                           backgroundColor: clip.muted
                             ? 'var(--color-danger-clip-bg)'
-                            : 'var(--color-accent-clip-bg)',
+                            : `color-mix(in srgb, ${track.color} 9%, var(--color-bg-primary))`,
                           opacity: isDragging ? 0.4 : 1,
                           cursor: 'grab',
                           pointerEvents: 'all',
@@ -528,7 +528,7 @@ export function WaveformView({
                           width: `${ghostState.widthPct}%`,
                           top: 4,
                           bottom: 4,
-                          borderRadius: 3,
+                          borderRadius: 6,
                           border: '1px dashed var(--color-accent)',
                           backgroundColor: 'var(--color-accent-ghost)',
                           pointerEvents: 'none',
@@ -606,7 +606,8 @@ export function WaveformView({
       </div>
 
       {/* + Add Track row */}
-      <div
+      <button
+        type="button"
         onClick={() => {
           onAddTrack()
         }}
@@ -620,14 +621,14 @@ export function WaveformView({
           borderTop: '1px solid var(--color-border)',
         }}
         onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-accent)')
+          ((e.currentTarget as HTMLButtonElement).style.color = 'var(--color-accent)')
         }
         onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLDivElement).style.color = 'var(--color-text-muted)')
+          ((e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)')
         }
       >
         + Add Track
-      </div>
+      </button>
     </div>
   )
 }
