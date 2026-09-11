@@ -17,3 +17,5 @@ Do not regenerate fixtures inside an active acceptance container or mutate these
 Save projects, imported caches and generated transcription results in owned run directories.
 
 Conversation fixtures and their provenance are documented in [conversation/README.md](conversation/README.md).
+
+`mandarin-conversation-mix.wav` is a repository-local symlink to the immutable conversation mix under `conversation/`, exposing it to the basename-only prepared import dialog without duplicating audio.

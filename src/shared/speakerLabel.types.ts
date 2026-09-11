@@ -10,6 +10,10 @@ export const RenameSpeakerRequestSchema = z
     analysisRevisionId: AnalysisRevisionIdSchema,
     speakerId: SpeakerIdSchema,
     displayName: z.string().trim().min(1).max(80),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
   })
   .strict()
 export type RenameSpeakerRequest = z.infer<typeof RenameSpeakerRequestSchema>

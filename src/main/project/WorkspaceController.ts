@@ -162,6 +162,14 @@ export class WorkspaceController {
               speechArtifactSha256: reference.artifactSha256,
               speakerId: request.speakerId,
               displayName: request.displayName,
+              color:
+                request.color ??
+                workspace.project.speakerLabelOverrides.find(
+                  (override) =>
+                    override.audioSourceId === request.audioSourceId &&
+                    override.analysisRevisionId === request.analysisRevisionId &&
+                    override.speakerId === request.speakerId,
+                )?.color,
             },
           ],
         })

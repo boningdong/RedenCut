@@ -380,7 +380,12 @@ export function WaveformView({
                   overflow: 'hidden',
                 }}
               >
-                <TimelineRuler duration={duration} pxPerSec={pxPerSec} scaleFactor={scaleFactor} />
+                <TimelineRuler
+                  duration={duration || 60}
+                  pxPerSec={duration ? pxPerSec : (viewport.width || 900) / 60}
+                  scaleFactor={duration ? scaleFactor : 1}
+                  empty={duration === 0}
+                />
               </div>
 
               {/* Track lanes */}
@@ -591,16 +596,17 @@ interface TimelineRulerProps {
   duration: number
   pxPerSec: number
   scaleFactor: number
+  empty?: boolean
 }
 
-function TimelineRuler({ duration, pxPerSec, scaleFactor }: TimelineRulerProps) {
+function TimelineRuler({ duration, pxPerSec, scaleFactor, empty }: TimelineRulerProps) {
   if (duration <= 0 || pxPerSec <= 0) return null
 
   // Pick the smallest "nice" interval that keeps ticks ≥ 40px apart
   const MIN_PX = 40
   const rawSec = MIN_PX / pxPerSec
   const NICE = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
-  const interval = NICE.find((n) => n >= rawSec) ?? NICE[NICE.length - 1]
+  const interval = empty ? 5 : (NICE.find((n) => n >= rawSec) ?? NICE[NICE.length - 1])
 
   const ticks: number[] = []
   for (let t = 0; t <= duration + interval; t += interval) ticks.push(t)

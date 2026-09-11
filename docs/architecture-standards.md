@@ -68,6 +68,15 @@
 - Apply canonical text edits to an exact clip occurrence using `muteClipRanges`; ambiguous cross-occurrence selections must not silently select a track or duplicate clip.
 - Preserve coarse acoustic boundaries and disclose partial clipped units instead of inventing character timestamps.
 
+## Speaker Presentation
+
+- Reserve eight audio-track colors in [`trackColors.ts`](../src/shared/trackColors.ts), shared by import and renderer track creation.
+- Resolve speaker colors by source, analysis revision, and speaker identity; do not replace speaker colors with track colors when multiple tracks exist.
+- Anchor the first speaker for a track to its track color by default and allocate secondary colors outside the reserved palette with project-wide collision tracking.
+- Store optional user-selected colors alongside speaker display-name overrides; old projects without colors retain valid defaults.
+- Keep speaker visibility in renderer transcript state; filtering changes neither track audibility nor export content and clears the active transcript edit selection.
+- Keep color popovers outside clipping workspace panels so resizing does not make the controls inaccessible.
+
 ## Product Evolution
 
 - Track future audio processing, intelligence, and plugin work in [`ROADMAP.md`](../ROADMAP.md), not as speculative interfaces in current architecture standards.

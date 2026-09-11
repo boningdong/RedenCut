@@ -12,9 +12,10 @@ import {
 } from '../../domain/transcriptSelection'
 import type { TranscriptPanelProps } from './TranscriptPanel'
 import { TranscriptDialogue } from './TranscriptDialogue'
-import { SpeakerLabels, speakerColor } from './SpeakerLabels'
+import { SpeakerLabels } from './SpeakerLabels'
+import { speakerKey } from '../../domain/speakerPresentation'
+import { useSpeakerColors } from '../../hooks/useSpeakerColors'
 import './transcript.css'
-import { trackPresentationColor } from '../../themes/trackColors'
 
 type SessionSelection = OccurrenceSelection & { workspaceToken: string | undefined }
 
@@ -28,7 +29,16 @@ export function CanonicalTranscriptPanel({
   const tracks = useTimelineStore((s) => s.tracks)
   const currentTime = usePlaybackStore((s) => s.currentTime)
   const setSelection = useEditorStore((s) => s.setSelection)
-  const units = useMemo(() => projectTranscript(analyses, tracks), [analyses, tracks])
+  const colors = useSpeakerColors()
+  const hidden = useTranscriptStore((s) => s.hiddenSpeakerKeys)
+  const units = useMemo(
+    () =>
+      projectTranscript(analyses, tracks).filter((u) => {
+        const speaker = u.speakerId ?? u.contextSpeakerId
+        return !speaker || !hidden.includes(speakerKey(u.analysis, speaker))
+      }),
+    [analyses, tracks, hidden],
+  )
   const container = useRef<HTMLDivElement>(null)
   const elements = useRef(new Map<string, HTMLSpanElement>())
   const [pending, setPending] = useState<SessionSelection | null>(null)
@@ -80,6 +90,17 @@ export function CanonicalTranscriptPanel({
     (selected: SessionSelection) => {
       if (!selected.editable) return
       const { track, clip, analysis } = selected.occurrence
+      const selectedSpeaker = selected.occurrence.speakerId ?? selected.occurrence.contextSpeakerId
+      if (
+        selectedSpeaker &&
+        useTranscriptStore
+          .getState()
+          .hiddenSpeakerKeys.includes(speakerKey(analysis, selectedSpeaker))
+      ) {
+        setPending(null)
+        setScopeMessage('The selected speaker is hidden. Show their text and select it again.')
+        return
+      }
       const current = useTimelineStore
         .getState()
         .tracks.find((t) => t.id === track.id)
@@ -131,12 +152,8 @@ export function CanonicalTranscriptPanel({
       editable && !u.muted && currentTime >= u.outputStart! && currentTime < u.outputEnd!
     const highlighted =
       pending?.occurrence.scopeId === u.scopeId && pending.resolvedUnitIds.includes(u.unit.id)
-    const color =
-      tracks.length > 1
-        ? trackPresentationColor(u.track.color)
-        : u.speakerId
-          ? speakerColor(u.analysis, u.speakerId)
-          : undefined
+    const speaker = u.speakerId ?? u.contextSpeakerId
+    const color = speaker ? colors.get(speakerKey(u.analysis, speaker)) : undefined
     return (
       <span
         key={u.id}

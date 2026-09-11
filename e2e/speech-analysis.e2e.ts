@@ -67,8 +67,26 @@ test('real speech analysis publishes an editable durable transcript and survives
   })
   await session.call('browser_click', { target: 'input[aria-label^="Rename"] + button' })
   await expect
-    .poll(() => session!.page.getByText('● Host').count(), { timeout: 10_000, interval: 200 })
+    .poll(() => session!.page.getByRole('button', { name: 'Show Host', exact: true }).count(), {
+      timeout: 10_000,
+      interval: 200,
+    })
     .toBe(1)
+  await session.call('browser_click', { target: 'button[aria-label="Change color for Host"]' })
+  await session.call('browser_fill_form', {
+    fields: [
+      {
+        name: 'Speaker color',
+        type: 'textbox',
+        target: 'input[aria-label="Hex color"]',
+        value: '#dc8b9c',
+      },
+    ],
+  })
+  await session.call('browser_click', { target: 'button:text-is("Apply color")' })
+  await expect
+    .poll(() => session!.page.locator('.speaker-color-button span').getAttribute('style'))
+    .toContain('rgb(220, 139, 156)')
   const transcriptText = await transcript.innerText()
   expect(transcriptText).toContain('Host')
   await session.screenshot('speech-analysis-complete')
@@ -91,6 +109,7 @@ test('real speech analysis publishes an editable durable transcript and survives
   )
   expect(project.speechArtifacts).toHaveLength(1)
   expect(project.speakerLabelOverrides.map((override) => override.displayName)).toEqual(['Host'])
+  expect(project.speakerLabelOverrides[0].color).toBe('#dc8b9c')
   const reference = project.speechArtifacts[0]
   expect(reference.artifactPath).toBe(
     `speech/${reference.audioSourceId}/revision-${reference.analysisRevisionId}.json`,
@@ -113,7 +132,10 @@ test('real speech analysis publishes an editable durable transcript and survives
       interval: 250,
     })
     .toBe(transcriptText)
-  expect(await session.page.getByText('● Host').count()).toBe(1)
+  expect(await session.page.getByRole('button', { name: 'Show Host', exact: true }).count()).toBe(1)
+  expect(await session.page.locator('.speaker-color-button span').getAttribute('style')).toContain(
+    'rgb(220, 139, 156)',
+  )
   await session.screenshot('speech-analysis-reopened')
 
   writeFileSync(

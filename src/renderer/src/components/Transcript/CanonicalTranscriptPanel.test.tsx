@@ -207,6 +207,10 @@ describe('canonical transcript editability', () => {
     const speakerB = document.querySelector('[data-unit-id="speaker-b-1"]') as HTMLElement
     const unattributed = document.querySelector('[data-unit-id="unattributed"]') as HTMLElement
 
+    act(() => {
+      const track = useTimelineStore.getState().tracks[0]
+      useTimelineStore.setState({ tracks: [track, { ...track, id: 'empty', clips: [] }] })
+    })
     const colorA = speakerA1.style.getPropertyValue('--track-color')
     expect(colorA).not.toBe('')
     expect(speakerA2.style.getPropertyValue('--track-color')).toBe(colorA)

@@ -16,6 +16,8 @@ import type { Word } from '@shared/project.types'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 
 interface TranscriptState {
+  hiddenSpeakerKeys: string[]
+  toggleSpeakerVisibility: (key: string) => void
   analyses: RendererSpeechAnalysis[]
   selectedTranscriptUnitIds: Set<string>
   loadAnalyses: (analyses: RendererSpeechAnalysis[]) => void
@@ -93,6 +95,7 @@ interface TranscriptState {
 }
 
 const initialState = {
+  hiddenSpeakerKeys: [] as string[],
   analyses: [] as RendererSpeechAnalysis[],
   selectedTranscriptUnitIds: new Set<string>(),
   words: [] as Word[],
@@ -105,6 +108,13 @@ const initialState = {
 
 export const useTranscriptStore = create<TranscriptState>()((set) => ({
   ...initialState,
+  toggleSpeakerVisibility: (key) =>
+    set((s) => ({
+      hiddenSpeakerKeys: s.hiddenSpeakerKeys.includes(key)
+        ? s.hiddenSpeakerKeys.filter((k) => k !== key)
+        : [...s.hiddenSpeakerKeys, key],
+      selectedTranscriptUnitIds: new Set(),
+    })),
 
   loadAnalyses: (analyses) => set({ analyses, selectedTranscriptUnitIds: new Set() }),
   setSelectedTranscriptUnitIds: (selectedTranscriptUnitIds) => set({ selectedTranscriptUnitIds }),

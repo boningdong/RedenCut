@@ -165,5 +165,5 @@ export interface RendererSpeechAnalysis {
   diarization: Pick<DiarizationArtifact, 'id' | 'turns' | 'provenance'>
   speakerAttribution: SpeakerAttributionArtifact
   speakers: Speaker[]
-  speakerLabelOverrides: Array<{ speakerId: SpeakerId; displayName: string }>
+  speakerLabelOverrides: Array<{ speakerId: SpeakerId; displayName: string; color?: string }>
 }

@@ -7,3 +7,7 @@ it('maps legacy defaults without changing custom saved colors', () => {
   expect(trackPresentationColor('#123456')).toBe('#123456')
   expect(trackPresentationColor(TRACK_COLORS[2])).toBe(TRACK_COLORS[2])
 })
+
+it('reserves eight distinct track colors', () => {
+  expect(new Set(TRACK_COLORS).size).toBe(8)
+})

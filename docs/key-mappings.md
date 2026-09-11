@@ -59,3 +59,10 @@ Other chords, composition events, and key releases restore normal menu shortcut 
 - Escape cancels an active panel drag or divider resize without clearing the audio selection.
 - Panel move buttons provide keyboard equivalents for swapping Transcript/Audio and placing Transport above or below them.
 - Command/Control shortcuts retain their editor meanings when focus is on a layout control and no pointer layout interaction is active.
+
+## Speaker Labels
+
+Click a speaker label to show or hide that speaker's transcript; this does not mute their audio.
+Double-click the label or press F2 while it is focused to rename it.
+Enter saves the edited name and Escape cancels it.
+The separate color button opens a color picker; Apply color persists the choice and Escape dismisses the picker.

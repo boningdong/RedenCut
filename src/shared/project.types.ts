@@ -168,6 +168,10 @@ export const SpeakerLabelOverrideSchema = z
     speechArtifactSha256: z.string().regex(SHA256_PATTERN),
     speakerId: SpeakerIdSchema,
     displayName: z.string().trim().min(1),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
   })
   .strict()
 export type SpeakerLabelOverride = z.infer<typeof SpeakerLabelOverrideSchema>

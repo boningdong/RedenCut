@@ -24,7 +24,7 @@ import { FfmpegAudioSourceCacheBuilder } from './FfmpegAudioSourceCacheBuilder'
 import { copyWithHash } from './copyWithHash'
 import { fingerprintAudioFile, verifyAudioFingerprint } from './audioFingerprint'
 
-const TRACK_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6']
+import { nextTrackColor } from '../../../shared/trackColors'
 
 export class ImportCoordinator {
   private active: {
@@ -236,7 +236,7 @@ function appendImportedSource(project: ProjectFile, source: AudioSource): Projec
       {
         id: trackId,
         name: `Track ${project.tracks.length + 1}`,
-        color: TRACK_COLORS[project.tracks.length % TRACK_COLORS.length],
+        color: nextTrackColor(project.tracks.map((track) => track.color)),
         clips: [
           {
             id: randomUUID(),

@@ -40,8 +40,6 @@ function nextId(prefix: string): string {
   return `${prefix}-${++_idCounter}-${Date.now()}`
 }
 
-let _colorIndex = 0
-
 /** Deep-clone tracks (metadata only — no audio buffers). */
 function cloneTracks(tracks: Track[]): Track[] {
   return tracks.map((t) => ({
@@ -183,7 +181,7 @@ interface TimelineState {
 
 // ── Implementation ─────────────────────────────────────────────────────────────
 
-import { TRACK_COLORS } from '../themes/trackColors'
+import { nextTrackColor } from '@shared/trackColors'
 
 const initialState = {
   audioSources: [] as RendererAudioSource[],
@@ -222,7 +220,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume: 1,
       muted: false,
       solo: false,
-      color: TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
+      color: nextTrackColor(get().tracks.map((track) => track.color)),
       effects: [],
     }
 
@@ -272,7 +270,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       volume: 1,
       muted: false,
       solo: false,
-      color: TRACK_COLORS[_colorIndex++ % TRACK_COLORS.length],
+      color: nextTrackColor(get().tracks.map((track) => track.color)),
       effects: [],
     }
     if (audioSourceId) {

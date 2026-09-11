@@ -7,8 +7,8 @@ import {
   type DialogueBlock,
 } from '../../domain/transcriptDialogue'
 import { trackPresentationColor } from '../../themes/trackColors'
-import { useTimelineStore } from '../../stores/timeline.store'
-import { speakerName, speakerColor } from './SpeakerLabels'
+import { useSpeakerColors } from '../../hooks/useSpeakerColors'
+import { speakerName, speakerKey } from '../../domain/speakerPresentation'
 
 function timestamp(time: number): string {
   return `${Math.floor(time / 60)
@@ -28,12 +28,11 @@ function lanes(units: TranscriptOccurrence[]) {
   return [...rows.values()]
 }
 function Speaker({ unit }: { unit: TranscriptOccurrence }) {
-  const trackCount = useTimelineStore((state) => state.tracks.length)
+  const colors = useSpeakerColors()
   const speaker = unit.speakerId ?? unit.contextSpeakerId
-  const color =
-    trackCount > 1 || !speaker
-      ? trackPresentationColor(unit.track.color)
-      : speakerColor(unit.analysis, speaker)
+  const color = speaker
+    ? colors.get(speakerKey(unit.analysis, speaker))
+    : trackPresentationColor(unit.track.color)
   return (
     <div className="transcript-speaker" contentEditable={false}>
       <span className="transcript-speaker-dot" style={{ background: color }} />
