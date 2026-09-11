@@ -2,7 +2,7 @@
 // TransportBar
 //
 // Play/pause controls, time display, and Preview Mode toggle.
-// Lives at the bottom of the app.
+// Placement is owned by EditorWorkspace.
 //
 // All playback control goes through IAudioPlayer.
 // Playback state (isPlaying, currentTime, duration) comes from playback.store

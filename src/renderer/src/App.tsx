@@ -18,6 +18,7 @@ import { BinaryWaveformDataProvider } from './components/Waveform/BinaryWaveform
 import type { WaveformDataProvider } from './components/Waveform/WaveformDataProvider'
 import { WaveformView } from './components/Waveform/WaveformView'
 import { FileInfoPanel } from './components/FileInfoPanel'
+import { EditorWorkspace } from './components/Workspace/EditorWorkspace'
 import { TransportBar } from './components/Transport/TransportBar'
 import { TranscriptPanel } from './components/Transcript/TranscriptPanel'
 import { ExportModal } from './components/Export/ExportModal'
@@ -89,7 +90,6 @@ export default function App() {
   const [importState, setImportState] = useState<ImportState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showExport, setShowExport] = useState(false)
-  const [transcriptWidth, setTranscriptWidth] = useState(280)
   const playerRef = useRef<IAudioPlayer | null>(null)
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
@@ -789,9 +789,9 @@ export default function App() {
         <FileInfoPanel displayName={primarySource.displayName} metadata={primarySource.metadata} />
       ) : null}
 
-      <main style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <section style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
-          {tracks.length > 0 ? (
+      <EditorWorkspace
+        audio={
+          tracks.length > 0 ? (
             <WaveformView
               duration={projectDuration}
               providersBySource={waveforms}
@@ -810,34 +810,17 @@ export default function App() {
                 Import your first audio file
               </Button>
             </div>
-          )}
-        </section>
-        <div
-          onPointerDown={(event) => {
-            const startX = event.clientX
-            const startWidth = transcriptWidth
-            const move = (moveEvent: PointerEvent) =>
-              setTranscriptWidth(
-                Math.min(600, Math.max(180, startWidth + startX - moveEvent.clientX)),
-              )
-            const up = () => {
-              window.removeEventListener('pointermove', move)
-              window.removeEventListener('pointerup', up)
-            }
-            window.addEventListener('pointermove', move)
-            window.addEventListener('pointerup', up)
-          }}
-          style={{ width: 4, cursor: 'col-resize', background: 'var(--color-border)' }}
-        />
-        <aside style={{ width: transcriptWidth, minWidth: 180, overflow: 'auto' }}>
+          )
+        }
+        transcript={
           <TranscriptPanel
             onGenerate={(trackId) => void generateTranscript(trackId)}
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
           />
-        </aside>
-      </main>
-      <TransportBar />
+        }
+        transport={<TransportBar />}
+      />
       {showExport && exportDraft && session ? (
         <ExportModal session={session} draft={exportDraft} onClose={() => setShowExport(false)} />
       ) : null}

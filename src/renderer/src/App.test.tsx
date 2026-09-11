@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import React from 'react'
+import { useWorkspaceStore } from './stores/workspace.store'
+import { DEFAULT_WORKSPACE_LAYOUT } from '@shared/workspaceLayout.types'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IElectronAPI, SessionJobResult, SpeechAnalysisJobId } from '@shared/ipc.types'
@@ -181,7 +183,10 @@ function installApi(initial: RendererSession) {
   const saveProjectAs = vi.fn<IElectronAPI['project']['saveAs']>(async () => null)
   const api = {
     workspaceLayout: {
-      get: vi.fn<IElectronAPI['workspaceLayout']['get']>(),
+      get: vi.fn<IElectronAPI['workspaceLayout']['get']>(async () => ({
+        layout: DEFAULT_WORKSPACE_LAYOUT,
+        warning: null,
+      })),
       set: vi.fn<IElectronAPI['workspaceLayout']['set']>(),
     },
     project: {
@@ -271,10 +276,26 @@ describe('App transcription job identity', () => {
     mocks.destroyPlayer.mockResolvedValue(undefined)
     mocks.players.splice(0)
     mocks.keyboardSave = undefined
+    useWorkspaceStore.setState({ layout: DEFAULT_WORKSPACE_LAYOUT })
     const ids = ['job-a', 'job-b', 'job-c']
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
       () => ids.shift()! as `${string}-${string}-${string}-${string}-${string}`,
     )
+  })
+
+  it('keeps the active player, project state and timeline history when workspace panels move', async () => {
+    const { api } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+    const player = getAudioPlayerInstance()
+    const editor = useEditorStore.getState()
+    const timeline = useTimelineStore.getState()
+    fireEvent.click(screen.getByRole('button', { name: 'Move Transcript down' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move Transport up' }))
+    expect(getAudioPlayerInstance()).toBe(player)
+    expect(mocks.players).toHaveLength(1)
+    expect(mocks.destroyPlayer).not.toHaveBeenCalled()
+    expect(useEditorStore.getState()).toBe(editor)
+    expect(useTimelineStore.getState()).toBe(timeline)
+    await waitFor(() => expect(api.workspaceLayout.set).toHaveBeenCalled())
   })
 
   it('applies the authoritative speech-analysis session without making analysis a local edit', async () => {

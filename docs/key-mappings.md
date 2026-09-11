@@ -27,3 +27,13 @@ Update the implementation and this document together whenever a mapping or its c
 - In content-editable elements, do not intercept editor shortcuts other than Space.
 - Space remains available for play or pause while focus is in the transcript's content-editable surface.
 - After handling Command or Control shortcuts, ignore other editor mappings while that modifier remains pressed.
+
+## Workspace Layout Controls
+
+- Tab reaches panel move buttons, drag handles, the divider, and reset/retry controls in their visible order.
+- Enter or Space activates a focused layout button without toggling audio playback.
+- With the divider focused, Up and Down move the divider by five percentage points within the available panel limits.
+- With the divider focused, Home minimizes the Transcript region and End maximizes it within the available panel limits.
+- Escape cancels an active panel drag or divider resize without clearing the audio selection.
+- Panel move buttons provide keyboard equivalents for swapping Transcript/Audio and placing Transport above or below them.
+- Command/Control shortcuts retain their editor meanings when focus is on a layout control and no pointer layout interaction is active.

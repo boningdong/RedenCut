@@ -1,7 +1,7 @@
 # Editor Workspace Layout Design
 
 Date: 2026-09-10.
-Status: Architecture and checkpoint 1 implementation plan approved in conversation; configuration implementation is complete and awaiting checkpoint review.
+Status: Architecture and checkpoint 1 implementation plan approved in conversation; configuration and draggable workspace checkpoints are implemented and verified; full visual integration remains a subsequent checkpoint.
 
 ## Goal and scope
 

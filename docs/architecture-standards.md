@@ -23,6 +23,9 @@
 - Main owns `workspace-layout.json` under Electron's active `userData` directory; harness userData isolation applies before preference initialization.
 - Validate workspace preferences with [`WorkspaceLayoutSchema`](../src/shared/workspaceLayout.types.ts) and expose only typed get/set operations through preload.
 - Keep workspace preferences independent of project files, project revisions, and audio edit history.
+- Renderer workspace state coordinates hydration and serialized saves through preload; late responses must not overwrite newer local layout choices.
+- Workspace owns panel placement and sizing; keep feature panels mounted with stable keys and keep DOM reading order aligned with visual placement.
+- Persist completed layout actions only; transient drag/resize previews and window-size clamping remain local.
 - Recover compatible stored fields without rewriting configuration during reads; surface recovery warnings and propagate filesystem failures.
 
 ## Audio Access and Caches
