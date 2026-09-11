@@ -18,6 +18,13 @@
 - Identify imported media with stable `AudioSourceId` values; never use filesystem paths as clip or transcript identities.
 - Keep app-wide identity and project-extension values in [`src/shared/constants.ts`](../src/shared/constants.ts).
 
+## User Workspace Preferences
+
+- Main owns `workspace-layout.json` under Electron's active `userData` directory; harness userData isolation applies before preference initialization.
+- Validate workspace preferences with [`WorkspaceLayoutSchema`](../src/shared/workspaceLayout.types.ts) and expose only typed get/set operations through preload.
+- Keep workspace preferences independent of project files, project revisions, and audio edit history.
+- Recover compatible stored fields without rewriting configuration during reads; surface recovery warnings and propagate filesystem failures.
+
 ## Audio Access and Caches
 
 - Serve only validated cache artifacts through `podcut://cache/<audio-source-id>/pcm` and `/waveform/<level>`; do not expose arbitrary paths or direct renderer `file://` access.

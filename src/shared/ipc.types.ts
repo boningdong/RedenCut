@@ -1,3 +1,4 @@
+import type { WorkspaceLayout, WorkspaceLayoutReadResult } from './workspaceLayout.types'
 import type {
   ImportCancellationResult,
   ImportMode,
@@ -97,6 +98,10 @@ export interface RenderProgress {
 export interface RenderProgressEvent extends SessionJobRequest<ExportJobId>, RenderProgress {}
 
 export interface IElectronAPI {
+  workspaceLayout: {
+    get(): Promise<WorkspaceLayoutReadResult>
+    set(layout: WorkspaceLayout): Promise<WorkspaceLayout>
+  }
   audio: {
     selectImportFile(expected: SessionPrecondition): Promise<ImportSelection | null>
     startImport(request: ImportJobRequest): Promise<SessionJobResult<RendererSession>>

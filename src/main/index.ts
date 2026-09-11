@@ -1,3 +1,5 @@
+import { WorkspaceLayoutStore } from './preferences/WorkspaceLayoutStore'
+import { registerWorkspaceLayoutIpc } from './ipc/workspaceLayout.ipc'
 import { app, BrowserWindow, protocol } from 'electron'
 import { join } from 'path'
 import { createProjectDialogs } from './dialogs/createProjectDialogs'
@@ -94,6 +96,9 @@ startApplicationLifecycle({
     registerTranscriptIpc(controller, jobs)
     registerSpeechAnalysisIpc(controller, jobs)
     registerSpeakerLabelIpc(controller)
+    registerWorkspaceLayoutIpc(
+      new WorkspaceLayoutStore(join(app.getPath('userData'), 'workspace-layout.json')),
+    )
     registerRenderIpc(
       controller,
       jobs,

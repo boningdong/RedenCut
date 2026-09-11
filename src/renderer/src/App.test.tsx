@@ -180,6 +180,10 @@ function installApi(initial: RendererSession) {
   const saveProject = vi.fn<IElectronAPI['project']['save']>(async () => null)
   const saveProjectAs = vi.fn<IElectronAPI['project']['saveAs']>(async () => null)
   const api = {
+    workspaceLayout: {
+      get: vi.fn<IElectronAPI['workspaceLayout']['get']>(),
+      set: vi.fn<IElectronAPI['workspaceLayout']['set']>(),
+    },
     project: {
       initialize: vi.fn(async () => initial),
       openDialog,

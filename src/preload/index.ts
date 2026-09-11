@@ -1,3 +1,4 @@
+import type { WorkspaceLayout, WorkspaceLayoutReadResult } from '../shared/workspaceLayout.types'
 import type { IpcRendererEvent } from 'electron'
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
@@ -93,6 +94,11 @@ const api = {
       ),
     cancel: (request: CancelSessionJobRequest<SpeechAnalysisJobId>) =>
       invokeSafe<TranscriptionCancellationResult>(invoke, 'speech-analysis:cancel', request),
+  },
+  workspaceLayout: {
+    get: () => invokeSafe<WorkspaceLayoutReadResult>(invoke, 'workspace-layout:get'),
+    set: (layout: WorkspaceLayout) =>
+      invokeSafe<WorkspaceLayout>(invoke, 'workspace-layout:set', layout),
   },
   speakerLabel: {
     rename: (request: RenameSpeakerRequest) =>
