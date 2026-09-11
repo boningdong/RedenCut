@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import type { Track } from '@shared/project.types'
-import { redactionPreviewRanges } from './redactionPreview'
+import type { Track } from './project.types'
+import { redactionSkipRanges } from './redactionTimeline'
 
 function track(
   id: string,
@@ -22,7 +22,7 @@ function track(
 }
 it('skips only redacted content, preserving natural gaps and merging adjacent redactions', () => {
   expect(
-    redactionPreviewRanges([
+    redactionSkipRanges([
       track('a', [
         [0, 1, false],
         [1, 2, true],
@@ -37,17 +37,15 @@ it('skips only redacted content, preserving natural gaps and merging adjacent re
   ])
 })
 it('does not skip retained material on an overlapping track', () => {
-  expect(redactionPreviewRanges([track('a', [[0, 5, true]]), track('b', [[1, 3, false]])])).toEqual(
-    [
-      { start: 0, end: 1 },
-      { start: 3, end: 5 },
-    ],
-  )
+  expect(redactionSkipRanges([track('a', [[0, 5, true]]), track('b', [[1, 3, false]])])).toEqual([
+    { start: 0, end: 1 },
+    { start: 3, end: 5 },
+  ])
 })
 it('ordinary track mute and solo exclusion do not become redactions', () => {
-  expect(redactionPreviewRanges([track('a', [[0, 5, false]], true)])).toEqual([])
-  expect(redactionPreviewRanges([track('a', [[0, 5, true]], true)])).toEqual([])
+  expect(redactionSkipRanges([track('a', [[0, 5, false]], true)])).toEqual([])
+  expect(redactionSkipRanges([track('a', [[0, 5, true]], true)])).toEqual([])
   expect(
-    redactionPreviewRanges([track('a', [[0, 5, false]], false, true), track('b', [[0, 5, true]])]),
+    redactionSkipRanges([track('a', [[0, 5, false]], false, true), track('b', [[0, 5, true]])]),
   ).toEqual([])
 })

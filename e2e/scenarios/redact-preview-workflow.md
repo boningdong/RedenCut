@@ -37,6 +37,25 @@ If source silence is additionally used as a variation, disclose how the silent i
 No checkpoint passes solely because the playhead reached a later time.
 Unavailable mandatory evidence remains BLOCKED.
 
+## Export Checkpoints
+
+Export produces a rendered file without changing source media or project clips: by default it removes the same eligible redacted time intervals as Preview, regardless of the Preview switch.
+Use the prepared `export-audio` dialog destination and wait for visible Done; retain each actual output in the owned run’s exports directory.
+Read the resulting files with FFprobe and decode PCM with FFmpeg; a shorter duration alone does not prove the correct retained material was joined.
+A baseline unedited WAV export of the same fixture permits direct comparison of the retained audio content.
+Use separate filenames for each output, never overwrite prior evidence.
+
+| ID | Required observable outcome | Evidence |
+| --- | --- | --- |
+| `export-redact` | With Preview off, default export removes the interior redacted interval and joins the retained prefix and suffix. | Done screenshot, produced filename, measured duration equal to original minus eligible interval, and decoded-content comparison before and after the join. |
+| `export-preview-independent` | Changing Preview does not change the export’s removal policy. | Both actual outputs and their measured durations/decoded-content agreement for the same project. |
+| `export-track-mute` | Track-level mute does not remove timeline duration. | Actual output retains duration and decoded muted region is silent. |
+| `export-gap` | Natural empty gaps remain in exported timeline time. | Gap geometry, actual duration and decoded silence inside gap plus retained material afterward. |
+| `export-overlap` | An unmuted retained second track prevents deleting its covered interval from the mixed export. | Both track states, actual full duration and decoded retained content from inside the interval. |
+
+These export requirements use produced-file inspection authorized by the user; they are not blocked by the lack of live recorder controls.
+If an output cannot be obtained or decoded, mark the corresponding mandatory export checkpoint BLOCKED.
+
 ## Change-Focused Exploration
 
 Choose one or two relevant variations after mandatory coverage, such as adjacent redacted portions, pause/resume near the project end, or rapid Play–Pause–Play input after a redaction transition.
@@ -44,7 +63,8 @@ Keep retries, selection workarounds and timing uncertainty explicit.
 
 ## Scope
 
-This scenario verifies actual UI playback progression and controls, not listening or sample-level sound correctness.
+Playback checkpoints verify visible progression and controls, not listening or sample-level sound correctness.
+Export checkpoints additionally inspect decoded output content and measured duration.
 The retained second-track region establishes the timeline's reason not to skip; audible output must be verified separately with supported audio capture if the task requires a sound-content claim.
 The current Docker MCP does not expose recorder controls, so required listening/capture claims remain BLOCKED rather than inferred from these observations.
 Do not manipulate private stores, serialized projects or playback callbacks to manufacture a passing state.

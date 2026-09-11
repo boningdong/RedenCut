@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 const cancel = z.object({ type: z.literal('cancel') }).strict()
+const exportFormat = z.enum(['wav', 'mp3', 'flac', 'aac'])
 const project = z.object({ type: z.literal('project'), name: z.string().min(1) }).strict()
 export const HarnessDialogRequestSchema = z.discriminatedUnion('purpose', [
   z
@@ -12,13 +13,25 @@ export const HarnessDialogRequestSchema = z.discriminatedUnion('purpose', [
       ]),
     })
     .strict(),
+  z
+    .object({
+      purpose: z.literal('export-audio'),
+      selection: z.union([
+        cancel,
+        z
+          .object({ type: z.literal('export'), filename: z.string().min(1), format: exportFormat })
+          .strict(),
+      ]),
+    })
+    .strict(),
   z.object({ purpose: z.literal('save-project'), selection: z.union([cancel, project]) }).strict(),
   z.object({ purpose: z.literal('open-project'), selection: z.union([cancel, project]) }).strict(),
 ])
 export type HarnessDialogRequest = z.infer<typeof HarnessDialogRequestSchema>
 export const HarnessDialogReplySchema = z
   .object({
-    purpose: z.enum(['import-audio', 'save-project', 'open-project']),
+    purpose: z.enum(['import-audio', 'save-project', 'open-project', 'export-audio']),
+    format: exportFormat.nullable().default(null),
     path: z.string().min(1).nullable(),
     parent: z.string().min(1).nullable().default(null),
   })

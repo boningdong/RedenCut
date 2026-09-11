@@ -29,6 +29,7 @@ Canonical transcript selections use their own occurrence-aware editing and acous
 
 Track Mute and Solo control audibility only; they do not redact transcript text.
 The Preview edits toggle skips redacted sections during playback.
+Export always removes those same intervals by default, even when Preview is off; retained overlapping audio, ordinary track mute, and natural gaps follow the same timeline rules.
 For compatibility, project files retain `clip.muted` as the redaction marker; `track.muted` remains the ordinary track mute control.
 
 ## Native Menu Routing

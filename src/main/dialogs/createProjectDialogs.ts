@@ -19,9 +19,6 @@ export function createProjectDialogs(harnessMode: boolean, env: NodeJS.ProcessEn
       mailbox.consume('dirty-project')
       throw new Error('UNSUPPORTED_HARNESS_DIALOG')
     },
-    exportAudio: async () => {
-      mailbox.consume('export-audio')
-      throw new Error('UNSUPPORTED_HARNESS_DIALOG')
-    },
+    exportAudio: async (_window, format) => mailbox.consume('export-audio', format),
   }
 }

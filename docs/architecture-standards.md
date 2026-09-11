@@ -47,6 +47,13 @@
 - Target two buffered seconds and enforce a three-second hard maximum per active track.
 - Keep the AudioWorklet processor alive for the player lifetime by returning `true` from `process()`.
 
+## Export
+
+- Export removes Redact intervals by default, independently of the interactive Preview toggle.
+- Share interval eligibility and retained-overlap protection through [`redactionTimeline.ts`](../src/shared/redactionTimeline.ts); do not maintain a second export-specific skip policy.
+- Contract retained clip positions and export progress by those intervals, preserving natural gaps and ordinary track-mute duration.
+- Export remains non-destructive; source audio and project clip positions do not change.
+
 ## Transcription
 
 - Route speech-to-text through [`ITranscriber`](../src/shared/transcriber.types.ts); callers must not invoke a transcription engine directly.

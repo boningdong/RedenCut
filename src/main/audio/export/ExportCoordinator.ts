@@ -1,4 +1,5 @@
 import { spawn } from 'child_process'
+import { redactedTimelineDuration } from '../../../shared/redactionTimeline'
 import { randomUUID } from 'crypto'
 import type { EventEmitter } from 'events'
 import { link, rename, rm, stat } from 'fs/promises'
@@ -389,17 +390,12 @@ async function waitForSuccessfulClose(
     killOnce()
   }
   const abort = () => recordFailure(new DOMException('Export cancelled', 'AbortError'))
+  const totalSeconds = redactedTimelineDuration(project.tracks)
   const reportProgress = (text: string) => {
     const matches = [...text.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)]
     const match = matches.at(-1)
     if (!match) return
     const currentSeconds = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
-    const totalSeconds = project.tracks
-      .flatMap((track) => track.clips)
-      .reduce(
-        (maximum, clip) => Math.max(maximum, clip.outputStart + clip.sourceEnd - clip.sourceStart),
-        0,
-      )
     try {
       onProgress({
         ...envelope(identity),

@@ -1,4 +1,4 @@
-import type { Track } from '@shared/project.types'
+import type { Track } from './project.types'
 
 export interface RedactionRange {
   start: number
@@ -6,7 +6,7 @@ export interface RedactionRange {
 }
 
 /** Clip.muted is the persisted redaction marker; track.muted is ordinary mix muting. */
-export function redactionPreviewRanges(tracks: Track[]): RedactionRange[] {
+export function redactionSkipRanges(tracks: Track[]): RedactionRange[] {
   const solo = tracks.some((track) => track.solo)
   const events = tracks
     .filter((track) => !track.muted && (!solo || track.solo))
@@ -38,4 +38,21 @@ export function redactionPreviewRanges(tracks: Track[]): RedactionRange[] {
     else ranges.push({ start, end })
   }
   return ranges
+}
+
+export function timeAfterRedactions(time: number, ranges: RedactionRange[]): number {
+  return (
+    time -
+    ranges.reduce(
+      (removed, range) => removed + Math.max(0, Math.min(time, range.end) - range.start),
+      0,
+    )
+  )
+}
+
+export function redactedTimelineDuration(tracks: Track[]): number {
+  const duration = tracks
+    .flatMap((track) => track.clips)
+    .reduce((end, clip) => Math.max(end, clip.outputStart + clip.sourceEnd - clip.sourceStart), 0)
+  return timeAfterRedactions(duration, redactionSkipRanges(tracks))
 }

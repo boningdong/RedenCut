@@ -51,6 +51,21 @@ export function prepareDialog(
       const selected = join(root, filename(request.selection.filename))
       path = contained(root, selected)
       if (!lstatSync(path).isFile()) throw new Error('AUDIO_NOT_REGULAR_FILE')
+    } else if (request.selection.type === 'export') {
+      const name = filename(request.selection.filename)
+      if (!name.endsWith(`.${request.selection.format}`) || name === `.${request.selection.format}`)
+        throw new Error('INVALID_EXPORT_NAME')
+      const root = join(runDirectory, 'exports')
+      mkdirSync(root, { recursive: true, mode: 0o700 })
+      if (lstatSync(root).isSymbolicLink()) throw new Error('EXPORT_ROOT_SYMLINK')
+      contained(runDirectory, root)
+      path = join(realpathSync(root), name)
+      try {
+        lstatSync(path)
+        throw new Error('EXPORT_ALREADY_EXISTS')
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
     } else {
       const name = filename(request.selection.name)
       if (!name.endsWith('.podcut') || name === '.podcut') throw new Error('INVALID_PROJECT_NAME')
@@ -77,6 +92,7 @@ export function prepareDialog(
     temporary,
     JSON.stringify({
       purpose: request.purpose,
+      format: request.selection.type === 'export' ? request.selection.format : null,
       path,
       parent: path ? realpathSync(dirname(path)) : null,
     }),

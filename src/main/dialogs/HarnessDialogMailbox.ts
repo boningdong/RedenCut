@@ -14,7 +14,7 @@ import { HarnessDialogReplySchema } from '../../shared/harnessDialog.types'
 export class HarnessDialogMailbox {
   constructor(private readonly directory: string) {}
 
-  consume(purpose: string): string | null {
+  consume(purpose: string, format?: string): string | null {
     mkdirSync(this.directory, { recursive: true, mode: 0o700 })
     const claimed = join(this.directory, `${randomUUID()}.claimed`)
     try {
@@ -27,10 +27,12 @@ export class HarnessDialogMailbox {
       }
       const reply = HarnessDialogReplySchema.parse(JSON.parse(readFileSync(claimed, 'utf8')))
       if (reply.purpose !== purpose) throw new Error('DIALOG_PURPOSE_MISMATCH')
+      if (reply.path && purpose === 'export-audio' && reply.format !== format)
+        throw new Error('DIALOG_FORMAT_MISMATCH')
       if (reply.path) {
         if (!reply.parent || realpathSync(dirname(reply.path)) !== reply.parent)
           throw new Error('DIALOG_PATH_CHANGED')
-        if (purpose !== 'save-project') {
+        if (purpose !== 'save-project' && purpose !== 'export-audio') {
           if (realpathSync(reply.path) !== reply.path) throw new Error('DIALOG_PATH_CHANGED')
           const stat = lstatSync(reply.path)
           if (purpose === 'import-audio' ? !stat.isFile() : !stat.isDirectory())
@@ -38,10 +40,12 @@ export class HarnessDialogMailbox {
         }
       }
       // Recheck destination existence at consumption, not only at preparation.
-      if (purpose === 'save-project' && reply.path) {
+      if ((purpose === 'save-project' || purpose === 'export-audio') && reply.path) {
         try {
           lstatSync(reply.path)
-          throw new Error('PROJECT_ALREADY_EXISTS')
+          throw new Error(
+            purpose === 'export-audio' ? 'EXPORT_ALREADY_EXISTS' : 'PROJECT_ALREADY_EXISTS',
+          )
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
         }

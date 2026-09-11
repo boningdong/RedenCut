@@ -87,3 +87,13 @@ Explicit container stop has a 15-second supervisor deadline; expiry is a reporte
 Linux containers still share host compute resources, and this does not certify macOS window behavior, GPU performance or audio hardware.
 Native file selection is replaced by purpose-matched one-shot replies for import/open/save; the real UI, import, cache and project persistence paths remain active.
 Container audio-output and basic editing acceptance are covered by the named product E2Es; real transcription/model setup and native OS dialog interaction remain separate work.
+
+## Prepared export destinations
+
+Use `podcut_prepare_dialog` with `purpose: "export-audio"` and `selection: {type: "export", filename: "mix.wav", format: "wav"}` before clicking the modal’s Export button.
+Supported formats are `wav`, `mp3`, `flac`, and `aac`; the filename must be a single basename with its matching extension.
+`{type: "cancel"}` cancels without creating an output.
+The destination is `<runDirectory>/exports/<filename>`, retained on the host under `.harness-runs/container/<runId>/exports/`.
+Preparation and consumption reject existing outputs, symlink parent changes and format mismatches; no arbitrary path or other run destination is accepted.
+To inspect an actual export, wait for the UI’s Done confirmation, then read only that run-owned output using FFprobe/FFmpeg.
+This file inspection verifies produced media and is separate from live audio recording, which MCP does not expose.

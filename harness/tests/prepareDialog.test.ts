@@ -126,3 +126,46 @@ test('consumption rejects a project parent replaced by an outside symlink after 
   symlinkSync(root, join(run, 'projects'))
   expect(() => mailbox.consume('save-project')).toThrow('DIALOG_PATH_CHANGED')
 })
+
+test('export destinations are run-owned, format-bound, single-use and never overwrite', () => {
+  const { root, run, mailbox } = setup()
+  const request = {
+    purpose: 'export-audio',
+    selection: { type: 'export', filename: 'mix.wav', format: 'wav' },
+  } as const
+  prepareDialog(root, run, 1, request)
+  expect(() => mailbox.consume('export-audio', 'mp3')).toThrow('DIALOG_FORMAT_MISMATCH')
+  prepareDialog(root, run, 1, request)
+  expect(mailbox.consume('export-audio', 'wav')).toBe(join(run, 'exports/mix.wav'))
+  expect(() => mailbox.consume('export-audio', 'wav')).toThrow('DIALOG_NOT_PREPARED')
+  prepareDialog(root, run, 1, request)
+  writeFileSync(join(run, 'exports/mix.wav'), 'existing')
+  expect(() => mailbox.consume('export-audio', 'wav')).toThrow('EXPORT_ALREADY_EXISTS')
+  expect(() => prepareDialog(root, run, 1, request)).toThrow('EXPORT_ALREADY_EXISTS')
+})
+test('export cancellation needs no format and unsafe destinations never publish', () => {
+  const { root, run, mailbox } = setup()
+  prepareDialog(root, run, 1, { purpose: 'export-audio', selection: { type: 'cancel' } })
+  expect(mailbox.consume('export-audio', 'wav')).toBeNull()
+  for (const filename of ['../mix.wav', '/tmp/mix.wav', 'mix.mp3', '.wav', 'nested/mix.wav']) {
+    expect(() =>
+      prepareDialog(root, run, 1, {
+        purpose: 'export-audio',
+        selection: { type: 'export', filename, format: 'wav' },
+      }),
+    ).toThrow()
+    expect(existsSync(join(run, 'generation-1/dialogs/pending.json'))).toBe(false)
+  }
+})
+test('export parent cannot be replaced by a symlink to another run', () => {
+  const { root, run, mailbox } = setup()
+  const request = {
+    purpose: 'export-audio',
+    selection: { type: 'export', filename: 'mix.wav', format: 'wav' },
+  } as const
+  prepareDialog(root, run, 1, request)
+  rmSync(join(run, 'exports'), { recursive: true })
+  symlinkSync(root, join(run, 'exports'))
+  expect(() => mailbox.consume('export-audio', 'wav')).toThrow('DIALOG_PATH_CHANGED')
+  expect(() => prepareDialog(root, run, 1, request)).toThrow('EXPORT_ROOT_SYMLINK')
+})

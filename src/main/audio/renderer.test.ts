@@ -83,7 +83,7 @@ describe('buildRenderArgs', () => {
     expect(args[args.indexOf('-filter_complex') + 1]).toContain('[1:a]')
   })
 
-  it('excludes muted clips and places audible clips on the output timeline', () => {
+  it('removes redacted clips and compacts retained output positions', () => {
     const project = makeProject([
       { source: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0 },
       { source: 0, sourceStart: 5, sourceEnd: 10, outputStart: 5, muted: true },
@@ -91,8 +91,8 @@ describe('buildRenderArgs', () => {
     ])
     const args = buildRenderArgs(project, paths, '/tmp/out.mp3')
     const graph = args[args.indexOf('-filter_complex') + 1]
-    expect(graph).not.toContain('sourceStart=5')
-    expect(graph).toContain('adelay=10000:all=1')
+    expect(graph).not.toContain('atrim=start=5:end=10')
+    expect(graph).toContain('adelay=240000S:all=1')
     expect(graph).toContain('amix=inputs=2')
   })
 
@@ -129,7 +129,7 @@ describe('buildRenderArgs', () => {
     const project = makeProject([
       { source: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0, muted: true },
     ])
-    expect(() => buildRenderArgs(project, paths, '/tmp/out.mp3')).toThrow('No non-muted clips')
+    expect(() => buildRenderArgs(project, paths, '/tmp/out.mp3')).toThrow('No retained timeline')
   })
 
   it('throws when main has not resolved a referenced source', () => {
@@ -156,7 +156,7 @@ describe('buildRenderArgs', () => {
     })
     const graph = buildRenderArgs(project, paths, '/tmp/out.wav').join(' ')
     expect(graph).toContain('volume=0.5')
-    expect(graph).toContain('adelay=2000:all=1')
+    expect(graph).toContain('adelay=96000S:all=1')
     expect(graph).toContain('volume=0.25')
     expect(graph).not.toContain('track1')
   })

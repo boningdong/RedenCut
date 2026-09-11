@@ -70,4 +70,4 @@ Call `podcut_prepare_dialog` with the current `runId`, `generation` and a typed 
 Audio selection accepts plain filenames only within `e2e/fixtures/audio/`; no registry or arbitrary paths are exposed.
 Project selections stay inside this run's `projects/` directory; new saves cannot replace existing projects.
 Replies are single-use, purpose-matched and generation-scoped; restart clears pending replies.
-Unprepared or unsupported dialogs fail explicitly and are recorded in diagnostics/events; dirty-project confirmations and export dialogs remain unsupported.
+Unprepared or unsupported dialogs fail explicitly and are recorded in diagnostics/events; dirty-project confirmations remain unsupported. Export uses purpose `export-audio` with selection `{type: "export", filename: "mix.wav", format: "wav"}` (or cancellation). Formats are `wav`, `mp3`, `flac`, `aac`, and the extension must match. Destinations stay in this run’s `exports/` directory; existing files, path traversal, symlink escapes and mismatched format consumption are rejected.

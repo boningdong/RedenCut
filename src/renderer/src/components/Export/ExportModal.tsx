@@ -177,6 +177,10 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
           Export Audio
         </h2>
 
+        <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+          Redacted sections are removed from the export. Overlapping retained audio is preserved.
+        </p>
+
         {/* Format */}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>

@@ -14,14 +14,14 @@ export const runtimeTools = [
     schema: z.object({ ...generationSchema.shape, request: HarnessDialogRequestSchema }).strict(),
     readOnly: false,
     description:
-      'Prepare one native-dialog reply before clicking the real UI. request has purpose import-audio with selection {type:file,filename} from e2e/fixtures/audio, or save-project/open-project with selection {type:project,name} within this run, or {type:cancel}. Project names must end in .podcut. Never replaces a pending reply. Restart clears pending replies. No arbitrary filesystem paths.',
+      'Prepare one native-dialog reply before clicking the real UI. request has purpose import-audio with selection {type:file,filename} from e2e/fixtures/audio, or save-project/open-project with selection {type:project,name} within this run, or export-audio with selection {type:export,filename,format} targeting this run’s exports directory (wav/mp3/flac/aac; matching extension; no overwrite), or {type:cancel}. Project names must end in .podcut. Never replaces a pending reply. Restart clears pending replies. No arbitrary filesystem paths.',
   },
   {
     name: 'podcut_start',
     schema: empty,
     readOnly: false,
     description:
-      'Start one isolated Podcut run from the current built application. Does not install dependencies or build implicitly. Returns runId and generation. Take browser_snapshot before UI actions. Prepare import/open/save dialog replies with podcut_prepare_dialog before clicking. Dirty-project confirmation and export dialogs are unsupported.',
+      'Start one isolated Podcut run from the current built application. Does not install dependencies or build implicitly. Returns runId and generation. Take browser_snapshot before UI actions. Prepare import/open/save/export dialog replies with podcut_prepare_dialog before clicking. Dirty-project confirmation is unsupported.',
   },
   {
     name: 'podcut_status',

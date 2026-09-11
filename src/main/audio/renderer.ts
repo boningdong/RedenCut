@@ -1,20 +1,9 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Audio Renderer — FFmpeg filter-graph builder
-//
-// Pure function: takes a ProjectFile snapshot and output path, returns the
-// ffmpeg argument array. No I/O, no side effects — unit-testable.
-//
-// Filter graph shape (see spec §6):
-//   Step 1: Per track, collect non-muted clips sorted by outputStart.
-//           Skip tracks where all clips are muted.
-//   Step 2: Per clip: trim, reset timestamps, apply gain, and delay to outputStart.
-//   Step 3: Mix positioned clips within each track and apply track volume.
-//   Step 4: [track0][track1]...amix=inputs=T:normalize=0[out]
-//           (if T=1, skip amix and use [track0] directly)
-//
-// ─────────────────────────────────────────────────────────────────────────────
-
 import type { ProjectFile } from '@shared/project.types'
+import {
+  redactionSkipRanges,
+  redactedTimelineDuration,
+  timeAfterRedactions,
+} from '@shared/redactionTimeline'
 
 // NOTE: No import of `binaries.ts` here — this module is a pure function so it
 // can be unit-tested in the Vitest node environment without Homebrew being present.
@@ -27,6 +16,9 @@ export function buildRenderArgs(
   outputPath: string,
 ): string[] {
   const { audioSources, tracks } = project
+  const skipRanges = redactionSkipRanges(tracks)
+  const outputDuration = redactedTimelineDuration(tracks)
+  if (outputDuration <= 0) throw new Error('No retained timeline to export')
 
   // Map AudioSourceId → FFmpeg input index (0-based, in insertion order)
   const sfIndexMap = new Map<string, number>()
@@ -52,10 +44,6 @@ export function buildRenderArgs(
     }
   }
 
-  if (activeTrackClips.length === 0) {
-    throw new Error('No non-muted clips to export')
-  }
-
   // Build filter_complex string
   const parts: string[] = []
   let segIndex = 0
@@ -69,9 +57,12 @@ export function buildRenderArgs(
       const srcIdx = sfIndexMap.get(clip.audioSourceId)
       if (srcIdx === undefined) throw new Error(`Unknown audioSourceId: ${clip.audioSourceId}`)
       const label = `seg${segIndex++}`
-      const delayMilliseconds = Math.max(0, Math.round(clip.outputStart * 1000))
+      const delayFrames = Math.max(
+        0,
+        Math.round(timeAfterRedactions(clip.outputStart, skipRanges) * 48_000),
+      )
       parts.push(
-        `[${srcIdx}:a]atrim=start=${clip.sourceStart}:end=${clip.sourceEnd},asetpts=PTS-STARTPTS,volume=${clip.gain},adelay=${delayMilliseconds}:all=1[${label}]`,
+        `[${srcIdx}:a]atrim=start=${clip.sourceStart}:end=${clip.sourceEnd},asetpts=PTS-STARTPTS,volume=${clip.gain},aresample=48000,adelay=${delayFrames}S:all=1[${label}]`,
       )
       segLabels.push(`[${label}]`)
     }
@@ -88,7 +79,10 @@ export function buildRenderArgs(
   }
 
   let outLabel: string
-  if (trackLabels.length === 1) {
+  if (trackLabels.length === 0) {
+    parts.push('anullsrc=r=48000:cl=stereo[silent]')
+    outLabel = '[silent]'
+  } else if (trackLabels.length === 1) {
     // Single active track — use its label directly; no amix needed
     outLabel = trackLabels[0]
   } else {
@@ -96,6 +90,11 @@ export function buildRenderArgs(
     outLabel = '[out]'
   }
 
+  // Retain natural gaps and ordinary muted tails; only Redact contracts time.
+  const outputFrames = Math.round(outputDuration * 48_000)
+  parts.push(
+    `${outLabel}apad=whole_len=${outputFrames},atrim=end_sample=${outputFrames},asetpts=N/SR/TB[export]`,
+  )
   const filterComplex = parts.join(';')
 
   // Determine format-specific encoding args
@@ -108,7 +107,7 @@ export function buildRenderArgs(
     '-filter_complex',
     filterComplex,
     '-map',
-    outLabel,
+    '[export]',
     ...encodeArgs,
     outputPath,
   ]

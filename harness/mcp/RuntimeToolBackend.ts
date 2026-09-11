@@ -99,7 +99,7 @@ export class RuntimeToolBackend implements ToolBackend {
         delete properties.filename
         return {
           ...tool,
-          description: `${tool.description ?? ''} Podcut: requires current runId/generation and an initial full browser_snapshot. Prepare import/open/save dialog replies with podcut_prepare_dialog before clicking; dirty-project and export dialogs are unsupported. Generated files use the runtime-owned artifact directory.`,
+          description: `${tool.description ?? ''} Podcut: requires current runId/generation and an initial full browser_snapshot. Prepare import/open/save/export dialog replies with podcut_prepare_dialog before clicking; dirty-project confirmation is unsupported. Generated files use the runtime-owned artifact directory.`,
           inputSchema: {
             ...tool.inputSchema,
             additionalProperties: false,
