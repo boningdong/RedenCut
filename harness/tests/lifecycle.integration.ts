@@ -6,7 +6,7 @@ import { HarnessRuntime } from '../runtime/HarnessRuntime'
 
 const options = { repositoryRoot: resolve('.'), outputRoot: resolve('.harness-runs') }
 
-test('runs real isolated RiffCut, rebuilds the UI session on restart, and retains trace and logs', async () => {
+test('runs real isolated RedenCut, rebuilds the UI session on restart, and retains trace and logs', async () => {
   const runtime = new HarnessRuntime(options)
   await expect(
     runtime.callUiTool('browser_snapshot', {}, { runId: 'absent', generation: 0 }),

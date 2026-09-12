@@ -33,7 +33,7 @@ test('dialog preparation is generation-bound, recorded on rejection and cleared 
     ).toBe(true)
     const restarted = await runtime.restart({})
     expect(existsSync(pending)).toBe(false)
-    const stale = await backend.callTool('riffcut_prepare_dialog', { ...identity, request })
+    const stale = await backend.callTool('redencut_prepare_dialog', { ...identity, request })
     expect(stale.structuredContent).toMatchObject({ error: { code: 'STALE_GENERATION' } })
     const current = { runId: restarted.runId!, generation: restarted.generation }
     await runtime.callUiTool('browser_snapshot', {}, current)

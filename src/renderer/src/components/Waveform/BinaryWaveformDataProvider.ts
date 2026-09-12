@@ -27,7 +27,7 @@ export class BinaryWaveformDataProvider implements WaveformDataProvider {
     const bucketCount = Math.max(0, endBucket - startBucket)
     if (bucketCount === 0) return { buckets: [] }
     const response = await fetch(
-      `riffcut://cache/${this.descriptor.audioSourceId}/waveform/${level.samplesPerBucket}`,
+      `redencut://cache/${this.descriptor.audioSourceId}/waveform/${level.samplesPerBucket}`,
       {
         headers: { Range: `bytes=${startBucket * 8}-${endBucket * 8 - 1}` },
         signal: request.signal,

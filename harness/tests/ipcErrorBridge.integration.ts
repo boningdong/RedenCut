@@ -10,7 +10,7 @@ import { electronEnvironment } from '../runtime/electronEnvironment'
 test.skipIf(!existsSync('/.dockerenv'))(
   'retains whitelisted rejected IPC codes and localization reasons across the real contextBridge',
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'riffcut-error-bridge-'))
+    const directory = await mkdtemp(join(tmpdir(), 'redencut-error-bridge-'))
     const errors = [
       { code: 'operation-failed', reason: 'speech-aligning', message: 'Speech alignment failed.' },
       { code: 'cancelled', reason: 'cancelled', message: 'The operation was cancelled.' },

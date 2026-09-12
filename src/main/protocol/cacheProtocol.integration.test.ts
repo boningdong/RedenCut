@@ -75,7 +75,7 @@ async function createFixture(): Promise<{
   project: ReturnType<typeof createEmptyProject>
   descriptor: AudioSourceCacheDescriptor
 }> {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-cache-integration-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-cache-integration-'))
   temporaryRoots.push(root)
   const source = AudioSourceSchema.parse({
     id: SOURCE_ID,
@@ -115,7 +115,7 @@ async function createFixture(): Promise<{
       version: 1,
       audioSourceId: SOURCE_ID,
       sourceSha256: SOURCE_HASH,
-      generatorVersion: 'riffcut-cache-v1',
+      generatorVersion: 'redencut-cache-v1',
       pcm: {
         file: `cache/${SOURCE_ID}/audio.f32le`,
         sampleFormat: 'f32le',
@@ -189,7 +189,7 @@ describe('managed cache provider integration', () => {
 
     expect(requests).toHaveLength(3)
     for (const request of requests) {
-      expect(request.url).toMatch(/^riffcut:\/\/cache\//)
+      expect(request.url).toMatch(/^redencut:\/\/cache\//)
       const rangeHeader = request.headers.get('Range')
       expect(rangeHeader).toMatch(/^bytes=\d+-\d+$/)
       const [, start, end] = rangeHeader!.match(/^bytes=(\d+)-(\d+)$/)!

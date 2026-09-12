@@ -14,7 +14,7 @@ Project data, user-owned names and speech recognition language remain independen
 
 Run ID:62e016a6-1b04-4a65-94ae-d2add4d5d652, generations1 and2.
 Owned run stopped cleanly; client close and process exit returned0.
-Local evidence is retained under `/Users/boning/Workspaces/RiffCut/localization-evidence/`, with the final `agent-testing-report.md` in `harness-runs/container/62e016a6-1b04-4a65-94ae-d2add4d5d652/`.
+Local evidence is retained under `/Users/boning/Workspaces/RedenCut/localization-evidence/`, with the final `agent-testing-report.md` in `harness-runs/container/62e016a6-1b04-4a65-94ae-d2add4d5d652/`.
 
 ## Limits
 

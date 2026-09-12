@@ -38,7 +38,7 @@ export function inspectOrphanRuns(
       if (!ownership.success || ownership.data.runId !== entry.name) continue
       const { runId, host, application } = ownership.data
       if (sameProcess(host, readProcess(host.pid))) continue
-      if (!application.command.split(/\s+/).includes(`--riffcut-harness-run-id=${runId}`)) continue
+      if (!application.command.split(/\s+/).includes(`--redencut-harness-run-id=${runId}`)) continue
       if (!sameProcess(application, readProcess(application.pid))) continue
       orphans.push({
         runId,

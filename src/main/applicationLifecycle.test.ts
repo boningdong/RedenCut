@@ -54,17 +54,21 @@ describe('application lifecycle', () => {
     const initialize = vi.fn(async () => active)
     startApplicationLifecycle({ app, initialize })
 
-    app.emit('second-instance', {}, ['/Applications/RiffCut', '--flag', '/private/Episode.riffcut'])
+    app.emit('second-instance', {}, [
+      '/Applications/RedenCut',
+      '--flag',
+      '/private/Episode.redencut',
+    ])
     const preventDefault = vi.fn()
-    app.emit('open-file', { preventDefault }, '/private/Mac.riffcut')
+    app.emit('open-file', { preventDefault }, '/private/Mac.redencut')
     app.emit('second-instance', {}, ['/private/not-a-project.txt'])
     expect(initialize).not.toHaveBeenCalled()
 
     app.ready.resolve()
     await vi.waitFor(() => expect(active.forwardProject).toHaveBeenCalledTimes(2))
     expect(active.forwardProject.mock.calls.map(([path]) => path)).toEqual([
-      '/private/Episode.riffcut',
-      '/private/Mac.riffcut',
+      '/private/Episode.redencut',
+      '/private/Mac.redencut',
     ])
     expect(active.restoreWindow).toHaveBeenCalledTimes(1)
     expect(active.focusWindow).toHaveBeenCalledTimes(2)
@@ -78,17 +82,17 @@ describe('application lifecycle', () => {
     app.ready.resolve()
     await vi.waitFor(() => expect(app.whenReady).toHaveBeenCalled())
 
-    app.emit('second-instance', {}, ['/private/Later.riffcut'])
+    app.emit('second-instance', {}, ['/private/Later.redencut'])
     await vi.waitFor(() =>
-      expect(active.forwardProject).toHaveBeenCalledWith('/private/Later.riffcut'),
+      expect(active.forwardProject).toHaveBeenCalledWith('/private/Later.redencut'),
     )
     active.isWindowDestroyed.mockReturnValue(true)
     active.ensureWindow.mockImplementationOnce(async () => {
       active.isWindowDestroyed.mockReturnValue(false)
     })
-    app.emit('second-instance', {}, ['/private/Ignored.riffcut'])
+    app.emit('second-instance', {}, ['/private/Ignored.redencut'])
     await vi.waitFor(() =>
-      expect(active.forwardProject).toHaveBeenCalledWith('/private/Ignored.riffcut'),
+      expect(active.forwardProject).toHaveBeenCalledWith('/private/Ignored.redencut'),
     )
     expect(active.ensureWindow).toHaveBeenCalledTimes(2)
 
@@ -109,16 +113,16 @@ describe('application lifecycle', () => {
     app.ready.resolve()
     await vi.waitFor(() => expect(active.ensureWindow).toHaveBeenCalledTimes(0))
 
-    app.emit('second-instance', {}, ['/private/First.riffcut'])
-    app.emit('second-instance', {}, ['/private/Second.riffcut'])
+    app.emit('second-instance', {}, ['/private/First.redencut'])
+    app.emit('second-instance', {}, ['/private/Second.redencut'])
     await vi.waitFor(() => expect(active.ensureWindow).toHaveBeenCalledTimes(1))
     expect(active.forwardProject).not.toHaveBeenCalled()
 
     recreated.resolve()
     await vi.waitFor(() => expect(active.forwardProject).toHaveBeenCalledTimes(2))
     expect(active.forwardProject.mock.calls.map(([path]) => path)).toEqual([
-      '/private/First.riffcut',
-      '/private/Second.riffcut',
+      '/private/First.redencut',
+      '/private/Second.redencut',
     ])
   })
 
@@ -129,14 +133,14 @@ describe('application lifecycle', () => {
     startApplicationLifecycle({ app, initialize: async () => active, reportDiagnostic })
 
     for (let index = 0; index < 33; index += 1)
-      app.emit('second-instance', {}, [`/private/Queued-${index}.riffcut`])
+      app.emit('second-instance', {}, [`/private/Queued-${index}.redencut`])
     expect(reportDiagnostic).toHaveBeenCalledTimes(1)
     expect(String(reportDiagnostic.mock.calls[0][0])).not.toContain('/private')
 
     app.ready.resolve()
     await vi.waitFor(() => expect(active.forwardProject).toHaveBeenCalledTimes(32))
-    expect(active.forwardProject.mock.calls.at(0)?.[0]).toBe('/private/Queued-0.riffcut')
-    expect(active.forwardProject.mock.calls.at(-1)?.[0]).toBe('/private/Queued-31.riffcut')
+    expect(active.forwardProject.mock.calls.at(0)?.[0]).toBe('/private/Queued-0.redencut')
+    expect(active.forwardProject.mock.calls.at(-1)?.[0]).toBe('/private/Queued-31.redencut')
   })
 
   it('drops only its bounded main queue on shutdown while recreation is pending', async () => {
@@ -146,7 +150,7 @@ describe('application lifecycle', () => {
     active.ensureWindow.mockReturnValue(recreated.promise)
     startApplicationLifecycle({ app, initialize: async () => active })
     app.ready.resolve()
-    app.emit('second-instance', {}, ['/private/Shutdown.riffcut'])
+    app.emit('second-instance', {}, ['/private/Shutdown.redencut'])
     await vi.waitFor(() => expect(active.ensureWindow).toHaveBeenCalledTimes(1))
 
     app.emit('before-quit')

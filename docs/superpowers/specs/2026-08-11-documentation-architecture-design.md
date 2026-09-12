@@ -41,12 +41,12 @@ Existing design specifications and implementation plans remain as dated implemen
 
 The cleanup preserves these durable requirements from the older documents:
 
-- RiffCut is a minimalist podcast editor built with Electron, React, and TypeScript, targeting macOS first and Windows later.
+- RedenCut is a minimalist podcast editor built with Electron, React, and TypeScript, targeting macOS first and Windows later.
 - Renderer state uses Zustand.
 - Persisted data is defined by Zod schemas, with TypeScript types derived from those schemas.
 - Electron main, preload, shared, and renderer responsibilities remain separate.
 - Editing remains non-destructive, and legacy project loading remains supported.
-- Renderer audio uses the `riffcut://` protocol, while peak files remain regenerable caches.
+- Renderer audio uses the `redencut://` protocol, while peak files remain regenerable caches.
 - Playback uses `IAudioPlayer`, prefers `WebCodecsPlayer`, and retains `SimpleAudioPlayer` as a supported fallback.
 - WebCodecs and AudioWorklet implementation constraints that prevent timing, pitch, or processor-lifetime regressions remain documented.
 - Transcription remains behind `ITranscriber`; the current implementation uses local whisper.cpp.

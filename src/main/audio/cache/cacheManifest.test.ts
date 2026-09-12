@@ -8,7 +8,7 @@ function manifest() {
     version: 1,
     audioSourceId: SOURCE_ID,
     sourceSha256: 'a'.repeat(64),
-    generatorVersion: 'riffcut-cache-v1',
+    generatorVersion: 'redencut-cache-v1',
     pcm: {
       file: `cache/${SOURCE_ID}/audio.f32le`,
       sampleFormat: 'f32le',

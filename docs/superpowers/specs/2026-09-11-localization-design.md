@@ -1,4 +1,4 @@
-# RiffCut English and Simplified Chinese Localization
+# RedenCut English and Simplified Chinese Localization
 
 ## Decision and scope
 

@@ -36,11 +36,11 @@ test('production selection preserves native options, suffix normalization and ca
     window,
     expect.objectContaining({ properties: ['openDirectory'] }),
   )
-  expect(await dialogs.saveProject(window)).toBe('/episode.riffcut')
+  expect(await dialogs.saveProject(window)).toBe('/episode.redencut')
   expect(await dialogs.saveProject(window)).toBeNull()
 })
 test('harness handles cancellation without native UI and logs unsupported dialogs', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'riffcut-main-dialog-'))
+  const root = mkdtempSync(join(tmpdir(), 'redencut-main-dialog-'))
   roots.push(root)
   const directory = join(root, 'generation-1/dialogs')
   mkdirSync(directory, { recursive: true })
@@ -49,8 +49,8 @@ test('harness handles cancellation without native UI and logs unsupported dialog
     JSON.stringify({ purpose: 'import-audio', path: null }),
   )
   const dialogs = createProjectDialogs(true, {
-    RIFFCUT_HARNESS_RUN_DIRECTORY: root,
-    RIFFCUT_HARNESS_GENERATION: '1',
+    REDENCUT_HARNESS_RUN_DIRECTORY: root,
+    REDENCUT_HARNESS_GENERATION: '1',
   })
   expect(await dialogs.importAudio(window)).toBeNull()
   await expect(dialogs.dirtyProject(window)).rejects.toThrow('DIALOG_NOT_PREPARED')
@@ -70,7 +70,7 @@ test('harness handles cancellation without native UI and logs unsupported dialog
 test.each([undefined, '0', '../1', '1.2'])(
   'harness rejects invalid generation %s',
   (generation) => {
-    expect(() => createProjectDialogs(true, { RIFFCUT_HARNESS_GENERATION: generation })).toThrow(
+    expect(() => createProjectDialogs(true, { REDENCUT_HARNESS_GENERATION: generation })).toThrow(
       'INVALID_HARNESS_GENERATION',
     )
   },
@@ -95,12 +95,12 @@ test('native dialogs resolve the committed language at invocation and retain res
   await dialogs.saveProject(window)
   expect(native.showSaveDialog).toHaveBeenLastCalledWith(
     window,
-    expect.objectContaining({ title: 'Save RiffCut Project', defaultPath: 'Untitled.riffcut' }),
+    expect.objectContaining({ title: 'Save RedenCut Project', defaultPath: 'Untitled.redencut' }),
   )
   await dialogs.openProject(window)
   expect(native.showOpenDialog).toHaveBeenLastCalledWith(
     window,
-    expect.objectContaining({ title: 'Open RiffCut Project' }),
+    expect.objectContaining({ title: 'Open RedenCut Project' }),
   )
   await dialogs.exportAudio(window, 'wav')
   expect(native.showSaveDialog).toHaveBeenLastCalledWith(
@@ -132,15 +132,15 @@ test('native dialogs resolve the committed language at invocation and retain res
       ],
     }),
   )
-  expect(await dialogs.saveProject(window)).toBe('/episode.riffcut')
+  expect(await dialogs.saveProject(window)).toBe('/episode.redencut')
   expect(native.showSaveDialog).toHaveBeenLastCalledWith(
     window,
-    expect.objectContaining({ title: '保存 RiffCut 项目', defaultPath: '未命名.riffcut' }),
+    expect.objectContaining({ title: '保存 RedenCut 项目', defaultPath: '未命名.redencut' }),
   )
   await dialogs.openProject(window)
   expect(native.showOpenDialog).toHaveBeenLastCalledWith(
     window,
-    expect.objectContaining({ title: '打开 RiffCut 项目' }),
+    expect.objectContaining({ title: '打开 RedenCut 项目' }),
   )
   expect(await dialogs.exportAudio(window, 'flac')).toBe('/episode')
   expect(native.showSaveDialog).toHaveBeenLastCalledWith(

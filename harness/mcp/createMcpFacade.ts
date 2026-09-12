@@ -4,7 +4,7 @@ import type { ToolBackend } from './ToolBackend'
 
 export function createMcpFacade(backend: ToolBackend): Server {
   const server = new Server(
-    { name: 'riffcut-harness', version: '0.1.0' },
+    { name: 'redencut-harness', version: '0.1.0' },
     { capabilities: { tools: {} } },
   )
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

@@ -30,7 +30,7 @@ export class PlaywrightMcpAdapter implements ToolBackend {
       },
       getContext,
     )
-    const client = new Client({ name: 'riffcut-ui-adapter', version: '0.1.0' })
+    const client = new Client({ name: 'redencut-ui-adapter', version: '0.1.0' })
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     try {
       await server.connect(serverTransport)

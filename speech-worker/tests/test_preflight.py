@@ -5,7 +5,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from riffcut_speech_worker.preflight import inspect_runtime, main
+from redencut_speech_worker.preflight import inspect_runtime, main
 
 
 class PreflightTest(unittest.TestCase):

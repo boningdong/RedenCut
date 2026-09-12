@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Establish a green verification baseline, enforce the approved repository rules, apply isolated mechanical formatting, and remove only code and dependencies proven unused by the current RiffCut implementation.
+**Goal:** Establish a green verification baseline, enforce the approved repository rules, apply isolated mechanical formatting, and remove only code and dependencies proven unused by the current RedenCut implementation.
 
 **Architecture:** This is package 1 of the umbrella readability-refactor design. Work proceeds through independently reviewable gates: baseline repair, tooling, formatting, lint remediation, test-layout consolidation, evidence-backed dead-code cleanup, and final verification. Structural decomposition of the timeline, App, transcript, waveform, and playback subsystems is reserved for later packages.
 
@@ -412,7 +412,7 @@ Add these scripts to `package.json` while preserving the existing commands:
 Create `docs/coding-standards.md` with these sections and approved rules:
 
 ```markdown
-# RiffCut Coding Standards
+# RedenCut Coding Standards
 
 ## Responsibility
 
@@ -450,7 +450,7 @@ Create `docs/coding-standards.md` with these sections and approved rules:
 - Explain every lint or Knip exception beside its narrow configuration or suppression.
 ```
 
-Do not add unrelated example domains. Add a RiffCut example only when a real repository case materially clarifies a rule.
+Do not add unrelated example domains. Add a RedenCut example only when a real repository case materially clarifies a rule.
 
 - [ ] **Step 7: Verify that each tool executes and reports the current repository honestly**
 

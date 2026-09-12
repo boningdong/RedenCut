@@ -4,7 +4,7 @@ The user approved replacing the inherited editor layout with the approved standa
 
 ## Reference and boundaries
 
-Use [the final mock](../../../ui-mock/2026-09-10/riffcut-ui-final.html) as the visual authority.
+Use [the final mock](../../../ui-mock/2026-09-10/redencut-ui-final.html) as the visual authority.
 Keep existing playback, transcript projection, scoped editing, project persistence and user workspace preferences intact.
 Do not implement unsupported demo controls.
 

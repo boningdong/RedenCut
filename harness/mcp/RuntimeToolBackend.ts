@@ -31,32 +31,32 @@ export class RuntimeToolBackend implements ToolBackend {
         if ('runId' in parsed) {
           const status = this.runtime.status()
           if (status.runId !== parsed.runId || status.generation !== parsed.generation)
-            throw new Error('STALE_GENERATION: read riffcut_status before retrying')
+            throw new Error('STALE_GENERATION: read redencut_status before retrying')
         }
         switch (name) {
-          case 'riffcut_prepare_dialog':
+          case 'redencut_prepare_dialog':
             return jsonResult(
               await this.runtime.prepareDialog(
                 HarnessDialogRequestSchema.parse('request' in parsed ? parsed.request : undefined),
                 generationSchema.parse(parsed),
               ),
             )
-          case 'riffcut_start':
+          case 'redencut_start':
             return jsonResult(await this.runtime.start())
-          case 'riffcut_status':
+          case 'redencut_status':
             return jsonResult({
               ...this.runtime.status(),
               orphanedRuns: this.runtime.inspectOrphans(),
             })
-          case 'riffcut_restart':
+          case 'redencut_restart':
             return jsonResult(
               await this.runtime.restart(parsed as { rebuild?: boolean; discardUnsaved?: boolean }),
             )
-          case 'riffcut_stop':
+          case 'redencut_stop':
             return jsonResult(await this.runtime.stop(parsed as { discardUnsaved?: boolean }))
-          case 'riffcut_read_diagnostics':
+          case 'redencut_read_diagnostics':
             return jsonResult(await this.runtime.readDiagnostics(generationSchema.parse(parsed)))
-          case 'riffcut_list_artifacts':
+          case 'redencut_list_artifacts':
             return jsonResult({
               runId: this.runtime.status().runId,
               runDirectory: this.runtime.status().runDirectory,
@@ -85,7 +85,7 @@ export class RuntimeToolBackend implements ToolBackend {
           error: { code: message.match(/^[A-Z_]+/)?.[0] ?? 'INVALID_REQUEST', message },
           status: this.runtime.status(),
           recovery:
-            'Inspect riffcut_status; do not automatically replay mutations. Use the current identity and a fresh browser_snapshot after restart.',
+            'Inspect redencut_status; do not automatically replay mutations. Use the current identity and a fresh browser_snapshot after restart.',
         },
       }
     }
@@ -99,13 +99,13 @@ export class RuntimeToolBackend implements ToolBackend {
         delete properties.filename
         return {
           ...tool,
-          description: `${tool.description ?? ''} RiffCut: requires current runId/generation and an initial full browser_snapshot. Prepare import/open/save/export dialog replies with riffcut_prepare_dialog before clicking; dirty-project confirmation is unsupported. Generated files use the runtime-owned artifact directory.`,
+          description: `${tool.description ?? ''} RedenCut: requires current runId/generation and an initial full browser_snapshot. Prepare import/open/save/export dialog replies with redencut_prepare_dialog before clicking; dirty-project confirmation is unsupported. Generated files use the runtime-owned artifact directory.`,
           inputSchema: {
             ...tool.inputSchema,
             additionalProperties: false,
             properties: {
               ...properties,
-              runId: { type: 'string', description: 'Current runId from riffcut_start/status.' },
+              runId: { type: 'string', description: 'Current runId from redencut_start/status.' },
               generation: {
                 type: 'integer',
                 minimum: 1,

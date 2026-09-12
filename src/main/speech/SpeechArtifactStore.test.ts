@@ -98,7 +98,7 @@ function artifact(): SpeechArtifact {
 describe('SpeechArtifactStore', () => {
   let root: string
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), 'riffcut-speech-store-'))
+    root = await mkdtemp(join(tmpdir(), 'redencut-speech-store-'))
   })
   afterEach(async () => {
     await rm(root, { recursive: true, force: true })

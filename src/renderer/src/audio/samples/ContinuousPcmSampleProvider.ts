@@ -31,7 +31,7 @@ export class ContinuousPcmSampleProvider implements AudioSampleProvider {
     const bytesPerFrame = this.channels * 4
     const startByte = start * bytesPerFrame
     const byteLength = frameCount * bytesPerFrame
-    const response = await fetch(`riffcut://cache/${this.audioSourceId}/pcm`, {
+    const response = await fetch(`redencut://cache/${this.audioSourceId}/pcm`, {
       headers: { Range: `bytes=${startByte}-${startByte + byteLength - 1}` },
       signal,
     })

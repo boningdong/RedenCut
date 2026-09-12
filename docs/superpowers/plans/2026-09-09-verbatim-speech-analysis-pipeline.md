@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace RiffCut's word-timestamp transcript path with an atomically published, source-scoped verbatim speech bundle containing canonical transcript units, acoustic edit units, diarization, speaker attribution, and integrity-checked durable storage.
+**Goal:** Replace RedenCut's word-timestamp transcript path with an atomically published, source-scoped verbatim speech bundle containing canonical transcript units, acoustic edit units, diarization, speaker attribution, and integrity-checked durable storage.
 
-**Architecture:** Electron main owns the complete analysis pipeline and durable artifacts. The existing native whisper.cpp adapter produces best-effort-verbatim text; a job-scoped Python JSON Lines worker runs WhisperX forced alignment and pyannote anonymous speaker diarization; main normalizes and validates all outputs, writes one immutable `.riffcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`, and atomically swaps its compact reference into `project.json`. The renderer receives only a path-free read projection and resolves text selections through `AcousticSelectionResolver` before creating ordinary non-destructive timeline edits.
+**Architecture:** Electron main owns the complete analysis pipeline and durable artifacts. The existing native whisper.cpp adapter produces best-effort-verbatim text; a job-scoped Python JSON Lines worker runs WhisperX forced alignment and pyannote anonymous speaker diarization; main normalizes and validates all outputs, writes one immutable `.redencut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`, and atomically swaps its compact reference into `project.json`. The renderer receives only a path-free read projection and resolves text selections through `AcousticSelectionResolver` before creating ordinary non-destructive timeline edits.
 
 **Tech Stack:** Electron 40, TypeScript 5.9, React 19, Zustand, Zod 4, Vitest, Node child processes, Python with a committed lockfile, PyTorch, WhisperX, pyannote.audio, whisper.cpp, Docker/OrbStack Linux ARM64, Playwright MCP harness.
 
@@ -12,12 +12,12 @@
 
 ## Global Constraints
 
-- Work in an isolated RiffCut Git worktree; do not implement directly on `main`.
+- Work in an isolated RedenCut Git worktree; do not implement directly on `main`.
 - Do not add backward compatibility for version-1 projects or preserve `Word`/`Transcript` as a parallel domain model.
 - Use test-driven development for each behavior change: add the focused failing test, observe the expected failure, implement the minimum behavior, then rerun the focused test.
 - Keep model downloads, Hugging Face credentials, and generated caches out of Git. Never print or persist token contents.
 - Normal application startup and fast tests must never install packages or download models.
-- Treat the speech artifact as durable project data, not cache. Cache cleanup must never traverse `.riffcut/speech`.
+- Treat the speech artifact as durable project data, not cache. Cache cleanup must never traverse `.redencut/speech`.
 - Do not fabricate per-character or per-token times when the aligner only supports a larger acoustic unit.
 - Every successful publication returns a same-workspace, newer-revision `RendererSession`; every failure or cancellation leaves the previous speech reference untouched.
 - Commit after each task only when its focused verification passes. Run the full repository gate at the final task.
@@ -30,8 +30,8 @@
 
 - Create: `speech-worker/pyproject.toml`
 - Create: `speech-worker/uv.lock`
-- Create: `speech-worker/src/riffcut_speech_worker/__init__.py`
-- Create: `speech-worker/src/riffcut_speech_worker/preflight.py`
+- Create: `speech-worker/src/redencut_speech_worker/__init__.py`
+- Create: `speech-worker/src/redencut_speech_worker/preflight.py`
 - Create: `speech-worker/tests/test_preflight.py`
 - Create: `speech-worker/models.json`
 - Create: `harness/container/Dockerfile.speech`
@@ -41,9 +41,9 @@
 - Modify: `docs/speech-models-and-dependencies.md`
 
 - [ ] Add a failing preflight test that requires a machine-readable descriptor containing protocol version, Python/PyTorch/WhisperX/pyannote versions, architecture, backend, and manifest status, while rejecting missing or partial model caches without attempting a download.
-- [ ] Add a minimal independently runnable Python package, lock its complete dependency graph, and implement `python -m riffcut_speech_worker.preflight --json` with distinct exit codes for runtime incompatibility, missing models, wrong revisions, gated access, and unsupported backend.
+- [ ] Add a minimal independently runnable Python package, lock its complete dependency graph, and implement `python -m redencut_speech_worker.preflight --json` with distinct exit codes for runtime incompatibility, missing models, wrong revisions, gated access, and unsupported backend.
 - [ ] Add `models.json` entries for the first supported transcription smoke model, Chinese and English alignment models, and `pyannote/speaker-diarization-community-1`. Each entry must contain capability, repository ID, immutable revision, expected files, license/access note, and supported execution profiles. Record the actual resolved revisions, never `main`.
-- [ ] Add a separate `riffcut-harness-speech` image extending the standard harness runtime with pinned Python and the locked worker environment. Keep the standard image unchanged.
+- [ ] Add a separate `redencut-harness-speech` image extending the standard harness runtime with pinned Python and the locked worker environment. Keep the standard image unchanged.
 - [ ] Add a username-agnostic launcher that resolves `HF_TOKEN_PATH`, then `HF_HOME/token`, then the Hugging Face default; mounts the resolved token file read-only at `/run/secrets/hf_token` only for explicit provisioning; and mounts a named model-cache volume separately.
 - [ ] Implement explicit `provision` and `preflight` container commands. Provision into a staging directory, verify manifest revisions and expected files, then atomically write a cache-ready marker. Cached preflight and smoke runs must work without a token mount.
 - [ ] Add `npm run speech:docker:build`, `speech:docker:provision`, and `speech:docker:preflight` scripts and document disk, CPU, credential, and native-Linux-CUDA boundaries.
@@ -155,8 +155,8 @@ git diff --check
 - Create: `src/main/speech/SpeechWorkerClient.ts`
 - Create: `src/main/speech/SpeechWorkerClient.test.ts`
 - Create: `src/main/speech/__fixtures__/worker-fixture.mjs`
-- Create: `speech-worker/src/riffcut_speech_worker/protocol.py`
-- Create: `speech-worker/src/riffcut_speech_worker/__main__.py`
+- Create: `speech-worker/src/redencut_speech_worker/protocol.py`
+- Create: `speech-worker/src/redencut_speech_worker/__main__.py`
 - Create: `speech-worker/tests/test_protocol.py`
 
 - [ ] Add failing TypeScript and Python contract tests for versioned `ready`, stage progress, one terminal `result` or `error`, job-ID correlation, standard-error-only logs, malformed lines, unknown versions, duplicate terminal messages, premature exit, maximum line/result sizes, overall timeout, and no-progress timeout.
@@ -179,11 +179,11 @@ git diff --check
 
 **Files:**
 
-- Create: `speech-worker/src/riffcut_speech_worker/alignment.py`
+- Create: `speech-worker/src/redencut_speech_worker/alignment.py`
 - Create: `speech-worker/tests/test_alignment.py`
 - Create: `speech-worker/tests/fixtures/alignment/zh.json`
 - Create: `speech-worker/tests/fixtures/alignment/en.json`
-- Modify: `speech-worker/src/riffcut_speech_worker/__main__.py`
+- Modify: `speech-worker/src/redencut_speech_worker/__main__.py`
 - Modify: `speech-worker/models.json`
 
 - [ ] Capture small, license-compatible normalized fixture outputs from the pinned Chinese and English alignment models; do not commit model weights or raw user media.
@@ -205,12 +205,12 @@ git diff --check
 
 **Files:**
 
-- Create: `speech-worker/src/riffcut_speech_worker/diarization.py`
+- Create: `speech-worker/src/redencut_speech_worker/diarization.py`
 - Create: `speech-worker/tests/test_diarization.py`
 - Create: `speech-worker/tests/fixtures/diarization/overlap.json`
 - Create: `src/main/speech/SpeakerAttribution.ts`
 - Create: `src/main/speech/SpeakerAttribution.test.ts`
-- Modify: `speech-worker/src/riffcut_speech_worker/__main__.py`
+- Modify: `speech-worker/src/redencut_speech_worker/__main__.py`
 
 - [ ] Add failing worker tests for anonymous stable-within-result speaker labels, overlapping turns, confidence when available, finite valid ranges, and provenance for `speaker-diarization-community-1`.
 - [ ] Implement the pyannote adapter using the token only during explicit provisioning; normal analysis loads the verified local snapshot offline and never writes credentials to result or logs.
@@ -224,7 +224,7 @@ git diff --check
 ```sh
 python -m unittest speech-worker.tests.test_diarization
 npx vitest run src/main/speech/SpeakerAttribution.test.ts
-sh harness/container/run-speech.sh python -m riffcut_speech_worker.preflight --json
+sh harness/container/run-speech.sh python -m redencut_speech_worker.preflight --json
 git diff --check
 ```
 

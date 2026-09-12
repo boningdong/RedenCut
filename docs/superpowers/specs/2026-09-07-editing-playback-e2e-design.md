@@ -71,7 +71,7 @@ This slice proves UI transport behavior and real output, not sample-exact source
 ## Verification and rollout
 
 First prove the virtual device and capture path in isolation, including a negative silence case and cleanup.
-Then prove real RiffCut UI playback reaches that capture path; a standalone tone played by another process is insufficient product evidence.
+Then prove real RedenCut UI playback reaches that capture path; a standalone tone played by another process is insufficient product evidence.
 Implement the editing flow, followed by the transport flow; rerun each to detect coordinate/timing flakiness.
 Run all product E2Es, the full Docker harness suite, host-to-container stdio smoke tests and repository `npm run check`.
 Inspect screenshots and retained audio evidence; report what is and is not certified.

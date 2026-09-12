@@ -58,8 +58,8 @@ def run_pyannote(*, audio_path: str, device: str, model_path: str) -> List[Dict[
 
 def diarize(request: Dict[str, Any]) -> Dict[str, Any]:
     model = load_manifest_model(
-        os.environ.get("RIFFCUT_SPEECH_MANIFEST", "/opt/riffcut-speech-worker/models.json"),
-        os.environ.get("RIFFCUT_SPEECH_MODEL_CACHE", "/models"),
+        os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
+        os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
         request["models"]["diarization"],
     )
     turns = normalize_turns(run_pyannote(

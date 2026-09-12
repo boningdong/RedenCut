@@ -45,7 +45,7 @@ export class PendingProjectOpenRegistry {
     })
     return {
       requestId,
-      displayName: basename(path, '.riffcut'),
+      displayName: basename(path, '.redencut'),
     }
   }
 

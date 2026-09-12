@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` and `superpowers:test-driven-development` for these tightly coupled bring-up tasks; request independent code review at the gate boundaries.
 
-**Goal:** Prove shared-context MCP compatibility, then expose an isolated real RiffCut instance through one lifecycle-aware MCP server.
+**Goal:** Prove shared-context MCP compatibility, then expose an isolated real RedenCut instance through one lifecycle-aware MCP server.
 
 **Architecture:** The Node runtime alone owns Electron and tracing; the official Playwright MCP adapter borrows its BrowserContext through the public `createConnection` API.
 The external facade forwards MCP schemas/results, with runtime admission and generation checks around UI operations.
@@ -48,7 +48,7 @@ The external facade forwards MCP schemas/results, with runtime admission and gen
 | `src/main/harnessStartup.ts`                        | Opt-in isolated paths configured before the single-instance lock      |
 | `harness/tests/fixtures/minimal-electron.cjs`       | Small visible Electron compatibility fixture                          |
 | `harness/tests/compatibility.integration.ts`        | Gate A: actual MCP traffic, images, context lifetime, trace           |
-| `harness/tests/lifecycle.integration.ts`            | Gate B: real RiffCut lifecycle, isolation and clean exit evidence      |
+| `harness/tests/lifecycle.integration.ts`            | Gate B: real RedenCut lifecycle, isolation and clean exit evidence      |
 | `harness/tests/server.integration.ts`               | External stdio discovery, calls and disconnect behavior               |
 | `harness/tests/failureCleanup.fault.integration.ts` | Cleanup despite ownership/evidence write failures                     |
 | `harness/tests/startupRaces.integration.ts`         | Public launch automation defaults                                     |
@@ -160,7 +160,7 @@ class HarnessRuntime {
 
 **Files:** Create runtime tool backend and stdio server; extend unit/integration tests and package scripts.
 
-**Interfaces:** External tools are `riffcut_start`, `riffcut_status`, `riffcut_restart`, `riffcut_stop`, `riffcut_read_diagnostics`, `riffcut_list_artifacts`, plus curated upstream UI tools.
+**Interfaces:** External tools are `redencut_start`, `redencut_status`, `redencut_restart`, `redencut_stop`, `redencut_read_diagnostics`, `redencut_list_artifacts`, plus curated upstream UI tools.
 UI tool schemas add required `runId` and `generation`; returned results carry the same identity.
 Only `browser_snapshot` may establish the first current-generation snapshot; state-dependent UI calls fail until it succeeds.
 

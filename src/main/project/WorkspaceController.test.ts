@@ -60,7 +60,7 @@ async function emptyPackage(parent: string, name: string): Promise<string> {
 }
 
 async function packageWithoutCache() {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-open-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-open-'))
   const bytes = new Uint8Array([1, 2, 3, 4])
   await mkdir(join(root, 'media', SOURCE_ID), { recursive: true })
   await writeFile(join(root, 'media', SOURCE_ID, 'source.wav'), bytes)
@@ -148,7 +148,7 @@ function generatedManifest(request: Parameters<FfmpegAudioSourceCacheBuilder['bu
     version: 1,
     audioSourceId: request.audioSourceId,
     sourceSha256: request.sourceSha256,
-    generatorVersion: 'riffcut-cache-v1',
+    generatorVersion: 'redencut-cache-v1',
     pcm: {
       file: `${base}/audio.f32le`,
       sampleFormat: 'f32le',
@@ -172,7 +172,7 @@ function generatedManifest(request: Parameters<FfmpegAudioSourceCacheBuilder['bu
 describe('WorkspaceController session authority', () => {
   it('initializes revision one with an opaque token and returns the same current session', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
 
     const initialized = await controller.initialize(parent)
     const described = await controller.describe()
@@ -185,7 +185,7 @@ describe('WorkspaceController session authority', () => {
   it('normal Save retains the token and advances the controller revision', async () => {
     const controller = new WorkspaceController()
     const session = await controller.initialize(
-      await mkdtemp(join(tmpdir(), 'riffcut-controller-')),
+      await mkdtemp(join(tmpdir(), 'redencut-controller-')),
     )
 
     const saved = await controller.save(request(session, draftWithLufs(session, -14)))
@@ -197,10 +197,10 @@ describe('WorkspaceController session authority', () => {
 
   it('Save As rotates the token, advances the same revision, and deletes the old temporary root', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const oldRoot = controller.workspace.root
-    const destination = join(parent, 'Saved.riffcut')
+    const destination = join(parent, 'Saved.redencut')
 
     const saved = await controller.saveAs(destination, request(session))
 
@@ -213,7 +213,7 @@ describe('WorkspaceController session authority', () => {
   it('rejects stale tokens before mutation', async () => {
     const controller = new WorkspaceController()
     const session = await controller.initialize(
-      await mkdtemp(join(tmpdir(), 'riffcut-controller-')),
+      await mkdtemp(join(tmpdir(), 'redencut-controller-')),
     )
 
     await expect(
@@ -228,7 +228,7 @@ describe('WorkspaceController session authority', () => {
   it('rejects stale revisions before mutation', async () => {
     const controller = new WorkspaceController()
     const session = await controller.initialize(
-      await mkdtemp(join(tmpdir(), 'riffcut-controller-')),
+      await mkdtemp(join(tmpdir(), 'redencut-controller-')),
     )
 
     await expect(controller.save({ ...request(session), revision: 0 })).rejects.toThrow(
@@ -240,7 +240,7 @@ describe('WorkspaceController session authority', () => {
   it('leaves token and revision unchanged when a project write fails', async () => {
     const controller = new WorkspaceController()
     const session = await controller.initialize(
-      await mkdtemp(join(tmpdir(), 'riffcut-controller-')),
+      await mkdtemp(join(tmpdir(), 'redencut-controller-')),
     )
     vi.spyOn(ProjectWorkspace.prototype, 'save').mockRejectedValueOnce(new Error('disk full'))
 
@@ -264,7 +264,7 @@ describe('WorkspaceController session authority', () => {
       }),
     } as unknown as FfmpegAudioSourceCacheBuilder)
     const session = await controller.initialize(
-      await mkdtemp(join(tmpdir(), 'riffcut-controller-')),
+      await mkdtemp(join(tmpdir(), 'redencut-controller-')),
     )
     const oldRoot = controller.workspace.root
     const preparation = controller.prepareOpen(await packageWithoutCache())
@@ -283,11 +283,11 @@ describe('WorkspaceController session authority', () => {
 
   it('never deletes an old saved package after a successful switch', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const initial = await controller.initialize(parent)
-    const firstRoot = join(parent, 'First.riffcut')
+    const firstRoot = join(parent, 'First.redencut')
     const first = await controller.saveAs(firstRoot, request(initial))
-    const candidate = await controller.prepareOpen(await emptyPackage(parent, 'Second.riffcut'))
+    const candidate = await controller.prepareOpen(await emptyPackage(parent, 'Second.redencut'))
 
     const second = await controller.commitPreparedOpen(candidate, first)
 
@@ -298,10 +298,10 @@ describe('WorkspaceController session authority', () => {
 
   it('rejects Open through a symlink to the same temporary root without changing the session', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const temporaryRoot = controller.workspace.root
-    const alias = join(parent, 'Alias.riffcut')
+    const alias = join(parent, 'Alias.redencut')
     await symlink(temporaryRoot, alias, 'dir')
     const candidate = await controller.prepareOpen(alias)
 
@@ -316,11 +316,11 @@ describe('WorkspaceController session authority', () => {
 
   it('rejects an Open alias lexically below the temporary root even when it targets an external project', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const temporaryRoot = controller.workspace.root
-    const externalRoot = await emptyPackage(parent, 'External.riffcut')
-    const alias = join(temporaryRoot, 'ExternalAlias.riffcut')
+    const externalRoot = await emptyPackage(parent, 'External.redencut')
+    const alias = join(temporaryRoot, 'ExternalAlias.redencut')
     await symlink(externalRoot, alias, 'dir')
     const candidate = await controller.prepareOpen(alias)
 
@@ -360,11 +360,11 @@ describe('WorkspaceController session authority', () => {
 
   it('rejects Open of a descendant of the temporary root without changing the session', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const temporaryRoot = controller.workspace.root
     const candidate = await controller.prepareOpen(
-      await emptyPackage(temporaryRoot, 'Nested.riffcut'),
+      await emptyPackage(temporaryRoot, 'Nested.redencut'),
     )
 
     await expect(controller.commitPreparedOpen(candidate, session)).rejects.toThrow(
@@ -378,10 +378,10 @@ describe('WorkspaceController session authority', () => {
 
   it('rejects Save As through a symlink to the same temporary root before publication', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const temporaryRoot = controller.workspace.root
-    const alias = join(parent, 'Alias.riffcut')
+    const alias = join(parent, 'Alias.redencut')
     await symlink(temporaryRoot, alias, 'dir')
 
     await expect(controller.saveAs(alias, request(session))).rejects.toThrow(
@@ -395,10 +395,10 @@ describe('WorkspaceController session authority', () => {
 
   it('rejects Save As below the temporary root before publication', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const temporaryRoot = controller.workspace.root
-    const destination = join(temporaryRoot, 'Nested.riffcut')
+    const destination = join(temporaryRoot, 'Nested.redencut')
 
     await expect(controller.saveAs(destination, request(session))).rejects.toThrow(
       'overlaps the temporary workspace',
@@ -411,7 +411,7 @@ describe('WorkspaceController session authority', () => {
 
   it('keeps a captured original resolver bound to its validated workspace after a switch', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     await controller.initialize(parent)
     const firstRoot = await packageWithoutCache()
     const secondRoot = await packageWithoutCache()
@@ -438,12 +438,12 @@ describe('WorkspaceController serialization', () => {
         return generatedManifest(cacheRequest)
       }),
     } as unknown as FfmpegAudioSourceCacheBuilder)
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     await controller.initialize(parent)
     const activeRoot = await packageWithoutCache()
     await writeValidCache(activeRoot)
     const session = await controller.open(activeRoot)
-    const candidate = await controller.prepareOpen(await emptyPackage(parent, 'Candidate.riffcut'))
+    const candidate = await controller.prepareOpen(await emptyPackage(parent, 'Candidate.redencut'))
     await rm(join(activeRoot, 'cache', SOURCE_ID, 'manifest.json'))
 
     const saving = controller.save(request(session, draftWithLufs(session, -13)))
@@ -460,10 +460,10 @@ describe('WorkspaceController serialization', () => {
 
   it('keeps a concurrent Open commit queued while Save writes its captured workspace', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const oldRoot = controller.workspace.root
-    const candidate = await controller.prepareOpen(await emptyPackage(parent, 'Candidate.riffcut'))
+    const candidate = await controller.prepareOpen(await emptyPackage(parent, 'Candidate.redencut'))
     const writeEntered = deferred()
     const releaseWrite = deferred()
     const actualSave = ProjectWorkspace.prototype.save
@@ -494,9 +494,9 @@ describe('WorkspaceController serialization', () => {
 
   it('queues concurrent Save behind Save As and rejects its now-stale precondition', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
-    const destination = join(parent, 'Saved.riffcut')
+    const destination = join(parent, 'Saved.redencut')
     const publishEntered = deferred()
     const releasePublish = deferred()
     const actualSaveAs = ProjectWorkspace.prototype.saveAs
@@ -524,7 +524,7 @@ describe('WorkspaceController serialization', () => {
 
   it('serializes import commit at one publish boundary and advances revision once', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const writeEntered = deferred()
     const releaseWrite = deferred()
@@ -558,7 +558,7 @@ describe('WorkspaceController serialization', () => {
 
   it('removes an aborted queued transition before it can enter the workspace', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const session = await controller.initialize(parent)
     const firstEntered = deferred()
     const releaseFirst = deferred()
@@ -593,11 +593,11 @@ describe('WorkspaceController serialization', () => {
 
   it('holds one lock across dirty Save, candidate preparation, and switch without deadlock', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-controller-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-controller-'))
     const initialized = await controller.initialize(parent)
-    const session = await controller.saveAs(join(parent, 'Current.riffcut'), request(initialized))
+    const session = await controller.saveAs(join(parent, 'Current.redencut'), request(initialized))
     const oldRoot = controller.workspace.root
-    const candidateRoot = await emptyPackage(parent, 'Candidate.riffcut')
+    const candidateRoot = await emptyPackage(parent, 'Candidate.redencut')
     const savedInsideTransition = deferred<RendererSession>()
     const continueTransition = deferred()
 
@@ -633,7 +633,7 @@ describe('WorkspaceController cache recovery', () => {
       build,
     } as unknown as FfmpegAudioSourceCacheBuilder)
     const session = await controller.initialize(
-      await mkdtemp(join(tmpdir(), 'riffcut-controller-')),
+      await mkdtemp(join(tmpdir(), 'redencut-controller-')),
     )
     const result = await controller.open(await packageWithoutCache())
     expect(build).toHaveBeenCalledTimes(1)
@@ -647,7 +647,7 @@ describe('WorkspaceController cache recovery', () => {
         throw new Error('decode failed')
       }),
     } as unknown as FfmpegAudioSourceCacheBuilder)
-    await controller.initialize(await mkdtemp(join(tmpdir(), 'riffcut-controller-')))
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-controller-')))
     const previousRoot = controller.workspace.root
     await expect(controller.open(await packageWithoutCache())).rejects.toThrow('decode failed')
     expect(controller.workspace.root).toBe(previousRoot)
@@ -657,7 +657,7 @@ describe('WorkspaceController cache recovery', () => {
     const controller = new WorkspaceController({
       build: vi.fn(),
     } as unknown as FfmpegAudioSourceCacheBuilder)
-    await controller.initialize(await mkdtemp(join(tmpdir(), 'riffcut-controller-')))
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-controller-')))
     const previousRoot = controller.workspace.root
     const candidate = await packageWithoutCache()
     await writeValidCache(candidate)
@@ -672,7 +672,7 @@ describe('WorkspaceController cache recovery', () => {
     } as unknown as FfmpegAudioSourceCacheBuilder)
     const root = await packageWithoutCache()
     await writeValidCache(root)
-    await controller.initialize(await mkdtemp(join(tmpdir(), 'riffcut-controller-')))
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-controller-')))
     const session = await controller.open(root)
     await rm(join(root, 'media', SOURCE_ID, 'source.wav'))
     await expect(controller.save(request(session, draftWithLufs(session, -10)))).rejects.toThrow(
@@ -689,7 +689,7 @@ describe('WorkspaceController cache recovery', () => {
     } as unknown as FfmpegAudioSourceCacheBuilder)
     const root = await packageWithoutCache()
     await writeValidCache(root)
-    await controller.initialize(await mkdtemp(join(tmpdir(), 'riffcut-controller-')))
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-controller-')))
     const session = await controller.open(root)
     await writeFile(join(root, 'media', SOURCE_ID, 'source.wav'), new Uint8Array([4, 3, 2, 1]))
 
@@ -707,7 +707,7 @@ describe('WorkspaceController cache recovery', () => {
     const controller = new WorkspaceController(builder)
     const root = await packageWithoutCache()
     await writeValidCache(root)
-    await controller.initialize(await mkdtemp(join(tmpdir(), 'riffcut-controller-')))
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-controller-')))
     const session = await controller.open(root)
     const sourcePath = join(root, 'media', SOURCE_ID, 'source.wav')
     const touched = new Date(Date.now() + 10_000)

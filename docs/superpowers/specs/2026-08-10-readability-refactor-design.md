@@ -6,7 +6,7 @@
 
 ### Goal
 
-Make the RiffCut repository easier for a human to read, navigate, and safely change while preserving all observable behavior.
+Make the RedenCut repository easier for a human to read, navigate, and safely change while preserving all observable behavior.
 
 ### Inputs
 
@@ -113,7 +113,7 @@ Electron main and preload files, IPC registration, AudioWorklet code, tests, and
 - Do not add section comments to short methods or stages whose flow is already obvious.
 - Comment a field only when its name and type do not fully explain its semantics, lifecycle, units, ownership, or valid states.
 - Update or remove comments when implementation changes make them inaccurate.
-- Any examples added to coding standards must come from RiffCut and accurately represent its current code.
+- Any examples added to coding standards must come from RedenCut and accurately represent its current code.
 
 #### Abstraction Discipline
 

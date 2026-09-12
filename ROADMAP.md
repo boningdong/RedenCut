@@ -1,4 +1,4 @@
-# RiffCut Roadmap
+# RedenCut Roadmap
 
 This roadmap records delivered product capabilities, the current milestone, and intended future work.
 Repository rules live in [`AGENTS.md`](AGENTS.md) and its linked standards rather than being repeated here.

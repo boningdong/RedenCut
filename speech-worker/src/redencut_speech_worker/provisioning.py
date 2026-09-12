@@ -50,9 +50,10 @@ def provision_models(
 
 
 def _migrate_snapshot_marker(snapshot: Path, model: dict) -> None:
-    current = snapshot / ".riffcut-model.json"
-    # The old filename is retained only to validate caches created before the rename.
-    source = current if current.exists() else snapshot / ".podcut-model.json"
+    current = snapshot / ".redencut-model.json"
+    # Prefer the newest marker; an invalid newer marker must not fall back to an older one.
+    candidates = (current, snapshot / ".riffcut-model.json", snapshot / ".podcut-model.json")
+    source = next((candidate for candidate in candidates if candidate.exists()), current)
     try:
         marker = json.loads(source.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -66,7 +67,7 @@ def _migrate_snapshot_marker(snapshot: Path, model: dict) -> None:
 
 
 def _write_snapshot_marker(snapshot: Path, model: dict) -> None:
-    temporary = snapshot / f".riffcut-model-{uuid.uuid4()}.tmp"
+    temporary = snapshot / f".redencut-model-{uuid.uuid4()}.tmp"
     try:
         temporary.write_text(
             json.dumps(
@@ -75,7 +76,7 @@ def _write_snapshot_marker(snapshot: Path, model: dict) -> None:
             ),
             encoding="utf-8",
         )
-        os.replace(temporary, snapshot / ".riffcut-model.json")
+        os.replace(temporary, snapshot / ".redencut-model.json")
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -87,7 +88,7 @@ def _verify_expected_files(root: Path, expected_files: Sequence[str]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Provision RiffCut speech models")
+    parser = argparse.ArgumentParser(description="Provision RedenCut speech models")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path, required=True)
     parser.add_argument("--token-path", type=Path, required=True)

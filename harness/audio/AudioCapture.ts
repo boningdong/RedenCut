@@ -7,9 +7,9 @@ export function requireContainerAudio(env: NodeJS.ProcessEnv = process.env): voi
   if (
     process.platform !== 'linux' ||
     !existsSync('/.dockerenv') ||
-    env.RIFFCUT_CONTAINER_AUDIO !== '1' ||
-    env.PULSE_SERVER !== 'unix:/tmp/riffcut-audio/native' ||
-    env.PULSE_SINK !== 'riffcut_test'
+    env.REDENCUT_CONTAINER_AUDIO !== '1' ||
+    env.PULSE_SERVER !== 'unix:/tmp/redencut-audio/native' ||
+    env.PULSE_SINK !== 'redencut_test'
   )
     throw new Error(
       'CONTAINER_AUDIO_REQUIRED: run with Docker: sh harness/container/run.sh npm run test:e2e',
@@ -46,7 +46,7 @@ export class AudioCapture {
         '-fragment_size',
         '3840',
         '-i',
-        'riffcut_test.monitor',
+        'redencut_test.monitor',
         '-ac',
         '2',
         '-ar',

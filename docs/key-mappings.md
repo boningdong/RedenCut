@@ -1,4 +1,4 @@
-# RiffCut Key Mappings
+# RedenCut Key Mappings
 
 [`useKeyboardShortcuts.ts`](../src/renderer/src/hooks/useKeyboardShortcuts.ts) implements this keyboard interaction contract.
 Update the implementation and this document together whenever a mapping or its contextual behavior changes.

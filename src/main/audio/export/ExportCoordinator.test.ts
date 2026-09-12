@@ -87,7 +87,7 @@ class FakeChild extends EventEmitter implements ExportChild {
 }
 
 async function temporaryRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-export-test-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-export-test-'))
   roots.push(root)
   return root
 }
@@ -148,7 +148,7 @@ describe('ExportCoordinator', () => {
     await expect(execution.settled).resolves.toMatchObject({ value: true })
     const arguments_ = spawn.mock.calls[0][1]
     expect(arguments_).not.toContain(destination)
-    expect(arguments_.at(-1)).toBe(join(root, '.episode.riffcut-export-unique-a.mp3'))
+    expect(arguments_.at(-1)).toBe(join(root, '.episode.redencut-export-unique-a.mp3'))
     expect(await readFile(destination, 'utf8')).toBe('new-export')
   })
 
@@ -343,7 +343,7 @@ describe('ExportCoordinator', () => {
   it('keeps a post-commit backup when its first cleanup attempt fails without retrying or failing export', async () => {
     const root = await temporaryRoot()
     const destination = join(root, 'episode.mp3')
-    const backup = join(root, '.episode.riffcut-backup-unique-a.mp3')
+    const backup = join(root, '.episode.redencut-backup-unique-a.mp3')
     await writeFile(destination, 'original')
     const child = new FakeChild()
     const remove = vi.fn(async (path: string) => {
@@ -418,8 +418,8 @@ describe('ExportCoordinator', () => {
   it('never overwrites a competitor created after backing up the observed destination', async () => {
     const root = await temporaryRoot()
     const destination = join(root, 'episode.mp3')
-    const backup = join(root, '.episode.riffcut-backup-unique-a.mp3')
-    const temporary = join(root, '.episode.riffcut-export-unique-a.mp3')
+    const backup = join(root, '.episode.redencut-backup-unique-a.mp3')
+    const temporary = join(root, '.episode.redencut-export-unique-a.mp3')
     await writeFile(destination, 'original')
     const child = new FakeChild()
     const warningSink = { record: vi.fn() }
@@ -495,7 +495,7 @@ describe('ExportCoordinator', () => {
   it('never overwrites a competitor created after an absent destination was observed', async () => {
     const root = await temporaryRoot()
     const destination = join(root, 'episode.mp3')
-    const temporary = join(root, '.episode.riffcut-export-unique-a.mp3')
+    const temporary = join(root, '.episode.redencut-export-unique-a.mp3')
     const child = new FakeChild()
     const warningSink = { record: vi.fn() }
     const coordinator = new ExportCoordinator({
@@ -530,7 +530,7 @@ describe('ExportCoordinator', () => {
   it('preserves a cancellation competitor and the exact original backup', async () => {
     const root = await temporaryRoot()
     const destination = join(root, 'episode.mp3')
-    const backup = join(root, '.episode.riffcut-backup-unique-a.mp3')
+    const backup = join(root, '.episode.redencut-backup-unique-a.mp3')
     await writeFile(destination, 'original')
     const child = new FakeChild()
     const backupMoved = deferred<void>()
@@ -611,7 +611,7 @@ describe('ExportCoordinator', () => {
     await writeFile(destination, 'original', { mode: 0o640 })
     const child = new FakeChild()
     const renameDependency = vi.fn(async (source: string, target: string) => {
-      if (source.includes('riffcut-export')) throw new Error('publish rename failed')
+      if (source.includes('redencut-export')) throw new Error('publish rename failed')
       await rename(source, target)
     })
     const coordinator = new ExportCoordinator({
@@ -672,7 +672,7 @@ describe('ExportCoordinator', () => {
       'publication failed',
       'rollback failed',
     ])
-    expect(await readFile(join(root, '.episode.riffcut-backup-unique-a.mp3'), 'utf8')).toBe(
+    expect(await readFile(join(root, '.episode.redencut-backup-unique-a.mp3'), 'utf8')).toBe(
       'original',
     )
     expect(await readFile(unrelated, 'utf8')).toBe('keep')

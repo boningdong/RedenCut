@@ -964,7 +964,7 @@ wheels = [
 ]
 
 [[package]]
-name = "riffcut-speech-worker"
+name = "redencut-speech-worker"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

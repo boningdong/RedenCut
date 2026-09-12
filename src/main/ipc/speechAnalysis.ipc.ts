@@ -24,20 +24,20 @@ export function registerSpeechAnalysisIpc(
   jobs: SessionJobRegistry,
   diagnosticSink: (error: unknown) => void = console.error,
 ): void {
-  const workerRoot = process.env.RIFFCUT_SPEECH_WORKER_ROOT ?? join(process.cwd(), 'speech-worker')
+  const workerRoot = process.env.REDENCUT_SPEECH_WORKER_ROOT ?? join(process.cwd(), 'speech-worker')
   const python =
-    process.env.RIFFCUT_SPEECH_WORKER_PYTHON ?? join(workerRoot, '.venv', 'bin', 'python')
-  const manifest = process.env.RIFFCUT_SPEECH_MANIFEST ?? join(workerRoot, 'models.json')
+    process.env.REDENCUT_SPEECH_WORKER_PYTHON ?? join(workerRoot, '.venv', 'bin', 'python')
+  const manifest = process.env.REDENCUT_SPEECH_MANIFEST ?? join(workerRoot, 'models.json')
   const modelCache =
-    process.env.RIFFCUT_SPEECH_MODEL_CACHE ??
-    join(homedir(), 'Library', 'Caches', 'RiffCut', 'speech-models')
-  const worker = new SpeechWorkerClient(python, ['-m', 'riffcut_speech_worker'], {
+    process.env.REDENCUT_SPEECH_MODEL_CACHE ??
+    join(homedir(), 'Library', 'Caches', 'RedenCut', 'speech-models')
+  const worker = new SpeechWorkerClient(python, ['-m', 'redencut_speech_worker'], {
     cwd: workerRoot,
     env: {
       ...process.env,
       PYTHONPATH: join(workerRoot, 'src'),
-      RIFFCUT_SPEECH_MANIFEST: manifest,
-      RIFFCUT_SPEECH_MODEL_CACHE: modelCache,
+      REDENCUT_SPEECH_MANIFEST: manifest,
+      REDENCUT_SPEECH_MODEL_CACHE: modelCache,
       HF_HUB_OFFLINE: '1',
       TRANSFORMERS_OFFLINE: '1',
     },

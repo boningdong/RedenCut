@@ -7,10 +7,10 @@ import { ProjectWorkspace } from './ProjectWorkspace'
 
 describe('ProjectWorkspace', () => {
   it('create-only publication preserves a destination that appears during staging', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-create-only-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-create-only-'))
     try {
       const workspace = await ProjectWorkspace.initialize(parent, { saveAsPolicy: 'create' })
-      const destination = join(parent, 'new.riffcut')
+      const destination = join(parent, 'new.redencut')
       await expect(
         workspace.saveAs(destination, workspace.project, async () => {
           await mkdir(destination)
@@ -24,7 +24,7 @@ describe('ProjectWorkspace', () => {
     }
   })
   it('initializes a temporary managed bundle with a valid empty project', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     const project = ProjectFileSchema.parse(
       JSON.parse(await readFile(join(workspace.root, 'project.json'), 'utf8')),
@@ -36,7 +36,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('writes project.json atomically without changing the workspace root', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     const root = workspace.root
     const project = workspace.project
@@ -51,7 +51,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('publishes Save As through a validated sibling and replaces an existing destination', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const warningSink = { record: vi.fn() }
     const workspace = await ProjectWorkspace.initialize(parent, { cleanupWarningSink: warningSink })
     const sourceId = '00000000-0000-4000-8000-000000000001'
@@ -59,7 +59,7 @@ describe('ProjectWorkspace', () => {
     await writeFile(join(workspace.root, 'media', sourceId, 'kept.wav'), 'managed artifact')
     await mkdir(join(workspace.root, 'cache', 'orphan'), { recursive: true })
     await writeFile(join(workspace.root, 'cache', 'orphan', 'partial.bin'), 'crash leftover')
-    const destination = join(parent, 'Episode.riffcut')
+    const destination = join(parent, 'Episode.redencut')
     await mkdir(destination)
     await writeFile(join(destination, 'old.txt'), 'old destination')
     const project = ProjectFileSchema.parse({
@@ -105,7 +105,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('keeps a committed Save As result and records only its exact leftover destination backup', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const warningSink = {
       record: vi.fn(async () => {
         throw new Error('warning sink unavailable')
@@ -121,7 +121,7 @@ describe('ProjectWorkspace', () => {
       cleanupWarningSink: warningSink,
       remove,
     })
-    const destination = join(parent, 'Episode.riffcut')
+    const destination = join(parent, 'Episode.redencut')
     await mkdir(destination)
     await writeFile(join(destination, 'old.txt'), 'old destination')
 
@@ -142,11 +142,11 @@ describe('ProjectWorkspace', () => {
   })
 
   it('preserves both the active root and existing destination when stage preparation fails', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const warningSink = { record: vi.fn() }
     const workspace = await ProjectWorkspace.initialize(parent, { cleanupWarningSink: warningSink })
     const originalRoot = workspace.root
-    const destination = join(parent, 'Existing.riffcut')
+    const destination = join(parent, 'Existing.redencut')
     await mkdir(destination)
     await writeFile(join(destination, 'sentinel.txt'), 'keep me')
 
@@ -163,7 +163,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('does not allow Save As to publish in place over a temporary workspace', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     await expect(workspace.saveAs(workspace.root, workspace.project)).rejects.toThrow(
       'temporary workspace',
@@ -172,10 +172,10 @@ describe('ProjectWorkspace', () => {
   })
 
   it('retains the previous saved package when Save As switches to a new package', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const workspace = await ProjectWorkspace.initialize(parent)
-    const first = join(parent, 'First.riffcut')
-    const second = join(parent, 'Second.riffcut')
+    const first = join(parent, 'First.redencut')
+    const second = join(parent, 'Second.redencut')
     const firstWorkspace = await workspace.saveAs(first, workspace.project)
     const secondWorkspace = await firstWorkspace.saveAs(second, firstWorkspace.project)
     expect(await readFile(join(first, 'project.json'), 'utf8')).toContain('"version": 2')
@@ -185,7 +185,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('close deletes its exact temporary root without deleting its parent', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     const temporaryRoot = workspace.root
     await writeFile(join(parent, 'keep.txt'), 'keep parent contents')
@@ -197,7 +197,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('records a failed exact temporary-root retirement without rejecting the committed transition', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const warningSink = { record: vi.fn() }
     let temporaryRoot = ''
     const remove = vi.fn(
@@ -224,7 +224,7 @@ describe('ProjectWorkspace', () => {
   })
 
   it('close never deletes a saved workspace root', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'riffcut-workspaces-'))
+    const parent = await mkdtemp(join(tmpdir(), 'redencut-workspaces-'))
     const warningSink = { record: vi.fn() }
     const remove = vi.fn(async (path: string, options?: { recursive?: boolean; force?: boolean }) =>
       rm(path, options),
@@ -233,7 +233,7 @@ describe('ProjectWorkspace', () => {
       cleanupWarningSink: warningSink,
       remove,
     })
-    const destination = join(parent, 'Saved.riffcut')
+    const destination = join(parent, 'Saved.redencut')
     const saved = await workspace.saveAs(destination, workspace.project)
 
     await saved.close()

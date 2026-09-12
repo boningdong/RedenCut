@@ -17,13 +17,13 @@ test('never forwards unrelated credentials or Node/Electron injection variables 
 test('forwards only the fixed private container audio endpoint, never arbitrary host endpoints', () => {
   expect(
     electronEnvironment({
-      RIFFCUT_CONTAINER_AUDIO: '1',
-      PULSE_SERVER: 'unix:/tmp/riffcut-audio/native',
-      PULSE_SINK: 'riffcut_test',
+      REDENCUT_CONTAINER_AUDIO: '1',
+      PULSE_SERVER: 'unix:/tmp/redencut-audio/native',
+      PULSE_SINK: 'redencut_test',
     }),
   ).toMatchObject({
-    PULSE_SERVER: 'unix:/tmp/riffcut-audio/native',
-    PULSE_SINK: 'riffcut_test',
+    PULSE_SERVER: 'unix:/tmp/redencut-audio/native',
+    PULSE_SINK: 'redencut_test',
   })
   expect(electronEnvironment({ PULSE_SERVER: 'tcp:host.example', PULSE_SINK: 'speakers' })).toEqual(
     {},
@@ -33,19 +33,19 @@ test('forwards only the fixed private container audio endpoint, never arbitrary 
 test('forwards non-secret speech paths but never Hugging Face credentials', () => {
   expect(
     electronEnvironment({
-      RIFFCUT_SPEECH_WORKER_ROOT: '/opt/riffcut-speech-worker',
-      RIFFCUT_SPEECH_WORKER_PYTHON: '/opt/riffcut-speech-worker/.venv/bin/python',
-      RIFFCUT_SPEECH_MANIFEST: '/opt/riffcut-speech-worker/models.json',
-      RIFFCUT_SPEECH_MODEL_CACHE: '/models',
-      RIFFCUT_WHISPER_MODEL_DIR: '/models/whisper',
+      REDENCUT_SPEECH_WORKER_ROOT: '/opt/redencut-speech-worker',
+      REDENCUT_SPEECH_WORKER_PYTHON: '/opt/redencut-speech-worker/.venv/bin/python',
+      REDENCUT_SPEECH_MANIFEST: '/opt/redencut-speech-worker/models.json',
+      REDENCUT_SPEECH_MODEL_CACHE: '/models',
+      REDENCUT_WHISPER_MODEL_DIR: '/models/whisper',
       HF_TOKEN: 'do-not-forward',
       HF_TOKEN_PATH: '/run/secrets/hf_token',
     }),
   ).toEqual({
-    RIFFCUT_SPEECH_WORKER_ROOT: '/opt/riffcut-speech-worker',
-    RIFFCUT_SPEECH_WORKER_PYTHON: '/opt/riffcut-speech-worker/.venv/bin/python',
-    RIFFCUT_SPEECH_MANIFEST: '/opt/riffcut-speech-worker/models.json',
-    RIFFCUT_SPEECH_MODEL_CACHE: '/models',
-    RIFFCUT_WHISPER_MODEL_DIR: '/models/whisper',
+    REDENCUT_SPEECH_WORKER_ROOT: '/opt/redencut-speech-worker',
+    REDENCUT_SPEECH_WORKER_PYTHON: '/opt/redencut-speech-worker/.venv/bin/python',
+    REDENCUT_SPEECH_MANIFEST: '/opt/redencut-speech-worker/models.json',
+    REDENCUT_SPEECH_MODEL_CACHE: '/models',
+    REDENCUT_WHISPER_MODEL_DIR: '/models/whisper',
   })
 })

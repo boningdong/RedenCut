@@ -1,4 +1,4 @@
-# RiffCut Coding Standards
+# RedenCut Coding Standards
 
 ## Responsibility
 

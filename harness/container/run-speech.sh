@@ -2,9 +2,9 @@
 set -eu
 
 repository=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)
-docker_bin=${RIFFCUT_DOCKER_BIN:-docker}
-image=${RIFFCUT_SPEECH_IMAGE:-riffcut-harness-speech:local}
-model_volume=${RIFFCUT_SPEECH_MODEL_VOLUME:-riffcut-speech-models}
+docker_bin=${REDENCUT_DOCKER_BIN:-docker}
+image=${REDENCUT_SPEECH_IMAGE:-redencut-harness-speech:local}
+model_volume=${REDENCUT_SPEECH_MODEL_VOLUME:-redencut-speech-models}
 mode=${1:-preflight}
 
 case "$mode" in
@@ -27,13 +27,13 @@ case "$mode" in
       --mount "type=volume,source=$model_volume,target=/models" \
       --mount "type=bind,source=$token_file,target=/run/secrets/hf_token,readonly" \
       --entrypoint /bin/sh "$image" -c \
-      'python -m riffcut_speech_worker.provisioning --manifest "$RIFFCUT_SPEECH_MANIFEST" --cache-root "$RIFFCUT_SPEECH_MODEL_CACHE" --token-path /run/secrets/hf_token && chown -R node:node "$RIFFCUT_SPEECH_MODEL_CACHE"'
+      'python -m redencut_speech_worker.provisioning --manifest "$REDENCUT_SPEECH_MANIFEST" --cache-root "$REDENCUT_SPEECH_MODEL_CACHE" --token-path /run/secrets/hf_token && chown -R node:node "$REDENCUT_SPEECH_MODEL_CACHE"'
     ;;
   preflight)
     exec "$docker_bin" run --rm \
       --mount "type=volume,source=$model_volume,target=/models" \
-      --entrypoint python "$image" -m riffcut_speech_worker.preflight --json \
-      --manifest /opt/riffcut-speech-worker/models.json --cache-root /models
+      --entrypoint python "$image" -m redencut_speech_worker.preflight --json \
+      --manifest /opt/redencut-speech-worker/models.json --cache-root /models
     ;;
   *)
     echo "Usage: $0 {build|provision|preflight}" >&2

@@ -18,7 +18,7 @@ export class McpTestSession {
     outputRoot: resolve('.harness-runs'),
   })
   private readonly server = createMcpFacade(new RuntimeToolBackend(this.runtime))
-  private readonly client = new Client({ name: 'riffcut-visible-e2e', version: '1.0.0' })
+  private readonly client = new Client({ name: 'redencut-visible-e2e', version: '1.0.0' })
   private observer: ReturnType<typeof vi.spyOn> | undefined
   private currentPage: Page | undefined
   private identity: { runId: string; generation: number } | undefined
@@ -44,7 +44,7 @@ export class McpTestSession {
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
     await this.server.connect(serverTransport)
     await this.client.connect(clientTransport)
-    this.adopt((await this.call('riffcut_start')).structuredContent as unknown as RuntimeStatus)
+    this.adopt((await this.call('redencut_start')).structuredContent as unknown as RuntimeStatus)
     console.error(`Visible UI E2E evidence: ${this.directory}`)
     await this.call('browser_snapshot')
   }
@@ -66,7 +66,7 @@ export class McpTestSession {
   }
 
   async restart(): Promise<void> {
-    this.adopt((await this.call('riffcut_restart')).structuredContent as unknown as RuntimeStatus)
+    this.adopt((await this.call('redencut_restart')).structuredContent as unknown as RuntimeStatus)
     await this.call('browser_snapshot')
   }
 

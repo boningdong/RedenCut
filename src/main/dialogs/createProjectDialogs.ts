@@ -11,10 +11,10 @@ export function createProjectDialogs(
   getTranslator?: () => TFunction,
 ): ProjectDialogs {
   if (!harnessMode) return createNativeProjectDialogs(getTranslator)
-  const generation = env.RIFFCUT_HARNESS_GENERATION
+  const generation = env.REDENCUT_HARNESS_GENERATION
   if (!generation || !/^[1-9]\d*$/.test(generation)) throw new Error('INVALID_HARNESS_GENERATION')
   const mailbox = new HarnessDialogMailbox(
-    join(env.RIFFCUT_HARNESS_RUN_DIRECTORY!, `generation-${generation}`, 'dialogs'),
+    join(env.REDENCUT_HARNESS_RUN_DIRECTORY!, `generation-${generation}`, 'dialogs'),
   )
   return {
     importAudio: async () => mailbox.consume('import-audio'),

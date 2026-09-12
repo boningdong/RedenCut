@@ -2,23 +2,23 @@
 set -eu
 
 # Dependencies belong to the image, never to the host checkout.
-if ! (cd /source && sha256sum --check --status /opt/riffcut-dependencies.sha256); then
+if ! (cd /source && sha256sum --check --status /opt/redencut-dependencies.sha256); then
   echo 'DEPENDENCY_IMAGE_STALE: rebuild the harness image after package changes.' >&2
   exit 1
 fi
 # electron-vite writes temporary config files beside the source configuration.
 # Snapshot into the container layer rather than making the host checkout writable.
-snapshot=$(mktemp /tmp/riffcut-source.XXXXXX.tar)
+snapshot=$(mktemp /tmp/redencut-source.XXXXXX.tar)
 tar -C /source --exclude=./node_modules --exclude=./out --exclude=./dist \
   --exclude=./.harness-runs --exclude=./.worktrees --exclude=./.git \
   --exclude='./.env*' --exclude='./*.tsbuildinfo' -cf "$snapshot" .
 tar -C /workspace -xf "$snapshot" --no-same-owner
 rm "$snapshot"
-printf 'gitdir: %s\n' "$RIFFCUT_GIT_DIRECTORY" > /workspace/.git
+printf 'gitdir: %s\n' "$REDENCUT_GIT_DIRECTORY" > /workspace/.git
 # Build output is a fresh private volume. Keep MCP stdout protocol-only.
 npm run build >&2
 # Xvfb reports its allocated display only after it is ready.
-display_file=$(mktemp /tmp/riffcut-display.XXXXXX)
+display_file=$(mktemp /tmp/redencut-display.XXXXXX)
 Xvfb -displayfd 3 -screen 0 1280x800x24 -nolisten tcp 3>"$display_file" >&2 &
 display_pid=$!
 attempt=0
@@ -33,5 +33,5 @@ done
 DISPLAY=":$(cat "$display_file")"
 export DISPLAY
 rm "$display_file"
-. /opt/riffcut-start-audio.sh
-exec node /opt/riffcut-supervise.mjs "$@"
+. /opt/redencut-start-audio.sh
+exec node /opt/redencut-supervise.mjs "$@"

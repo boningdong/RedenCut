@@ -65,9 +65,9 @@ export class ElectronSession {
     applicationEntry = join(repositoryRoot, 'out/main/index.js'),
   ): Promise<ElectronSession> {
     const env = electronEnvironment(process.env)
-    env.RIFFCUT_HARNESS_RUN_DIRECTORY = artifacts.directory
-    env.RIFFCUT_HARNESS_RUN_ID = artifacts.runId
-    env.RIFFCUT_HARNESS_GENERATION = String(generation)
+    env.REDENCUT_HARNESS_RUN_DIRECTORY = artifacts.directory
+    env.REDENCUT_HARNESS_RUN_ID = artifacts.runId
+    env.REDENCUT_HARNESS_GENERATION = String(generation)
     env.TMPDIR = join(artifacts.directory, 'temporary')
     mkdirSync(env.TMPDIR, { recursive: true })
     // The public default launcher coordinates Electron readiness and applies automation defaults.
@@ -75,7 +75,7 @@ export class ElectronSession {
     const application = await _electron.launch({
       args: [
         applicationEntry,
-        `--riffcut-harness-run-id=${artifacts.runId}`,
+        `--redencut-harness-run-id=${artifacts.runId}`,
         '--remote-debugging-address=127.0.0.1',
       ],
       cwd: repositoryRoot,
@@ -107,7 +107,7 @@ export class ElectronSession {
     )
     this.artifacts.record(this.generation, 'main-ready', { ready: true })
     this.page = await deadline(this.application.firstWindow(), timeoutMs, 'WINDOW_READY_TIMEOUT')
-    await this.page.locator('[data-riffcut-session-ready="true"]').waitFor({ timeout: timeoutMs })
+    await this.page.locator('[data-redencut-session-ready="true"]').waitFor({ timeout: timeoutMs })
     const diagnostics = await this.diagnostics()
     if (!diagnostics.main.hasSingleInstanceLock) throw new Error('SINGLE_INSTANCE_LOCK_NOT_OWNED')
     if (
@@ -130,11 +130,11 @@ export class ElectronSession {
       hasSingleInstanceLock: app.hasSingleInstanceLock(),
     }))
     const renderer = await this.page
-      .locator('[data-riffcut-session-ready]')
+      .locator('[data-redencut-session-ready]')
       .evaluate((element) => ({
-        ready: element.getAttribute('data-riffcut-session-ready') === 'true',
-        dirty: element.getAttribute('data-riffcut-dirty') === 'true',
-        busy: element.getAttribute('data-riffcut-busy') === 'true',
+        ready: element.getAttribute('data-redencut-session-ready') === 'true',
+        dirty: element.getAttribute('data-redencut-dirty') === 'true',
+        busy: element.getAttribute('data-redencut-busy') === 'true',
         title: element.querySelector('header .project-name')?.textContent ?? '',
         tracks: Array.from(element.querySelectorAll('[data-lane]')).map((lane) => ({
           id: lane.getAttribute('data-trackid') ?? '',

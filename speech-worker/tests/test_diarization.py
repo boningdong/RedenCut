@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from riffcut_speech_worker.diarization import diarize, normalize_turns
+from redencut_speech_worker.diarization import diarize, normalize_turns
 
 
 class DiarizationTest(unittest.TestCase):
@@ -21,8 +21,8 @@ class DiarizationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize_turns([{"label": "x", "start": float("nan"), "end": 2.0}])
 
-    @patch("riffcut_speech_worker.diarization.run_pyannote")
-    @patch("riffcut_speech_worker.diarization.load_manifest_model")
+    @patch("redencut_speech_worker.diarization.run_pyannote")
+    @patch("redencut_speech_worker.diarization.load_manifest_model")
     def test_adapter_loads_the_manifest_snapshot_offline(self, load_model, run_pyannote):
         load_model.return_value = {
             "id": "diarization-default", "repository": "pyannote/community",

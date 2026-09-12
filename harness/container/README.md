@@ -1,6 +1,6 @@
 # Container harness
 
-Runs the existing RiffCut MCP server, Runtime, Playwright and Electron inside a Linux container with an Xvfb virtual display and private PulseAudio virtual output.
+Runs the existing RedenCut MCP server, Runtime, Playwright and Electron inside a Linux container with an Xvfb virtual display and private PulseAudio virtual output.
 The host AI communicates through Docker stdin/stdout; there is no second CDP connection, published port, host display connection, or AI-client registration performed by these scripts.
 
 ## Build
@@ -8,7 +8,7 @@ The host AI communicates through Docker stdin/stdout; there is no second CDP con
 From the repository/worktree root, with Docker Engine running:
 
 ```sh
-docker build -f harness/container/Dockerfile -t riffcut-harness:local .
+docker build -f harness/container/Dockerfile -t redencut-harness:local .
 ```
 
 The launcher uses the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
@@ -37,8 +37,8 @@ The third command runs the [product E2Es](../../e2e/README.md): import/save/reop
 ## Virtual audio (container only)
 
 Virtual output and recording currently support Docker containers only; no native host audio setup is performed.
-Startup creates a private 48 kHz PulseAudio null sink (`riffcut_test`) and local Unix socket, then waits for the server before starting the requested command.
-Electron routes audio to this device; E2Es record `riffcut_test.monitor` as WAV, which never plays through host speakers.
+Startup creates a private 48 kHz PulseAudio null sink (`redencut_test`) and local Unix socket, then waits for the server before starting the requested command.
+Electron routes audio to this device; E2Es record `redencut_test.monitor` as WAV, which never plays through host speakers.
 No sound device, host audio socket, microphone or audio network port is shared.
 Missing audio prerequisites fail explicitly before audio-dependent E2Es launch Electron.
 PulseAudio may log unavailable D-Bus/desktop services in this minimal image; device readiness and actual sound capture are verified separately and these services are not used for the null sink.
@@ -65,7 +65,7 @@ AI-client configuration is a separate explicit step; successfully testing this e
 | Host `.harness-runs/container/` | `/workspace/.harness-runs` | Writable retained evidence |
 
 The launcher snapshots and builds current source at startup because electron-vite writes temporary config files beside its configuration.
-Host source edits require closing and recreating the container; `riffcut_restart` with `rebuild: true` rebuilds the same container snapshot, not newer host files.
+Host source edits require closing and recreating the container; `redencut_restart` with `rebuild: true` rebuilds the same container snapshot, not newer host files.
 Do not edit source or Git state during the startup copy; it is a file copy, not an atomic filesystem snapshot.
 The existing provenance observes the copied source against the read-only live Git metadata, not a content-addressed attestation of compiled output.
 Container paths reported in artifacts map to the host evidence directory above; PNG responses also travel directly through MCP.
@@ -73,8 +73,8 @@ Run IDs identify evidence; container PIDs must never be used to signal processes
 
 `--rm` removes the container and anonymous dependency/output volumes after exit; retained host evidence is not deleted automatically.
 Images and build cache remain reusable; no broad Docker prune is performed.
-`RIFFCUT_HARNESS_IMAGE` overrides the image tag and `RIFFCUT_CONTAINER_NAME` optionally gives a specific container name.
-Containers have the label `dev.riffcut.harness=container` for scoped inspection.
+`REDENCUT_HARNESS_IMAGE` overrides the image tag and `REDENCUT_CONTAINER_NAME` optionally gives a specific container name.
+Containers have the label `dev.redencut.harness=container` for scoped inspection.
 
 ## Scope and security
 
@@ -91,7 +91,7 @@ Container audio-output and basic editing acceptance are covered by the named pro
 
 ## Prepared export destinations
 
-Use `riffcut_prepare_dialog` with `purpose: "export-audio"` and `selection: {type: "export", filename: "mix.wav", format: "wav"}` before clicking the modal’s Export button.
+Use `redencut_prepare_dialog` with `purpose: "export-audio"` and `selection: {type: "export", filename: "mix.wav", format: "wav"}` before clicking the modal’s Export button.
 Supported formats are `wav`, `mp3`, `flac`, and `aac`; the filename must be a single basename with its matching extension.
 `{type: "cancel"}` cancels without creating an output.
 The destination is `<runDirectory>/exports/<filename>`, retained on the host under `.harness-runs/container/<runId>/exports/`.

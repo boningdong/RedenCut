@@ -4,7 +4,7 @@
 
 **Goal:** Replace path-identified sources and compressed renderer decoding with portable managed project bundles, regenerable PCM/waveform caches, and bounded AudioWorklet playback.
 
-**Architecture:** Main owns a temporary or saved `.riffcut` workspace, import transactions, FFmpeg, cache validation, source resolution, and protected resource routes. Renderer receives source/cache descriptors, reads bounded PCM and waveform ranges through `riffcut://cache`, shares stateless providers by `AudioSourceId`, and feeds one bounded AudioWorklet queue per track.
+**Architecture:** Main owns a temporary or saved `.redencut` workspace, import transactions, FFmpeg, cache validation, source resolution, and protected resource routes. Renderer receives source/cache descriptors, reads bounded PCM and waveform ranges through `redencut://cache`, shares stateless providers by `AudioSourceId`, and feeds one bounded AudioWorklet queue per track.
 
 **MP3 regression anchor:** The replacement must make the old failure mode unreachable: `WebCodecsPlayer` split MP3 input into arbitrary 32,768-byte decoder chunks and extrapolated seeks beyond its first-256-KiB index sample, leading to decoder closure, roughly one-second playback, and broken late seeks. The real-FFmpeg cache test and PCM-only player retirement task jointly guard this requirement.
 
@@ -58,7 +58,7 @@
 
 **Files:** Create `src/main/audio/cache/cacheManifest.ts`, `cacheManifest.test.ts`, `AudioSourceCacheStore.ts`, and `AudioSourceCacheStore.test.ts`.
 
-**Interfaces:** Parse generator `riffcut-cache-v1`; validate, describe, publish, locate, and remove source-specific caches.
+**Interfaces:** Parse generator `redencut-cache-v1`; validate, describe, publish, locate, and remove source-specific caches.
 
 - [ ] Add failing tests for supported manifests, wrong versions/generators/source hashes, unsafe paths, missing artifacts, wrong PCM size, wrong waveform size, and manifest-last publication.
 - [ ] Implement manifest schemas and exact size arithmetic (`frames × channels × 4`, `buckets × 8`).
@@ -109,7 +109,7 @@
 
 **Files:** Refactor `src/main/index.ts`, `src/main/ipc/*.ipc.ts`, `src/preload/index.ts`; create protocol/service tests.
 
-**Interfaces:** Register handlers with injected services; serve only `riffcut://cache/<id>/pcm` and `/waveform/<level>`; expose initialize/open/save/import/cancel APIs.
+**Interfaces:** Register handlers with injected services; serve only `redencut://cache/<id>/pcm` and `/waveform/<level>`; expose initialize/open/save/import/cancel APIs.
 
 - [ ] Add failing tests for single-use sender-scoped selection tokens, exact preload conformance, protected routes, invalid IDs/levels, range forwarding, bounded responses, and preservation of the active workspace on open failure.
 - [ ] Replace side-effect imports with explicit handler registration after `app.whenReady()` and before renderer loading.
@@ -262,7 +262,7 @@ Public workspace transitions acquire the controller mutex. Compound operations u
 - [ ] Add deterministic interleaving tests that pause descriptor validation and project writes, overlap Save/Open/Save As/import-commit entry, and prove an operation always writes to its captured workspace rather than whichever workspace later becomes current.
 - [ ] Add a compound-transition test proving dirty Open holds the same mutex across Save, candidate preparation, and switch while a concurrent public Save remains queued; prove the implementation never deadlocks by recursively acquiring its own mutex.
 - [ ] Refactor `ProjectWorkspace.saveAs` to return a prepared saved `ProjectWorkspace` instead of mutating the old object. Add `close()` whose only deletion behavior is removing that exact workspace when it is temporary; closing a saved workspace is a no-op.
-- [ ] Add tests proving the active workspace switches only after candidate validation, an old temporary root is deleted only after a successful switch, a failed switch preserves it, and an old saved `.riffcut` root is never deleted.
+- [ ] Add tests proving the active workspace switches only after candidate validation, an old temporary root is deleted only after a successful switch, a failed switch preserves it, and an old saved `.redencut` root is never deleted.
 - [ ] Implement exact precondition validation and revision advancement inside the mutex; capture the active workspace once per operation and never re-read `this.workspace` after an `await`.
 - [ ] Run `npx vitest run src/main/project/AsyncMutex.test.ts src/main/project/ProjectWorkspace.test.ts src/main/project/WorkspaceController.test.ts` and `npm run typecheck`.
 - [ ] Commit with `fix: serialize workspace transitions`.
@@ -345,7 +345,7 @@ Public workspace transitions acquire the controller mutex. Compound operations u
 - [ ] Implement: validate precondition; prompt; optionally save; select and validate candidate; mark current token closing; cancel/settle all registered jobs; request and await playback-stop acknowledgement; atomically switch/new token/revision; close the prior workspace only after success.
 - [ ] Add five-second barrier timeout, sender-destruction, wrong/duplicate ID, and shutdown tests. Outside shutdown, failure reopens the rollback-point session, releases the mutex, keeps the visible project, and returns a path-free stayed result; settled jobs remain settled.
 - [ ] On `project:will-switch`, renderer invalidates epochs, stops/destroys playback, and acknowledges only after settlement; it does not clear the visible project before the returned result is applied.
-- [ ] Add single-instance tests for lock win/loss, immediate secondary quit, second-instance `.riffcut`, macOS `open-file`, ignored arguments, early queueing, minimized restore, and focus. Call `requestSingleInstanceLock()` before readiness; a loser initializes no workspace/protocol/IPC.
+- [ ] Add single-instance tests for lock win/loss, immediate secondary quit, second-instance `.redencut`, macOS `open-file`, ignored arguments, early queueing, minimized restore, and focus. Call `requestSingleInstanceLock()` before readiness; a loser initializes no workspace/protocol/IPC.
 - [ ] Prove pending-open paths never enter renderer payloads, IDs are sender-bound/one-use/expiring, and both Open Project and forwarded opens use the same coordinator.
 - [ ] Run transition, barrier, registry, lifecycle, IPC, renderer, and `npm run typecheck` tests.
 - [ ] Commit with `feat: switch revisioned sessions transactionally`.
@@ -356,13 +356,13 @@ Public workspace transitions acquire the controller mutex. Compound operations u
 
 - [ ] Add cleanup to file-range test fixtures and verify their exact temporary roots are absent after the suite.
 - [ ] Encode integration PCM fixture bytes explicitly with `DataView.setFloat32(..., true)`.
-- [ ] Make the CSP parser reject duplicate directive names and assert exactly one `connect-src` with `"'self'"` and `riffcut:`; retain no `bypassCSP`.
+- [ ] Make the CSP parser reject duplicate directive names and assert exactly one `connect-src` with `"'self'"` and `redencut:`; retain no `bypassCSP`.
 - [ ] Route Save and Save As button rejections through the same visible error handler as keyboard Save.
 - [ ] Add an injectable cleanup-warning sink and tests for failed post-switch removal of old temporary roots or destination backups; the successful workspace switch remains committed and the exact leftover path is recorded for retry rather than silently ignored.
 - [ ] Run `npm run format`, `npm run check`, `npm run profile:waveform`, and `git diff --check`.
 - [ ] Repeat the complete long-MP3 Reference workflow: import; renderer exact `206` observations; waveforms at beginning, around 2,400 seconds, and near 4,800 seconds; 15 seconds playback from zero; 10 seconds after seeks near 60, 2,400, and 4,800 seconds; Save As; close/relaunch/open; and 10 seconds late playback.
-- [ ] Exercise dirty-open Save, Don't Save, Cancel, failed Save, invalid candidate, active import cancellation, active transcription cancellation, active export cancellation, and second-instance project forwarding. Confirm the old project remains active on every canceled/failed transition and no saved `.riffcut` package is deleted.
-- [ ] Confirm unchanged invariants: `connect-src 'self' riffcut:`, no `bypassCSP`, no `net.fetch(file://...)`, exact bounded `206` responses, 32 MiB cap, unchanged PCM/cache layout, no active WebCodecs symbols, and no temporary diagnostic workspace left behind.
+- [ ] Exercise dirty-open Save, Don't Save, Cancel, failed Save, invalid candidate, active import cancellation, active transcription cancellation, active export cancellation, and second-instance project forwarding. Confirm the old project remains active on every canceled/failed transition and no saved `.redencut` package is deleted.
+- [ ] Confirm unchanged invariants: `connect-src 'self' redencut:`, no `bypassCSP`, no `net.fetch(file://...)`, exact bounded `206` responses, 32 MiB cap, unchanged PCM/cache layout, no active WebCodecs symbols, and no temporary diagnostic workspace left behind.
 - [ ] Request one final whole-branch review and address its complete Critical/Important list in the single allowed final fix wave.
 - [ ] Commit with `test: verify revisioned managed audio lifecycle`.
 

@@ -2,12 +2,12 @@ const { app, BrowserWindow } = require('electron')
 const { appendFileSync, mkdirSync } = require('node:fs')
 const { join } = require('node:path')
 
-const userData = join(process.env.RIFFCUT_HARNESS_RUN_DIRECTORY, 'user-data')
+const userData = join(process.env.REDENCUT_HARNESS_RUN_DIRECTORY, 'user-data')
 mkdirSync(userData, { recursive: true })
 app.setPath('userData', userData)
 const record = (stage) =>
   appendFileSync(
-    join(process.env.RIFFCUT_HARNESS_RUN_DIRECTORY, 'main-startup.jsonl'),
+    join(process.env.REDENCUT_HARNESS_RUN_DIRECTORY, 'main-startup.jsonl'),
     JSON.stringify({
       at: new Date().toISOString(),
       pid: process.pid,

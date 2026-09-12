@@ -33,7 +33,7 @@ afterEach(async () => {
 })
 
 async function setup() {
-  const directory = await mkdtemp(join(tmpdir(), 'riffcut-app-preferences-ipc-'))
+  const directory = await mkdtemp(join(tmpdir(), 'redencut-app-preferences-ipc-'))
   directories.push(directory)
   const path = join(directory, 'app-preferences.json')
   const store = new AppPreferencesStore(path, () => ['en'])

@@ -11,7 +11,7 @@ test('language switches preserve imported audio and survive an application resta
     await expect
       .poll(() => ui.page.getByRole('button', { name: 'Open Project', exact: true }).count())
       .toBe(1)
-    await ui.call('riffcut_prepare_dialog', {
+    await ui.call('redencut_prepare_dialog', {
       request: {
         purpose: 'import-audio',
         selection: { type: 'file', filename: 'mandarin-short-female.wav' },
@@ -22,7 +22,7 @@ test('language switches preserve imported audio and survive an application resta
       .poll(() => ui.page.locator('.waveform-clip canvas').count(), { timeout: 40_000 })
       .toBe(1)
     await expect
-      .poll(() => ui.page.locator('[data-riffcut-busy]').getAttribute('data-riffcut-busy'))
+      .poll(() => ui.page.locator('[data-redencut-busy]').getAttribute('data-redencut-busy'))
       .toBe('false')
     await ui.call('browser_select_option', { target: 'select', values: ['zh-CN'] })
     await expect.poll(() => ui.page.locator('html').getAttribute('lang')).toBe('zh-CN')
@@ -31,15 +31,15 @@ test('language switches preserve imported audio and survive an application resta
       .toBe(1)
     expect(await ui.page.locator('.waveform-clip canvas').count()).toBe(1)
     await ui.screenshot('chinese-imported')
-    await ui.call('riffcut_prepare_dialog', {
+    await ui.call('redencut_prepare_dialog', {
       request: {
         purpose: 'save-project',
-        selection: { type: 'project', name: 'localized-audio.riffcut' },
+        selection: { type: 'project', name: 'localized-audio.redencut' },
       },
     })
     await ui.call('browser_click', { target: 'button:text-is("保存")' })
     await expect
-      .poll(() => ui.page.locator('[data-riffcut-dirty]').getAttribute('data-riffcut-dirty'))
+      .poll(() => ui.page.locator('[data-redencut-dirty]').getAttribute('data-redencut-dirty'))
       .toBe('false')
     await ui.restart()
     await expect.poll(() => ui.page.locator('html').getAttribute('lang')).toBe('zh-CN')
@@ -49,10 +49,10 @@ test('language switches preserve imported audio and survive an application resta
     await expect
       .poll(() => ui.page.getByRole('button', { name: 'Open Project', exact: true }).count())
       .toBe(1)
-    await ui.call('riffcut_prepare_dialog', {
+    await ui.call('redencut_prepare_dialog', {
       request: {
         purpose: 'open-project',
-        selection: { type: 'project', name: 'localized-audio.riffcut' },
+        selection: { type: 'project', name: 'localized-audio.redencut' },
       },
     })
     await ui.call('browser_click', { target: 'button:text-is("Open Project")' })

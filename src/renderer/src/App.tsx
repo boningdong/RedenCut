@@ -691,9 +691,9 @@ export default function App() {
 
   return (
     <div
-      data-riffcut-session-ready={Boolean(session)}
-      data-riffcut-dirty={isDirty}
-      data-riffcut-busy={Boolean(importState) || isGenerating}
+      data-redencut-session-ready={Boolean(session)}
+      data-redencut-dirty={isDirty}
+      data-redencut-busy={Boolean(importState) || isGenerating}
       style={{
         height: '100vh',
         display: 'flex',

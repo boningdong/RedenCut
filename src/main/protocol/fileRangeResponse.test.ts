@@ -7,7 +7,7 @@ import { createFileRangeResponse } from './fileRangeResponse'
 const temporaryRoots: string[] = []
 
 async function fixture(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-file-range-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-file-range-'))
   temporaryRoots.push(root)
   const path = join(root, 'artifact.bin')
   await writeFile(
@@ -76,7 +76,7 @@ describe('createFileRangeResponse', () => {
   it('propagates a missing authorized artifact so the protocol can report 500', async () => {
     await expect(
       createFileRangeResponse(
-        join(tmpdir(), 'riffcut-definitely-missing-artifact.bin'),
+        join(tmpdir(), 'redencut-definitely-missing-artifact.bin'),
         { start: 0, end: 1 },
         new AbortController().signal,
       ),
@@ -92,7 +92,7 @@ describe('createFileRangeResponse', () => {
   })
 
   it('aborts an in-flight file stream', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'riffcut-file-range-abort-'))
+    const root = await mkdtemp(join(tmpdir(), 'redencut-file-range-abort-'))
     temporaryRoots.push(root)
     const path = join(root, 'large.bin')
     await writeFile(path, new Uint8Array(1024 * 1024))

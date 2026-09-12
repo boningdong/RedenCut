@@ -22,7 +22,7 @@ The user approved implementation in this session; execute locally in the existin
 
 ```sh
 node --test harness/tests/container.smoke.mjs
-docker build -f harness/container/Dockerfile -t riffcut-harness:local .
+docker build -f harness/container/Dockerfile -t redencut-harness:local .
 sh harness/container/run.sh npm run test:harness:all
 npm run format
 npm run check
@@ -34,7 +34,7 @@ The container launcher defaults to the current Docker context.
 
 ## Acceptance record
 
-Verified with Docker running Linux ARM64 containers using the final image `riffcut-harness:local` (image index `sha256:4f66dc1c56b63f25cdedcf684f52748a59f1ed1efafed9df63d9f455c1734f64`).
+Verified with Docker running Linux ARM64 containers using the final image `redencut-harness:local` (image index `sha256:4f66dc1c56b63f25cdedcf684f52748a59f1ed1efafed9df63d9f455c1734f64`).
 
 - Host and container `npm run check`: formatting, lint, Knip, types, 467 unit tests and production build passed on both platforms.
 - Container `test:harness:all`: 22/22 passed, including explicit fault injection.

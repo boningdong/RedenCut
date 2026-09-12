@@ -1,5 +1,5 @@
-ARG RIFFCUT_HARNESS_BASE=riffcut-harness:local
-FROM ${RIFFCUT_HARNESS_BASE}
+ARG REDENCUT_HARNESS_BASE=redencut-harness:local
+FROM ${REDENCUT_HARNESS_BASE}
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,22 +15,22 @@ RUN git clone --filter=blob:none https://github.com/ggerganov/whisper.cpp.git /t
     && install /tmp/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli \
     && rm -rf /tmp/whisper.cpp
 
-COPY speech-worker/pyproject.toml speech-worker/uv.lock /opt/riffcut-speech-worker/
+COPY speech-worker/pyproject.toml speech-worker/uv.lock /opt/redencut-speech-worker/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /opt/riffcut-speech-worker \
+    cd /opt/redencut-speech-worker \
     && uv sync --frozen --no-dev --no-install-project
-COPY speech-worker/src /opt/riffcut-speech-worker/src
-COPY speech-worker/models.json /opt/riffcut-speech-worker/models.json
+COPY speech-worker/src /opt/redencut-speech-worker/src
+COPY speech-worker/models.json /opt/redencut-speech-worker/models.json
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /opt/riffcut-speech-worker \
+    cd /opt/redencut-speech-worker \
     && uv sync --frozen --no-dev \
     && mkdir -p /models \
-    && chown -R node:node /opt/riffcut-speech-worker /models
+    && chown -R node:node /opt/redencut-speech-worker /models
 
-ENV PATH="/opt/riffcut-speech-worker/.venv/bin:${PATH}"
-ENV PYTHONPATH="/opt/riffcut-speech-worker/src"
-ENV RIFFCUT_SPEECH_MANIFEST="/opt/riffcut-speech-worker/models.json"
-ENV RIFFCUT_SPEECH_MODEL_CACHE="/models"
+ENV PATH="/opt/redencut-speech-worker/.venv/bin:${PATH}"
+ENV PYTHONPATH="/opt/redencut-speech-worker/src"
+ENV REDENCUT_SPEECH_MANIFEST="/opt/redencut-speech-worker/models.json"
+ENV REDENCUT_SPEECH_MODEL_CACHE="/models"
 ENV HF_HOME="/models/.huggingface"
 ENV HF_HUB_CACHE="/models/.huggingface/hub"
 

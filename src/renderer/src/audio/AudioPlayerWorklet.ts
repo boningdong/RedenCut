@@ -13,7 +13,7 @@ export function sendPcmChunk(port: MessagePort, message: PcmQueueMessage): void 
 }
 
 export const WORKLET_CODE = /* javascript */ `
-class RiffCutPlayerProcessor extends AudioWorkletProcessor {
+class RedenCutPlayerProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super()
     this.queue = []
@@ -101,5 +101,5 @@ class RiffCutPlayerProcessor extends AudioWorkletProcessor {
     return true
   }
 }
-registerProcessor('riffcut-player', RiffCutPlayerProcessor)
+registerProcessor('redencut-player', RedenCutPlayerProcessor)
 `

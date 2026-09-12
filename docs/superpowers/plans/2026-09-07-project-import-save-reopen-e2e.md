@@ -30,7 +30,7 @@ Interface: `prepareDialog(repositoryRoot, runDirectory, generation, request)` pu
 ## Task 2: Main composition and MCP lifecycle wiring
 
 Files: `src/main/dialogs/ProjectDialogs.ts`, `src/main/dialogs/createProjectDialogs.ts`, `src/main/index.ts`, relevant IPC registration functions, `harness/runtime/`, `harness/mcp/`, harness startup validation.
-Interfaces: Main methods choose import/save/open/dirty/export; Runtime exposes `prepareDialog` using existing generation guards and operation queue; MCP exposes `riffcut_prepare_dialog`.
+Interfaces: Main methods choose import/save/open/dirty/export; Runtime exposes `prepareDialog` using existing generation guards and operation queue; MCP exposes `redencut_prepare_dialog`.
 
 - [x] Add failing tests for stale generations, native/default routing and unsupported harness dialogs.
 - [x] Inject purpose-specific dialog methods while retaining current native options and cancellation mapping.

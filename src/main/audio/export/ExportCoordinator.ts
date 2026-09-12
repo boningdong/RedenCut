@@ -365,7 +365,7 @@ function isAlreadyExists(error: unknown): boolean {
 function siblingArtifact(destination: string, kind: 'export' | 'backup', id: string): string {
   const extension = extname(destination)
   const stem = basename(destination, extension)
-  return join(dirname(destination), `.${stem}.riffcut-${kind}-${id}${extension}`)
+  return join(dirname(destination), `.${stem}.redencut-${kind}-${id}${extension}`)
 }
 
 async function waitForSuccessfulClose(

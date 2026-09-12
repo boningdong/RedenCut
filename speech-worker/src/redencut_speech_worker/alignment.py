@@ -108,8 +108,8 @@ def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device:
 
 def align(request: Dict[str, Any]) -> Dict[str, Any]:
     model = load_manifest_model(
-        os.environ.get("RIFFCUT_SPEECH_MANIFEST", "/opt/riffcut-speech-worker/models.json"),
-        os.environ.get("RIFFCUT_SPEECH_MODEL_CACHE", "/models"),
+        os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
+        os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
         request["models"]["alignment"],
     )
     text = "".join(unit["text"] for unit in request["transcriptUnits"])

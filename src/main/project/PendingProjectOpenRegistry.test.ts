@@ -8,14 +8,14 @@ import {
 describe('PendingProjectOpenRegistry', () => {
   it('keeps paths behind opaque sender-bound one-use identifiers', () => {
     const registry = new PendingProjectOpenRegistry({ createId: () => 'opaque-request' })
-    const pending = registry.issue(7, '/private/projects/Episode.riffcut')
+    const pending = registry.issue(7, '/private/projects/Episode.redencut')
 
     expect(pending).toEqual({ requestId: 'opaque-request', displayName: 'Episode' })
     expect(JSON.stringify(pending)).not.toContain('/private/projects')
     expect(() => registry.consume(8, pending.requestId)).toThrow(
       'Pending project request is invalid',
     )
-    expect(registry.consume(7, pending.requestId)).toBe('/private/projects/Episode.riffcut')
+    expect(registry.consume(7, pending.requestId)).toBe('/private/projects/Episode.redencut')
     expect(() => registry.consume(7, pending.requestId)).toThrow(
       'Pending project request is invalid',
     )
@@ -28,7 +28,7 @@ describe('PendingProjectOpenRegistry', () => {
       now: () => now,
       ttlMs: 1_000,
     })
-    const pending = registry.issue(7, '/private/projects/Episode.riffcut')
+    const pending = registry.issue(7, '/private/projects/Episode.redencut')
 
     now = 1_101
     expect(() => registry.consume(7, pending.requestId)).toThrow(
@@ -44,16 +44,16 @@ describe('PendingProjectOpenRegistry', () => {
       now: () => now,
       ttlMs: 1_000,
     })
-    registry.issue(7, '/private/projects/Expired-on-issue.riffcut')
+    registry.issue(7, '/private/projects/Expired-on-issue.redencut')
     now = 1_100
-    registry.issue(8, '/private/projects/Fresh.riffcut')
+    registry.issue(8, '/private/projects/Fresh.redencut')
     expect(entryCount(registry)).toBe(1)
 
-    registry.issue(7, '/private/projects/Expired-on-consume.riffcut')
+    registry.issue(7, '/private/projects/Expired-on-consume.redencut')
     now = 1_600
-    registry.issue(8, '/private/projects/Fresh-on-consume.riffcut')
+    registry.issue(8, '/private/projects/Fresh-on-consume.redencut')
     now = 2_100
-    expect(registry.consume(8, 'opaque-4')).toBe('/private/projects/Fresh-on-consume.riffcut')
+    expect(registry.consume(8, 'opaque-4')).toBe('/private/projects/Fresh-on-consume.redencut')
     expect(entryCount(registry)).toBe(0)
   })
 
@@ -62,9 +62,9 @@ describe('PendingProjectOpenRegistry', () => {
     const registry = new PendingProjectOpenRegistry({ createId: () => `opaque-${++id}` })
     const sender = Object.assign(new EventEmitter(), { id: 7 })
     removePendingProjectOpensOnSenderDestroyed(registry, sender)
-    const first = registry.issue(sender.id, '/private/projects/First.riffcut')
-    const second = registry.issue(sender.id, '/private/projects/Second.riffcut')
-    const other = registry.issue(8, '/private/projects/Other.riffcut')
+    const first = registry.issue(sender.id, '/private/projects/First.redencut')
+    const second = registry.issue(sender.id, '/private/projects/Second.redencut')
+    const other = registry.issue(8, '/private/projects/Other.redencut')
 
     sender.emit('destroyed')
 
@@ -75,7 +75,7 @@ describe('PendingProjectOpenRegistry', () => {
     expect(() => registry.consume(sender.id, second.requestId)).toThrow(
       'Pending project request is invalid',
     )
-    expect(registry.consume(8, other.requestId)).toBe('/private/projects/Other.riffcut')
+    expect(registry.consume(8, other.requestId)).toBe('/private/projects/Other.redencut')
   })
 })
 

@@ -6,7 +6,7 @@ import { ProjectPathResolver } from './ProjectPathResolver'
 
 describe('ProjectPathResolver', () => {
   it('resolves a normalized project-relative path inside the bundle', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'riffcut-path-'))
+    const root = await mkdtemp(join(tmpdir(), 'redencut-path-'))
     const resolver = new ProjectPathResolver(root)
 
     const canonicalRoot = await realpath(root)
@@ -18,7 +18,7 @@ describe('ProjectPathResolver', () => {
   it.each(['/tmp/file', 'C:/file', 'C:\\file', '../file', 'media\\file', './file', 'a//b'])(
     'rejects unsafe path %s',
     async (unsafe) => {
-      const root = await mkdtemp(join(tmpdir(), 'riffcut-path-'))
+      const root = await mkdtemp(join(tmpdir(), 'redencut-path-'))
       await expect(new ProjectPathResolver(root).resolve(unsafe)).rejects.toThrow(
         'Invalid project-relative path',
       )
@@ -26,8 +26,8 @@ describe('ProjectPathResolver', () => {
   )
 
   it('rejects a symlink whose target escapes the bundle', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'riffcut-path-'))
-    const outside = await mkdtemp(join(tmpdir(), 'riffcut-outside-'))
+    const root = await mkdtemp(join(tmpdir(), 'redencut-path-'))
+    const outside = await mkdtemp(join(tmpdir(), 'redencut-outside-'))
     await mkdir(join(root, 'cache'))
     await symlink(outside, join(root, 'cache', 'escape'))
 

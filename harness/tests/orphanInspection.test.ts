@@ -8,7 +8,7 @@ const roots: string[] = []
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
 
 test('reports only a dead host with an exact still-live application identity and run marker', () => {
-  const root = mkdtempSync(join(tmpdir(), 'riffcut-orphan-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'redencut-orphan-test-'))
   roots.push(root)
   const runId = 'bd1f4ec8-3b8a-4d5f-b321-7c344366ae08'
   const run = join(root, runId)
@@ -16,7 +16,7 @@ test('reports only a dead host with an exact still-live application identity and
   const application = {
     pid: 20,
     startedAt: 'app-start',
-    command: `Electron --riffcut-harness-run-id=${runId}`,
+    command: `Electron --redencut-harness-run-id=${runId}`,
   }
   const host = { pid: 10, startedAt: 'host-start', command: 'node harness/server.ts' }
   writeFileSync(join(run, 'manifest.json'), JSON.stringify({ runId, host, application }))

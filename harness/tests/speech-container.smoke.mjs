@@ -8,7 +8,7 @@ import test from 'node:test'
 const repository = resolve(import.meta.dirname, '../..')
 
 test('provision resolves the current user token and mounts it read-only', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-speech-launcher-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-speech-launcher-'))
   const home = join(root, 'developer-home')
   const token = join(home, '.cache', 'huggingface', 'token')
   const fakeDocker = join(root, 'docker')
@@ -24,7 +24,7 @@ test('provision resolves the current user token and mounts it read-only', async 
       HOME: home,
       HF_HOME: '',
       HF_TOKEN_PATH: '',
-      RIFFCUT_DOCKER_BIN: fakeDocker,
+      REDENCUT_DOCKER_BIN: fakeDocker,
     },
   })
 

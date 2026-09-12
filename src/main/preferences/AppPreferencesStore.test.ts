@@ -11,7 +11,7 @@ import { AppPreferencesStore } from './AppPreferencesStore'
 let directory: string
 let path: string
 beforeEach(async () => {
-  directory = await fs.mkdtemp(join(tmpdir(), 'riffcut-app-preferences-'))
+  directory = await fs.mkdtemp(join(tmpdir(), 'redencut-app-preferences-'))
   path = join(directory, 'app-preferences.json')
 })
 afterEach(async () => {

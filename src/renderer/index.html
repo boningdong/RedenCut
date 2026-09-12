@@ -7,14 +7,14 @@
       Content Security Policy:
       - script-src 'self': only load scripts from same origin
       - style-src 'self' 'unsafe-inline': allow inline styles (needed for Tailwind CSS-in-JS)
-      - connect-src 'self' riffcut: permits managed cache fetches
+      - connect-src 'self' redencut: permits managed cache fetches
       Note: In dev mode this page is served by Vite dev server; CSP does not block HMR.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' riffcut:; media-src 'self' blob: file:; img-src 'self' data: blob:"
+      content="default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' redencut:; media-src 'self' blob: file:; img-src 'self' data: blob:"
     />
-    <title>RiffCut</title>
+    <title>RedenCut</title>
   </head>
   <body>
     <div id="root"></div>

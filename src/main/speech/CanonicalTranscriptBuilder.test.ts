@@ -32,7 +32,7 @@ function result(text: string): TranscriptionResult {
 describe('CanonicalTranscriptBuilder', () => {
   it('creates selectable Chinese characters, Latin words, and acoustically inert punctuation', () => {
     const artifact = new CanonicalTranscriptBuilder(() => crypto.randomUUID()).build({
-      result: result('我觉得 RiffCut works, 真的。'),
+      result: result('我觉得 RedenCut works, 真的。'),
       audioSourceId: sourceId,
       sourceFingerprint: fingerprint,
       analysisRevisionId: revisionId,
@@ -42,7 +42,7 @@ describe('CanonicalTranscriptBuilder', () => {
       { text: '我', kind: 'speech' },
       { text: '觉', kind: 'speech' },
       { text: '得', kind: 'speech' },
-      { text: 'RiffCut', kind: 'speech' },
+      { text: 'RedenCut', kind: 'speech' },
       { text: 'works', kind: 'speech' },
       { text: ',', kind: 'punctuation' },
       { text: '真', kind: 'speech' },

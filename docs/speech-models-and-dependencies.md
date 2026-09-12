@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is the operational source of truth for external runtimes, engines, models, credentials, caches, and provisioning used by RiffCut speech features. Architectural contracts remain in the speech design specifications; exact package versions and model revisions become machine-enforced in their implementation lockfiles and manifests.
+This document is the operational source of truth for external runtimes, engines, models, credentials, caches, and provisioning used by RedenCut speech features. Architectural contracts remain in the speech design specifications; exact package versions and model revisions become machine-enforced in their implementation lockfiles and manifests.
 
 The first implementation has fixed defaults and no model-selection UI. Future transcription, alignment, diarization, disfluency-detection, and speech-generation engines remain independently replaceable.
 
@@ -13,12 +13,12 @@ The first implementation has fixed defaults and no model-selection UI. Future tr
 | Transcription        | Transcriber (`best-effort-verbatim`)         | whisper.cpp                                                                                              | Native executable              | Existing    |
 | Alignment            | Alignment Engine (forced alignment)          | WhisperX alignment adapter with a manifest-pinned language model                                         | Python worker                  | Implemented |
 | Speaker separation   | Diarization Engine (anonymous speakers)      | pyannote.audio `speaker-diarization-community-1`, invoked through the worker                             | Python/PyTorch worker          | Implemented |
-| Process hosting      | Job-scoped alignment and diarization process | RiffCut JSON Lines speech worker                                                                          | Independent Python environment | Implemented |
+| Process hosting      | Job-scoped alignment and diarization process | RedenCut JSON Lines speech worker                                                                          | Independent Python environment | Implemented |
 | Intended transcript  | Intended Transcript Model                    | Replaceable model; CrisperWhisper is research-only unless its distribution terms permit the intended use | Separate detector dependency   | Deferred    |
 | Disfluency detection | Hybrid Disfluency Detector                   | Transcript-diff evidence plus deterministic rules                                                        | Separate pipeline              | Deferred    |
 | Speech generation    | Speech Generation Engine                     | Not selected                                                                                             | Separate pipeline              | Deferred    |
 
-WhisperX is not RiffCut's canonical transcriber in the first version. whisper.cpp produces the canonical best-effort-verbatim text; WhisperX aligns that text and hosts the initial diarization integration.
+WhisperX is not RedenCut's canonical transcriber in the first version. whisper.cpp produces the canonical best-effort-verbatim text; WhisperX aligns that text and hosts the initial diarization integration.
 
 Speech analysis reads the imported source's validated Float32 PCM cache and prepares one temporary 16 kHz mono PCM WAV for both engines. This supports imported containers such as AAC/M4A even when the local whisper.cpp build cannot read them directly. The temporary WAV is removed on success, failure, or cancellation; artifacts retain the original source identity and fingerprint. Preparation and engine failures display a fixed, stage-specific recovery message, while underlying paths and engine diagnostics remain in the main-process log.
 
@@ -50,7 +50,7 @@ A developer who provisions a gated model must:
 3. Authenticate locally with `hf auth login` using a read token.
 4. Verify the active account with `hf auth whoami` without printing the token.
 
-The initial diarization model, [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1), requires accepted model conditions and an authenticated read token. Authentication proves access for the current account; it is not a project credential shared by RiffCut developers. WhisperX's current setup and CPU guidance are documented in its [official repository](https://github.com/m-bain/whisperX).
+The initial diarization model, [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1), requires accepted model conditions and an authenticated read token. Authentication proves access for the current account; it is not a project credential shared by RedenCut developers. WhisperX's current setup and CPU guidance are documented in its [official repository](https://github.com/m-bain/whisperX).
 
 ### Username-agnostic Docker mount
 
@@ -82,7 +82,7 @@ The speech-enabled harness uses a dedicated named Docker volume for downloaded m
 - The read-only source checkout.
 - Per-container `node_modules` and build-output volumes.
 - Per-run `.harness-runs` evidence.
-- Project-local `.riffcut/cache` and `.riffcut/speech` data.
+- Project-local `.redencut/cache` and `.redencut/speech` data.
 
 Inside the container, `HF_HOME`, `HF_HUB_CACHE`, and engine-specific cache roots point into the named model volume. During authenticated provisioning only, `HF_TOKEN_PATH` points to `/run/secrets/hf_token`; no login command runs inside the container and the named volume never stores the credential. A model-provision command downloads the exact manifest revisions and verifies required files before marking the cache ready. Test startup never silently downloads a model.
 
@@ -92,14 +92,14 @@ Model-cache cleanup is an explicit scoped operation. Neither ordinary harness sh
 
 ### Standard Docker harness
 
-The existing `riffcut-harness` image remains the fast Node/Electron/UI environment. It does not gain Python, PyTorch, WhisperX, pyannote.audio, or model weights.
+The existing `redencut-harness` image remains the fast Node/Electron/UI environment. It does not gain Python, PyTorch, WhisperX, pyannote.audio, or model weights.
 
 ### Speech-enabled Docker harness
 
-A separate `riffcut-harness-speech` target extends the standard harness with:
+A separate `redencut-harness-speech` target extends the standard harness with:
 
 - A pinned Python runtime and package manager.
-- A locked RiffCut worker environment.
+- A locked RedenCut worker environment.
 - PyTorch, WhisperX, and pyannote.audio.
 - Native libraries required by the locked packages.
 - whisper.cpp plus the configured smoke transcription model when the full product pipeline is exercised.
@@ -189,7 +189,7 @@ The committed model manifest uses immutable revisions:
 | English alignment               | `facebook/wav2vec2-base-960h`                         | `22aad52d435eb6dbaf354bdad9b0da84ce7d6156` |
 | Speaker diarization             | `pyannote/speaker-diarization-community-1`            | `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee` |
 
-Provisioning downloaded only the manifest's required files into the dedicated `riffcut-speech-models` Docker volume. A subsequent container received no token mount and reported all four snapshots ready. Approximate snapshot sizes were 75 MB for whisper.cpp tiny, 1.2 GB for Chinese alignment, 361 MB for English alignment, and 32 MB for diarization.
+Provisioning downloaded only the manifest's required files into the dedicated `redencut-speech-models` Docker volume. A subsequent container received no token mount and reported all four snapshots ready. Approximate snapshot sizes were 75 MB for whisper.cpp tiny, 1.2 GB for Chinese alignment, 361 MB for English alignment, and 32 MB for diarization.
 
 An offline load of the pinned pyannote pipeline succeeded. A real CPU smoke run on the first 20 seconds of `mandarin-conversation-mix.wav`, preloaded as an in-memory 48 kHz waveform, completed and returned nine turns across three anonymous speaker labels. This proves model loading and inference plumbing only; it is not a diarization-quality acceptance result.
 
@@ -213,14 +213,15 @@ npm run speech:native:provision
 npm run speech:native:preflight
 ```
 
-The native launcher uses the same username-agnostic token lookup as Docker. Its default model location is `$HOME/Library/Caches/RiffCut/speech-models` (or `$XDG_CACHE_HOME/RiffCut/speech-models` when set). The app never installs or downloads anything at startup. `RIFFCUT_SPEECH_WORKER_ROOT`, `RIFFCUT_SPEECH_WORKER_PYTHON`, `RIFFCUT_SPEECH_MODEL_CACHE`, and `RIFFCUT_SPEECH_MANIFEST` can point a development or packaged build at an independently managed runtime.
+The native launcher uses the same username-agnostic token lookup as Docker. Its default model location is `$HOME/Library/Caches/RedenCut/speech-models` (or `$XDG_CACHE_HOME/RedenCut/speech-models` when set). The app never installs or downloads anything at startup. `REDENCUT_SPEECH_WORKER_ROOT`, `REDENCUT_SPEECH_WORKER_PYTHON`, `REDENCUT_SPEECH_MODEL_CACHE`, and `REDENCUT_SPEECH_MANIFEST` can point a development or packaged build at an independently managed runtime.
 
 ### Reusing a model cache created before the rename
 
 The new default cache location does not automatically discover an older installation's cache.
-Set `RIFFCUT_SPEECH_MODEL_CACHE` to the existing cache root (and use that same setting when starting the app), or move the cache to the current default location.
-Then run `npm run speech:native:provision` followed by `npm run speech:native:preflight`; Docker users can select their existing volume with `RIFFCUT_SPEECH_MODEL_VOLUME` and use the corresponding Docker commands.
-Provisioning verifies every required file and the existing marker's model ID, repository and immutable revision before adding `.riffcut-model.json` to a cache carrying the legacy `.podcut-model.json` marker.
+Set `REDENCUT_SPEECH_MODEL_CACHE` to the existing cache root (and use that same setting when starting the app), or move the cache to the current default location.
+Then run `npm run speech:native:provision` followed by `npm run speech:native:preflight`; Docker users can select their existing volume with `REDENCUT_SPEECH_MODEL_VOLUME` and use the corresponding Docker commands.
+Provisioning verifies every required file and the existing marker's model ID, repository and immutable revision before adding `.redencut-model.json` to a cache carrying a legacy `.riffcut-model.json` or `.podcut-model.json` marker.
+The newest present marker takes precedence (RedenCut, then RiffCut, then PodCut); an invalid newer marker is never bypassed using an older marker.
 This migration does not download or rewrite the model files, preserves the legacy marker, and can be repeated without rewriting a valid current marker.
 A missing, malformed or mismatched marker, or an incomplete snapshot, fails explicitly instead of certifying an unverified cache.
 The existing provisioning command still requires its configured token file; the app itself never provisions or migrates models at startup.

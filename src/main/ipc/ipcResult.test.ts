@@ -3,7 +3,7 @@ import { PublicIpcError, toIpcResult } from './ipcResult'
 
 describe('IPC result sanitization', () => {
   it('reports an unknown nested filesystem error only to the diagnostic sink', async () => {
-    const cause = new Error('ENOENT /Users/private/episode.riffcut/project.json')
+    const cause = new Error('ENOENT /Users/private/episode.redencut/project.json')
     const original = new Error('Project open failed', { cause })
     const diagnostics = vi.fn()
 

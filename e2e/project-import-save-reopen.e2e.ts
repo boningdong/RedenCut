@@ -42,7 +42,7 @@ test('imported short audio survives project save and a full application restart'
     uiTimeoutMs: 30_000,
   })
   const server = createMcpFacade(new RuntimeToolBackend(runtime))
-  const client = new Client({ name: 'riffcut-project-e2e', version: '1.0.0' })
+  const client = new Client({ name: 'redencut-project-e2e', version: '1.0.0' })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   await server.connect(serverTransport)
   await client.connect(clientTransport)
@@ -58,7 +58,7 @@ test('imported short audio survives project save and a full application restart'
     return result
   }
   const diagnostics = async () =>
-    (await call('riffcut_read_diagnostics', identity))
+    (await call('redencut_read_diagnostics', identity))
       .structuredContent as unknown as ApplicationDiagnostics
   const screenshot = async (label: string) => {
     const result = await call('browser_take_screenshot', { ...identity, type: 'png' })
@@ -91,12 +91,12 @@ test('imported short audio survives project save and a full application restart'
   }
   try {
     // Launch an isolated app and import through the UI with a prepared file selection.
-    const started = (await call('riffcut_start')).structuredContent as unknown as RuntimeStatus
+    const started = (await call('redencut_start')).structuredContent as unknown as RuntimeStatus
     identity = { runId: started.runId!, generation: started.generation }
     runDirectory = started.runDirectory!
     console.error(`Project E2E evidence: ${runDirectory}`)
     await call('browser_snapshot', identity)
-    await call('riffcut_prepare_dialog', {
+    await call('redencut_prepare_dialog', {
       ...identity,
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },
     })
@@ -105,8 +105,8 @@ test('imported short audio survives project save and a full application restart'
     await screenshot('imported')
 
     // Save through the UI, then inspect the persisted project and copied audio independently.
-    const selection = { type: 'project', name: 'short-audio.riffcut' }
-    await call('riffcut_prepare_dialog', {
+    const selection = { type: 'project', name: 'short-audio.redencut' }
+    await call('redencut_prepare_dialog', {
       ...identity,
       request: { purpose: 'save-project', selection },
     })
@@ -135,14 +135,14 @@ test('imported short audio survives project save and a full application restart'
     expect(checksum(join(projectRoot, source.location.path))).toBe(originalHash)
 
     // Replace the Electron process and reopen the saved project in a fresh UI generation.
-    const restarted = (await call('riffcut_restart', identity))
+    const restarted = (await call('redencut_restart', identity))
       .structuredContent as unknown as RuntimeStatus
     expect(restarted.generation).toBe(started.generation + 1)
     expect(restarted.pid).not.toBe(started.pid)
     identity = { runId: restarted.runId!, generation: restarted.generation }
     expect((await diagnostics()).renderer.tracks).toEqual([])
     await call('browser_snapshot', identity)
-    await call('riffcut_prepare_dialog', {
+    await call('redencut_prepare_dialog', {
       ...identity,
       request: { purpose: 'open-project', selection },
     })
@@ -160,7 +160,7 @@ test('imported short audio survives project save and a full application restart'
     expect(checksum(fixture)).toBe(originalHash)
 
     // Verify both application generations exited cleanly, without forced termination.
-    await call('riffcut_stop', identity)
+    await call('redencut_stop', identity)
     for (const generation of [1, 2]) {
       const events = readFileSync(
         join(runDirectory, `generation-${generation}/events.jsonl`),

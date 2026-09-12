@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
   whisperPath: vi.fn((): string | null => '/usr/bin/whisper-cli'),
-  mkdtemp: vi.fn(async () => '/tmp/riffcut-whisper-job'),
+  mkdtemp: vi.fn(async () => '/tmp/redencut-whisper-job'),
   readFile: vi.fn(async () => JSON.stringify({ transcription: [], result: { language: 'en' } })),
   rm: vi.fn(async (_path?: unknown, _options?: unknown): Promise<void> => {}),
   existsSync: vi.fn((path: string) => path.endsWith('ggml-base.bin')),
@@ -97,7 +97,7 @@ describe('WhisperTranscriber cancellation', () => {
 
     child.emit('close', null)
     await expect(transcription).rejects.toMatchObject({ name: 'AbortError' })
-    expect(mocks.rm).toHaveBeenCalledWith('/tmp/riffcut-whisper-job', {
+    expect(mocks.rm).toHaveBeenCalledWith('/tmp/redencut-whisper-job', {
       recursive: true,
       force: true,
     })

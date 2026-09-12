@@ -1,4 +1,4 @@
-# RiffCut File Organization Standards
+# RedenCut File Organization Standards
 
 ## Clear Names
 

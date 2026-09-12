@@ -16,7 +16,7 @@ async function connect() {
     env: electronEnvironment(process.env),
     stderr: 'pipe',
   })
-  const client = new Client({ name: 'riffcut-stdio-test', version: '1.0.0' })
+  const client = new Client({ name: 'redencut-stdio-test', version: '1.0.0' })
   await client.connect(transport)
   return { client, transport }
 }
@@ -39,7 +39,7 @@ test('handles SIGTERM with bounded owned-application cleanup', async () => {
   const { client, transport } = await connect()
   try {
     const status = statusOf(
-      (await client.callTool({ name: 'riffcut_start', arguments: {} })) as CallToolResult,
+      (await client.callTool({ name: 'redencut_start', arguments: {} })) as CallToolResult,
     )
     process.kill(transport.pid!, 'SIGTERM')
     await expect.poll(() => alive(status.pid!), { timeout: 15_000 }).toBe(false)
@@ -54,10 +54,10 @@ test('detects a surviving owned application after host SIGKILL without automatic
   let application: ReturnType<typeof readProcessIdentity> = null
   try {
     const status = statusOf(
-      (await client.callTool({ name: 'riffcut_start', arguments: {} })) as CallToolResult,
+      (await client.callTool({ name: 'redencut_start', arguments: {} })) as CallToolResult,
     )
     application = readProcessIdentity(status.pid!)
-    expect(application?.command).toContain(`--riffcut-harness-run-id=${status.runId}`)
+    expect(application?.command).toContain(`--redencut-harness-run-id=${status.runId}`)
     const hostPid = transport.pid!
     process.kill(hostPid, 'SIGKILL')
     await expect.poll(() => alive(hostPid), { timeout: 10_000 }).toBe(false)
@@ -71,7 +71,7 @@ test('detects a surviving owned application after host SIGKILL without automatic
       const observer = await connect()
       try {
         const observed = (await observer.client.callTool({
-          name: 'riffcut_status',
+          name: 'redencut_status',
           arguments: {},
         })) as CallToolResult
         expect(JSON.stringify(observed.structuredContent)).toContain(status.runId!)

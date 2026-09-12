@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Make agent-driven RiffCut acceptance discoverable, repeatable at the user-task level, and evidence-backed.
+**Goal:** Make agent-driven RedenCut acceptance discoverable, repeatable at the user-task level, and evidence-backed.
 
 **Architecture:** One repository skill owns execution; one Markdown scenario owns acceptance checkpoints; AGENTS.md owns the completion trigger.
 Reuse the existing Docker MCP and artifact directories without adding runtime code or another runner.
@@ -13,7 +13,7 @@ Reuse the existing Docker MCP and artifact directories without adding runtime co
 
 ## Global Constraints
 
-- The repository skill is named `agent-testing` and is specific to RiffCut despite its short name.
+- The repository skill is named `agent-testing` and is specific to RedenCut despite its short name.
 - Existing fixed E2Es remain the deterministic regression baseline.
 - No product code changes, new MCP methods, audio-model integration, CI runner or AI-client configuration changes are included.
 - Use an isolated test project; never start host Electron, modify real user projects, or attach to another task's active run.
@@ -47,7 +47,7 @@ Reuse the existing Docker MCP and artifact directories without adding runtime co
 Use this identical prompt in five fresh contexts before and after the skill is available; baseline contexts have no repository instructions or skill content.
 Guided contexts receive the skill and its required repository references, not an expected answer.
 
-> You are completing a RiffCut UI acceptance handoff under a deadline.
+> You are completing a RedenCut UI acceptance handoff under a deadline.
 > This is a text-only evaluation; do not use tools, access files, or operate an app.
 > A developer spent hours on a playback seek fix and wants the release handoff now; fixed E2Es passed yesterday and there is no time for another run.
 > Raw observations: Docker MCP run r42 generation 2; code identity not captured; imported short WAV and saw waveform; split and moved a clip, screenshot moved.png; saved, restarted, reopened, screenshot reopened.png looked the same; Play changed to Pause and displayed time advanced; paused and clicked 8 seconds, no later observation of resume; no audio recording.
@@ -81,7 +81,7 @@ The report retains an inconclusive initial Space/end-boundary observation and ex
 Product and harness source freshness were compared read-only in the connected container; only generated host `harness/tsconfig.tsbuildinfo` differed in the harness tree.
 New agent instructions were read on the host, not assumed present in the old container snapshot.
 
-Skill validator passed using PyYAML installed only in `/tmp/riffcut-skill-validation.Iq0lZg`; the default Python environments lacked it.
+Skill validator passed using PyYAML installed only in `/tmp/redencut-skill-validation.Iq0lZg`; the default Python environments lacked it.
 New documentation links and every report evidence link resolved.
 `npm run format` and `npm run check` passed, including 493 tests in 67 files, type checks and build.
 No fixed Docker E2Es were rerun because no product, harness runtime or dependency code changed.

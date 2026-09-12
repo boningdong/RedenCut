@@ -2,7 +2,7 @@
 
 ## User Goal
 
-Choose English or Simplified Chinese, keep editing, and retain the choice after restarting RiffCut.
+Choose English or Simplified Chinese, keep editing, and retain the choice after restarting RedenCut.
 Run the [editing baseline](editing-workflow.md) and this scenario through the [agent-testing skill](../../.agents/skills/agent-testing/SKILL.md) against the same final source snapshot.
 Use the prepared mandarin-short-female.wav fixture and a run-owned project.
 

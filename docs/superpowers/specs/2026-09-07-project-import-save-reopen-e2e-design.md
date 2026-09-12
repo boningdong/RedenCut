@@ -2,7 +2,7 @@
 
 ## Goal and scope
 
-Prove that importing `mandarin-short-female.wav`, saving a project, fully restarting RiffCut and reopening the saved project preserves the imported audio and restores the visible track and waveform.
+Prove that importing `mandarin-short-female.wav`, saving a project, fully restarting RedenCut and reopening the saved project preserves the imported audio and restores the visible track and waveform.
 Run the acceptance test inside Docker using the existing shared-context MCP harness.
 Do not implement playback verification, editing, transcription, export automation or native OS dialog interaction in this slice.
 
@@ -28,7 +28,7 @@ Supported purposes in this slice are `import-audio`, `save-project` and `open-pr
 Other native dialogs in harness mode must fail explicitly rather than opening a window or choosing a default; dirty-project decisions and export remain unsupported.
 The failure must be visible in harness diagnostics/events, not only in an application notification.
 
-Add `riffcut_prepare_dialog` to the existing MCP server with current `runId` and `generation`, a purpose and a typed selection: audio filename, project name or cancellation.
+Add `redencut_prepare_dialog` to the existing MCP server with current `runId` and `generation`, a purpose and a typed selection: audio filename, project name or cancellation.
 For `import-audio`, use `selection: { "type": "file", "filename": "mandarin-short-female.wav" }`; the fixture directory is fixed and does not depend on the caller's working directory.
 Runtime validates and resolves the selection, serializes preparation with UI/lifecycle work and refuses to replace an unconsumed reply.
 Use a generation-scoped file mailbox inside the isolated run directory to deliver the validated reply to Main; publish replies atomically and consume them once before returning a result.
@@ -51,7 +51,7 @@ The adapter substitutes file selection only: selection tokens, IPC validation, i
 9. Verify the restored track name, source/track identity, duration, waveform readiness and clean state; capture a second screenshot.
 10. Verify copied project media has the same SHA-256 as the supplied fixture, and the fixture itself remains unchanged; stop cleanly.
 
-Derive expected source duration from independent FFprobe inspection, not from RiffCut's own imported metadata.
+Derive expected source duration from independent FFprobe inspection, not from RedenCut's own imported metadata.
 Waveform readiness must reflect successful data loading/rendering, not merely the presence of a canvas element; use a narrow read-only readiness observation if the UI lacks one.
 Screenshots supplement assertions and are retained for inspection; a screenshot alone is not a pass condition.
 All waits are bounded and tied to observable conditions rather than fixed sleeps.

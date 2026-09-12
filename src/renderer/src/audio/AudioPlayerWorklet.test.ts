@@ -36,7 +36,7 @@ function send(processor: ReturnType<typeof createProcessor>, data: Record<string
   processor.port.onmessage?.({ data })
 }
 
-describe('RiffCut AudioWorklet queue', () => {
+describe('RedenCut AudioWorklet queue', () => {
   it('applies gain, maps mono to every output channel, and reports acknowledged depth', () => {
     const processor = createProcessor()
     send(processor, { type: 'flush', generation: 2 })

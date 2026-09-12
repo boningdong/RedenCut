@@ -53,7 +53,7 @@ export class HarnessRuntime {
     return this.transition(async () => {
       if (this.shuttingDown) throw new Error('HOST_SHUTTING_DOWN')
       if (!['idle', 'stopped'].includes(this.current.state))
-        throw new Error('RUN_ALREADY_ACTIVE: use riffcut_restart or riffcut_stop')
+        throw new Error('RUN_ALREADY_ACTIVE: use redencut_restart or redencut_stop')
       this.artifacts = new RunArtifacts(this.options.outputRoot, this.options.repositoryRoot)
       this.current = {
         state: 'starting',
@@ -69,7 +69,7 @@ export class HarnessRuntime {
   async restart(options: { rebuild?: boolean; discardUnsaved?: boolean }): Promise<RuntimeStatus> {
     return this.transition(async () => {
       if (this.shuttingDown) throw new Error('HOST_SHUTTING_DOWN')
-      if (!this.artifacts) throw new Error('NO_RUN: call riffcut_start first')
+      if (!this.artifacts) throw new Error('NO_RUN: call redencut_start first')
       await this.checkClosePreconditions(options.discardUnsaved ?? false)
       const recovering = this.current.state === 'failed'
       this.update({ state: 'stopping', stage: 'shutdown' })
@@ -158,7 +158,7 @@ export class HarnessRuntime {
               : item,
           ),
         })
-        return { ...result, _meta: { ...result._meta, riffcut: identity } }
+        return { ...result, _meta: { ...result._meta, redencut: identity } }
       } catch (error) {
         controller.abort(error)
         // A cancelled mutation may still complete: quarantine this generation and never replay it.
@@ -425,7 +425,7 @@ export class HarnessRuntime {
 
   private assertReady(identity: GenerationIdentity): void {
     if (this.current.state !== 'ready' || this.shuttingDown)
-      throw new Error('APPLICATION_NOT_READY: inspect riffcut_status and start/restart explicitly')
+      throw new Error('APPLICATION_NOT_READY: inspect redencut_status and start/restart explicitly')
     if (identity.runId !== this.current.runId || identity.generation !== this.current.generation)
       throw new Error('STALE_GENERATION: use the current run identity and take a fresh snapshot')
   }

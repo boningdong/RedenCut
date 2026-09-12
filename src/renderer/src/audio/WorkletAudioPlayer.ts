@@ -287,7 +287,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
         1,
         ...track.clips.map((clip) => this.providers.get(clip.audioSourceId)?.channels ?? 1),
       )
-      const node = new AudioWorkletNode(this.context!, 'riffcut-player', {
+      const node = new AudioWorkletNode(this.context!, 'redencut-player', {
         numberOfOutputs: 1,
         outputChannelCount: [channelCount],
         processorOptions: {

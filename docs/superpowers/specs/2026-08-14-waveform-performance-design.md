@@ -2,7 +2,7 @@
 
 ## Status and delivery order
 
-This design is the first implementation project in RiffCut's audio-performance work.
+This design is the first implementation project in RedenCut's audio-performance work.
 
 It replaces duration-proportional waveform rendering before the project adopts managed audio sources and decoded PCM caches.
 
@@ -39,7 +39,7 @@ It does not introduce project packages, copied media, PCM caches, new playback b
 
 The current peak density is approximately 190 values per second, so a one-hour clip can create roughly 684,000 React elements and DOM nodes.
 
-Each track also maintains an invisible WaveSurfer instance even though RiffCut draws the visible per-clip waveform separately.
+Each track also maintains an invisible WaveSurfer instance even though RedenCut draws the visible per-clip waveform separately.
 
 The existing design therefore performs work proportional to audio duration and duplicates waveform-rendering responsibilities.
 
@@ -49,7 +49,7 @@ Audacity stores waveform summaries at multiple sample scales and selects raw sam
 
 Its waveform data cache produces screen columns, and its bitmap cache renders fixed-width image tiles for only the requested viewport.
 
-RiffCut should adopt the principles rather than the implementation:
+RedenCut should adopt the principles rather than the implementation:
 
 - Choose data resolution according to pixels per second.
 - Produce at most a small constant amount of data per visible pixel.
@@ -124,7 +124,7 @@ It maps clips to source ranges and output positions, controls selection and drag
 
 It no longer constructs visible SVG peak elements or creates invisible WaveSurfer renderers.
 
-The ruler remains custom because it already supports RiffCut's zoom-out behavior without depending on WaveSurfer.
+The ruler remains custom because it already supports RedenCut's zoom-out behavior without depending on WaveSurfer.
 
 ## Initial file changes
 

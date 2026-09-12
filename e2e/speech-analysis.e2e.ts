@@ -16,7 +16,7 @@ test('real speech analysis publishes an editable durable transcript and survives
   session = new McpTestSession()
   await session.start()
 
-  await session.call('riffcut_prepare_dialog', {
+  await session.call('redencut_prepare_dialog', {
     request: {
       purpose: 'import-audio',
       selection: { type: 'file', filename: 'mandarin-short-female.wav' },
@@ -91,8 +91,8 @@ test('real speech analysis publishes an editable durable transcript and survives
   expect(transcriptText).toContain('Host')
   await session.screenshot('speech-analysis-complete')
 
-  const selection = { type: 'project' as const, name: 'speech-analysis.riffcut' }
-  await session.call('riffcut_prepare_dialog', {
+  const selection = { type: 'project' as const, name: 'speech-analysis.redencut' }
+  await session.call('redencut_prepare_dialog', {
     request: { purpose: 'save-project', selection },
   })
   await session.call('browser_click', { target: 'button:text-is("Save")' })
@@ -122,7 +122,7 @@ test('real speech analysis publishes an editable durable transcript and survives
   expect(artifact.diarization.turns.length).toBeGreaterThan(0)
 
   await session.restart()
-  await session.call('riffcut_prepare_dialog', {
+  await session.call('redencut_prepare_dialog', {
     request: { purpose: 'open-project', selection },
   })
   await session.call('browser_click', { target: 'button:text-is("Open Project")' })

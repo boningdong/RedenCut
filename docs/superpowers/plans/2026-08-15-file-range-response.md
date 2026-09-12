@@ -4,7 +4,7 @@
 
 **Goal:** Replace Electron's non-compliant `net.fetch(file://...)` cache adapter with an exact, abortable filesystem range response so managed PCM playback and waveform reads receive standards-compliant `206` responses.
 
-**Architecture:** The protected cache protocol continues to authorize routes, validate active-project manifests, parse and limit renderer ranges, and verify adapter responses. A new main-only `fileRangeResponse.ts` function opens the authorized artifact, streams only the inclusive validated byte interval, and constructs exact partial-content headers. Renderer providers, project schemas, cache manifests, IPC contracts, and `.riffcut` directory structure remain unchanged.
+**Architecture:** The protected cache protocol continues to authorize routes, validate active-project manifests, parse and limit renderer ranges, and verify adapter responses. A new main-only `fileRangeResponse.ts` function opens the authorized artifact, streams only the inclusive validated byte interval, and constructs exact partial-content headers. Renderer providers, project schemas, cache manifests, IPC contracts, and `.redencut` directory structure remain unchanged.
 
 **Tech Stack:** Electron 40, Node.js `fs/promises` and `FileHandle.createReadStream`, Web `Response`/`ReadableStream`, TypeScript 5.9, Vitest 4.
 
@@ -15,7 +15,7 @@
 - Do not read an entire PCM or waveform artifact into memory.
 - Preserve the 32 MiB maximum request size enforced by `cacheProtocol.ts`.
 - Keep filesystem paths and `BoundedByteRange` inside the main process.
-- Add no project schema, manifest, IPC, preload, renderer-provider, or `.riffcut` layout changes.
+- Add no project schema, manifest, IPC, preload, renderer-provider, or `.redencut` layout changes.
 - Use lower camel case filenames for function-primary modules: `fileRangeResponse.ts` and `fileRangeResponse.test.ts`.
 - The range end is inclusive everywhere.
 - Run each red test before implementation and confirm it fails for the stated reason.
@@ -54,7 +54,7 @@ import { describe, expect, it } from 'vitest'
 import { createFileRangeResponse } from './fileRangeResponse'
 
 async function fixture(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-file-range-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-file-range-'))
   const path = join(root, 'artifact.bin')
   await writeFile(path, Uint8Array.from({ length: 64 }, (_, index) => index))
   return path
@@ -114,7 +114,7 @@ it.each([
 it('propagates a missing authorized artifact so the protocol can report 500', async () => {
   await expect(
     createFileRangeResponse(
-      join(tmpdir(), 'riffcut-definitely-missing-artifact.bin'),
+      join(tmpdir(), 'redencut-definitely-missing-artifact.bin'),
       { start: 0, end: 1 },
       new AbortController().signal,
     ),
@@ -190,7 +190,7 @@ Use a 1 MiB fixture so the response body remains unread when cancellation occurs
 
 ```ts
 it('aborts an in-flight file stream', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'riffcut-file-range-abort-'))
+  const root = await mkdtemp(join(tmpdir(), 'redencut-file-range-abort-'))
   const path = join(root, 'large.bin')
   await writeFile(path, new Uint8Array(1024 * 1024))
   const controller = new AbortController()
@@ -245,7 +245,7 @@ it('serves a validated PCM artifact through the real bounded file adapter', asyn
   const active = await projectRoot()
   const handler = createCacheProtocolHandler(() => active, createFileRangeResponse)
   const response = await handler(
-    new Request(`riffcut://cache/${SOURCE_ID}/pcm`, {
+    new Request(`redencut://cache/${SOURCE_ID}/pcm`, {
       headers: { Range: 'bytes=0-3' },
     }),
   )
@@ -305,7 +305,7 @@ it('rejects an adapter that does not return exact partial-content metadata', asy
     vi.fn(async () => new Response(new Uint8Array(4), { status: 200 })),
   )
   const response = await handler(
-    new Request(`riffcut://cache/${SOURCE_ID}/pcm`, {
+    new Request(`redencut://cache/${SOURCE_ID}/pcm`, {
       headers: { Range: 'bytes=0-3' },
     }),
   )
@@ -321,7 +321,7 @@ it('reports 500 when an authorized cache artifact disappears before it can be op
     }),
   )
   const response = await handler(
-    new Request(`riffcut://cache/${SOURCE_ID}/pcm`, {
+    new Request(`redencut://cache/${SOURCE_ID}/pcm`, {
       headers: { Range: 'bytes=0-3' },
     }),
   )
@@ -457,7 +457,7 @@ const range = await provider.readRange({
 expect(range.buckets).toEqual([{ min: -1, max: 1 }])
 ```
 
-Also assert the scoped fetch bridge observed only `riffcut://cache/` URLs and bounded `Range` headers.
+Also assert the scoped fetch bridge observed only `redencut://cache/` URLs and bounded `Range` headers.
 
 - [ ] **Step 5: Add a late-file range case**
 
@@ -501,7 +501,7 @@ git commit -m "test: exercise managed cache range workflow"
 
 **Interfaces:**
 - Replaces the `net.fetch(pathToFileURL(...))` adapter with `createFileRangeResponse`.
-- Leaves `createCacheProtocolHandler` and renderer-facing `riffcut://cache` URLs unchanged.
+- Leaves `createCacheProtocolHandler` and renderer-facing `redencut://cache` URLs unchanged.
 
 - [ ] **Step 1: Add a source-wiring assertion before changing `index.ts`**
 
@@ -550,7 +550,7 @@ Compose:
 
 ```ts
 protocol.handle(
-  'riffcut',
+  'redencut',
   createCacheProtocolHandler(
     () => ({ root: controller.workspace.root, project: controller.workspace.project }),
     createFileRangeResponse,
@@ -626,9 +626,9 @@ Address every Critical or Important finding with a new failing test before chang
 - Verify: `src/main/index.ts:11-13`
 
 **Interfaces:**
-- Produces: renderer CSP directive `connect-src 'self' riffcut:`.
+- Produces: renderer CSP directive `connect-src 'self' redencut:`.
 - Preserves: `{ secure: true, supportFetchAPI: true, stream: true }` protocol privileges without `bypassCSP`.
-- Consumes: the unchanged renderer-facing `riffcut://cache/...` URLs and protected main-process handler.
+- Consumes: the unchanged renderer-facing `redencut://cache/...` URLs and protected main-process handler.
 
 - [ ] **Step 1: Add a failing semantic policy regression test**
 
@@ -661,7 +661,7 @@ describe('managed cache renderer security policy', () => {
     )?.[1]
 
     expect(policy).toBeDefined()
-    expect(parseDirectives(policy!).get('connect-src')).toEqual(["'self'", 'riffcut:'])
+    expect(parseDirectives(policy!).get('connect-src')).toEqual(["'self'", 'redencut:'])
     expect(mainSource).not.toContain('bypassCSP')
   })
 })
@@ -682,10 +682,10 @@ Expected: FAIL because `connect-src` is absent, while the no-`bypassCSP` asserti
 Change the renderer CSP to:
 
 ```html
-content="default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' riffcut:; media-src 'self' blob: file:; img-src 'self' data: blob:"
+content="default-src 'self'; script-src 'self' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' redencut:; media-src 'self' blob: file:; img-src 'self' data: blob:"
 ```
 
-Update the adjacent CSP comment to state that `connect-src 'self' riffcut:` permits managed cache fetches. Do not add `bypassCSP` or any wildcard source.
+Update the adjacent CSP comment to state that `connect-src 'self' redencut:` permits managed cache fetches. Do not add `bypassCSP` or any wildcard source.
 
 - [ ] **Step 4: Run the policy and cache integration tests**
 
@@ -716,7 +716,7 @@ Run `npm run dev` and import `/Users/boning/Documents/自来野/long-sample.mp3`
 
 Verify all of these checkpoints:
 
-1. The renderer reports no CSP violation for `riffcut://cache/...`.
+1. The renderer reports no CSP violation for `redencut://cache/...`.
 2. Waveforms render at the beginning, around 2,400 seconds, and near 4,800 seconds.
 3. Playback runs from zero for at least 15 seconds.
 4. Playback runs for at least 10 seconds after seeks near 60, 2,400, and 4,800 seconds.
@@ -745,6 +745,6 @@ Invoke `superpowers:requesting-code-review` over the complete managed-audio repa
 - Authorized file failures return `500`; authorization and manifest failures remain `404`.
 - Cancellation aborts in-flight file delivery without producing a playback error.
 - Renderer providers require no code or contract changes.
-- Renderer CSP contains exactly `connect-src 'self' riffcut:` and the protocol registration does not use `bypassCSP`.
+- Renderer CSP contains exactly `connect-src 'self' redencut:` and the protocol registration does not use `bypassCSP`.
 - The supplied MP3 imports, renders waveforms, plays from zero, and seeks near 60, 2,400, and 4,800 seconds without cache transport errors.
 - `npm run check`, `npm run profile:waveform`, and `git diff --check` pass.

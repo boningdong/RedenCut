@@ -23,7 +23,7 @@ test('leaves normal application paths unchanged without explicit harness opt-in'
 })
 
 test('sets isolated userData, sessionData and temp paths without touching other files', () => {
-  const root = mkdtempSync(join(tmpdir(), 'riffcut-startup-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'redencut-startup-test-'))
   roots.push(root)
   writeFileSync(join(root, 'untouched'), 'user-data')
   const paths: Record<string, string> = {}
@@ -37,8 +37,8 @@ test('sets isolated userData, sessionData and temp paths without touching other 
         },
       },
       {
-        RIFFCUT_HARNESS_RUN_DIRECTORY: runDirectory,
-        RIFFCUT_HARNESS_RUN_ID: runId,
+        REDENCUT_HARNESS_RUN_DIRECTORY: runDirectory,
+        REDENCUT_HARNESS_RUN_ID: runId,
       },
     ),
   ).toBe(true)
@@ -57,8 +57,8 @@ test.each(['relative/path', '/', '/tmp/unrelated'])(
       configureHarnessStartup(
         { setPath: () => {} },
         {
-          RIFFCUT_HARNESS_RUN_DIRECTORY: runDirectory,
-          RIFFCUT_HARNESS_RUN_ID: '318932a4-3c50-4a27-a9f8-0288a189b5d7',
+          REDENCUT_HARNESS_RUN_DIRECTORY: runDirectory,
+          REDENCUT_HARNESS_RUN_ID: '318932a4-3c50-4a27-a9f8-0288a189b5d7',
         },
       ),
     ).toThrow('INVALID_HARNESS_CONFIGURATION')

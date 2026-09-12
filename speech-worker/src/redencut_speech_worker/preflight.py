@@ -23,7 +23,7 @@ def inspect_runtime(
         if any(not (snapshot / relative_path).is_file() for relative_path in model["expectedFiles"]):
             missing_model_ids.append(model["id"])
             continue
-        marker_path = snapshot / ".riffcut-model.json"
+        marker_path = snapshot / ".redencut-model.json"
         try:
             marker = json.loads(marker_path.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
@@ -58,7 +58,7 @@ def main(
     machine: Optional[str] = None,
     backend: Optional[str] = None,
 ) -> int:
-    parser = argparse.ArgumentParser(description="Inspect the RiffCut speech worker runtime")
+    parser = argparse.ArgumentParser(description="Inspect the RedenCut speech worker runtime")
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path, required=True)

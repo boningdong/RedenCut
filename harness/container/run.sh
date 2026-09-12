@@ -14,18 +14,18 @@ fi
 # Docker's current context selects OrbStack or another compatible engine.
 # No TTY, host display/socket sharing, network ports, or privileged mode.
 exec docker run --rm -i --stop-timeout 20 --shm-size 1g \
-  --label dev.riffcut.harness=container \
-  --name "${RIFFCUT_CONTAINER_NAME:-riffcut-harness-$(uuidgen | tr '[:upper:]' '[:lower:]')}" \
-  --env "RIFFCUT_GIT_DIRECTORY=$worktree_git_directory" \
+  --label dev.redencut.harness=container \
+  --name "${REDENCUT_CONTAINER_NAME:-redencut-harness-$(uuidgen | tr '[:upper:]' '[:lower:]')}" \
+  --env "REDENCUT_GIT_DIRECTORY=$worktree_git_directory" \
   --mount "type=bind,source=$repository,target=/source,readonly" \
   --mount "type=bind,source=$git_directory,target=$git_directory,readonly" \
   --mount type=volume,target=/workspace/node_modules \
   --mount type=volume,target=/workspace/out \
-  --mount "type=volume,source=${RIFFCUT_SPEECH_MODEL_VOLUME:-riffcut-speech-models},target=/models" \
+  --mount "type=volume,source=${REDENCUT_SPEECH_MODEL_VOLUME:-redencut-speech-models},target=/models" \
   --mount "type=bind,source=$artifacts,target=/workspace/.harness-runs" \
-  --env RIFFCUT_SPEECH_WORKER_ROOT=/opt/riffcut-speech-worker \
-  --env RIFFCUT_SPEECH_WORKER_PYTHON=/opt/riffcut-speech-worker/.venv/bin/python \
-  --env RIFFCUT_SPEECH_MANIFEST=/opt/riffcut-speech-worker/models.json \
-  --env RIFFCUT_SPEECH_MODEL_CACHE=/models \
-  --env RIFFCUT_WHISPER_MODEL_DIR=/models/transcription-smoke-multilingual-tiny/5359861c739e955e79d9a303bcbc70fb988958b1 \
-  "${RIFFCUT_HARNESS_IMAGE:-riffcut-harness:local}" "$@"
+  --env REDENCUT_SPEECH_WORKER_ROOT=/opt/redencut-speech-worker \
+  --env REDENCUT_SPEECH_WORKER_PYTHON=/opt/redencut-speech-worker/.venv/bin/python \
+  --env REDENCUT_SPEECH_MANIFEST=/opt/redencut-speech-worker/models.json \
+  --env REDENCUT_SPEECH_MODEL_CACHE=/models \
+  --env REDENCUT_WHISPER_MODEL_DIR=/models/transcription-smoke-multilingual-tiny/5359861c739e955e79d9a303bcbc70fb988958b1 \
+  "${REDENCUT_HARNESS_IMAGE:-redencut-harness:local}" "$@"

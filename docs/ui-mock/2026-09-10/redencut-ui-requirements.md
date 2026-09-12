@@ -1,4 +1,4 @@
-# RiffCut UI Requirements and Final Mock
+# RedenCut UI Requirements and Final Mock
 
 Date: 2026-09-10.
 This document records the requirements explicitly raised and the direction selected during the UI discussion, while distinguishing mock behavior from remaining production work.
@@ -7,7 +7,7 @@ All artifacts from this iteration are stored under `ui-mock/2026-09-10/`.
 
 ## 1. Deliverables and Opening Instructions
 
-- Final mock: [riffcut-ui-final.html](riffcut-ui-final.html).
+- Final mock: [redencut-ui-final.html](redencut-ui-final.html).
 - CSS, JavaScript, SVG icons, and demonstration data are embedded in the HTML; fonts come from the operating system.
 - Double-click the HTML or open it in a browser; no Node.js, build step, dependency installation, internet connection, or server is required.
 - The HTML can be copied independently to another directory or computer; this Markdown document is not needed at runtime.
@@ -21,7 +21,7 @@ All artifacts from this iteration are stored under `ui-mock/2026-09-10/`.
 
 ### User-confirmed direction
 
-- RiffCut's primary purpose is editing audio content.
+- RedenCut's primary purpose is editing audio content.
 - Reduce the engineering-heavy feel of the existing UI by emphasizing content and editing actions.
 - The user approved the mock's overall visual style; the final HTML should serve as the visual reference for subsequent work.
 - The supplied reference image guides visual style and similar interface elements, not the entire feature set.
@@ -121,7 +121,7 @@ This illustrates correspondence, not required character counts, exact whitespace
 - Export demonstrates format selection and progress without encoding or creating actual audio files.
 - Audio import accepts local file selections and adds demonstration tracks without decoding the audio or extracting waveforms.
 - Save uses browser local storage; if storage is blocked, the UI directs the user to Save as.
-- Save as downloads demonstration JSON that can be loaded through the mock's Open project action; it is not the production RiffCut project format.
+- Save as downloads demonstration JSON that can be loaded through the mock's Open project action; it is not the production RedenCut project format.
 - Refreshing is not guaranteed to restore all edits, layout, or playback state; use demonstration JSON to carry edited state between sessions.
 - This deliverable does not modify the existing App source code.
 
@@ -129,11 +129,11 @@ This illustrates correspondence, not required character counts, exact whitespace
 
 | File | Purpose |
 | --- | --- |
-| [riffcut-v1.html](riffcut-v1.html) | Original complete interface mock |
-| [riffcut-overlap.html](riffcut-overlap.html) | Single-column overlap markers versus local side-by-side comparison |
-| [riffcut-alignment-v1.html](riffcut-alignment-v1.html) | Earlier exploration using a proportional time scale |
-| [riffcut-alignment.html](riffcut-alignment.html) | Content-driven alignment comparison preceding the final deliverable |
-| [riffcut-ui-final.html](riffcut-ui-final.html) | Final standalone offline deliverable |
+| [redencut-v1.html](redencut-v1.html) | Original complete interface mock |
+| [redencut-overlap.html](redencut-overlap.html) | Single-column overlap markers versus local side-by-side comparison |
+| [redencut-alignment-v1.html](redencut-alignment-v1.html) | Earlier exploration using a proportional time scale |
+| [redencut-alignment.html](redencut-alignment.html) | Content-driven alignment comparison preceding the final deliverable |
+| [redencut-ui-final.html](redencut-ui-final.html) | Final standalone offline deliverable |
 
 Earlier versions remain available for traceability; retaining them does not make every alternative a final requirement.
 Screenshots from the same iteration are retained in this dated directory alongside the HTML files.
