@@ -79,3 +79,6 @@ The flow imports audio, switches to Simplified Chinese, saves, fully restarts, v
 It uses MCP for actions and only visible DOM observations for assertions; screenshots stay in the run directory.
 The [localization agent scenario](scenarios/localization-workflow.md) adds adaptive playback, edit-state, modal, and minimum-window checks to the editing baseline.
 Chinese font rendering is covered in the Linux container; system-owned native picker controls and actual macOS window/font behavior remain separate manual checks.
+
+Run `sh harness/container/run.sh npm run test:harness -- ipcErrorBridge` to verify rejected IPC descriptors across the real Electron contextBridge.
+This isolated boundary regression uses the built application preload and checks that safe reason/code/message fields survive while diagnostic fields are excluded; it complements the UI workflow.
