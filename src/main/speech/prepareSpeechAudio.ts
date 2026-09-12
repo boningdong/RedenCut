@@ -17,7 +17,7 @@ export async function withSpeechAudio<T>(
   analyze: (wavPath: string) => Promise<T>,
 ): Promise<T> {
   signal.throwIfAborted()
-  const root = await mkdtemp(join(tmpdir(), 'podcut-speech-audio-'))
+  const root = await mkdtemp(join(tmpdir(), 'riffcut-speech-audio-'))
   try {
     const output = join(root, 'analysis.wav')
     await normalize(input, output, signal)

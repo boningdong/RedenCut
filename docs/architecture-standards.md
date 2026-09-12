@@ -1,4 +1,4 @@
-# PodCut Architecture Standards
+# RiffCut Architecture Standards
 
 ## Process Boundaries
 
@@ -14,7 +14,7 @@
 - Treat [`ProjectFileSchema`](../src/shared/project.types.ts) as the source of truth for persisted project data and derive TypeScript types from its Zod schemas.
 - Keep editing non-destructive: store timeline decisions as project metadata and never modify source audio.
 - Treat the managed package schema as the first published project format; do not add adapters for the retired unpublished path-identified shape.
-- Main owns the active temporary or saved `.podcut` workspace, and renderer state uses path-free workspace and cache descriptors.
+- Main owns the active temporary or saved `.riffcut` workspace, and renderer state uses path-free workspace and cache descriptors.
 - Identify imported media with stable `AudioSourceId` values; never use filesystem paths as clip or transcript identities.
 - Keep app-wide identity and project-extension values in [`src/shared/constants.ts`](../src/shared/constants.ts).
 
@@ -42,7 +42,7 @@
 
 ## Audio Access and Caches
 
-- Serve only validated cache artifacts through `podcut://cache/<audio-source-id>/pcm` and `/waveform/<level>`; do not expose arbitrary paths or direct renderer `file://` access.
+- Serve only validated cache artifacts through `riffcut://cache/<audio-source-id>/pcm` and `/waveform/<level>`; do not expose arbitrary paths or direct renderer `file://` access.
 - Require and forward bounded byte ranges, and preserve binary MIME and CORS headers when changing the custom protocol.
 - Treat continuous Float32 PCM, binary waveform levels, and cache manifests as regenerable data; copied files under `media/` remain durable originals.
 - Resolve FFmpeg, FFprobe, and whisper.cpp binaries through [`src/main/audio/binaries.ts`](../src/main/audio/binaries.ts) so platform lookup, package fallback, caching, and actionable errors remain centralized.

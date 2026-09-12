@@ -9,8 +9,8 @@ Introduce a repositionable editor workspace and apply the approved visual design
 The delivery has three review checkpoints: user layout configuration, draggable workspace integration, and visual integration.
 Multitrack transcript projection, overlap detection, and content-driven alignment are defined in the companion [transcript projection design](2026-09-10-transcript-projection-design.md).
 
-The approved mock and requirements are located in the enclosing workspace at `docs/ui-mock/2026-09-10/podcut-ui-final.html` and `podcut-ui-requirements.md`.
-From this repository's current checkout, the enclosing workspace is `/Users/boning/Workspaces/Podcut`.
+The approved mock and requirements are located in the enclosing workspace at `docs/ui-mock/2026-09-10/riffcut-ui-final.html` and `riffcut-ui-requirements.md`.
+From this repository's current checkout, the enclosing workspace is `/Users/boning/Workspaces/RiffCut`.
 The mock is a visual reference, not production logic: do not copy simulated generation, playback, export, or timestamp allocation.
 
 ## Global constraints

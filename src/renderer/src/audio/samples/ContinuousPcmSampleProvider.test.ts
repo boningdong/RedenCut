@@ -23,7 +23,7 @@ describe('ContinuousPcmSampleProvider', () => {
 
     const chunk = await provider.readFrames(10, 2, new AbortController().signal)
 
-    expect(fetch).toHaveBeenCalledWith(`podcut://cache/${SOURCE_ID}/pcm`, {
+    expect(fetch).toHaveBeenCalledWith(`riffcut://cache/${SOURCE_ID}/pcm`, {
       headers: { Range: 'bytes=80-95' },
       signal: expect.any(AbortSignal),
     })

@@ -2,7 +2,7 @@
 
 ## Status and purpose
 
-This document is the program-level design for PodCut's speech-intelligence work.
+This document is the program-level design for RiffCut's speech-intelligence work.
 
 It records the product goals, subsystem boundaries, shared design principles, delivery order, and initial technology choices across three related subprojects.
 
@@ -76,7 +76,7 @@ Assisted Speech Generation Pipeline (future)
 
 Each high-level pipeline is one product operation. Its internal engines remain independently replaceable and testable.
 
-A general `PipelineStep<Input, Output>` framework is intentionally deferred. PodCut first defines domain interfaces whose names and contracts express the actual capability required.
+A general `PipelineStep<Input, Output>` framework is intentionally deferred. RiffCut first defines domain interfaces whose names and contracts express the actual capability required.
 
 ## Shared data principles
 
@@ -211,7 +211,7 @@ Each detected interval contains at least:
 - Aggregate ranking score.
 - Per-detector evidence and provenance.
 
-Scores initially rank suggestions; they are not presented as literal correctness probabilities without calibration on representative PodCut data.
+Scores initially rank suggestions; they are not presented as literal correctness probabilities without calibration on representative RiffCut data.
 
 User thresholds control visibility and bulk selection. They do not destroy lower-scored detector output.
 
@@ -304,7 +304,7 @@ The future plugin-system project may expose selected speech-engine capabilities 
 
 ### Model runtime and configuration
 
-The first macOS release uses an independently installed local model worker. Electron does not embed Python or model runtimes, and PodCut detects the worker and provides actionable installation guidance when it is unavailable.
+The first macOS release uses an independently installed local model worker. Electron does not embed Python or model runtimes, and RiffCut detects the worker and provides actionable installation guidance when it is unavailable.
 
 The first release uses the configured default engine and model for each pipeline and does not include a model-selection interface.
 
@@ -347,7 +347,7 @@ Representative fixtures must include:
 - Fillers, repetitions, false starts, and semantically meaningful uses of common filler-like phrases.
 - Timeline edits that move, split, mute, or duplicate source ranges.
 
-Subproject plans define exact metrics. At program level, PodCut tracks:
+Subproject plans define exact metrics. At program level, RiffCut tracks:
 
 - Transcript correctness and verbatim retention.
 - Alignment boundary error.

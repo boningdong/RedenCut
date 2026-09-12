@@ -4,7 +4,7 @@
 
 This document is the approved-design candidate for subproject 1 of the [Speech Intelligence Program Design](./2026-08-27-speech-intelligence-program-design.md): the Verbatim Speech Analysis Pipeline.
 
-It defines the canonical transcript and acoustic-alignment model, local worker boundary, project persistence, selection resolution, atomic publication, invalidation, and integration with PodCut's current project and job infrastructure.
+It defines the canonical transcript and acoustic-alignment model, local worker boundary, project persistence, selection resolution, atomic publication, invalidation, and integration with RiffCut's current project and job infrastructure.
 
 It is a detailed design, not an implementation plan. Implementation sequencing begins only after this document is reviewed and approved.
 
@@ -12,7 +12,7 @@ It is a detailed design, not an implementation plan. Implementation sequencing b
 
 ### 1.1 Goal
 
-Given one managed `AudioSource`, PodCut produces and atomically publishes one coherent speech-analysis result containing:
+Given one managed `AudioSource`, RiffCut produces and atomically publishes one coherent speech-analysis result containing:
 
 - A canonical verbatim or explicitly best-effort-verbatim transcript.
 - Reliable source-time acoustic edit units.
@@ -28,7 +28,7 @@ The result remains editable after cache cleanup and remains stable when clips mo
 - Replaceable transcription capability and provenance.
 - WhisperX alignment and diarization through a job-scoped local CLI worker.
 - Canonical domain normalization and validation in Electron main.
-- Compact speech references in `.podcut/project.json` and immutable canonical artifacts in `.podcut/speech/`.
+- Compact speech references in `.riffcut/project.json` and immutable canonical artifacts in `.riffcut/speech/`.
 - Text-selection resolution to acoustically addressable source ranges.
 - Atomic publication, cancellation, and invalidation.
 - Path-free renderer projections and speaker-label editing.
@@ -61,10 +61,10 @@ SpeechAnalysisCoordinator (Electron main)
       └── atomic workspace publication
                     │
                     ▼
-        .podcut/project.json ── SpeechArtifactRef
+        .riffcut/project.json ── SpeechArtifactRef
                                     │ path + SHA-256
                                     ▼
-                 .podcut/speech/<audio-source-id>/
+                 .riffcut/speech/<audio-source-id>/
                    revision-<analysis-revision-id>.json
 ```
 
@@ -150,7 +150,7 @@ type AcousticEditUnit = {
 
 An `AcousticEditUnit` is the smallest range that the Alignment Engine can locate reliably and that text-driven editing must treat atomically.
 
-One acoustic edit unit contains one or more consecutive transcript units. For example, if the visible units `觉` and `得` cannot be aligned independently but `觉得` can be aligned to `0.75–1.18`, both units belong to the same acoustic edit unit. PodCut must not average that interval into fabricated character timestamps.
+One acoustic edit unit contains one or more consecutive transcript units. For example, if the visible units `觉` and `得` cannot be aligned independently but `觉得` can be aligned to `0.75–1.18`, both units belong to the same acoustic edit unit. RiffCut must not average that interval into fabricated character timestamps.
 
 ```text
 Transcript:  … 觉 │ 得 …
@@ -242,7 +242,7 @@ type SpeakerAttributionArtifact = {
 
 Speaker IDs are anonymous and local to one analysis revision. The diarization adapter's raw label, such as `SPEAKER_00`, becomes the immutable `diarizationLabel`; normalization creates the corresponding `Speaker` and rewrites turns and attributions to its `SpeakerId`. Overlap is allowed in diarization turns. Attribution uses overlap duration and deterministic tie rules, but records unsupported or ambiguous assignments instead of inventing certainty.
 
-`defaultDisplayName` is the generated user-facing label, such as `Speaker 1`. A user who knows the participant may enter a real name through a `SpeakerLabelOverride`, but PodCut does not infer or verify real-world identity from the voice. User edits never mutate the speaker ID, raw diarization label, turns, or attribution.
+`defaultDisplayName` is the generated user-facing label, such as `Speaker 1`. A user who knows the participant may enter a real name through a `SpeakerLabelOverride`, but RiffCut does not infer or verify real-world identity from the voice. User edits never mutate the speaker ID, raw diarization label, turns, or attribution.
 
 The immutable `Speaker[]` catalog is stored in `SpeechArtifact`; the small mutable override array is stored in `project.json`. Reanalysis may produce different speaker IDs. The first version must require explicit confirmation before replacing an analysis containing user-named speakers; it does not silently transfer or discard names without a verified mapping.
 
@@ -286,7 +286,7 @@ type SpeechArtifact = {
 }
 ```
 
-The large payload is stored at `.podcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`. `ProjectFile` stores only one compact reference per currently analyzed source:
+The large payload is stored at `.riffcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`. `ProjectFile` stores only one compact reference per currently analyzed source:
 
 ```ts
 type SpeechArtifactRef = {
@@ -338,7 +338,7 @@ Some speech units may remain unaligned when evidence is insufficient. This is re
 
 ## 5. Runtime indexes
 
-On project load and after successful publication, PodCut builds:
+On project load and after successful publication, RiffCut builds:
 
 ```ts
 Map<TranscriptUnitId, AcousticEditUnitId>
@@ -487,14 +487,14 @@ interface IDiarizationEngine {
 }
 ```
 
-Engine results are adapter DTOs, not persisted project types. Main-process normalization assigns PodCut IDs, converts units and times, validates provenance, and constructs the canonical artifacts.
+Engine results are adapter DTOs, not persisted project types. Main-process normalization assigns RiffCut IDs, converts units and times, validates provenance, and constructs the canonical artifacts.
 
 The initial technology roles are named explicitly throughout code, diagnostics, and documentation:
 
 - whisper.cpp is the Transcriber (`best-effort-verbatim` transcription).
 - WhisperX is the Alignment Engine adapter (forced alignment).
 - pyannote.audio through the worker is the Diarization Engine (anonymous speaker separation).
-- The PodCut Python worker is the process host for alignment and diarization, not an engine or model itself.
+- The RiffCut Python worker is the process host for alignment and diarization, not an engine or model itself.
 
 The first version uses fixed default engine and model descriptors. Configuration is centralized so a future UI can select transcription, alignment, diarization, disfluency, and generation models independently.
 
@@ -595,7 +595,7 @@ Renderer code never appends `audioSourceId` or `trackId` to engine results and n
 
 ### 10.1 Durable standard artifacts
 
-The first version stores the following complete immutable payload in `.podcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`:
+The first version stores the following complete immutable payload in `.riffcut/speech/<audioSourceId>/revision-<analysisRevisionId>.json`:
 
 - `TranscriptArtifact` and `TranscriptUnit[]`.
 - `AlignmentArtifact` and `AcousticEditUnit[]`.
@@ -604,7 +604,7 @@ The first version stores the following complete immutable payload in `.podcut/sp
 - Engine, model, and configuration provenance.
 - Source fingerprint and analysis revision.
 
-The compact `SpeechArtifactRef[]`, `SpeakerLabelOverride[]`, and non-destructive user edits remain in `.podcut/project.json`. These are all project data, not cache. Cleaning `.podcut/cache` must not remove `.podcut/speech`, canonical transcripts, acoustic edit units, speakers, display-name overrides, or user edits.
+The compact `SpeechArtifactRef[]`, `SpeakerLabelOverride[]`, and non-destructive user edits remain in `.riffcut/project.json`. These are all project data, not cache. Cleaning `.riffcut/cache` must not remove `.riffcut/speech`, canonical transcripts, acoustic edit units, speakers, display-name overrides, or user edits.
 
 Speech artifacts use UTF-8 JSON with stable field ordering and no insignificant whitespace. One canonical encoder owns serialization for both hashing and disk writes; implementations must not independently stringify an equivalent object and assume identical bytes.
 
@@ -713,7 +713,7 @@ The existing behavior that toggles `Word.muted` separately from timeline clip ed
 
 The existing manual operation that shifts timing fields on individual words is incompatible with the new model. Any retained timing-calibration feature must operate on or regenerate a whole validated `AlignmentArtifact`; it cannot mutate `TranscriptUnit` or create per-character pseudo-timing.
 
-## 13. Integration assessment against current PodCut
+## 13. Integration assessment against current RiffCut
 
 ### 13.1 Conflict matrix
 

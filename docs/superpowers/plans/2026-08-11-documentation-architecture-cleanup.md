@@ -45,7 +45,7 @@ Document only current, enforceable invariants:
 - Electron process boundaries and typed IPC;
 - Zustand state ownership and Zod-derived persisted types;
 - non-destructive editing and legacy project compatibility;
-- `podcut://` audio access and regenerable peak caches;
+- `riffcut://` audio access and regenerable peak caches;
 - `IAudioPlayer`, preferred WebCodecs playback, and supported `SimpleAudioPlayer` fallback;
 - AudioWorklet FIFO alignment, native sample-rate construction, and persistent processor lifetime;
 - `ITranscriber` and the current local whisper.cpp implementation; and

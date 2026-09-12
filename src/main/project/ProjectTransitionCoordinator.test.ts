@@ -68,7 +68,9 @@ function harness(controller: WorkspaceController, overrides: Record<string, unkn
 describe('ProjectTransitionCoordinator', () => {
   it('keeps the exact current session for dirty Cancel and temporary Save As cancellation', async () => {
     const controller = new WorkspaceController()
-    const current = await controller.initialize(await mkdtemp(join(tmpdir(), 'podcut-transition-')))
+    const current = await controller.initialize(
+      await mkdtemp(join(tmpdir(), 'riffcut-transition-')),
+    )
     const cancelled = harness(controller, {
       chooseDirtyAction: vi.fn(async () => 'cancel' as const),
     })
@@ -95,14 +97,14 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('reports save failure without selecting or preparing a candidate', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const initial = await controller.initialize(parent)
-    const current = await controller.saveAs(join(parent, 'Current.podcut'), {
+    const current = await controller.saveAs(join(parent, 'Current.riffcut'), {
       ...initial,
       draft: initial.draft,
     })
     vi.spyOn(ProjectWorkspace.prototype, 'save').mockRejectedValueOnce(new Error('disk failed'))
-    const candidate = await packageRoot(parent, 'Candidate.podcut')
+    const candidate = await packageRoot(parent, 'Candidate.riffcut')
     const { coordinator, dependencies } = harness(controller, {
       chooseDirtyAction: vi.fn(async () => 'save' as const),
       chooseOpenDestination: vi.fn(async () => candidate),
@@ -118,9 +120,9 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('discards dirty edits without saving before switching', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
-    const candidate = await packageRoot(parent, 'Candidate.podcut')
+    const candidate = await packageRoot(parent, 'Candidate.riffcut')
     const save = vi.spyOn(ProjectWorkspace.prototype, 'save')
     save.mockClear()
     const { coordinator } = harness(controller, {
@@ -136,10 +138,10 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('uses a successful Save As as the rollback point when candidate validation later fails', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
-    const destination = join(parent, 'Saved.podcut')
-    const missingCandidate = join(parent, 'Missing.podcut')
+    const destination = join(parent, 'Saved.riffcut')
+    const missingCandidate = join(parent, 'Missing.riffcut')
     const { coordinator } = harness(controller, {
       chooseDirtyAction: vi.fn(async () => 'save' as const),
       chooseSaveDestination: vi.fn(async () => destination),
@@ -163,10 +165,10 @@ describe('ProjectTransitionCoordinator', () => {
     ['acknowledgement failure', 'switch-unacknowledged'],
   ] as const)('returns the advanced Save As rollback after %s', async (failure, reason) => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
-    const destination = join(parent, 'Saved.podcut')
-    const candidate = await packageRoot(parent, 'Candidate.podcut')
+    const destination = join(parent, 'Saved.riffcut')
+    const candidate = await packageRoot(parent, 'Candidate.riffcut')
     const configured = harness(controller, {
       chooseDirtyAction: vi.fn(async () => 'save' as const),
       chooseSaveDestination: vi.fn(async () => destination),
@@ -206,10 +208,10 @@ describe('ProjectTransitionCoordinator', () => {
     'settles starting-token jobs before releasing a retired temporary workspace on %s',
     async (_failure, candidateSelection) => {
       const controller = new WorkspaceController()
-      const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+      const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
       const current = await controller.initialize(parent)
       const oldRoot = controller.workspace.root
-      const destination = join(parent, 'Saved.podcut')
+      const destination = join(parent, 'Saved.riffcut')
       const jobs = new SessionJobRegistry()
       const settlement = deferred()
       const cancel = vi.fn(async () => {
@@ -234,7 +236,7 @@ describe('ProjectTransitionCoordinator', () => {
         chooseDirtyAction: async () => 'save',
         chooseSaveDestination: async () => destination,
         chooseOpenDestination: async () =>
-          candidateSelection === null ? null : join(parent, 'Missing.podcut'),
+          candidateSelection === null ? null : join(parent, 'Missing.riffcut'),
       })
 
       const result = await coordinator.openDialog(sender(), request(current, true))
@@ -252,10 +254,10 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('retains a retired temporary root when starting-token settlement fails', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
     const oldRoot = controller.workspace.root
-    const destination = join(parent, 'Saved.podcut')
+    const destination = join(parent, 'Saved.riffcut')
     const jobs = new SessionJobRegistry()
     jobs.register(
       {
@@ -291,10 +293,10 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('settles the starting token before releasing a retired temporary workspace when candidate selection rejects', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
     const oldRoot = controller.workspace.root
-    const destination = join(parent, 'Saved.podcut')
+    const destination = join(parent, 'Saved.riffcut')
     const selection = deferred<string | null>()
     const jobs = new SessionJobRegistry()
     const settled = deferred()
@@ -340,10 +342,10 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('retains the retired temporary root and returns the advanced rollback when selection rejection settlement fails', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
     const oldRoot = controller.workspace.root
-    const destination = join(parent, 'Saved.podcut')
+    const destination = join(parent, 'Saved.riffcut')
     const jobs = new SessionJobRegistry()
     jobs.register(
       {
@@ -382,7 +384,9 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('maps candidate selection rejection without Save As to a stayed result without settling jobs', async () => {
     const controller = new WorkspaceController()
-    const current = await controller.initialize(await mkdtemp(join(tmpdir(), 'podcut-transition-')))
+    const current = await controller.initialize(
+      await mkdtemp(join(tmpdir(), 'riffcut-transition-')),
+    )
     const configured = harness(controller, {
       chooseOpenDestination: vi.fn(async () => Promise.reject(new Error('selection failed'))),
     })
@@ -401,11 +405,11 @@ describe('ProjectTransitionCoordinator', () => {
     ['candidate validation failure', 'missing', 'candidate-invalid'],
   ] as const)('keeps the current project after %s', async (_name, selected, reason) => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
     const { coordinator } = harness(controller, {
       chooseOpenDestination: vi.fn(async () =>
-        selected === null ? null : join(parent, 'Missing.podcut'),
+        selected === null ? null : join(parent, 'Missing.riffcut'),
       ),
     })
 
@@ -418,9 +422,9 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('does not reopen or commit a session when shutdown interrupts acknowledgement', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
-    const candidate = await packageRoot(parent, 'Candidate.podcut')
+    const candidate = await packageRoot(parent, 'Candidate.riffcut')
     const { coordinator, jobs, barrier } = harness(controller, {
       chooseOpenDestination: vi.fn(async () => candidate),
     })
@@ -437,14 +441,14 @@ describe('ProjectTransitionCoordinator', () => {
     'rejects a %s overlapping candidate before closing jobs or requesting playback teardown',
     async (kind) => {
       const controller = new WorkspaceController()
-      const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+      const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
       const current = await controller.initialize(parent)
       const temporaryRoot = controller.workspace.root
       let candidate: string
       if (kind === 'nested') {
-        candidate = await packageRoot(temporaryRoot, 'Nested.podcut')
+        candidate = await packageRoot(temporaryRoot, 'Nested.riffcut')
       } else {
-        candidate = join(parent, 'Alias.podcut')
+        candidate = join(parent, 'Alias.riffcut')
         await symlink(temporaryRoot, candidate, 'dir')
       }
       const configured = harness(controller, {
@@ -470,9 +474,9 @@ describe('ProjectTransitionCoordinator', () => {
     ['playback acknowledgement', 'switch-unacknowledged'],
   ] as const)('reopens the rollback token after %s failure', async (failure, reason) => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
-    const candidate = await packageRoot(parent, 'Candidate.podcut')
+    const candidate = await packageRoot(parent, 'Candidate.riffcut')
     const { coordinator, jobs, barrier } = harness(controller, {
       chooseOpenDestination: vi.fn(async () => candidate),
     })
@@ -492,11 +496,11 @@ describe('ProjectTransitionCoordinator', () => {
 
   it('settles the starting and rollback tokens in order, switches, and deletes only temporary roots', async () => {
     const controller = new WorkspaceController()
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-transition-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-transition-'))
     const current = await controller.initialize(parent)
     const oldTemporaryRoot = controller.workspace.root
-    const savedRoot = join(parent, 'Saved.podcut')
-    const candidate = await packageRoot(parent, 'Candidate.podcut')
+    const savedRoot = join(parent, 'Saved.riffcut')
+    const candidate = await packageRoot(parent, 'Candidate.riffcut')
     const events: string[] = []
     const jobs = {
       beginClosing: vi.fn((token) => events.push(`close:${token}`)),

@@ -69,7 +69,7 @@ describe('SpeechWorkerClient', () => {
 
   it('rejects without an uncaught EPIPE when the worker cannot start', async () => {
     await expect(
-      new SpeechWorkerClient('/definitely/missing/podcut-speech-worker', []).run(
+      new SpeechWorkerClient('/definitely/missing/riffcut-speech-worker', []).run(
         request,
         new AbortController().signal,
       ),

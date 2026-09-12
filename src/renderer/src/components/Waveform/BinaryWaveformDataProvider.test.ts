@@ -37,7 +37,7 @@ describe('BinaryWaveformDataProvider', () => {
     })
 
     expect(fetch).toHaveBeenCalledWith(
-      `podcut://cache/${descriptor.audioSourceId}/waveform/256`,
+      `riffcut://cache/${descriptor.audioSourceId}/waveform/256`,
       expect.objectContaining({ headers: { Range: 'bytes=0-303' } }),
     )
     expect(result.buckets.slice(0, 2)).toEqual([

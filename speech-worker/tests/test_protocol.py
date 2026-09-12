@@ -3,8 +3,8 @@ import json
 import unittest
 from unittest.mock import patch
 
-from podcut_speech_worker.__main__ import run
-from podcut_speech_worker.protocol import ProtocolError, parse_request
+from riffcut_speech_worker.__main__ import run
+from riffcut_speech_worker.protocol import ProtocolError, parse_request
 
 
 def request():
@@ -32,8 +32,8 @@ class ProtocolTest(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             parse_request(candidate)
 
-    @patch("podcut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}})
-    @patch("podcut_speech_worker.__main__.align", return_value={"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}})
+    @patch("riffcut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}})
+    @patch("riffcut_speech_worker.__main__.align", return_value={"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}})
     def test_emits_one_correlated_result_and_machine_readable_progress(self, _align, _diarize):
         output = io.StringIO()
         code = run(io.StringIO(json.dumps(request()) + "\n"), output)
@@ -49,8 +49,8 @@ class ProtocolTest(unittest.TestCase):
         self.assertNotEqual(0, code)
         self.assertEqual(["error"], [m["type"] for m in messages])
 
-    @patch("podcut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}})
-    @patch("podcut_speech_worker.__main__.align", return_value={"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}})
+    @patch("riffcut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}})
+    @patch("riffcut_speech_worker.__main__.align", return_value={"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}})
     def test_accepts_a_long_audio_request_above_the_legacy_one_mibibyte_limit(self, _align, _diarize):
         candidate = request()
         candidate["transcriptUnits"] = [

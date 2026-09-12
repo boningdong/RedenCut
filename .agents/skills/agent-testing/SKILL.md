@@ -1,6 +1,6 @@
 ---
 name: agent-testing
-description: Use when completing a user-visible PodCut feature or behavior fix, or when asked to exercise PodCut through its Docker MCP harness. Not for unrelated apps or documentation-only changes.
+description: Use when completing a user-visible RiffCut feature or behavior fix, or when asked to exercise RiffCut through its Docker MCP harness. Not for unrelated apps or documentation-only changes.
 ---
 
 # Agent Testing

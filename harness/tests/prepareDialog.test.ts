@@ -16,7 +16,7 @@ import { HarnessDialogMailbox } from '../../src/main/dialogs/HarnessDialogMailbo
 const roots: string[] = []
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
 function setup() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'podcut-dialog-')))
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'riffcut-dialog-')))
   roots.push(root)
   const fixtures = join(root, 'e2e/fixtures/audio')
   mkdirSync(fixtures, { recursive: true })
@@ -43,7 +43,7 @@ test('refuses to replace a pending reply and invalidates a mismatched reply', ()
   const { root, run, mailbox } = setup()
   const request = {
     purpose: 'save-project',
-    selection: { type: 'project', name: 'episode.podcut' },
+    selection: { type: 'project', name: 'episode.riffcut' },
   } as const
   prepareDialog(root, run, 1, request)
   expect(() => prepareDialog(root, run, 1, request)).toThrow('DIALOG_ALREADY_PREPARED')
@@ -86,11 +86,11 @@ test('rejects fixture symlink escapes and non-files', () => {
 })
 test('save cannot overwrite and open requires an existing project directory within the run', () => {
   const { root, run, mailbox } = setup()
-  const selection = { type: 'project', name: 'episode.podcut' } as const
+  const selection = { type: 'project', name: 'episode.riffcut' } as const
   expect(() => prepareDialog(root, run, 1, { purpose: 'open-project', selection })).toThrow()
   prepareDialog(root, run, 1, { purpose: 'save-project', selection })
   const destination = mailbox.consume('save-project')!
-  expect(destination).toBe(join(run, 'projects/episode.podcut'))
+  expect(destination).toBe(join(run, 'projects/episode.riffcut'))
   mkdirSync(destination)
   expect(() => prepareDialog(root, run, 1, { purpose: 'save-project', selection })).toThrow(
     'PROJECT_ALREADY_EXISTS',
@@ -100,7 +100,7 @@ test('save cannot overwrite and open requires an existing project directory with
 })
 test('project names and project-root symlinks cannot escape the run', () => {
   const { root, run } = setup()
-  for (const name of ['../outside.podcut', '/tmp/out.podcut', 'bad\\out.podcut', 'bare'])
+  for (const name of ['../outside.riffcut', '/tmp/out.riffcut', 'bad\\out.riffcut', 'bare'])
     expect(() =>
       prepareDialog(root, run, 1, {
         purpose: 'save-project',
@@ -111,7 +111,7 @@ test('project names and project-root symlinks cannot escape the run', () => {
   expect(() =>
     prepareDialog(root, run, 1, {
       purpose: 'save-project',
-      selection: { type: 'project', name: 'out.podcut' },
+      selection: { type: 'project', name: 'out.riffcut' },
     }),
   ).toThrow()
 })
@@ -120,7 +120,7 @@ test('consumption rejects a project parent replaced by an outside symlink after 
   const { root, run, mailbox } = setup()
   prepareDialog(root, run, 1, {
     purpose: 'save-project',
-    selection: { type: 'project', name: 'out.podcut' },
+    selection: { type: 'project', name: 'out.riffcut' },
   })
   rmSync(join(run, 'projects'), { recursive: true })
   symlinkSync(root, join(run, 'projects'))

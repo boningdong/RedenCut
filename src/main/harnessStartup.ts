@@ -3,8 +3,8 @@ interface HarnessApplication {
 }
 
 export function configureHarnessStartup(app: HarnessApplication, env: NodeJS.ProcessEnv): boolean {
-  const directory = env.PODCUT_HARNESS_RUN_DIRECTORY
-  const runId = env.PODCUT_HARNESS_RUN_ID
+  const directory = env.RIFFCUT_HARNESS_RUN_DIRECTORY
+  const runId = env.RIFFCUT_HARNESS_RUN_ID
   if (!directory && !runId) return false
   if (
     !directory ||

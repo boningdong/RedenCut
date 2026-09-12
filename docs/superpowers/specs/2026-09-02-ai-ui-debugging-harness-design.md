@@ -1,11 +1,11 @@
-# Podcut AI UI Debugging Harness
+# RiffCut AI UI Debugging Harness
 
 Date: 2026-09-02
 Status: Gates A/B passed local revalidation on September 5 within the coverage recorded in section 13; the original September 3 checkpoint is retained in section 12; Gates C/D remain unimplemented.
 
 ## 1. Goal and scope
 
-Build a local macOS-first harness that lets an AI start an isolated, visible Podcut instance, operate its real UI, inspect evidence, restart it after code changes, and repeat the same workflow.
+Build a local macOS-first harness that lets an AI start an isolated, visible RiffCut instance, operate its real UI, inspect evidence, restart it after code changes, and repeat the same workflow.
 Expose application control and UI automation through one MCP entry point, without a separate user-facing CLI.
 The immediate deliverable is infrastructure bring-up, not a broad collection of UI tests.
 
@@ -21,7 +21,7 @@ Playback UI verification does not establish subjective audio quality; sample-lev
 ## 2. Confirmed architecture decisions
 
 - A Node harness runtime owns Electron startup, shutdown, restart, isolation, and artifacts.
-- A custom Podcut Harness MCP server is the only AI-facing entry point.
+- A custom RiffCut Harness MCP server is the only AI-facing entry point.
 - Reuse official Playwright MCP UI tools through its programmatic interface, passing the BrowserContext owned by the Electron launcher.
 - Do not introduce a second CDP attachment as the default UI connection.
 - Runtime alone owns application lifecycle; one trace manager owns trace recording.
@@ -50,7 +50,7 @@ An in-memory MCP client/server transport pair can connect the facade to the upst
 
 ### MCP composition
 
-The external server exposes a curated combination of `podcut_*` application tools and upstream UI tools.
+The external server exposes a curated combination of `riffcut_*` application tools and upstream UI tools.
 Use the official `createConnection(config, contextGetter)` entry point rather than importing Playwright's private backend classes or copying their implementation.
 The adapter must use supported MCP transport/client APIs to obtain and forward upstream schemas and tool results where needed.
 Prove tool aggregation, image forwarding, adapter disposal, and context ownership in the first compatibility probe.
@@ -68,14 +68,14 @@ Scenario selection and native-dialog preparation below are deferred to Gate C; t
 
 | Tool                      | Contract                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `podcut_start`            | Start one isolated run from an allowed scenario/configuration; return run identity and readiness             |
-| `podcut_status`           | Report run state, current generation, startup stage, available diagnostics, and errors                       |
-| `podcut_restart`          | Explicitly rebuild/restart as requested, retaining the isolated project unless reset is explicitly requested |
-| `podcut_stop`             | Stop the owned application with bounded cleanup and preserve artifacts                                       |
-| `podcut_list_scenarios`   | Describe available fixtures and their dependency requirements                                                |
-| `podcut_prepare_dialog`   | Register one typed, purpose-specific native-dialog response before the UI action                             |
-| `podcut_read_diagnostics` | Read narrow product/run state without mutating editing state                                                 |
-| `podcut_list_artifacts`   | List evidence for the selected run/generation                                                                |
+| `riffcut_start`            | Start one isolated run from an allowed scenario/configuration; return run identity and readiness             |
+| `riffcut_status`           | Report run state, current generation, startup stage, available diagnostics, and errors                       |
+| `riffcut_restart`          | Explicitly rebuild/restart as requested, retaining the isolated project unless reset is explicitly requested |
+| `riffcut_stop`             | Stop the owned application with bounded cleanup and preserve artifacts                                       |
+| `riffcut_list_scenarios`   | Describe available fixtures and their dependency requirements                                                |
+| `riffcut_prepare_dialog`   | Register one typed, purpose-specific native-dialog response before the UI action                             |
+| `riffcut_read_diagnostics` | Read narrow product/run state without mutating editing state                                                 |
+| `riffcut_list_artifacts`   | List evidence for the selected run/generation                                                                |
 
 Do not expose a general main-process JavaScript evaluator as an application tool.
 Exclude or mediate upstream tools that close the application/context, start an independent trace, or escape the intended application target.
@@ -127,7 +127,7 @@ Make that precondition check before the destructive part of the restart transact
 
 As a first-version design default, ordinary MCP transport closure or host SIGTERM initiates bounded cleanup of its owned Electron instance.
 Unexpected host death must be covered by orphan detection/recovery checks; graceful signal handlers alone do not prove cleanup after a hard kill.
-Recovery must validate run ownership and process identity before acting, and must never stop the user's ordinary Podcut process based on its name alone.
+Recovery must validate run ownership and process identity before acting, and must never stop the user's ordinary RiffCut process based on its name alone.
 
 ## 5. Startup protocol and isolation
 
@@ -215,12 +215,12 @@ The first implementation plan should focus on Gates A and B; C and D extend the 
 - Record and inspect a trace containing the relevant UI actions and screenshot evidence.
 - Fail explicitly if public shared-context composition is unavailable or ownership semantics cannot be made reliable.
 
-Gate A is a compatibility test, not proof that the full Podcut workflows pass.
+Gate A is a compatibility test, not proof that the full RiffCut workflows pass.
 Do not bypass a failure by importing private upstream objects, creating a second CDP connection, or replacing official tools without user confirmation.
 
 ### Gate B: host and lifecycle
 
-- Apply the lifecycle host to the real Podcut empty state; fixture import and dialog-dependent workflows are not required yet.
+- Apply the lifecycle host to the real RiffCut empty state; fixture import and dialog-dependent workflows are not required yet.
 - Expose lifecycle and UI tools through the single MCP facade without a separate CLI.
 - Exercise start, status, stop, explicit restart, and adapter recreation.
 - Verify application-not-ready and stale-generation behavior.
@@ -229,9 +229,9 @@ Do not bypass a failure by importing private upstream objects, creating a second
 - Verify graceful host disconnect, application crash, startup timeout, and recoverable evidence.
 - Check for owned child-process leaks and report any hard-kill recovery limitations.
 
-### Gate C: real Podcut boundaries
+### Gate C: real RiffCut boundaries
 
-- Apply the same runtime to the real Podcut build.
+- Apply the same runtime to the real RiffCut build.
 - Prove native-dialog replies, actual audio import/cache generation, waveform readiness, project opening, save, and reopen.
 - Confirm that product code follows normal preload/IPC boundaries.
 
@@ -250,10 +250,10 @@ Harness implementation belongs under a dedicated repository-level `harness/` dir
 Follow [file organization standards](../../file-organization-standards.md); keep artifact-management code under `harness/artifacts/` and store generated evidence separately.
 Harness unit and integration tests belong in `harness/tests/` and verify the infrastructure itself, including lifecycle and MCP integration.
 Product-level E2E tests belong in a separate repository-level `e2e/` directory alongside `harness/` and `src/`, not inside `harness/`.
-They verify Podcut user workflows and reuse the harness runtime without moving product scenarios into the harness's own tests.
+They verify RiffCut user workflows and reuse the harness runtime without moving product scenarios into the harness's own tests.
 
 ```text
-Podcut/
+RiffCut/
 ├── src/                 # Product implementation and existing unit tests
 ├── harness/             # Reusable UI debugging infrastructure
 │   ├── artifacts/       # Artifact-management code, not generated output
@@ -279,7 +279,7 @@ Confirmed from public interfaces/source:
 - [External trace merge discussion](https://github.com/microsoft/playwright/issues/40915) distinguishes context traces from test-runner traces.
 
 Initial research inspected moving upstream sources; Gates A/B now exercise the installed version set below through real Electron and MCP traffic.
-Successful runs demonstrate the infrastructure and the real Podcut empty state; the September 3 Main-startup timeouts and subsequent September 5 revalidation are recorded below.
+Successful runs demonstrate the infrastructure and the real RiffCut empty state; the September 3 Main-startup timeouts and subsequent September 5 revalidation are recorded below.
 Editing workflows in Gates C/D have not been tested.
 
 ## 11. Review boundary
@@ -299,7 +299,7 @@ In this pinned version, overriding the executable bypasses the upstream loader's
 | Gate       | Verified behavior                                                                                                                                                                                                                                         |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A          | Public shared-context injection, real MCP discovery/click/PNG forwarding, Main access, trace action/screenshots, adapter disposal without closing Electron                                                                                                |
-| B          | Real Podcut readiness, isolated paths/locks, loopback debug listeners, lifecycle tools, explicit rebuild/restart, fresh-generation snapshots, logs/traces, ordinary disconnect/SIGTERM cleanup                                                            |
+| B          | Real RiffCut readiness, isolated paths/locks, loopback debug listeners, lifecycle tools, explicit rebuild/restart, fresh-generation snapshots, logs/traces, ordinary disconnect/SIGTERM cleanup                                                            |
 | B failures | Readiness/adapter timeouts, crash during adapter creation, late-adapter disposal, uncertain UI timeout with no replay, shutdown during launch, close-failure retry, artifact-write failure cleanup, host hard-kill detection with process-identity checks |
 
 Current full verification commands are `npm run format`, `npm run check`, and `npm run test:harness:all`; the September 3 results below predate the normal/fault suite split.
@@ -334,7 +334,7 @@ Treat retained snapshots, logs and traces as local debugging data; there is no a
 - Dirty/busy observations cover current renderer session state, import and transcription; they do not yet constitute full product-job or native-dialog coordination.
 - A failed/uncertain UI generation requires an explicit restart/stop decision; failed mutations are never replayed automatically.
 - Transport shutdown may discard unsaved work to stop the owned application; ordinary explicit stop/restart requires settled work and saved edits or `discardUnsaved`.
-- Host SIGKILL cannot run cleanup handlers: `podcut_status` reports matching surviving Electron processes, but recovery remains manual and must revalidate process identity before termination.
+- Host SIGKILL cannot run cleanup handlers: `riffcut_status` reports matching surviving Electron processes, but recovery remains manual and must revalidate process identity before termination.
 - Cleanup is tested for the owned Electron process in these scenarios, not guaranteed for every OS-level descendant after arbitrary host failure.
 - Each generation records a fresh checkout/dependency observation, including after rebuild; this is not a content-addressed attestation of prebuilt output.
 - System dependencies/models, real media/transcription workflows, root-level product `e2e/`, Windows, CI, HMR and AI-client integration are not part of this acceptance.

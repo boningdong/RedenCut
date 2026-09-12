@@ -10,7 +10,7 @@ const execute = promisify(execFile)
 
 test('private container output captures silence and an audible signal then closes the recorder', async () => {
   requireContainerAudio()
-  const directory = await mkdtemp(join(tmpdir(), 'podcut-audio-test-'))
+  const directory = await mkdtemp(join(tmpdir(), 'riffcut-audio-test-'))
   let capture: AudioCapture | undefined
   try {
     capture = await AudioCapture.start(directory, 'silence')
@@ -36,7 +36,7 @@ test('private container output captures silence and an audible signal then close
       input,
     ])
     // paplay waits for the sink to drain; a muxer finishing its write is not playback completion.
-    await execute('paplay', ['--device=podcut_test', input])
+    await execute('paplay', ['--device=riffcut_test', input])
     const tone = await capture.stop()
     const { stdout: samples } = await execute(
       'ffmpeg',
@@ -53,7 +53,7 @@ test('private container output captures silence and an audible signal then close
 
 test('capture refuses overlap and existing output, and releases ownership after failed startup', async () => {
   requireContainerAudio()
-  const directory = await mkdtemp(join(tmpdir(), 'podcut-audio-failure-'))
+  const directory = await mkdtemp(join(tmpdir(), 'riffcut-audio-failure-'))
   let first: AudioCapture | undefined
   let second: AudioCapture | undefined
   try {

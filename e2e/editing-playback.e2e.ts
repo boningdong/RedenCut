@@ -82,7 +82,7 @@ test('split and drag survive save and reopen as visible clips with audible playb
   try {
     // Import real audio through MCP and wait for visible waveform pixels.
     await ui.start()
-    await ui.call('podcut_prepare_dialog', {
+    await ui.call('riffcut_prepare_dialog', {
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },
     })
     await ui.call('browser_click', { target: 'button:text-is("+ Add Track")' })
@@ -123,14 +123,14 @@ test('split and drag survive save and reopen as visible clips with audible playb
     await ui.screenshot('moved')
 
     // Save and fully restart; compare the reopened visible layout with the edited layout.
-    const selection = { type: 'project', name: 'edited-audio.podcut' }
-    await ui.call('podcut_prepare_dialog', { request: { purpose: 'save-project', selection } })
+    const selection = { type: 'project', name: 'edited-audio.riffcut' }
+    await ui.call('riffcut_prepare_dialog', { request: { purpose: 'save-project', selection } })
     await ui.call('browser_click', { target: 'button:text-is("Save")' })
     await expect
       .poll(() => ui.page.locator('header .project-name').innerText())
       .toContain('edited-audio')
     await ui.restart()
-    await ui.call('podcut_prepare_dialog', { request: { purpose: 'open-project', selection } })
+    await ui.call('riffcut_prepare_dialog', { request: { purpose: 'open-project', selection } })
     await ui.call('browser_click', { target: 'button:text-is("Open Project")' })
     await drawnWaveforms(ui.page, 2)
     const reopened = await layout(ui.page)
@@ -152,7 +152,7 @@ test('split and drag survive save and reopen as visible clips with audible playb
       join(ui.directory, 'editing-observations.json'),
       JSON.stringify({ split, moved, reopened, levels }, null, 2),
     )
-    await ui.call('podcut_stop')
+    await ui.call('riffcut_stop')
   } catch (error) {
     // Preserve failure screenshots; always finalize recording before releasing the app session.
     if (ui.directory) {
@@ -177,7 +177,7 @@ test('play pause seek and resume control visible time and real container audio',
   try {
     // Import through the UI and wait for the rendered waveform.
     await ui.start()
-    await ui.call('podcut_prepare_dialog', {
+    await ui.call('riffcut_prepare_dialog', {
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },
     })
     await ui.call('browser_click', { target: 'button:text-is("+ Add Track")' })
@@ -237,7 +237,7 @@ test('play pause seek and resume control visible time and real container audio',
       JSON.stringify({ pausedAt, playing, quiet, resumed }, null, 2),
     )
     await ui.screenshot('resumed-then-paused')
-    await ui.call('podcut_stop', { discardUnsaved: true })
+    await ui.call('riffcut_stop', { discardUnsaved: true })
   } catch (error) {
     // Preserve failure screenshots; always finalize recording before releasing the app session.
     if (ui.directory) {

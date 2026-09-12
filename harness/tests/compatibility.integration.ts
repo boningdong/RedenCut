@@ -25,7 +25,7 @@ test('forwards official MCP UI actions and images without transferring Electron 
   await mkdir(outputRoot, { recursive: true })
   const outputDir = await mkdtemp(join(outputRoot, 'compatibility-'))
   const env = electronEnvironment({ ...process.env, SECRET_TOKEN: 'sentinel-do-not-record' })
-  env.PODCUT_HARNESS_RUN_DIRECTORY = outputDir
+  env.RIFFCUT_HARNESS_RUN_DIRECTORY = outputDir
   const application = await _electron.launch({
     args: [resolve('harness/tests/fixtures/minimal-electron.cjs')],
     env,
@@ -34,7 +34,7 @@ test('forwards official MCP UI actions and images without transferring Electron 
   const child = application.process()
   let adapter: PlaywrightMcpAdapter | undefined
   let failure: unknown
-  const client = new Client({ name: 'podcut-gate-a', version: '1.0.0' })
+  const client = new Client({ name: 'riffcut-gate-a', version: '1.0.0' })
   try {
     expect(
       await deadline(

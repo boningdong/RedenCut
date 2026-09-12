@@ -25,14 +25,14 @@ describe('managed cache renderer security policy', () => {
     expect(policy).toBeDefined()
     const directives = parseDirectives(policy!)
     expect([...directives].filter(([name]) => name === 'connect-src')).toEqual([
-      ['connect-src', ["'self'", 'podcut:']],
+      ['connect-src', ["'self'", 'riffcut:']],
     ])
     expect(mainSource).not.toContain('bypassCSP')
   })
 
   it('rejects duplicate directive names instead of silently accepting the last one', () => {
     expect(() =>
-      parseDirectives("default-src 'self'; connect-src 'self'; connect-src podcut:"),
+      parseDirectives("default-src 'self'; connect-src 'self'; connect-src riffcut:"),
     ).toThrow('Duplicate CSP directive: connect-src')
   })
 })

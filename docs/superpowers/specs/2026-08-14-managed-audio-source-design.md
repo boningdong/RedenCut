@@ -69,7 +69,7 @@ The canvas/provider waveform design therefore ships first and later receives a b
 
 A regular file already supports bounded random byte-range reads, so selective access does not require physical block files.
 
-PodCut's non-destructive clips can reference source-time ranges without rewriting PCM.
+RiffCut's non-destructive clips can reference source-time ranges without rewriting PCM.
 
 A single continuous file provides simple byte arithmetic, sequential import writes, efficient operating-system caching, and fewer cleanup and indexing responsibilities.
 
@@ -81,7 +81,7 @@ Audacity stores immutable decoded sample blocks and multiscale summaries in the 
 
 That design supports Audacity's mature editing, recovery, reference counting, and garbage-collection requirements.
 
-PodCut does not yet need blob transactions, block reference counting, block garbage collection, or database migrations.
+RiffCut does not yet need blob transactions, block reference counting, block garbage collection, or database migrations.
 
 The sample-provider abstraction preserves a future path to block-backed storage without imposing those costs now.
 
@@ -90,7 +90,7 @@ The sample-provider abstraction preserves a future path to block-backed storage 
 ### Package layout
 
 ```text
-Episode.podcut/
+Episode.riffcut/
 ├── project.json
 ├── media/
 │   └── <audio-source-id>/
@@ -157,7 +157,7 @@ Opening another project is a transaction:
 4. Main selects or resolves the candidate package and fully validates its project, originals, and caches while the current session remains active.
 5. Main marks the old session as closing, rejects new mutations for it, cancels or settles its import, transcription, and export jobs, and obtains renderer acknowledgement that playback has stopped.
 6. Main atomically installs the prepared workspace, rotates the token, advances the revision, and returns one complete path-free renderer session.
-7. Only after the switch succeeds does main release old resources and delete an old temporary workspace. Closing a saved workspace never deletes its `.podcut` package.
+7. Only after the switch succeeds does main release old resources and delete an old temporary workspace. Closing a saved workspace never deletes its `.riffcut` package.
 
 Candidate selection paths stay in main. A second application instance or macOS open-file event is represented to the renderer by an opaque pending-open ID and display name, never by a filesystem path.
 
@@ -165,9 +165,9 @@ The renderer switch acknowledgement is bounded to five seconds and is rejected i
 
 ### Application instance ownership
 
-PodCut uses `app.requestSingleInstanceLock()` before readiness. A process that does not obtain the lock exits without initializing a workspace.
+RiffCut uses `app.requestSingleInstanceLock()` before readiness. A process that does not obtain the lock exits without initializing a workspace.
 
-The primary instance owns one active project session per window. A second launch forwards a requested `.podcut` package into the primary instance's pending-open registry, restores and focuses the existing window, and routes the request through the same dirty-check, candidate-validation, job-settlement, and atomic-switch transaction as the Open Project command.
+The primary instance owns one active project session per window. A second launch forwards a requested `.riffcut` package into the primary instance's pending-open registry, restores and focuses the existing window, and routes the request through the same dirty-check, candidate-validation, job-settlement, and atomic-switch transaction as the Open Project command.
 
 Requests received before the controller and window are ready remain queued until the renderer can acknowledge them.
 
@@ -273,7 +273,7 @@ Changing the project processing sample rate is a future explicit operation that 
 
 ### Project schema versioning
 
-The managed package is PodCut's first published project format, so `ProjectFileSchema` uses version `1` and replaces the current unpublished JSON-file schema.
+The managed package is RiffCut's first published project format, so `ProjectFileSchema` uses version `1` and replaces the current unpublished JSON-file schema.
 
 The relevant root fields are:
 
@@ -496,7 +496,7 @@ Effects remain outside the first managed-audio implementation unless required to
 
 `BinaryWaveformDataProvider` implements the waveform interface established by the earlier canvas project.
 
-The custom protocol serves bounded binary ranges as `podcut://cache/<audioSourceId>/pcm` and `podcut://cache/<audioSourceId>/waveform/<samplesPerBucket>`.
+The custom protocol serves bounded binary ranges as `riffcut://cache/<audioSourceId>/pcm` and `riffcut://cache/<audioSourceId>/waveform/<samplesPerBucket>`.
 
 The main process resolves those identifiers against the active workspace and a validated manifest; no route accepts a renderer-provided filesystem path.
 

@@ -1,4 +1,4 @@
-# Podcut English and Simplified Chinese Localization
+# RiffCut English and Simplified Chinese Localization
 
 ## Decision and scope
 

@@ -13,7 +13,7 @@ import { DEFAULT_WORKSPACE_LAYOUT as defaults } from '../../shared/workspaceLayo
 let directory: string
 let path: string
 beforeEach(async () => {
-  directory = await fs.mkdtemp(join(tmpdir(), 'podcut-layout-'))
+  directory = await fs.mkdtemp(join(tmpdir(), 'riffcut-layout-'))
   path = join(directory, 'workspace-layout.json')
 })
 afterEach(async () => {

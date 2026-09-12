@@ -154,7 +154,7 @@ function controllerStub() {
 }
 
 async function temporaryRoot() {
-  const root = await mkdtemp(join(tmpdir(), 'podcut-render-ipc-test-'))
+  const root = await mkdtemp(join(tmpdir(), 'riffcut-render-ipc-test-'))
   roots.push(root)
   return root
 }

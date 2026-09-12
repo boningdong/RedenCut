@@ -24,7 +24,7 @@ function manifest(request: CacheBuildRequest) {
     version: 1,
     audioSourceId: request.audioSourceId,
     sourceSha256: request.sourceSha256,
-    generatorVersion: 'podcut-cache-v1',
+    generatorVersion: 'riffcut-cache-v1',
     pcm: {
       file: `${base}/audio.f32le`,
       sampleFormat: 'f32le',
@@ -48,7 +48,7 @@ function manifest(request: CacheBuildRequest) {
 async function setup(builder: {
   build: (request: CacheBuildRequest, signal: AbortSignal) => Promise<ReturnType<typeof manifest>>
 }) {
-  const parent = await mkdtemp(join(tmpdir(), 'podcut-import-'))
+  const parent = await mkdtemp(join(tmpdir(), 'riffcut-import-'))
   const workspace = await ProjectWorkspace.initialize(parent)
   const sourcePath = join(parent, 'episode.mp3')
   await writeFile(sourcePath, new Uint8Array([1, 2, 3, 4]))
@@ -112,7 +112,7 @@ describe('ImportCoordinator transaction', () => {
   })
 
   it('fails preflight without starting cache construction when disk space is insufficient', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-import-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-import-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     const sourcePath = join(parent, 'episode.mp3')
     await writeFile(sourcePath, new Uint8Array([1]))
@@ -200,7 +200,7 @@ describe('ImportCoordinator transaction', () => {
   })
 
   it('contains an asynchronous copy-writer failure and removes only its owned partial stage', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-import-writer-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-import-writer-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     const sourcePath = join(parent, 'episode.mp3')
     await writeFile(sourcePath, new Uint8Array([1, 2, 3, 4]))
@@ -397,7 +397,7 @@ describe('ImportCoordinator transaction', () => {
 
   it('attempts every rollback cleanup and aggregates failures with the commit error', async () => {
     const builder = { build: vi.fn(buildStagedCache) }
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-import-cleanup-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-import-cleanup-'))
     const workspace = await ProjectWorkspace.initialize(parent)
     const sourcePath = join(parent, 'episode.mp3')
     await writeFile(sourcePath, new Uint8Array([1, 2, 3, 4]))

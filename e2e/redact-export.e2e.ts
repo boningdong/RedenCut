@@ -49,7 +49,7 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
     await ui.start()
     await ui.call('browser_resize', { width: 1440, height: 1000 })
     const importTrack = async () => {
-      await ui.call('podcut_prepare_dialog', {
+      await ui.call('riffcut_prepare_dialog', {
         request: {
           purpose: 'import-audio',
           selection: { type: 'file', filename: 'mandarin-short-female.wav' },
@@ -89,7 +89,7 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
         target: 'label:has-text("Format") select',
         values: ['wav'],
       })
-      await ui.call('podcut_prepare_dialog', {
+      await ui.call('riffcut_prepare_dialog', {
         request: {
           purpose: 'export-audio',
           selection: { type: 'export', filename: `${name}.wav`, format: 'wav' },

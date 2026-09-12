@@ -79,7 +79,7 @@ describe('project IPC', () => {
       openDialog: vi.fn(async () => stayed),
       openPath: vi.fn(async () => stayed),
     }
-    const pending = { consume: vi.fn(() => '/private/Episode.podcut') }
+    const pending = { consume: vi.fn(() => '/private/Episode.riffcut') }
     registerProjectIpc(
       { describe: vi.fn() } as unknown as WorkspaceController,
       coordinator as unknown as ProjectTransitionCoordinator,
@@ -104,7 +104,7 @@ describe('project IPC', () => {
     expect(coordinator.openPath).toHaveBeenCalledWith(
       ownedSender,
       request,
-      '/private/Episode.podcut',
+      '/private/Episode.riffcut',
     )
     expect(JSON.stringify([dialogResult, pendingResult])).not.toContain('/private')
   })
@@ -171,11 +171,11 @@ describe('project IPC', () => {
   it.each(['import', 'transcription', 'export'] as const)(
     'closes admission and settles an active %s before Save advances its revision',
     async (kind) => {
-      const parent = await mkdtemp(join(tmpdir(), 'podcut-project-ipc-'))
+      const parent = await mkdtemp(join(tmpdir(), 'riffcut-project-ipc-'))
       roots.push(parent)
       const controller = new WorkspaceController()
       const initialized = await controller.initialize(parent)
-      const current = await controller.saveAs(join(parent, 'Current.podcut'), {
+      const current = await controller.saveAs(join(parent, 'Current.riffcut'), {
         ...initialized,
         draft: initialized.draft,
       })
@@ -239,12 +239,12 @@ describe('project IPC', () => {
   )
 
   it('settles jobs before Save As publication and releases an old temporary root only afterward', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'podcut-project-ipc-'))
+    const parent = await mkdtemp(join(tmpdir(), 'riffcut-project-ipc-'))
     roots.push(parent)
     const controller = new WorkspaceController()
     const current = await controller.initialize(parent)
     const oldRoot = controller.workspace.root
-    const destination = join(parent, 'Saved.podcut')
+    const destination = join(parent, 'Saved.riffcut')
     const jobs = new SessionJobRegistry()
     const settled = deferred<void>()
     const cancel = vi.fn(async () => {

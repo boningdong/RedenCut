@@ -68,7 +68,7 @@ export function prepareDialog(
       }
     } else {
       const name = filename(request.selection.name)
-      if (!name.endsWith('.podcut') || name === '.podcut') throw new Error('INVALID_PROJECT_NAME')
+      if (!name.endsWith('.riffcut') || name === '.riffcut') throw new Error('INVALID_PROJECT_NAME')
       const root = join(runDirectory, 'projects')
       mkdirSync(root, { recursive: true, mode: 0o700 })
       if (lstatSync(root).isSymbolicLink()) throw new Error('PROJECT_ROOT_SYMLINK')

@@ -56,7 +56,7 @@ const MODEL_NAMES = [
 ]
 
 const MODEL_SEARCH_DIRS = [
-  ...(process.env.PODCUT_WHISPER_MODEL_DIR ? [process.env.PODCUT_WHISPER_MODEL_DIR] : []),
+  ...(process.env.RIFFCUT_WHISPER_MODEL_DIR ? [process.env.RIFFCUT_WHISPER_MODEL_DIR] : []),
   join(homedir(), '.cache', 'whisper'),
   join(homedir(), 'Library', 'Application Support', 'whisper.cpp', 'models'),
   '/opt/homebrew/share/whisper.cpp/models',
@@ -218,7 +218,7 @@ export class WhisperTranscriber implements ITranscriber {
     if (!model) throw new TranscriberUnavailableError('whisper-model-missing')
 
     // Write output to a temp directory so we don't litter the audio folder
-    const tmpDir = await mkdtemp(join(tmpdir(), 'podcut-whisper-'))
+    const tmpDir = await mkdtemp(join(tmpdir(), 'riffcut-whisper-'))
     const outputPrefix = join(tmpDir, 'out')
 
     let result: TranscriptionResult | undefined

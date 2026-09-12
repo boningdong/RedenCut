@@ -1,4 +1,4 @@
-# PodCut File Organization Standards
+# RiffCut File Organization Standards
 
 ## Clear Names
 

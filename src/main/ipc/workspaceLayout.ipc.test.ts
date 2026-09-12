@@ -20,7 +20,7 @@ afterEach(async () => {
   handlers.clear()
 })
 test('gets and sets without a project, rejects invalid data, and maps filesystem errors', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'podcut-layout-ipc-'))
+  const dir = await mkdtemp(join(tmpdir(), 'riffcut-layout-ipc-'))
   directories.push(dir)
   const path = join(dir, 'prefs.json'),
     store = new WorkspaceLayoutStore(path),

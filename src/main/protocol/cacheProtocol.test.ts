@@ -9,7 +9,7 @@ import { createFileRangeResponse } from './fileRangeResponse'
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001'
 
 async function projectRoot() {
-  const root = await mkdtemp(join(tmpdir(), 'podcut-protocol-'))
+  const root = await mkdtemp(join(tmpdir(), 'riffcut-protocol-'))
   const cache = join(root, 'cache', SOURCE_ID)
   await mkdir(join(cache, 'waveform'), { recursive: true })
   await writeFile(
@@ -24,7 +24,7 @@ async function projectRoot() {
       version: 1,
       audioSourceId: SOURCE_ID,
       sourceSha256: 'a'.repeat(64),
-      generatorVersion: 'podcut-cache-v1',
+      generatorVersion: 'riffcut-cache-v1',
       pcm: {
         file: `cache/${SOURCE_ID}/audio.f32le`,
         sampleFormat: 'f32le',
@@ -68,7 +68,7 @@ describe('managed cache protocol', () => {
     const active = await projectRoot()
     const handler = createCacheProtocolHandler(() => active, createFileRangeResponse)
     const response = await handler(
-      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+      new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
     expect(response.status).toBe(206)
     expect(response.headers.get('content-range')).toBe('bytes 0-3/8')
@@ -77,10 +77,10 @@ describe('managed cache protocol', () => {
   })
 
   it.each([
-    'podcut://other/00000000-0000-4000-8000-000000000001/pcm',
-    'podcut://cache/not-a-uuid/pcm',
-    `podcut://cache/${SOURCE_ID}/waveform/512`,
-    `podcut://cache/${SOURCE_ID}/../../project.json`,
+    'riffcut://other/00000000-0000-4000-8000-000000000001/pcm',
+    'riffcut://cache/not-a-uuid/pcm',
+    `riffcut://cache/${SOURCE_ID}/waveform/512`,
+    `riffcut://cache/${SOURCE_ID}/../../project.json`,
   ])('returns 404 for an unprotected route: %s', async (url) => {
     const handler = createCacheProtocolHandler(
       () => ({ root: '/unused', project: createEmptyProject() }),
@@ -95,11 +95,11 @@ describe('managed cache protocol', () => {
       () => ({ root: '/unused', project: createEmptyProject() }),
       fetchFile,
     )
-    expect((await handler(new Request(`podcut://cache/${SOURCE_ID}/pcm`))).status).toBe(416)
+    expect((await handler(new Request(`riffcut://cache/${SOURCE_ID}/pcm`))).status).toBe(416)
     expect(
       (
         await handler(
-          new Request(`podcut://cache/${SOURCE_ID}/pcm`, {
+          new Request(`riffcut://cache/${SOURCE_ID}/pcm`, {
             headers: { Range: `bytes=0-${32 * 1024 * 1024}` },
           }),
         )
@@ -113,7 +113,7 @@ describe('managed cache protocol', () => {
     const fetchFile = vi.fn(async () => new Response(new Uint8Array(8), { status: 200 }))
     const handler = createCacheProtocolHandler(() => active, fetchFile)
     const response = await handler(
-      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+      new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
     expect(response.status).toBe(502)
     expect(fetchFile).toHaveBeenCalledWith(
@@ -130,7 +130,7 @@ describe('managed cache protocol', () => {
       vi.fn(async () => new Response(new Uint8Array(4), { status: 200 })),
     )
     const response = await handler(
-      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+      new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
     expect(response.status).toBe(502)
   })
@@ -160,7 +160,7 @@ describe('managed cache protocol', () => {
         vi.fn(async () => new Response(body, { status: 206, headers })),
       )
       const response = await handler(
-        new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+        new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
       )
       expect(response.status).toBe(502)
       expect(cancelled).toBe(true)
@@ -177,7 +177,7 @@ describe('managed cache protocol', () => {
       }),
     )
     await expect(
-      handler(new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } })),
+      handler(new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } })),
     ).rejects.toBe(error)
   })
 
@@ -188,7 +188,7 @@ describe('managed cache protocol', () => {
       vi.fn(async () => new Response(null, { status: 416 })),
     )
     const response = await handler(
-      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+      new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
     expect(response.status).toBe(416)
   })
@@ -202,7 +202,7 @@ describe('managed cache protocol', () => {
       }),
     )
     const response = await handler(
-      new Request(`podcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
+      new Request(`riffcut://cache/${SOURCE_ID}/pcm`, { headers: { Range: 'bytes=0-3' } }),
     )
     expect(response.status).toBe(500)
   })

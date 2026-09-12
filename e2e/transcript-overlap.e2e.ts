@@ -6,7 +6,7 @@ test('real track occurrences align locally and follow clip movement and undo', a
   try {
     await ui.start()
     const importAudio = async (expectedTracks: number, filename = 'mandarin-short-female.wav') => {
-      await ui.call('podcut_prepare_dialog', {
+      await ui.call('riffcut_prepare_dialog', {
         request: {
           purpose: 'import-audio',
           selection: { type: 'file', filename },
@@ -17,7 +17,7 @@ test('real track occurrences align locally and follow clip movement and undo', a
         .poll(() => ui.page.locator('.waveform-clip canvas').count(), { timeout: 40_000 })
         .toBe(expectedTracks)
       await expect
-        .poll(() => ui.page.locator('[data-podcut-busy]').getAttribute('data-podcut-busy'))
+        .poll(() => ui.page.locator('[data-riffcut-busy]').getAttribute('data-riffcut-busy'))
         .toBe('false')
     }
     await importAudio(1)

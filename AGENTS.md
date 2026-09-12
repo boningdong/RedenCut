@@ -1,8 +1,8 @@
-# PodCut Repository Instructions
+# RiffCut Repository Instructions
 
 ## Project Scope
 
-PodCut is a minimalist podcast and audio editor built with Electron, React, and TypeScript.
+RiffCut is a minimalist podcast and audio editor built with Electron, React, and TypeScript.
 It targets macOS first and Windows later, with future extensibility tracked in the product roadmap.
 
 ## Documentation Policy

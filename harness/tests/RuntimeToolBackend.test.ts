@@ -13,14 +13,14 @@ afterEach(() => {
 
 function backend() {
   // Real status inspection must not depend on accumulated developer run artifacts.
-  const outputRoot = mkdtempSync(join(tmpdir(), 'podcut-backend-test-'))
+  const outputRoot = mkdtempSync(join(tmpdir(), 'riffcut-backend-test-'))
   outputRoots.push(outputRoot)
   return new RuntimeToolBackend(new HarnessRuntime({ repositoryRoot: resolve('.'), outputRoot }))
 }
 
 test('publishes lifecycle and curated official UI schemas before launch without a browser', async () => {
   const tools = await backend().listTools()
-  expect(tools.map((tool) => tool.name)).toContain('podcut_start')
+  expect(tools.map((tool) => tool.name)).toContain('riffcut_start')
   expect(tools.map((tool) => tool.name)).toContain('browser_click')
   expect(tools.map((tool) => tool.name)).not.toContain('browser_evaluate')
   expect(tools.map((tool) => tool.name)).not.toContain('browser_close')
@@ -36,7 +36,7 @@ test('rejects unlisted tools and hidden upstream overrides instead of forwarding
     ['browser_evaluate', { function: '() => process.env' }],
     ['browser_snapshot', { runId: 'run', generation: 1, _meta: { cwd: '/' } }],
     ['browser_take_screenshot', { runId: 'run', generation: 1, filename: '/tmp/unowned.png' }],
-    ['podcut_start', { outputRoot: '/tmp/unowned' }],
+    ['riffcut_start', { outputRoot: '/tmp/unowned' }],
   ] as const) {
     expect((await service.callTool(name, args)).isError).toBe(true)
   }
@@ -47,25 +47,25 @@ test('returns actionable not-ready state rather than launching implicitly', asyn
   const result = await service.callTool('browser_snapshot', { runId: 'run', generation: 1 })
   expect(result.isError).toBe(true)
   expect(JSON.stringify(result.content)).toContain('APPLICATION_NOT_READY')
-  const status = await service.callTool('podcut_status', {})
+  const status = await service.callTool('riffcut_status', {})
   expect(status.structuredContent).toMatchObject({ state: 'idle' })
 })
 
 test('rejects stale dialog identities and mismatched selection shapes without starting', async () => {
   const service = backend()
-  const stale = await service.callTool('podcut_prepare_dialog', {
+  const stale = await service.callTool('riffcut_prepare_dialog', {
     runId: 'old',
     generation: 1,
     request: { purpose: 'import-audio', selection: { type: 'file', filename: 'voice.wav' } },
   })
   expect(stale.structuredContent).toMatchObject({ error: { code: 'STALE_GENERATION' } })
-  const wrongShape = await service.callTool('podcut_prepare_dialog', {
+  const wrongShape = await service.callTool('riffcut_prepare_dialog', {
     runId: 'old',
     generation: 1,
-    request: { purpose: 'import-audio', selection: { type: 'project', name: 'project.podcut' } },
+    request: { purpose: 'import-audio', selection: { type: 'project', name: 'project.riffcut' } },
   })
   expect(wrongShape.isError).toBe(true)
-  expect((await service.callTool('podcut_status', {})).structuredContent).toMatchObject({
+  expect((await service.callTool('riffcut_status', {})).structuredContent).toMatchObject({
     state: 'idle',
   })
 })

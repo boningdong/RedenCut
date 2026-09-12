@@ -1,4 +1,4 @@
-# PodCut Coding Standards
+# RiffCut Coding Standards
 
 ## Responsibility
 

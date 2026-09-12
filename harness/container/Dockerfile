@@ -10,16 +10,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund \
-    && sha256sum package.json package-lock.json > /opt/podcut-dependencies.sha256 \
+    && sha256sum package.json package-lock.json > /opt/riffcut-dependencies.sha256 \
     && mkdir -p out .harness-runs \
     && chown -R node:node /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
-COPY harness/container/entrypoint.sh /opt/podcut-entrypoint.sh
-COPY harness/container/supervise.mjs /opt/podcut-supervise.mjs
-COPY harness/container/start-audio.sh /opt/podcut-start-audio.sh
+COPY harness/container/entrypoint.sh /opt/riffcut-entrypoint.sh
+COPY harness/container/supervise.mjs /opt/riffcut-supervise.mjs
+COPY harness/container/start-audio.sh /opt/riffcut-start-audio.sh
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 USER node
 RUN git config --global --add safe.directory /workspace
-ENTRYPOINT ["/usr/bin/tini", "--", "/bin/sh", "/opt/podcut-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/bin/sh", "/opt/riffcut-entrypoint.sh"]
 CMD ["node", "--import", "tsx", "harness/server.ts"]

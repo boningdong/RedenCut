@@ -36,10 +36,10 @@ src/main/
     └── fileRangeResponse.test.ts
 ```
 
-The `.podcut` bundle remains unchanged:
+The `.riffcut` bundle remains unchanged:
 
 ```text
-Project.podcut/
+Project.riffcut/
 ├── project.json
 ├── media/
 │   └── <audioSourceId>/...
@@ -59,7 +59,7 @@ Project.podcut/
 
 `cacheProtocol.ts` continues to own:
 
-- `podcut://cache/<audioSourceId>/pcm` and waveform route validation;
+- `riffcut://cache/<audioSourceId>/pcm` and waveform route validation;
 - active-project and AudioSource authorization;
 - cache-manifest validation and artifact resolution;
 - bounded-range syntax and maximum-range policy;
@@ -87,7 +87,7 @@ The filename uses lower camel case because the module exports a function, not a 
 
 ### Renderer connection policy
 
-The renderer Content Security Policy explicitly permits cache fetches with `connect-src 'self' podcut:`. The `podcut` scheme remains registered with `secure`, `supportFetchAPI`, and `stream` privileges, but it must not use Electron's `bypassCSP` privilege.
+The renderer Content Security Policy explicitly permits cache fetches with `connect-src 'self' riffcut:`. The `riffcut` scheme remains registered with `secure`, `supportFetchAPI`, and `stream` privileges, but it must not use Electron's `bypassCSP` privilege.
 
 This keeps Chromium's policy enforcement active while authorizing only the connection scheme required by the managed PCM and waveform providers. Main-process route, source, manifest, range, and artifact validation remain the authorization boundary behind that scheme.
 
@@ -126,7 +126,7 @@ The protocol obtains the signal from the incoming request and forwards it so can
 
 ```text
 PCM or waveform provider
-    -> podcut://cache URL plus bounded Range
+    -> riffcut://cache URL plus bounded Range
     -> cache protocol route, source, manifest, and range validation
     -> createFileRangeResponse(path, range, signal)
     -> exact filesystem stream
@@ -180,8 +180,8 @@ Re-import the supplied `long-sample.mp3`, then verify:
 - no AudioWorklet underruns attributable to cache transport;
 - reopening the generated project and repeating a late seek.
 
-The workflow must also confirm that renderer-originated `podcut://cache/...` requests reach the registered handler without CSP violations. A successful main-process diagnostic alone is insufficient because it bypasses the renderer policy boundary.
+The workflow must also confirm that renderer-originated `riffcut://cache/...` requests reach the registered handler without CSP violations. A successful main-process diagnostic alone is insufficient because it bypasses the renderer policy boundary.
 
 ## Completion criteria
 
-The repair is complete when the real file adapter returns exact standards-compliant `206` responses, PCM and waveform providers succeed through the protected protocol, the renderer CSP permits `podcut:` without `bypassCSP`, the supplied MP3 plays and seeks at late positions without cache transport errors, the repository quality gate passes, and no project-format or renderer-authority expansion has been introduced.
+The repair is complete when the real file adapter returns exact standards-compliant `206` responses, PCM and waveform providers succeed through the protected protocol, the renderer CSP permits `riffcut:` without `bypassCSP`, the supplied MP3 plays and seeks at late positions without cache transport errors, the repository quality gate passes, and no project-format or renderer-authority expansion has been introduced.

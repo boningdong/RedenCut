@@ -1,4 +1,4 @@
-# Podcut Localization Implementation Plan
+# RiffCut Localization Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 

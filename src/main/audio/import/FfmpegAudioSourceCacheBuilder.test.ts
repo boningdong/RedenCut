@@ -75,7 +75,7 @@ function monoWav(frameCount: number): Buffer {
 
 describe('FfmpegAudioSourceCacheBuilder', () => {
   it('does not miss a signal that was aborted before listener registration', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-pre-abort-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-pre-abort-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const controller = new AbortController()
@@ -87,7 +87,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('retains only the final 4096 bytes of FFmpeg diagnostics', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-tail-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-tail-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const building = fakeBuilder(child, outputs).build(request(root), new AbortController().signal)
@@ -104,7 +104,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('keeps re-encoded multibyte and malformed diagnostic text within 4096 bytes', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-utf8-tail-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-utf8-tail-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const building = fakeBuilder(child, outputs).build(request(root), new AbortController().signal)
@@ -126,7 +126,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('routes a child error through kill, reap, stream close, and cleanup', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-child-error-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-child-error-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const stagingRoot = request(root).stagingRoot
@@ -148,7 +148,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   it.each([0, 1, 2, 3])(
     'routes writer %i failure through the same centralized teardown',
     async (writerIndex) => {
-      const root = await mkdtemp(join(tmpdir(), `podcut-builder-writer-${writerIndex}-`))
+      const root = await mkdtemp(join(tmpdir(), `riffcut-builder-writer-${writerIndex}-`))
       const child = new FakeChild()
       const outputs: PassThrough[] = []
       const building = fakeBuilder(child, outputs).build(
@@ -170,7 +170,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   )
 
   it('kills once, reaps, closes streams, and only then removes staging on stream failure', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-failure-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-failure-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const stagingRoot = request(root).stagingRoot
@@ -198,7 +198,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('awaits delayed close before acknowledging abort cleanup', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-abort-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-abort-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const controller = new AbortController()
@@ -221,7 +221,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('aggregates abort and staging cleanup failures', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-cleanup-error-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-cleanup-error-'))
     const child = new FakeChild()
     const outputs: PassThrough[] = []
     const controller = new AbortController()
@@ -244,7 +244,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('publishes PCM, all waveform levels, and the manifest last', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-'))
     const sourcePath = join(root, 'source.wav')
     await writeFile(sourcePath, monoWav(5000))
     const builder = new FfmpegAudioSourceCacheBuilder()
@@ -276,7 +276,7 @@ describe('FfmpegAudioSourceCacheBuilder', () => {
   })
 
   it('decodes non-silent PCM near the end of an MP3 larger than the retired 256 KiB index window', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'podcut-builder-mp3-'))
+    const root = await mkdtemp(join(tmpdir(), 'riffcut-builder-mp3-'))
     const sourcePath = join(root, 'long.mp3')
     await execFileAsync(getFfmpegPath(), [
       '-v',

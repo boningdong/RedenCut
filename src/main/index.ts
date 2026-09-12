@@ -65,7 +65,7 @@ startApplicationLifecycle({
   app,
   preparePrimary: () => {
     protocol.registerSchemesAsPrivileged([
-      { scheme: 'podcut', privileges: { secure: true, supportFetchAPI: true, stream: true } },
+      { scheme: 'riffcut', privileges: { secure: true, supportFetchAPI: true, stream: true } },
     ])
   },
   initialize: async () => {
@@ -127,7 +127,7 @@ startApplicationLifecycle({
       dialogs,
     )
     protocol.handle(
-      'podcut',
+      'riffcut',
       createCacheProtocolHandler(
         () => ({ root: controller.workspace.root, project: controller.workspace.project }),
         createFileRangeResponse,

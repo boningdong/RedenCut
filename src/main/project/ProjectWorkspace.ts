@@ -49,7 +49,7 @@ export class ProjectWorkspace {
     options: ProjectWorkspaceOptions = {},
   ): Promise<ProjectWorkspace> {
     await mkdir(temporaryParent, { recursive: true })
-    const root = await mkdtemp(join(temporaryParent, 'podcut-'))
+    const root = await mkdtemp(join(temporaryParent, 'riffcut-'))
     const project = createEmptyProject()
     await writeFile(join(root, 'project.json'), JSON.stringify(project, null, 2))
     return new ProjectWorkspace(root, project, [], true, workspaceDependencies(options))
@@ -78,7 +78,7 @@ export class ProjectWorkspace {
   get descriptor(): WorkspaceDescriptor {
     return {
       kind: this.temporary ? 'temporary' : 'saved',
-      displayName: this.temporary ? 'Untitled' : basename(this.root, '.podcut'),
+      displayName: this.temporary ? 'Untitled' : basename(this.root, '.riffcut'),
       portable: this.project.audioSources.every((source) => source.location.mode === 'copy'),
     }
   }

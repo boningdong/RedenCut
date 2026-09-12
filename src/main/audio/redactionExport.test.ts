@@ -14,7 +14,7 @@ import { getFfmpegPath } from './binaries'
 import { buildRenderArgs } from './renderer'
 
 const rate = 48_000
-const root = mkdtempSync(join(tmpdir(), 'podcut-redaction-export-'))
+const root = mkdtempSync(join(tmpdir(), 'riffcut-redaction-export-'))
 const sourceId = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 const sourcePath = join(root, 'source.wav')
 const samples = new Float32Array(rate * 6)

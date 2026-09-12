@@ -3,9 +3,9 @@ requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "podcut-speech-worker"
+name = "riffcut-speech-worker"
 version = "0.1.0"
-description = "Job-scoped forced-alignment and diarization worker for PodCut"
+description = "Job-scoped forced-alignment and diarization worker for RiffCut"
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "huggingface-hub==0.36.0",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/podcut_speech_worker"]
+packages = ["src/riffcut_speech_worker"]
 
 [tool.uv]
 override-dependencies = [

@@ -132,7 +132,7 @@ The renderer test double was updated to satisfy the expanded API contract.
 - `npm run format` and `git diff --check`: passed; no unrelated formatting changes.
 - `npm run check`: passed formatting, lint, unused-code checks, type checking, 538 tests across 78 files, and production build.
 - `sh harness/container/run.sh npm run test:harness:all`: passed 25 tests across 12 files, including lifecycle and injected failure cases.
-- `PODCUT_HARNESS_IMAGE=podcut-harness-speech:local sh harness/container/run.sh npm run test:e2e`: passed all 4 tests across 3 files, covering clip split/drag, real audio playback, project save/restart, and real speech analysis with transcript persistence.
+- `RIFFCUT_HARNESS_IMAGE=riffcut-harness-speech:local sh harness/container/run.sh npm run test:e2e`: passed all 4 tests across 3 files, covering clip split/drag, real audio playback, project save/restart, and real speech analysis with transcript persistence.
 - Independent static review found a temporary-file ownership bug; an exclusive-create collision regression reproduced it before the fix, and the reviewer confirmed no remaining blockers afterward.
 
 The first E2E attempt used the base image, which lacks whisper-cli, and failed the speech test while the other three tests passed.

@@ -12,12 +12,12 @@ for (const shutdown of ['EOF', 'docker stop']) {
     `host MCP controls container Electron and ${shutdown} cleans up while retaining evidence`,
     { timeout: 180_000 },
     async () => {
-      const name = `podcut-smoke-${randomUUID()}`
+      const name = `riffcut-smoke-${randomUUID()}`
       const transport = new EofOnlyTransport('sh', [resolve('harness/container/run.sh')], {
         ...process.env,
-        PODCUT_CONTAINER_NAME: name,
+        RIFFCUT_CONTAINER_NAME: name,
       })
-      const client = new Client({ name: 'podcut-container-acceptance', version: '1.0.0' })
+      const client = new Client({ name: 'riffcut-container-acceptance', version: '1.0.0' })
       let runId
       const call = async (name, args = {}) => {
         const result = await client.callTool({ name, arguments: args }, undefined, {
@@ -29,8 +29,8 @@ for (const shutdown of ['EOF', 'docker stop']) {
       try {
         await client.connect(transport)
         const catalog = await client.listTools()
-        assert.ok(catalog.tools.some((tool) => tool.name === 'podcut_start'))
-        const started = (await call('podcut_start')).structuredContent
+        assert.ok(catalog.tools.some((tool) => tool.name === 'riffcut_start'))
+        const started = (await call('riffcut_start')).structuredContent
         assert.equal(started.state, 'ready')
         const container = JSON.parse(
           execFileSync('docker', ['inspect', name], { encoding: 'utf8' }),
@@ -73,12 +73,12 @@ for (const shutdown of ['EOF', 'docker stop']) {
         const bytes = Buffer.from(png.data, 'base64')
         assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
         await writeFile(resolve('.harness-runs/container', runId, 'host-received.png'), bytes)
-        const restarted = (await call('podcut_restart', { ...identity, rebuild: true }))
+        const restarted = (await call('riffcut_restart', { ...identity, rebuild: true }))
           .structuredContent
         assert.equal(restarted.generation, started.generation + 1)
         identity = { runId, generation: restarted.generation }
         await call('browser_snapshot', identity)
-        // Neither path uses podcut_stop: both must reach the server shutdown handler.
+        // Neither path uses riffcut_stop: both must reach the server shutdown handler.
         if (shutdown === 'docker stop') {
           execFileSync('docker', ['stop', '--time', '20', name], { stdio: 'pipe', timeout: 30_000 })
         }

@@ -29,8 +29,8 @@ describe('createTranslator', () => {
   it('treats interpolated filenames containing angle brackets as ordinary text data', () => {
     const translator = createTranslator('en')
 
-    expect(translator.t('errors.openFile', { filename: '<draft>.podcut' })).toBe(
-      'Could not open <draft>.podcut.',
+    expect(translator.t('errors.openFile', { filename: '<draft>.riffcut' })).toBe(
+      'Could not open <draft>.riffcut.',
     )
   })
 

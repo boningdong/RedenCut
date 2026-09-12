@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from podcut_speech_worker.alignment import align, normalize_alignment
+from riffcut_speech_worker.alignment import align, normalize_alignment
 
 
 UNITS = [
@@ -35,7 +35,7 @@ class AlignmentTest(unittest.TestCase):
         result = normalize_alignment(UNITS, [{"word": "觉得", "start": 0.75, "end": 1.18}], [])
         self.assertEqual(["u3"], result["unalignedTranscriptUnitIds"])
 
-    @patch("podcut_speech_worker.alignment.run_whisperx_alignment")
+    @patch("riffcut_speech_worker.alignment.run_whisperx_alignment")
     def test_adapter_uses_manifest_pinned_snapshot_offline(self, run_alignment):
         run_alignment.return_value = {"word_segments": [], "segments": []}
         request = {
@@ -43,8 +43,8 @@ class AlignmentTest(unittest.TestCase):
             "transcriptUnits": UNITS, "models": {"alignment": "alignment-zh"},
             "config": {"device": "cpu"},
         }
-        with patch.dict("os.environ", {"PODCUT_SPEECH_MODEL_CACHE": "/models", "PODCUT_SPEECH_MANIFEST": "/manifest.json"}), \
-             patch("podcut_speech_worker.alignment.load_manifest_model", return_value={
+        with patch.dict("os.environ", {"RIFFCUT_SPEECH_MODEL_CACHE": "/models", "RIFFCUT_SPEECH_MANIFEST": "/manifest.json"}), \
+             patch("riffcut_speech_worker.alignment.load_manifest_model", return_value={
                  "id": "alignment-zh", "repository": "repo", "revision": "rev", "snapshot": "/models/alignment-zh/rev"
              }):
             result = align(request)

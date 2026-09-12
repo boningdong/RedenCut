@@ -4,7 +4,7 @@
 
 Add repository-guided AI acceptance using the existing Docker MCP harness.
 Keep user goals and acceptance checkpoints stable while allowing the agent to choose UI actions from current observations.
-The repository skill is named `agent-testing` and is specific to PodCut despite its short name.
+The repository skill is named `agent-testing` and is specific to RiffCut despite its short name.
 This is an instruction-driven development workflow, not a new runner or an enforced merge gate.
 
 Existing fixed E2Es remain the deterministic regression baseline.

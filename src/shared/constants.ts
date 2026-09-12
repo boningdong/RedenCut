@@ -5,5 +5,5 @@
 // project name is finalised. Update them here only — nowhere else.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const APP_NAME = 'PodCut'
-export const APP_FILE_EXT = '.podcut'
+export const APP_NAME = 'RiffCut'
+export const APP_FILE_EXT = '.riffcut'

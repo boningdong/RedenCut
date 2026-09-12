@@ -15,7 +15,7 @@ async function connect() {
     env: electronEnvironment(process.env),
     stderr: 'pipe',
   })
-  const client = new Client({ name: 'podcut-stdio-test', version: '1.0.0' })
+  const client = new Client({ name: 'riffcut-stdio-test', version: '1.0.0' })
   await client.connect(transport)
   return { client, transport }
 }
@@ -39,10 +39,10 @@ test('exposes real lifecycle and UI tools through one stdio MCP and closes Elect
   let status: RuntimeStatus | undefined
   try {
     const tools = await client.listTools()
-    expect(tools.tools.map((tool) => tool.name)).toContain('podcut_start')
+    expect(tools.tools.map((tool) => tool.name)).toContain('riffcut_start')
     expect(tools.tools.map((tool) => tool.name)).toContain('browser_snapshot')
     status = statusOf(
-      (await client.callTool({ name: 'podcut_start', arguments: {} })) as CallToolResult,
+      (await client.callTool({ name: 'riffcut_start', arguments: {} })) as CallToolResult,
     )
     const identity = { runId: status.runId!, generation: status.generation }
     const snapshot = (await client.callTool({
@@ -56,7 +56,7 @@ test('exposes real lifecycle and UI tools through one stdio MCP and closes Elect
     })) as CallToolResult
     expect(screenshot.content.some((item) => item.type === 'image')).toBe(true)
     const restarted = statusOf(
-      (await client.callTool({ name: 'podcut_restart', arguments: identity })) as CallToolResult,
+      (await client.callTool({ name: 'riffcut_restart', arguments: identity })) as CallToolResult,
     )
     expect(restarted.generation).toBe(status.generation + 1)
     status = restarted

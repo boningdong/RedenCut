@@ -2,8 +2,8 @@
 set -eu
 
 worker_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-uv_bin=${PODCUT_UV_BIN:-uv}
-cache_root=${PODCUT_SPEECH_MODEL_CACHE:-${XDG_CACHE_HOME:-${HOME:?HOME is required}/Library/Caches}/PodCut/speech-models}
+uv_bin=${RIFFCUT_UV_BIN:-uv}
+cache_root=${RIFFCUT_SPEECH_MODEL_CACHE:-${XDG_CACHE_HOME:-${HOME:?HOME is required}/Library/Caches}/RiffCut/speech-models}
 mode=${1:-preflight}
 
 case "$mode" in
@@ -22,11 +22,11 @@ case "$mode" in
       echo "HF_TOKEN_UNAVAILABLE: authenticate with 'hf auth login' or set HF_TOKEN_PATH." >&2
       exit 20
     fi
-    exec "$worker_root/.venv/bin/python" -m podcut_speech_worker.provisioning \
+    exec "$worker_root/.venv/bin/python" -m riffcut_speech_worker.provisioning \
       --manifest "$worker_root/models.json" --cache-root "$cache_root" --token-path "$token_file"
     ;;
   preflight)
-    exec "$worker_root/.venv/bin/python" -m podcut_speech_worker.preflight --json \
+    exec "$worker_root/.venv/bin/python" -m riffcut_speech_worker.preflight --json \
       --manifest "$worker_root/models.json" --cache-root "$cache_root"
     ;;
   *)

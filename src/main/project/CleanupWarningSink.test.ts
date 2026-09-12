@@ -5,7 +5,7 @@ describe('CleanupWarningSink', () => {
   it('retains the exact owned path, operation, and kind for a later retry', async () => {
     const store = new CleanupWarningStore()
     const warning = {
-      path: '/private/tmp/.episode.podcut-backup-owned',
+      path: '/private/tmp/.episode.riffcut-backup-owned',
       operation: 'save-as-publication' as const,
       kind: 'destination-backup' as const,
       cause: new Error('busy'),
@@ -18,7 +18,7 @@ describe('CleanupWarningSink', () => {
 
   it('does not let a failing warning sink change an already committed operation', async () => {
     const warning = {
-      path: '/private/tmp/podcut-owned-workspace',
+      path: '/private/tmp/riffcut-owned-workspace',
       operation: 'workspace-switch' as const,
       kind: 'temporary-workspace' as const,
       cause: new Error('permission denied'),

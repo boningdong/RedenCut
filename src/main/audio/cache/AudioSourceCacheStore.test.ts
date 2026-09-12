@@ -14,7 +14,7 @@ const source = AudioSourceSchema.parse({
 })
 
 async function fixture(pcmFile = `cache/${source.id}/audio.f32le`) {
-  const root = await mkdtemp(join(tmpdir(), 'podcut-cache-store-'))
+  const root = await mkdtemp(join(tmpdir(), 'riffcut-cache-store-'))
   const cacheRoot = join(root, 'cache', source.id)
   await mkdir(join(cacheRoot, 'waveform'), { recursive: true })
   await mkdir(join(root, 'media'), { recursive: true })
@@ -29,7 +29,7 @@ async function fixture(pcmFile = `cache/${source.id}/audio.f32le`) {
       version: 1,
       audioSourceId: source.id,
       sourceSha256: source.fingerprint.sha256,
-      generatorVersion: 'podcut-cache-v1',
+      generatorVersion: 'riffcut-cache-v1',
       pcm: {
         file: pcmFile as ProjectRelativePath,
         sampleFormat: 'f32le',
