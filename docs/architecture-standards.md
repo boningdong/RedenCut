@@ -29,6 +29,17 @@
 - Persist completed layout actions only; transient drag/resize previews and window-size clamping remain local.
 - Recover compatible stored fields without rewriting configuration during reads; surface recovery warnings and propagate filesystem failures.
 
+## Application Localization
+
+- Main owns `app-preferences.json` under the active Electron `userData` directory, initialized after harness isolation.
+- Keep language preference (`system`, `en`, `zh-CN`) independent of workspace layout, project files, edit history, and speech recognition language.
+- Main resolves the effective language and publishes committed revisioned snapshots through typed preload IPC; renderer uses Zustand and ignores stale responses.
+- Bundle English and Simplified Chinese resources in `src/shared/i18n/`; keep the shared translator independent of Electron and Node.js.
+- Use semantic translation keys and whole-message interpolation for application copy, including accessible labels and native dialog text.
+- Retain stable business reasons and safe parameters in error/progress state; translate at presentation time so retained messages follow language changes.
+- Keep raw diagnostics in their diagnostic sink and preserve user-authored names, transcript content, timecodes, project identifiers and file extensions.
+- Changing language must not remount the editor, reset playback, restart jobs or alter project revisions.
+
 ## Audio Access and Caches
 
 - Serve only validated cache artifacts through `podcut://cache/<audio-source-id>/pcm` and `/waveform/<level>`; do not expose arbitrary paths or direct renderer `file://` access.

@@ -71,3 +71,11 @@ Audio selection accepts plain filenames only within `e2e/fixtures/audio/`; no re
 Project selections stay inside this run's `projects/` directory; new saves cannot replace existing projects.
 Replies are single-use, purpose-matched and generation-scoped; restart clears pending replies.
 Unprepared or unsupported dialogs fail explicitly and are recorded in diagnostics/events; dirty-project confirmations remain unsupported. Export uses purpose `export-audio` with selection `{type: "export", filename: "mix.wav", format: "wav"}` (or cancellation). Formats are `wav`, `mp3`, `flac`, `aac`, and the extension must match. Destinations stay in this run’s `exports/` directory; existing files, path traversal, symlink escapes and mismatched format consumption are rejected.
+
+## Localization
+
+Run `sh harness/container/run.sh npm run test:e2e -- localization` with an image built from the current dependency manifests.
+The flow imports audio, switches to Simplified Chinese, saves, fully restarts, verifies the retained language choice, switches back to English, and reopens the saved project.
+It uses MCP for actions and only visible DOM observations for assertions; screenshots stay in the run directory.
+The [localization agent scenario](scenarios/localization-workflow.md) adds adaptive playback, edit-state, modal, and minimum-window checks to the editing baseline.
+Chinese font rendering is covered in the Linux container; system-owned native picker controls and actual macOS window/font behavior remain separate manual checks.

@@ -85,7 +85,10 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
       await expect
         .poll(() => ui.page.getByText('Export Audio', { exact: true }).isVisible())
         .toBe(true)
-      await ui.call('browser_select_option', { target: 'select', values: ['wav'] })
+      await ui.call('browser_select_option', {
+        target: 'label:has-text("Format") select',
+        values: ['wav'],
+      })
       await ui.call('podcut_prepare_dialog', {
         request: {
           purpose: 'export-audio',

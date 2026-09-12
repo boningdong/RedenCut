@@ -13,6 +13,7 @@ docker build -f harness/container/Dockerfile -t podcut-harness:local .
 
 The launcher uses the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
 The image uses the repository's Node version and lockfile, installing Linux-native dependencies rather than reusing Mac `node_modules`.
+The image includes Noto CJK fonts so Simplified Chinese UI acceptance can inspect rendered glyphs.
 Debian FFmpeg supplies `/usr/bin/ffmpeg` and `/usr/bin/ffprobe`, avoiding reliance on static npm binary availability for Linux ARM64.
 Debian packages are installed from the configured repositories at build time, so rebuilding without cache is not a bit-for-bit reproducibility guarantee.
 Only the dependency manifests and container startup/supervisor scripts enter the image build context; product source code and Git metadata are not uploaded to a registry or baked into the image.
