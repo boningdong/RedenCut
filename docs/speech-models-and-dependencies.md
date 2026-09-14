@@ -6,6 +6,17 @@ This document is the operational source of truth for external runtimes, engines,
 
 The first implementation has fixed defaults and no model-selection UI. Future transcription, alignment, diarization, disfluency-detection, and speech-generation engines remain independently replaceable.
 
+## Application-managed preparation
+
+Settings and onboarding now use ResourceManager to download the fixed multilingual transcription model and both Chinese and English alignment models into Electron userData's managed model directories.
+They do not discover or migrate developer caches described below.
+The native executable/Python runtime is still prepared externally for development; final runtime bundling and distribution remain a separate pending phase.
+Downloads are staged, integrity checked and load-tested before installation, and can be canceled/resumed without changing existing project results.
+The optional diarization model requires explicit Hugging Face file-access verification; credentials are platform-protected and never passed to normal inference.
+Public files have pinned hashes in models.json; gated metadata must be verified with authorized immutable-revision metadata where public hashes are unavailable.
+The base transcription model is the pinned multilingual base candidate; this integration does not establish production quality/performance acceptance.
+The previous shell provisioning commands remain developer/harness utilities rather than the application's model discovery mechanism.
+
 ## Component roles
 
 | Capability           | Product role                                 | Initial implementation                                                                                   | Runtime                        | Status      |
@@ -30,7 +41,7 @@ Each dependency class has one version owner:
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Node/Electron harness dependencies | Root `package-lock.json` and container base-image digest/tag                                                                  |
 | Python worker dependencies         | Worker `pyproject.toml` plus committed lockfile introduced with the worker                                                    |
-| Native whisper.cpp executable      | Availability descriptor plus recorded executable version; installation remains external                                       |
+| Native whisper.cpp executable      | Availability descriptor plus recorded executable version; development installation remains external; application lookup uses AppRuntimeLocator                                       |
 | Model repositories                 | Committed speech-model manifest containing repository ID, immutable revision, purpose, license/terms note, and expected files |
 | Engine defaults                    | Validated speech-engine configuration, hashed into artifact provenance                                                        |
 | Test fixtures and expectations     | Repository `e2e/fixtures/audio/` and named speech acceptance scenarios                                                        |
@@ -208,8 +219,8 @@ Only `speech:docker:provision` forwards the read-only Hugging Face token. `speec
 For native macOS development, dependency installation and model provisioning are also explicit:
 
 ```sh
-npm run speech:native:setup
-npm run speech:native:provision
+npm run setup:speech
+npm run setup:speech-models
 npm run speech:native:preflight
 ```
 
@@ -219,7 +230,7 @@ The native launcher uses the same username-agnostic token lookup as Docker. Its 
 
 The new default cache location does not automatically discover an older installation's cache.
 Set `REDENCUT_SPEECH_MODEL_CACHE` to the existing cache root (and use that same setting when starting the app), or move the cache to the current default location.
-Then run `npm run speech:native:provision` followed by `npm run speech:native:preflight`; Docker users can select their existing volume with `REDENCUT_SPEECH_MODEL_VOLUME` and use the corresponding Docker commands.
+Then run `npm run setup:speech-models` followed by `npm run speech:native:preflight`; Docker users can select their existing volume with `REDENCUT_SPEECH_MODEL_VOLUME` and use the corresponding Docker commands.
 Provisioning verifies every required file and the existing marker's model ID, repository and immutable revision before adding `.redencut-model.json` to a cache carrying a legacy `.riffcut-model.json` or `.podcut-model.json` marker.
 The newest present marker takes precedence (RedenCut, then RiffCut, then PodCut); an invalid newer marker is never bypassed using an older marker.
 This migration does not download or rewrite the model files, preserves the legacy marker, and can be repeated without rewriting a valid current marker.
@@ -233,3 +244,39 @@ The new adapter verification added two real CPU checks in the speech container: 
 ## Maintenance rule
 
 When adding or replacing a speech dependency, update this document in the same change that updates its lockfile or model manifest. Record its product role, runtime boundary, version owner, model source and immutable revision, license or access conditions, cache location, supported execution profiles, provisioning procedure, preflight behavior, and verification lane.
+
+### Development onboarding
+
+Non-bundled builds show read-only tool and Python import checks in Settings and onboarding.
+Run `npm run setup:speech` at the current project root after installing uv, then click Validate in the app.
+This prepares `speech-worker/.venv`; it does not install FFmpeg or whisper-cli and does not download models.
+`speech:native:setup` remains a compatibility alias for existing scripts and older instructions, not a harness-specific requirement.
+Model preparation is blocked until the required runtime checks pass; uv itself is only needed for environment setup.
+Bundled builds omit developer instructions and validate their supplied runtime instead.
+
+### Development login and validation feedback
+
+Environment checks publish each item's checking/completed state through resource snapshots; completed tools need not wait visually for Python library imports.
+The resource section headers share one icon/title scale, and collapsing text-editing details never changes feature preferences or active preparation.
+Development-only model authorization can detect the active Hugging Face login using HF_TOKEN (then legacy HUGGING_FACE_HUB_TOKEN), HF_TOKEN_PATH, HF_HOME/token, or the documented XDG/default cache location.
+Detection returns only a found/missing/unavailable status, never credentials or token fragments.
+The credential boundary accepts both personal access tokens and longer CLI OAuth tokens, with a shared 16 KiB input limit and safe bearer characters; local detection does not establish validity, expiry, or model permissions.
+Explicit use validates access to every required pinned model file and saves an encrypted app copy only after success.
+Removing the app copy does not log the developer out of the CLI; packaged builds do not read local CLI credentials.
+Reference: https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables
+
+### Model preparation entry points
+
+For the app, use Download in Text editing, then authorize speaker recognition and return to the resource panel to download its model. Authorization checks permissions only; the download is a separate explicit action with progress in the resource panel.
+`npm run setup:speech` installs the development Python environment.
+`npm run setup:speech-models` is the standalone worker model-provisioning command; `speech:native:provision` remains a compatibility alias for existing developer scripts and older instructions.
+This command uses `REDENCUT_SPEECH_MODEL_CACHE` or the standalone worker cache documented above, and does not populate the app ResourceManager. App users should use the UI download flow rather than this command.
+
+### Resetting development app data
+
+Exit RedenCut before using either command so running downloads or in-memory preferences cannot recreate cleared files.
+`npm run clear:onboarding` resets only `onboardingDisposition` to `pending`; the next launch shows onboarding again while language, theme, feature preferences, credentials and models remain intact.
+`npm run clear:models` removes the app-managed `models` and `staging` directories, including partial downloads. It preserves Python environments, credentials, preferences, projects, standalone worker caches and Hugging Face caches.
+Both commands target Electron's default user-data directory for the package name (`~/Library/Application Support/redencut` on macOS), shared by normal worktrees.
+Use `-- --dry-run` to preview, or `-- --user-data-dir /absolute/path` to target an isolated test profile.
+These commands do not stop the running app automatically.

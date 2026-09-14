@@ -18,7 +18,6 @@ import { getAudioPlayerInstance } from '@shared/player.types'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { useThemeStore } from '../../stores/theme.store'
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -31,7 +30,13 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${fraction}`
 }
 
-export function TransportBar({ workspaceControls }: { workspaceControls?: React.ReactNode }) {
+export function TransportBar({
+  workspaceControls,
+  onOpenSettings,
+}: {
+  workspaceControls?: React.ReactNode
+  onOpenSettings?: () => void
+}) {
   const { t } = useTranslation()
   const canUndo = useTimelineStore((s) => s.undoStack.length > 0)
   const canRedo = useTimelineStore((s) => s.redoStack.length > 0)
@@ -44,9 +49,6 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
 
   const previewMode = useEditorStore((s) => s.previewMode)
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode)
-
-  const theme = useThemeStore((s) => s.theme)
-  const setTheme = useThemeStore((s) => s.setTheme)
 
   const handleSkipToStart = useCallback(() => {
     getAudioPlayerInstance()?.seekTo(0)
@@ -170,10 +172,11 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
           {t('transport.previewEdits')}
         </button>
 
-        {/* Theme toggle */}
+        {/* Application settings */}
         <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          title={theme === 'dark' ? t('transport.lightTheme') : t('transport.darkTheme')}
+          onClick={onOpenSettings}
+          title={t('settings.title')}
+          aria-label={t('settings.title')}
           style={{
             background: 'none',
             border: '1px solid var(--color-border)',
@@ -187,7 +190,7 @@ export function TransportBar({ workspaceControls }: { workspaceControls?: React.
             alignItems: 'center',
           }}
         >
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+          <Icon name="gear" />
         </button>
       </div>
     </div>

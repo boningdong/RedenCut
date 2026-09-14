@@ -11,8 +11,8 @@ import type {
 } from '../../shared/transcriber.types'
 import type { SessionJobRegistry } from '../project/SessionJobRegistry'
 import type { WorkspaceController } from '../project/WorkspaceController'
-import { TranscriptionCoordinator } from '../transcriber/TranscriptionCoordinator'
-import { whisperTranscriber } from '../transcriber/whisper'
+import { TranscriptionCoordinator } from '../speech/transcriber/TranscriptionCoordinator'
+import { whisperTranscriber } from '../speech/transcriber/whisper'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
 
 type DiagnosticSink = (error: unknown) => void

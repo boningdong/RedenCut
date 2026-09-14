@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import type { EventEmitter } from 'events'
 import type { Readable } from 'stream'
 import type { AudioMetadata } from '../../../shared/project.types'
-import { getFfprobePath } from '../binaries'
+import { getFfprobePath } from '../../runtime/AppRuntimeLocator'
 
 interface FFprobeStream {
   codec_type: 'audio' | 'video' | 'subtitle'

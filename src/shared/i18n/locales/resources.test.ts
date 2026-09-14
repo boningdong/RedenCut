@@ -4,6 +4,7 @@ import { englishResources } from './en'
 import { simplifiedChineseResources } from './zh-CN'
 
 const requiredGroups = [
+  'settings',
   'common',
   'app',
   'transport',

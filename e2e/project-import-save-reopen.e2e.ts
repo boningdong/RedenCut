@@ -96,6 +96,7 @@ test('imported short audio survives project save and a full application restart'
     runDirectory = started.runDirectory!
     console.error(`Project E2E evidence: ${runDirectory}`)
     await call('browser_snapshot', identity)
+    await call('browser_click', { ...identity, target: 'button:text-is("Set up later")' })
     await call('redencut_prepare_dialog', {
       ...identity,
       request: { purpose: 'import-audio', selection: { type: 'file', filename } },

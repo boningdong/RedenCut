@@ -47,10 +47,19 @@ export class ProjectTransitionCoordinator {
     return this.transition(sender, request, async () => path)
   }
 
+  openStarter(
+    sender: ProjectSwitchSender,
+    request: OpenProjectRequest,
+    kind: 'sample' | 'empty',
+  ): Promise<OpenProjectResult> {
+    return this.transition(sender, request, async () => null, kind)
+  }
+
   private transition(
     sender: ProjectSwitchSender,
     request: OpenProjectRequest,
     chooseCandidate: () => Promise<string | null>,
+    starterKind?: 'sample' | 'empty',
   ): Promise<OpenProjectResult> {
     return this.dependencies.controller.runTransition(request, async (transaction) => {
       const startingToken = transaction.precondition.workspaceToken
@@ -102,14 +111,16 @@ export class ProjectTransitionCoordinator {
             )
           : stayed(rollback, 'candidate-invalid')
       }
-      if (!candidatePath)
+      if (!candidatePath && !starterKind)
         return retainedStartingWorkspace
           ? await this.settleStartingAndStay(transaction, startingToken, rollback, 'cancelled')
           : stayed(rollback, 'cancelled')
 
       let candidate
       try {
-        candidate = await transaction.prepareOpen(candidatePath)
+        candidate = starterKind
+          ? await transaction.prepareStarter(starterKind)
+          : await transaction.prepareOpen(candidatePath!)
       } catch {
         return retainedStartingWorkspace
           ? await this.settleStartingAndStay(

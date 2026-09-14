@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { createStarterWorkspace } from './createStarterWorkspace'
 import { randomUUID } from 'crypto'
 import { realpath, stat } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
@@ -35,6 +37,7 @@ export interface WorkspaceTransaction {
   saveAsForOpen(destination: string, draft: ProjectDraft): Promise<RendererSession>
   releaseRetiredWorkspaces(): Promise<void>
   prepareOpen(root: string): Promise<PreparedWorkspace>
+  prepareStarter(kind: 'sample' | 'empty'): Promise<PreparedWorkspace>
   commitPreparedOpen(candidate: PreparedWorkspace): Promise<RendererSession>
   commitImport(authoritativeProject: ProjectFile): Promise<RendererSession>
   commitSpeechAnalysis(artifact: SpeechArtifact, draft: ProjectDraft): Promise<RendererSession>
@@ -219,6 +222,17 @@ export class WorkspaceController {
           }),
         releaseRetiredWorkspaces: () => this.releaseRetiredWorkspaces(transactionRetiredWorkspaces),
         prepareOpen: (root) => this.prepareOpenState(state, root),
+        prepareStarter: async (kind) => {
+          const workspace = await createStarterWorkspace(tmpdir(), kind)
+          try {
+            const candidate = { workspace, descriptors: await this.descriptors(workspace) }
+            this.preparedAgainstWorkspace.set(candidate, state.workspace)
+            return candidate
+          } catch (error) {
+            await workspace.close()
+            throw error
+          }
+        },
         commitPreparedOpen: (candidate) => this.commitPreparedOpenState(state, candidate),
         commitImport: (authoritativeProject) => this.commitImportState(state, authoritativeProject),
         commitSpeechAnalysis: (artifact, draft) =>

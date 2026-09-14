@@ -96,7 +96,7 @@ let _ffprobePath: string | null = null
 let _ffmpegPath: string | null = null
 let _whisperPath: string | null = null
 
-export function getFfprobePath(): string {
+function developmentFfprobe(): string {
   if (_ffprobePath) return _ffprobePath
 
   // Try Homebrew / system PATH first
@@ -118,7 +118,7 @@ export function getFfprobePath(): string {
   )
 }
 
-export function getFfmpegPath(): string {
+function developmentFfmpeg(): string {
   if (_ffmpegPath) return _ffmpegPath
 
   const fromPath = findInPath(FFMPEG_CANDIDATES, 'ffmpeg')
@@ -143,7 +143,7 @@ export function getFfmpegPath(): string {
  * Unlike ffprobe/ffmpeg, whisper is optional — callers should check
  * availability via `getWhisperPath()` returning null before showing UI.
  */
-export function getWhisperPath(): string | null {
+function developmentWhisper(): string | null {
   if (_whisperPath !== null) return _whisperPath // cached (may be empty string = not found)
 
   const fromPath = findInPath(WHISPER_CANDIDATES, 'whisper-cli')
@@ -168,4 +168,74 @@ export function getWhisperPath(): string | null {
 
   _whisperPath = '' // cache negative result
   return null
+}
+
+import { accessSync, constants } from 'node:fs'
+import { join } from 'node:path'
+
+export interface RuntimeLocationOptions {
+  packaged: boolean
+  resourcesPath: string
+  appPath: string
+  env?: NodeJS.ProcessEnv
+}
+export class AppRuntimeLocator {
+  constructor(private readonly options: RuntimeLocationOptions) {}
+  private resolve(name: string, variable: string, development?: () => string | null): string {
+    const executable = process.platform === 'win32' ? `${name}.exe` : name
+    const path = this.options.packaged
+      ? join(this.options.resourcesPath, 'runtime', 'bin', executable)
+      : (this.options.env ?? process.env)[variable] || development?.()
+    if (!path || !isExecutable(path)) throw new Error(`runtime-unavailable:${name}`)
+    try {
+      accessSync(path, constants.X_OK)
+    } catch {
+      throw new Error(`runtime-unavailable:${name}`)
+    }
+    return path
+  }
+  getFfmpegPath(): string {
+    return this.resolve('ffmpeg', 'REDENCUT_FFMPEG_PATH', developmentFfmpeg)
+  }
+  getFfprobePath(): string {
+    return this.resolve('ffprobe', 'REDENCUT_FFPROBE_PATH', developmentFfprobe)
+  }
+  getWhisperExecutablePath(): string {
+    return this.resolve('whisper-cli', 'REDENCUT_WHISPER_PATH', developmentWhisper)
+  }
+  getUvPath(): string {
+    return this.resolve('uv', 'REDENCUT_UV_BIN', () =>
+      findInPath(
+        [
+          '/opt/homebrew/bin/uv',
+          '/usr/local/bin/uv',
+          join(process.env.HOME ?? '', '.local/bin/uv'),
+        ],
+        'uv',
+      ),
+    )
+  }
+  getSpeechPythonPath(): string {
+    return this.resolve('python3', 'REDENCUT_SPEECH_WORKER_PYTHON', () =>
+      join(this.options.appPath, 'speech-worker', '.venv', 'bin', 'python'),
+    )
+  }
+}
+
+let configuredLocator: AppRuntimeLocator | null = null
+export function configureAppRuntime(locator: AppRuntimeLocator): void {
+  configuredLocator = locator
+}
+export function getFfmpegPath(): string {
+  return configuredLocator ? configuredLocator.getFfmpegPath() : developmentFfmpeg()
+}
+export function getFfprobePath(): string {
+  return configuredLocator ? configuredLocator.getFfprobePath() : developmentFfprobe()
+}
+export function getWhisperPath(): string | null {
+  try {
+    return configuredLocator ? configuredLocator.getWhisperExecutablePath() : developmentWhisper()
+  } catch {
+    return null
+  }
 }

@@ -12,6 +12,7 @@ export type PublicReason =
   | 'whisper-model-missing'
   | 'speech-worker-missing'
   | 'speech-models-missing'
+  | 'speech-language-unsupported'
   | 'workspace-invalid'
   | 'workspace-version'
   | 'workspace-recovered'

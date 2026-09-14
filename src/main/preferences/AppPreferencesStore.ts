@@ -3,6 +3,12 @@ import { randomUUID } from 'node:crypto'
 import { basename, dirname, join } from 'node:path'
 import {
   LocalePreferenceSchema,
+  ThemeIdSchema,
+  OnboardingDispositionSchema,
+  FeaturePreferencesSchema,
+  type ThemeId,
+  type OnboardingDisposition,
+  type FeaturePreferences,
   StoredAppPreferencesSchema,
   type AppPreferencesSnapshot,
 } from '../../shared/appPreferences.types'
@@ -13,6 +19,11 @@ export class AppPreferencesStore {
   private writes: Promise<void> = Promise.resolve()
   private hydration: Promise<void> | null = null
   private snapshot: AppPreferencesSnapshot = {
+    themeId: 'dark',
+    themePreferenceSet: false,
+    textEditingEnabled: true,
+    speakerRecognitionEnabled: true,
+    onboardingDisposition: 'pending',
     preference: 'system',
     resolvedLocale: 'en',
     revision: 0,
@@ -38,20 +49,51 @@ export class AppPreferencesStore {
   setLocale(input: LocalePreference): Promise<AppPreferencesSnapshot> {
     const parsed = LocalePreferenceSchema.safeParse(input)
     if (!parsed.success) return Promise.reject(parsed.error)
-    const preference = parsed.data
+    return this.update({ preference: parsed.data })
+  }
+
+  setTheme(input: ThemeId): Promise<AppPreferencesSnapshot> {
+    return this.update({ themeId: ThemeIdSchema.parse(input), themePreferenceSet: true })
+  }
+
+  migrateTheme(input: ThemeId): Promise<AppPreferencesSnapshot> {
+    return this.update({ themeId: ThemeIdSchema.parse(input), themePreferenceSet: true }, true)
+  }
+
+  setFeaturePreferences(input: FeaturePreferences): Promise<AppPreferencesSnapshot> {
+    return this.update(FeaturePreferencesSchema.parse(input))
+  }
+
+  setOnboardingDisposition(input: OnboardingDisposition): Promise<AppPreferencesSnapshot> {
+    return this.update({ onboardingDisposition: OnboardingDispositionSchema.parse(input) })
+  }
+
+  private update(
+    patch: Partial<
+      Pick<
+        AppPreferencesSnapshot,
+        | 'preference'
+        | 'themeId'
+        | 'themePreferenceSet'
+        | 'textEditingEnabled'
+        | 'speakerRecognitionEnabled'
+        | 'onboardingDisposition'
+      >
+    >,
+    migration = false,
+  ): Promise<AppPreferencesSnapshot> {
     const operation = this.writes.then(async () => {
       await this.hydrate()
-      const resolvedLocale = resolveLocale(
-        preference,
-        preference === 'system' ? this.getSystemLanguages() : [],
+      if (migration && this.snapshot.themePreferenceSet) return this.getSnapshot()
+      const next = { ...this.snapshot, ...patch }
+      next.resolvedLocale = resolveLocale(
+        next.preference,
+        next.preference === 'system' ? this.getSystemLanguages() : [],
       )
-      await this.persist(preference)
-      this.snapshot = {
-        preference,
-        resolvedLocale,
-        revision: this.snapshot.revision + 1,
-        warning: null,
-      }
+      next.revision++
+      next.warning = null
+      await this.persist(next)
+      this.snapshot = next
       return this.getSnapshot()
     })
     this.writes = operation.then(
@@ -74,6 +116,7 @@ export class AppPreferencesStore {
 
   private async load(): Promise<void> {
     let preference: LocalePreference = 'system'
+    let stored: ReturnType<typeof StoredAppPreferencesSchema.parse> | undefined
     let warning: AppPreferencesSnapshot['warning'] = null
     let raw: string | undefined
     try {
@@ -90,10 +133,17 @@ export class AppPreferencesStore {
         warning = 'invalid-preferences'
       }
       const parsed = StoredAppPreferencesSchema.safeParse(input)
-      if (parsed.success) preference = parsed.data.localePreference
-      else warning = 'invalid-preferences'
+      if (parsed.success) {
+        stored = parsed.data
+        preference = parsed.data.localePreference
+      } else warning = 'invalid-preferences'
     }
     this.snapshot = {
+      themeId: stored?.themeId ?? 'dark',
+      themePreferenceSet: stored?.themeId !== undefined,
+      textEditingEnabled: stored?.textEditingEnabled ?? true,
+      speakerRecognitionEnabled: stored?.speakerRecognitionEnabled ?? true,
+      onboardingDisposition: stored?.onboardingDisposition ?? 'pending',
       preference,
       resolvedLocale: resolveLocale(
         preference,
@@ -104,7 +154,7 @@ export class AppPreferencesStore {
     }
   }
 
-  private async persist(preference: LocalePreference): Promise<void> {
+  private async persist(snapshot: AppPreferencesSnapshot): Promise<void> {
     const directory = dirname(this.filePath)
     await fs.mkdir(directory, { recursive: true })
     const temporary = join(directory, `.${basename(this.filePath)}.${randomUUID()}.tmp`)
@@ -113,7 +163,18 @@ export class AppPreferencesStore {
     try {
       try {
         await handle.writeFile(
-          JSON.stringify({ version: 1, localePreference: preference }, null, 2) + '\n',
+          JSON.stringify(
+            {
+              version: 1,
+              localePreference: snapshot.preference,
+              ...(snapshot.themePreferenceSet ? { themeId: snapshot.themeId } : {}),
+              textEditingEnabled: snapshot.textEditingEnabled,
+              speakerRecognitionEnabled: snapshot.speakerRecognitionEnabled,
+              onboardingDisposition: snapshot.onboardingDisposition,
+            },
+            null,
+            2,
+          ) + '\n',
         )
       } finally {
         await handle.close()

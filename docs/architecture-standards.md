@@ -40,12 +40,28 @@
 - Keep raw diagnostics in their diagnostic sink and preserve user-authored names, transcript content, timecodes, project identifiers and file extensions.
 - Changing language must not remount the editor, reset playback, restart jobs or alter project revisions.
 
+## Settings and Resource Preparation
+
+- Main owns theme IDs, speech feature preferences and onboarding disposition in app-preferences.json, alongside locale preferences.
+- Settings and onboarding share the same renderer speech-resource components and main ResourceManager snapshots.
+- ModelRegistry resolves only verified app-managed installations; no legacy cache or Homebrew model discovery occurs.
+- ModelDownloader prepares immutable manifest revisions in staging with integrity checks and explicit cancellation/resumption; readiness follows load validation.
+- HuggingFaceTokenStore uses platform-protected credentials; HuggingFaceAccessService verifies target-model access explicitly without polling.
+- No token is returned through preload, written into project artifacts or passed to ordinary inference workers.
+- AppRuntimeLocator is the single executable-location boundary; development runtime availability does not certify packaged distribution.
+- Non-bundled builds use DevelopmentEnvironmentChecker for read-only executable and Python import checks, exposed in ResourceManager snapshots.
+- Developer installation is explicit through `npm run setup:speech`; the app validates the result and blocks model preparation while required runtime checks fail.
+- uv is only an environment-setup tool; an already usable runtime does not require uv for inference or model preparation.
+- Bundled snapshots omit development setup; installation guide IPC accepts fixed guide IDs rather than renderer-supplied URLs.
+- Explicit onboarding skip/close and completion persist independently of resources; dialog closure does not cancel preparation.
+- Settings changes affect subsequent analysis tasks; started tasks retain their configuration snapshot.
+
 ## Audio Access and Caches
 
 - Serve only validated cache artifacts through `redencut://cache/<audio-source-id>/pcm` and `/waveform/<level>`; do not expose arbitrary paths or direct renderer `file://` access.
 - Require and forward bounded byte ranges, and preserve binary MIME and CORS headers when changing the custom protocol.
 - Treat continuous Float32 PCM, binary waveform levels, and cache manifests as regenerable data; copied files under `media/` remain durable originals.
-- Resolve FFmpeg, FFprobe, and whisper.cpp binaries through [`src/main/audio/binaries.ts`](../src/main/audio/binaries.ts) so platform lookup, package fallback, caching, and actionable errors remain centralized.
+- Resolve FFmpeg, FFprobe, and whisper.cpp binaries through [`src/main/runtime/AppRuntimeLocator.ts`](../src/main/runtime/AppRuntimeLocator.ts) so platform lookup, package fallback, caching, and actionable errors remain centralized.
 
 ## Playback
 
@@ -68,8 +84,12 @@
 ## Transcription
 
 - Route speech-to-text through [`ITranscriber`](../src/shared/transcriber.types.ts); callers must not invoke a transcription engine directly.
-- The current implementation is local whisper.cpp in [`src/main/transcriber/whisper.ts`](../src/main/transcriber/whisper.ts), reached through the main-process transcript IPC handler.
+- The current implementation is local whisper.cpp in [`src/main/speech/transcriber/whisper.ts`](../src/main/speech/transcriber/whisper.ts), reached through the main-process transcript IPC handler.
 - Keep availability failures actionable and preserve progress delivery through the typed IPC contract.
+- SpeechAnalysisCoordinator runs transcription and Chinese/English alignment, with optional diarization based on snapshotted preferences.
+- New speech artifacts explicitly distinguish skipped-disabled diarization from completed results; existing v1 artifacts remain readable.
+- Skipped analysis uses source-track presentation without fabricated speaker results; settings changes preserve existing analysis and user overrides.
+- Analysis consumes provisioned resources and never implicitly downloads or authenticates.
 
 ## Transcript Presentation and Editing
 

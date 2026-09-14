@@ -1,0 +1,144 @@
+import { Icon } from '../ui/Icon'
+import type { DevelopmentCheck } from '@shared/developmentEnvironment.types'
+import { useState } from 'react'
+import { useTranslation } from '../../i18n/useTranslation'
+import { useResourcesStore } from '../../stores/resources.store'
+import './developmentEnvironment.css'
+export function DevelopmentEnvironmentPanel() {
+  const { t } = useTranslation()
+  const { snapshot, pending, refresh } = useResourcesStore()
+  const dev = snapshot?.development
+  const [expanded, setExpanded] = useState<boolean | null>(null)
+  const [guide, setGuide] = useState<'tools' | 'python' | null>(null)
+  if (!dev) return null
+  const open = expanded ?? !dev.ready
+  const row = (label: string, ready: boolean, key: DevelopmentCheck) => (
+    <div className="dev-item">
+      <span>{label}</span>
+      <span
+        className={
+          dev.checking?.includes(key) ? 'download-status' : `status ${ready ? 'ready' : 'pending'}`
+        }
+        role="status"
+        aria-label={label}
+      >
+        <i className={dev.checking?.includes(key) ? 'loading-spinner' : 'status-dot'} />
+        {t(
+          dev.checking?.includes(key)
+            ? 'settings.devChecking'
+            : ready
+              ? 'settings.ready'
+              : 'settings.devMissing',
+        )}
+      </span>
+    </div>
+  )
+  const actions = (group: 'tools' | 'python') => (
+    <div className="dev-block-footer">
+      <button className="outline" onClick={() => setGuide(guide === group ? null : group)}>
+        {t('settings.devGuide')}
+      </button>
+      <button className="recheck-action" disabled={pending} onClick={() => void refresh()}>
+        {pending ? <i className="loading-spinner" /> : <Icon name="refresh" />}
+        {t(pending ? 'settings.devChecking' : 'settings.devValidate')}
+      </button>
+    </div>
+  )
+  return (
+    <section className="dev-env">
+      <button className="dev-summary" aria-expanded={open} onClick={() => setExpanded(!open)}>
+        <span className="cap-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <path d="m7 9 3 3-3 3m6 0h4" />
+          </svg>
+        </span>
+        <b>{t('settings.devTitle')}</b>
+        <span className="pill">{t('settings.devOnly')}</span>
+        <span aria-hidden="true" className={`section-chevron ${open ? 'expanded' : ''}`}>
+          <svg viewBox="0 0 16 16">
+            <path d="m6 4 4 4-4 4" />
+          </svg>
+        </span>
+        <span className={`status ${dev.ready ? 'ready' : 'pending'}`}>
+          <i className={dev.checking?.length ? 'loading-spinner' : 'status-dot'} />
+          {t(
+            dev.checking?.length
+              ? 'settings.devChecking'
+              : dev.ready
+                ? 'settings.ready'
+                : 'settings.devRequired',
+          )}
+        </span>
+      </button>
+      {open && (
+        <>
+          <p className="dev-intro">{t('settings.devIntro')}</p>
+          <div className="dev-grid">
+            <section className="dev-block">
+              <h3>{t('settings.devTools')}</h3>
+              <p>{t('settings.devToolsHelp')}</p>
+              {row('FFmpeg', dev.ffmpeg, 'ffmpeg')}
+              {row('FFprobe', dev.ffprobe, 'ffprobe')}
+              {row('whisper-cli', dev.whisper, 'whisper')}
+              <p className="dev-note">{t('settings.devToolLocations')}</p>
+              {actions('tools')}
+              {guide === 'tools' && (
+                <div className="dev-guide">
+                  <p>
+                    {t(
+                      dev.platform === 'darwin'
+                        ? 'settings.devBrewTools'
+                        : 'settings.devOtherTools',
+                    )}
+                  </p>
+                  {dev.platform === 'darwin' && <code>brew install ffmpeg whisper-cpp</code>}
+                  <p>{t('settings.devToolReturn')}</p>
+                  <button
+                    className="textbutton"
+                    onClick={() =>
+                      void window.electronAPI.resourcesOpenGuide('tools').catch(() => {})
+                    }
+                  >
+                    Homebrew ↗
+                  </button>
+                </div>
+              )}
+            </section>
+            <section className="dev-block">
+              <h3>{t('settings.devPython')}</h3>
+              <p>{t('settings.devPythonHelp')}</p>
+              {row('uv', dev.uv, 'uv')}
+              {row('Python 3.11', dev.python, 'python')}
+              {row(t('settings.devLibraries'), dev.libraries, 'libraries')}
+              <p className="dev-note">WhisperX · PyTorch · pyannote.audio</p>
+              <p className="dev-note">speech-worker/.venv</p>
+              {actions('python')}
+              {guide === 'python' && (
+                <div className="dev-guide">
+                  <b>{t('settings.devInstallUv')}</b>
+                  <p>{t('settings.devUvHelp')}</p>
+                  {dev.platform === 'darwin' && <code>brew install uv</code>}
+                  <button
+                    className="textbutton"
+                    onClick={() =>
+                      void window.electronAPI.resourcesOpenGuide('python').catch(() => {})
+                    }
+                  >
+                    uv ↗
+                  </button>
+                  <hr />
+                  <b>{t('settings.devSetup')}</b>
+                  <p>{t('settings.devRunAtRoot')}</p>
+                  <code>npm run setup:speech</code>
+                  <p>{t('settings.devSetupHelp')}</p>
+                  <p>{t('settings.devReturn')}</p>
+                </div>
+              )}
+            </section>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}

@@ -1,4 +1,4 @@
-import { TranscriberUnavailableError } from '../transcriber/TranscriberUnavailableError'
+import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUnavailableError'
 import type { IpcError, IpcResult } from '../../shared/ipc.types'
 import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
 import { ZodError } from 'zod'

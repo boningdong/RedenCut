@@ -1,78 +1,19 @@
+import { offlineEnvironment } from '../inferenceEnvironment'
 import { TranscriberUnavailableError } from './TranscriberUnavailableError'
-import type { PublicMessage, TranscriptionProgress } from '../../shared/publicMessages'
-// ─────────────────────────────────────────────────────────────────────────────
-// WhisperTranscriber
-//
-// Implements ITranscriber using the local whisper.cpp binary.
-//
-// Prerequisites (user must install):
-//   brew install whisper-cpp
-//
-//   Then download a model manually, e.g.:
-//     mkdir -p ~/.cache/whisper
-//     curl -L -o ~/.cache/whisper/ggml-base.bin \
-//       https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
-//
-//   All available models: https://huggingface.co/ggerganov/whisper.cpp/tree/main
-//
-// How it works:
-//   1. Locate the whisper-cli binary via getWhisperPath()
-//   2. Find an available model file in common locations
-//   3. Run: whisper-cli -m <model> -f <audio> --output-json -of <tmpdir/out>
-//      stderr is streamed to extract real-time progress percentages.
-//   4. Parse the JSON output — use per-token timestamps when available,
-//      otherwise distribute each segment's time range evenly across its words
-//   5. Return a Transcript with word-level { id, text, start, end } entries
-//
-// CJK handling: Chinese/Japanese/Korean characters have no spaces between
-// them, so grouping tokens by leading space (the English heuristic) would
-// merge everything into one giant word. Instead each token is treated as its
-// own unit, and tokens that contain CJK characters are further split into
-// individual characters — each with its own proportional timestamp slice.
-// ─────────────────────────────────────────────────────────────────────────────
-
+import type { PublicMessage, TranscriptionProgress } from '../../../shared/publicMessages'
 import { spawn, type ChildProcess } from 'child_process'
 import { mkdtemp, readFile, rm } from 'fs/promises'
 import { join } from 'path'
-import { tmpdir, homedir } from 'os'
+import { tmpdir } from 'os'
 import { StringDecoder } from 'string_decoder'
 import { existsSync } from 'fs'
 import { createHash } from 'crypto'
-import { getWhisperPath, getFfmpegPath } from '../audio/binaries'
+import { getWhisperPath, getFfmpegPath } from '../../runtime/AppRuntimeLocator'
 import type {
   ITranscriber,
   TranscribeOptions,
   TranscriptionResult,
-} from '../../shared/transcriber.types'
-
-// ── Model discovery ───────────────────────────────────────────────────────────
-// Checked in priority order — smaller models are faster, larger are more accurate.
-const MODEL_NAMES = [
-  'ggml-base.bin',
-  'ggml-small.bin',
-  'ggml-tiny.bin',
-  'ggml-medium.bin',
-  'ggml-large-v3.bin',
-]
-
-const MODEL_SEARCH_DIRS = [
-  ...(process.env.REDENCUT_WHISPER_MODEL_DIR ? [process.env.REDENCUT_WHISPER_MODEL_DIR] : []),
-  join(homedir(), '.cache', 'whisper'),
-  join(homedir(), 'Library', 'Application Support', 'whisper.cpp', 'models'),
-  '/opt/homebrew/share/whisper.cpp/models',
-  '/usr/local/share/whisper.cpp/models',
-  '/usr/share/whisper.cpp/models',
-]
-
-function findModel(): string | null {
-  for (const dir of MODEL_SEARCH_DIRS) {
-    for (const name of MODEL_NAMES) {
-      const p = join(dir, name)
-      if (existsSync(p)) return p
-    }
-  }
-  return null
-}
+} from '../../../shared/transcriber.types'
 
 // ── Timestamp parsing ─────────────────────────────────────────────────────────
 // Whisper outputs timestamps in "HH:MM:SS,mmm" format.
@@ -129,7 +70,7 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
   const proc = spawn(
     ffmpegPath,
     ['-i', audioFilePath, '-t', '30', '-af', 'silencedetect=n=-40dB:d=0.1', '-f', 'null', '-'],
-    { stdio: ['ignore', 'ignore', 'pipe'] },
+    { stdio: ['ignore', 'ignore', 'pipe'], env: offlineEnvironment(process.env) },
   )
   const decoder = new StringDecoder('utf8')
   let tail = ''
@@ -194,13 +135,24 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
 export class WhisperTranscriber implements ITranscriber {
   readonly name = 'Whisper.cpp (local)'
 
+  constructor(private modelResolver: () => string | null = () => null) {}
+
+  setModelResolver(resolver: () => string | null): void {
+    this.modelResolver = resolver
+  }
+
+  private findModel(): string | null {
+    const path = this.modelResolver()
+    return path && existsSync(path) ? path : null
+  }
+
   async isAvailable(): Promise<boolean> {
     return (await this.unavailableReason()) === null
   }
 
   async unavailableReason(): Promise<PublicMessage | null> {
     if (!getWhisperPath()) return { reason: 'whisper-missing' }
-    if (!findModel()) return { reason: 'whisper-model-missing' }
+    if (!this.findModel()) return { reason: 'whisper-model-missing' }
     return null
   }
 
@@ -214,7 +166,11 @@ export class WhisperTranscriber implements ITranscriber {
     const binary = getWhisperPath()
     if (!binary) throw new TranscriberUnavailableError('whisper-missing')
 
-    const model = options.model && existsSync(options.model) ? options.model : findModel()
+    const model = options.model
+      ? existsSync(options.model)
+        ? options.model
+        : null
+      : this.findModel()
     if (!model) throw new TranscriberUnavailableError('whisper-model-missing')
 
     // Write output to a temp directory so we don't litter the audio folder
@@ -263,7 +219,7 @@ export class WhisperTranscriber implements ITranscriber {
       // ── Spawn with streaming stderr for real-time progress ──────────────
       // execFileAsync collects output only at the end; spawn lets us read
       // stderr line-by-line so we can forward percentage updates to the UI.
-      const proc = spawn(binary, args)
+      const proc = spawn(binary, args, { env: offlineEnvironment(process.env) })
       let lastPct = -1
       proc.stderr!.on('data', (chunk: Buffer) => {
         if (signal.aborted) return

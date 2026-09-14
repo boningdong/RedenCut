@@ -1,4 +1,4 @@
-import { toIpcResult } from '../ipc/ipcResult'
+import { toIpcResult } from '../../ipc/ipcResult'
 import { EventEmitter } from 'events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -18,7 +18,7 @@ vi.mock('fs/promises', () => ({
   rm: mocks.rm,
 }))
 vi.mock('fs', () => ({ existsSync: mocks.existsSync }))
-vi.mock('../audio/binaries', () => ({
+vi.mock('../../runtime/AppRuntimeLocator', () => ({
   getWhisperPath: mocks.whisperPath,
   getFfmpegPath: () => '/usr/bin/ffmpeg',
 }))
@@ -38,7 +38,11 @@ async function advanceToWhisper(signal: AbortSignal) {
   const silence = new FakeChild()
   const whisper = new FakeChild()
   mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
-  const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, signal)
+  const transcription = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+    '/source.wav',
+    {},
+    signal,
+  )
   await waitForSpawnCount(1)
   silence.emit('close', 0)
   await waitForSpawnCount(2)
@@ -59,7 +63,7 @@ describe('WhisperTranscriber cancellation', () => {
 
   it('retains an actionable missing-engine reason on the legacy IPC error path', async () => {
     mocks.whisperPath.mockReturnValue(null)
-    const engine = new WhisperTranscriber()
+    const engine = new WhisperTranscriber(() => '/managed/ggml-base.bin')
     expect(await engine.unavailableReason()).toEqual({ reason: 'whisper-missing' })
     const result = await toIpcResult(
       () => engine.transcribe('/private/source.wav', {}, new AbortController().signal),
@@ -77,7 +81,11 @@ describe('WhisperTranscriber cancellation', () => {
     controller.abort()
 
     await expect(
-      new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal),
+      new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+        '/source.wav',
+        {},
+        controller.signal,
+      ),
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(mocks.mkdtemp).not.toHaveBeenCalled()
     expect(mocks.spawn).not.toHaveBeenCalled()
@@ -87,7 +95,11 @@ describe('WhisperTranscriber cancellation', () => {
     const child = new FakeChild()
     mocks.spawn.mockReturnValueOnce(child)
     const controller = new AbortController()
-    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    const transcription = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+      '/source.wav',
+      {},
+      controller.signal,
+    )
     await waitForSpawnCount(1)
 
     controller.abort()
@@ -109,7 +121,11 @@ describe('WhisperTranscriber cancellation', () => {
     const silence = new FakeChild()
     const whisper = new FakeChild()
     mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
-    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    const transcription = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+      '/source.wav',
+      {},
+      controller.signal,
+    )
     await waitForSpawnCount(1)
 
     silence.stderr.emit('data', Buffer.from('silence_start: 10.000\nsilence_end: 12.000\n'))
@@ -130,7 +146,11 @@ describe('WhisperTranscriber cancellation', () => {
     const silence = new FakeChild()
     const whisper = new FakeChild()
     mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
-    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    const transcription = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+      '/source.wav',
+      {},
+      controller.signal,
+    )
     await waitForSpawnCount(1)
 
     silence.stderr.emit('data', Buffer.from('silence_sta'))
@@ -156,7 +176,11 @@ describe('WhisperTranscriber cancellation', () => {
     const silence = new FakeChild()
     const whisper = new FakeChild()
     mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
-    const transcription = new WhisperTranscriber().transcribe('/source.wav', {}, controller.signal)
+    const transcription = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+      '/source.wav',
+      {},
+      controller.signal,
+    )
     await waitForSpawnCount(1)
 
     silence.stderr.emit('data', Buffer.from(`silence_start: malformed ${'x'.repeat(16_384)}`))
@@ -268,5 +292,21 @@ describe('WhisperTranscriber cancellation', () => {
       ],
       provenance: { engineId: 'whisper.cpp', modelId: 'ggml-base.bin' },
     })
+  })
+  it('keeps credentials out of both native speech subprocesses', async () => {
+    vi.stubEnv('HF_TOKEN', 'private-token')
+    vi.stubEnv('HUGGING_FACE_HUB_TOKEN', 'private-token')
+    try {
+      const { whisper, transcription } = await advanceToWhisper(new AbortController().signal)
+      for (const call of mocks.spawn.mock.calls) {
+        expect(call[2]?.env?.HF_TOKEN).toBeUndefined()
+        expect(call[2]?.env?.HUGGING_FACE_HUB_TOKEN).toBeUndefined()
+        expect(call[2]?.env?.HF_HUB_OFFLINE).toBe('1')
+      }
+      whisper.emit('close', 0)
+      await transcription
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })

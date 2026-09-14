@@ -162,8 +162,9 @@ export interface RendererSpeechAnalysis {
     AlignmentArtifact,
     'id' | 'transcriptArtifactId' | 'transcriptRevision' | 'acousticEditUnits' | 'provenance'
   >
-  diarization: Pick<DiarizationArtifact, 'id' | 'turns' | 'provenance'>
-  speakerAttribution: SpeakerAttributionArtifact
+  diarization?: Pick<DiarizationArtifact, 'id' | 'turns' | 'provenance'>
+  diarizationStatus?: 'completed' | 'skipped-disabled'
+  speakerAttribution?: SpeakerAttributionArtifact
   speakers: Speaker[]
   speakerLabelOverrides: Array<{ speakerId: SpeakerId; displayName: string; color?: string }>
 }

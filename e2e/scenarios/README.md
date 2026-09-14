@@ -8,6 +8,7 @@ Existing [fixed E2Es](../README.md) continue to own deterministic regression ass
 
 | Scenario | When to run | Required capabilities |
 | --- | --- | --- |
+| [Settings and onboarding workflow](settings-onboarding-workflow.md) | First-run setup, appearance preferences and resource preparation | Docker MCP, snapshots; real downloads additionally require runtimes and appropriate access |
 | [Localization workflow](localization-workflow.md) | UI language, preference persistence, and localized editing controls | Docker MCP, prepared fixture/project dialogs, snapshots and screenshots |
 | [Editing workflow](editing-workflow.md) | Baseline for user-visible changes, plus explicit workflow trials | Docker MCP, prepared fixture/project dialogs, snapshots and screenshots |
 | [Redact preview workflow](redact-preview-workflow.md) | Redact playback or export changes: Preview comparison, default export removal and retained-overlap protection | Docker MCP, prepared dialogs, ordered playback snapshots and FFmpeg/FFprobe output inspection |

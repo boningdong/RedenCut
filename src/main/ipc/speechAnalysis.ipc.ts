@@ -1,6 +1,10 @@
+import type { ResourceManager } from '../resources/ResourceManager'
+import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
+import type { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
+import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUnavailableError'
 import { randomUUID } from 'crypto'
 import { existsSync } from 'fs'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { homedir } from 'os'
 import { ipcMain } from 'electron'
 import type {
@@ -16,18 +20,40 @@ import { SpeechAnalysisCoordinator } from '../speech/SpeechAnalysisCoordinator'
 import { withSpeechAudio } from '../speech/prepareSpeechAudio'
 import { SpeechAnalysisError, type SpeechFailureStage } from '../speech/SpeechAnalysisError'
 import { SpeechWorkerClient } from '../speech/SpeechWorkerClient'
-import { whisperTranscriber } from '../transcriber/whisper'
+import { whisperTranscriber } from '../speech/transcriber/whisper'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
+
+interface SpeechPreparationServices {
+  resources: ResourceManager
+  preferences: AppPreferencesStore
+  runtime: AppRuntimeLocator
+  manifestPath: string
+}
 
 export function registerSpeechAnalysisIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
   diagnosticSink: (error: unknown) => void = console.error,
+  services?: SpeechPreparationServices,
 ): void {
-  const workerRoot = process.env.REDENCUT_SPEECH_WORKER_ROOT ?? join(process.cwd(), 'speech-worker')
-  const python =
-    process.env.REDENCUT_SPEECH_WORKER_PYTHON ?? join(workerRoot, '.venv', 'bin', 'python')
-  const manifest = process.env.REDENCUT_SPEECH_MANIFEST ?? join(workerRoot, 'models.json')
+  const workerRoot = services
+    ? dirname(services.manifestPath)
+    : (process.env.REDENCUT_SPEECH_WORKER_ROOT ?? join(process.cwd(), 'speech-worker'))
+  let managedWhisper: string | null = null
+  if (services) whisperTranscriber.setModelResolver(() => managedWhisper)
+  const python = services
+    ? (() => {
+        try {
+          return services.runtime.getSpeechPythonPath()
+        } catch {
+          return ''
+        }
+      })()
+    : (process.env.REDENCUT_SPEECH_WORKER_PYTHON ?? join(workerRoot, '.venv', 'bin', 'python'))
+  const manifest =
+    services?.manifestPath ??
+    process.env.REDENCUT_SPEECH_MANIFEST ??
+    join(workerRoot, 'models.json')
   const modelCache =
     process.env.REDENCUT_SPEECH_MODEL_CACHE ??
     join(homedir(), 'Library', 'Caches', 'RedenCut', 'speech-models')
@@ -46,10 +72,27 @@ export function registerSpeechAnalysisIpc(
 
   ipcMain.handle('speech-analysis:check-availability', () =>
     toIpcResult(async () => {
+      if (services) {
+        const preferences = await services.preferences.read()
+        if (!preferences.textEditingEnabled) return { reason: 'speech-models-missing' as const }
+        const paths = await services.resources.getModelPaths()
+        const transcription = services.resources.models.find(
+          (model) => model.capability === 'transcription',
+        )!
+        managedWhisper = paths[transcription.id]
+          ? join(paths[transcription.id], transcription.files[0].path)
+          : null
+        if (
+          !paths['alignment-zh'] ||
+          !paths['alignment-en'] ||
+          (preferences.speakerRecognitionEnabled && !paths['diarization-default'])
+        )
+          return { reason: 'speech-models-missing' as const }
+      }
       const whisperReason = await whisperTranscriber.unavailableReason()
       if (whisperReason) return whisperReason
       if (!existsSync(python)) return { reason: 'speech-worker-missing' as const }
-      if (!existsSync(manifest) || !existsSync(modelCache))
+      if (!existsSync(manifest) || (!services && !existsSync(modelCache)))
         return { reason: 'speech-models-missing' as const }
       return null
     }, diagnosticSink),
@@ -73,6 +116,25 @@ export function registerSpeechAnalysisIpc(
           !request.confirmSpeakerLabelReset
         )
           throw new PublicIpcError('invalid-request')
+        if (services && !python) throw new TranscriberUnavailableError('speech-worker-missing')
+        const preferences = services ? await services.preferences.read() : undefined
+        const modelPaths = services ? await services.resources.getModelPaths() : undefined
+        let transcriptionModel: string | undefined
+        if (services && modelPaths) {
+          const model = services.resources.models.find(
+            (model) => model.capability === 'transcription',
+          )!
+          if (
+            !preferences?.textEditingEnabled ||
+            !modelPaths[model.id] ||
+            !modelPaths['alignment-zh'] ||
+            !modelPaths['alignment-en'] ||
+            (preferences.speakerRecognitionEnabled && !modelPaths['diarization-default'])
+          )
+            throw new TranscriberUnavailableError('speech-models-missing')
+          transcriptionModel = join(modelPaths[model.id], model.files[0].path)
+          managedWhisper = transcriptionModel
+        }
         const resolvePcm = controller.captureSpeechPcmResolver(request)
         const identity = {
           kind: 'speech-analysis' as const,
@@ -95,6 +157,9 @@ export function registerSpeechAnalysisIpc(
                   language: request.language,
                   alignmentModel: 'auto',
                   diarizationModel: 'diarization-default',
+                  speakerRecognitionEnabled: preferences?.speakerRecognitionEnabled ?? true,
+                  modelPaths,
+                  transcriptionModel,
                 },
                 abortController.signal,
                 (progress) => {
@@ -119,6 +184,7 @@ export function registerSpeechAnalysisIpc(
             if (abortController.signal.aborted) abortController.signal.throwIfAborted()
             if (error instanceof DOMException && error.name === 'AbortError') throw error
             if (
+              error instanceof TranscriberUnavailableError ||
               error instanceof PublicIpcError ||
               (error instanceof Error &&
                 (error.message === 'Stale workspace token' ||

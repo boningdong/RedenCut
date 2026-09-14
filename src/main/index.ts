@@ -1,3 +1,17 @@
+import { LocalHuggingFaceLogin } from './speech/huggingface/LocalHuggingFaceLogin'
+import { DevelopmentEnvironmentChecker } from './runtime/DevelopmentEnvironmentChecker'
+import { createModelLoadValidator } from './resources/validateModelLoad'
+import { readFile } from 'node:fs/promises'
+import { safeStorage } from 'electron'
+import { ModelManifestSchema } from '../shared/modelManifest.schema'
+import { ResourceManager } from './resources/ResourceManager'
+import { ModelRegistry } from './resources/ModelRegistry'
+import { ModelDownloader } from './resources/ModelDownloader'
+import { HuggingFaceTokenStore } from './speech/huggingface/HuggingFaceTokenStore'
+import { HuggingFaceAccessService } from './speech/huggingface/HuggingFaceAccessService'
+import { registerResourcesIpc } from './ipc/resources.ipc'
+import { registerModelAccessIpc } from './ipc/modelAccess.ipc'
+import { AppRuntimeLocator, configureAppRuntime } from './runtime/AppRuntimeLocator'
 import { createTranslator } from '../shared/i18n/createTranslator'
 import { AppPreferencesStore } from './preferences/AppPreferencesStore'
 import { registerAppPreferencesIpc } from './ipc/appPreferences.ipc'
@@ -75,6 +89,35 @@ startApplicationLifecycle({
     )
     await appPreferences.read().catch(console.error)
     registerAppPreferencesIpc(appPreferences)
+    const runtime = new AppRuntimeLocator({
+      packaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      appPath: app.isPackaged ? app.getAppPath() : join(__dirname, '../..'),
+    })
+    configureAppRuntime(runtime)
+    const manifestPath = app.isPackaged
+      ? join(process.resourcesPath, 'speech-worker', 'models.json')
+      : join(__dirname, '../../speech-worker/models.json')
+    const manifest = ModelManifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8')))
+    const access = new HuggingFaceAccessService(
+      new HuggingFaceTokenStore(
+        join(app.getPath('userData'), 'secrets', 'huggingface.token'),
+        safeStorage,
+      ),
+      manifest.models.find((model) => model.capability === 'diarization')!,
+      undefined,
+      app.isPackaged ? undefined : new LocalHuggingFaceLogin(),
+    )
+    const resources = new ResourceManager(
+      manifest.models,
+      new ModelRegistry(app.getPath('userData')),
+      new ModelDownloader(),
+      access,
+      createModelLoadValidator(runtime, manifestPath),
+      app.isPackaged ? undefined : new DevelopmentEnvironmentChecker(runtime),
+    )
+    registerResourcesIpc(resources)
+    registerModelAccessIpc(access)
     const translators = {
       en: createTranslator('en').getFixedT('en'),
       'zh-CN': createTranslator('zh-CN').getFixedT('zh-CN'),
@@ -114,7 +157,12 @@ startApplicationLifecycle({
     )
     registerAudioIpc(controller, jobs, console.error, dialogs)
     registerTranscriptIpc(controller, jobs)
-    registerSpeechAnalysisIpc(controller, jobs)
+    registerSpeechAnalysisIpc(controller, jobs, console.error, {
+      resources,
+      preferences: appPreferences,
+      runtime,
+      manifestPath,
+    })
     registerSpeakerLabelIpc(controller)
     registerWorkspaceLayoutIpc(
       new WorkspaceLayoutStore(join(app.getPath('userData'), 'workspace-layout.json')),
@@ -173,7 +221,10 @@ startApplicationLifecycle({
         const pending = pendingOpens.issue(window.webContents.id, path)
         window.webContents.send('project:pending-open', pending)
       },
-      shutdown: () => barrier.shutdown(),
+      shutdown: async () => {
+        await resources.cancel()
+        await barrier.shutdown()
+      },
     }
   },
 })

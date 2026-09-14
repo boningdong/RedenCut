@@ -20,7 +20,7 @@ interface ApplicationRuntime {
   restoreWindow(): void
   focusWindow(): void
   forwardProject(path: string): void
-  shutdown(): void
+  shutdown(): void | Promise<void>
 }
 
 interface ApplicationLifecycleDependencies {
@@ -48,6 +48,8 @@ export function startApplicationLifecycle({
   let runtime: ApplicationRuntime | null = null
   let draining = false
   let shuttingDown = false
+  let shutdownComplete = false
+  let shutdownPending = false
 
   const drain = async () => {
     if (draining || !runtime || shuttingDown) return
@@ -88,10 +90,23 @@ export function startApplicationLifecycle({
     event.preventDefault()
     forward(path)
   })
-  app.on('before-quit', () => {
+  app.on('before-quit', (event?: { preventDefault(): void }) => {
     shuttingDown = true
     queuedProjects.splice(0)
-    runtime?.shutdown()
+    if (shutdownComplete) return
+    if (shutdownPending) {
+      event?.preventDefault()
+      return
+    }
+    const result = runtime?.shutdown()
+    if (result && typeof result.then === 'function') {
+      event?.preventDefault()
+      shutdownPending = true
+      void result.catch(reportDiagnostic).finally(() => {
+        shutdownComplete = true
+        app.quit()
+      })
+    } else shutdownComplete = true
   })
 
   void app

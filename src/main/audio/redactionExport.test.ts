@@ -10,7 +10,7 @@ import {
   type Clip,
   type Track,
 } from '@shared/project.types'
-import { getFfmpegPath } from './binaries'
+import { getFfmpegPath } from '../runtime/AppRuntimeLocator'
 import { buildRenderArgs } from './renderer'
 
 const rate = 48_000

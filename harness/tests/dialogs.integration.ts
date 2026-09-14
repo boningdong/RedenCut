@@ -37,6 +37,7 @@ test('dialog preparation is generation-bound, recorded on rejection and cleared 
     expect(stale.structuredContent).toMatchObject({ error: { code: 'STALE_GENERATION' } })
     const current = { runId: restarted.runId!, generation: restarted.generation }
     await runtime.callUiTool('browser_snapshot', {}, current)
+    await runtime.callUiTool('browser_click', { target: 'button:text-is("Set up later")' }, current)
     await runtime.callUiTool('browser_click', { target: 'button:text-is("+ Add Track")' }, current)
     await expect
       .poll(

@@ -18,12 +18,22 @@ const english: AppPreferencesSnapshot = {
   resolvedLocale: 'en',
   revision: 0,
   warning: null,
+  themeId: 'dark',
+  themePreferenceSet: true,
+  textEditingEnabled: true,
+  speakerRecognitionEnabled: true,
+  onboardingDisposition: 'pending',
 }
 const chinese: AppPreferencesSnapshot = {
   preference: 'zh-CN',
   resolvedLocale: 'zh-CN',
   revision: 1,
   warning: null,
+  themeId: 'dark',
+  themePreferenceSet: true,
+  textEditingEnabled: true,
+  speakerRecognitionEnabled: true,
+  onboardingDisposition: 'pending',
 }
 function fixture() {
   const read = deferred<AppPreferencesSnapshot>()
@@ -36,6 +46,10 @@ function fixture() {
       return read.promise
     }),
     setLocale: vi.fn(),
+    setTheme: vi.fn(),
+    migrateTheme: vi.fn(),
+    setFeaturePreferences: vi.fn(),
+    setOnboardingDisposition: vi.fn(),
     onChanged: vi.fn((callback) => {
       events.push('subscribe')
       listener = callback
@@ -129,4 +143,59 @@ describe('locale preferences', () => {
     await hydration
     expect(f.store.getState().resolvedLocale).toBe('en')
   })
+})
+
+it('migrates only a valid legacy theme when main has not saved one', async () => {
+  const f = fixture()
+  localStorage.setItem('theme', 'light')
+  vi.mocked(f.api.migrateTheme).mockResolvedValue({
+    ...english,
+    themeId: 'light',
+    themePreferenceSet: true,
+    revision: 1,
+  })
+  const hydration = f.store.getState().hydrate()
+  f.read.resolve({ ...english, themePreferenceSet: false })
+  await hydration
+  expect(f.api.migrateTheme).toHaveBeenCalledWith('light')
+  expect(f.store.getState().themeId).toBe('light')
+  expect(document.documentElement.dataset.theme).toBe('light')
+  expect(localStorage.getItem('theme')).toBeNull()
+  f.store.getState().dispose()
+})
+it('shares serialization and revision protection across theme and feature writes', async () => {
+  const f = fixture()
+  const first = deferred<AppPreferencesSnapshot>()
+  vi.mocked(f.api.setTheme).mockReturnValue(first.promise)
+  vi.mocked(f.api.setFeaturePreferences).mockResolvedValue({
+    ...english,
+    themeId: 'light',
+    speakerRecognitionEnabled: false,
+    revision: 2,
+  })
+  const theme = f.store.getState().setTheme('light')
+  const feature = f.store.getState().setFeaturePreferences({ speakerRecognitionEnabled: false })
+  await Promise.resolve()
+  expect(f.api.setFeaturePreferences).not.toHaveBeenCalled()
+  first.resolve({ ...english, themeId: 'light', revision: 1 })
+  await theme
+  await feature
+  expect(f.store.getState()).toMatchObject({
+    themeId: 'light',
+    speakerRecognitionEnabled: false,
+    revision: 2,
+    pending: false,
+  })
+})
+it('retains a legacy theme and surfaces a failed migration for retry', async () => {
+  const f = fixture()
+  localStorage.setItem('theme', 'light')
+  vi.mocked(f.api.migrateTheme).mockRejectedValue(new Error('disk unavailable'))
+  const hydration = f.store.getState().hydrate()
+  f.read.resolve({ ...english, themePreferenceSet: false })
+  await hydration
+  expect(f.store.getState().error).toEqual({ reason: 'save-preferences' })
+  expect(localStorage.getItem('theme')).toBe('light')
+  localStorage.removeItem('theme')
+  f.store.getState().dispose()
 })

@@ -145,4 +145,37 @@ describe('SpeechArtifactStore', () => {
     }
     await expect(store.load(wrong)).rejects.toThrow()
   })
+  it('loads legacy bytes without rewriting and publishes skipped results as a new revision', async () => {
+    const store = new SpeechArtifactStore(root)
+    const old = store.prepare(artifact())
+    await store.publish(await store.stage(old))
+    const oldPath = join(root, old.reference.artifactPath)
+    const before = await readFile(oldPath)
+    await store.load(old.reference)
+    expect(await readFile(oldPath)).toEqual(before)
+    const revision = '550e8400-e29b-41d4-a716-446655440099'
+    const previous = artifact()
+    const next = SpeechArtifactSchema.parse({
+      ...previous,
+      schemaVersion: 2,
+      diarizationStatus: 'skipped-disabled',
+      analysisRevisionId: revision,
+      transcript: { ...previous.transcript, analysisRevisionId: revision },
+      alignment: { ...previous.alignment, analysisRevisionId: revision },
+      diarization: undefined,
+      speakerAttribution: undefined,
+      speakers: [],
+    })
+    const prepared = store.prepare(next)
+    const abandoned = await store.stage(prepared)
+    await store.discard(abandoned)
+    expect(await store.load(old.reference)).toEqual(previous)
+    await store.publish(await store.stage(prepared))
+    expect(await store.load(prepared.reference)).toMatchObject({
+      schemaVersion: 2,
+      diarizationStatus: 'skipped-disabled',
+      speakers: [],
+    })
+    expect(await readFile(oldPath)).toEqual(before)
+  })
 })

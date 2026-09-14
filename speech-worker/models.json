@@ -6,10 +6,50 @@
       "capability": "transcription-smoke",
       "repository": "ggerganov/whisper.cpp",
       "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
-      "expectedFiles": ["ggml-tiny.bin"],
+      "expectedFiles": [
+        "ggml-tiny.bin"
+      ],
       "license": "MIT",
       "access": "public",
-      "profiles": ["docker-linux-arm64-cpu"]
+      "profiles": [
+        "docker-linux-arm64-cpu"
+      ],
+      "files": [
+        {
+          "path": "ggml-tiny.bin",
+          "size": 77691713,
+          "sha256": "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21"
+        }
+      ],
+      "supportedLanguages": [
+        "zh",
+        "en"
+      ]
+    },
+    {
+      "id": "transcription-default",
+      "capability": "transcription",
+      "repository": "ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "expectedFiles": [
+        "ggml-base.bin"
+      ],
+      "license": "MIT",
+      "access": "public",
+      "profiles": [
+        "native-macos"
+      ],
+      "supportedLanguages": [
+        "zh",
+        "en"
+      ],
+      "files": [
+        {
+          "path": "ggml-base.bin",
+          "size": 147951465,
+          "sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
+        }
+      ]
     },
     {
       "id": "alignment-zh",
@@ -25,7 +65,40 @@
       ],
       "license": "Apache-2.0",
       "access": "public",
-      "profiles": ["docker-linux-arm64-cpu", "native-macos"]
+      "profiles": [
+        "docker-linux-arm64-cpu",
+        "native-macos"
+      ],
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1567,
+          "gitBlobSha1": "4f7143f7712623888c22adffeca380cef645124c"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 158,
+          "gitBlobSha1": "0886a48276922a77013d8aa4681192138ae90d90"
+        },
+        {
+          "path": "pytorch_model.bin",
+          "size": 1276296151,
+          "sha256": "de031fd4b29e0c0667e5346450fadfe1326c89936b888b59c4ede608db763ee4"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 85,
+          "gitBlobSha1": "25bc39604f72700b3b8e10bd69bb2f227157edd1"
+        },
+        {
+          "path": "vocab.json",
+          "size": 44357,
+          "gitBlobSha1": "da3e3b635068f5a44c273636b36f0153f964d8bb"
+        }
+      ],
+      "supportedLanguages": [
+        "zh"
+      ]
     },
     {
       "id": "alignment-en",
@@ -42,7 +115,45 @@
       ],
       "license": "Apache-2.0",
       "access": "public",
-      "profiles": ["docker-linux-arm64-cpu", "native-macos"]
+      "profiles": [
+        "docker-linux-arm64-cpu",
+        "native-macos"
+      ],
+      "files": [
+        {
+          "path": "config.json",
+          "size": 1596,
+          "gitBlobSha1": "8ca9cc7496e145e37d09cec17d0c3bf9b8523c8e"
+        },
+        {
+          "path": "model.safetensors",
+          "size": 377607901,
+          "sha256": "8aa76ab2243c81747a1f832954586bc566090c83a0ac167df6f31f0fa917d74a"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "size": 159,
+          "gitBlobSha1": "3f24dc078fcba55ee1d417a413847ead40c093a3"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 85,
+          "gitBlobSha1": "25bc39604f72700b3b8e10bd69bb2f227157edd1"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 163,
+          "gitBlobSha1": "978a15a96dbb2d23e2afbc70137cae6c5ce38c8d"
+        },
+        {
+          "path": "vocab.json",
+          "size": 291,
+          "gitBlobSha1": "88181b954aa14df68be9b444b3c36585f3078c0a"
+        }
+      ],
+      "supportedLanguages": [
+        "en"
+      ]
     },
     {
       "id": "diarization-default",
@@ -58,7 +169,42 @@
       ],
       "license": "CC-BY-4.0",
       "access": "gated-auto",
-      "profiles": ["docker-linux-arm64-cpu", "native-macos", "native-linux-nvidia"]
+      "profiles": [
+        "docker-linux-arm64-cpu",
+        "native-macos",
+        "native-linux-nvidia"
+      ],
+      "files": [
+        {
+          "path": "config.yaml",
+          "size": 444,
+          "gitBlobSha1": "4022db43960736338378fdb6b5a85cfdae198910"
+        },
+        {
+          "path": "embedding/pytorch_model.bin",
+          "size": 26646242,
+          "requiresAuthenticatedSha256": true
+        },
+        {
+          "path": "plda/plda.npz",
+          "size": 133852,
+          "requiresAuthenticatedSha256": true
+        },
+        {
+          "path": "plda/xvec_transform.npz",
+          "size": 134376,
+          "requiresAuthenticatedSha256": true
+        },
+        {
+          "path": "segmentation/pytorch_model.bin",
+          "size": 5906507,
+          "requiresAuthenticatedSha256": true
+        }
+      ],
+      "supportedLanguages": [
+        "zh",
+        "en"
+      ]
     }
   ]
 }

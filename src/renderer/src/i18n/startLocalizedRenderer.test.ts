@@ -43,6 +43,11 @@ const chinese: AppPreferencesSnapshot = {
   resolvedLocale: 'zh-CN',
   revision: 0,
   warning: null,
+  themeId: 'dark',
+  themePreferenceSet: true,
+  textEditingEnabled: true,
+  speakerRecognitionEnabled: true,
+  onboardingDisposition: 'pending',
 }
 it('hydrates before rendering and keeps the document language synchronized', async () => {
   const api = setup()

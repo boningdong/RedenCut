@@ -8,6 +8,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 })
 import { AppPreferencesStore } from './AppPreferencesStore'
 
+const defaults = {
+  themeId: 'dark',
+  themePreferenceSet: false,
+  textEditingEnabled: true,
+  speakerRecognitionEnabled: true,
+  onboardingDisposition: 'pending',
+}
 let directory: string
 let path: string
 beforeEach(async () => {
@@ -22,12 +29,14 @@ afterEach(async () => {
 test('missing preferences resolve system languages without creating a file', async () => {
   const store = new AppPreferencesStore(path, () => ['zh-TW', 'zh-Hans'])
   expect(store.getSnapshot()).toEqual({
+    ...defaults,
     preference: 'system',
     resolvedLocale: 'en',
     revision: 0,
     warning: null,
   })
   expect(await store.read()).toEqual({
+    ...defaults,
     preference: 'system',
     resolvedLocale: 'zh-CN',
     revision: 0,
@@ -43,6 +52,7 @@ test.each([
 ])('invalid preferences warn without rewriting the input', async (raw) => {
   await fs.writeFile(path, raw)
   expect(await new AppPreferencesStore(path, () => ['en-US']).read()).toEqual({
+    ...defaults,
     preference: 'system',
     resolvedLocale: 'en',
     revision: 0,
@@ -57,6 +67,7 @@ test('persists only version and preference; restart resolves system afresh and r
   await store.setLocale('zh-CN')
   languages = ['zh-SG']
   expect(await store.setLocale('system')).toEqual({
+    ...defaults,
     preference: 'system',
     resolvedLocale: 'zh-CN',
     revision: 2,
@@ -64,9 +75,13 @@ test('persists only version and preference; restart resolves system afresh and r
   })
   expect(JSON.parse(await fs.readFile(path, 'utf8'))).toEqual({
     version: 1,
+    textEditingEnabled: true,
+    speakerRecognitionEnabled: true,
+    onboardingDisposition: 'pending',
     localePreference: 'system',
   })
   expect(await new AppPreferencesStore(path, () => ['en-GB']).read()).toEqual({
+    ...defaults,
     preference: 'system',
     resolvedLocale: 'en',
     revision: 0,
@@ -80,12 +95,14 @@ test('serializes concurrent writes and reads observe admitted updates', async ()
   const second = store.setLocale('en')
   const read = store.read()
   expect(await first).toEqual({
+    ...defaults,
     preference: 'zh-CN',
     resolvedLocale: 'zh-CN',
     revision: 1,
     warning: null,
   })
   expect(await second).toEqual({
+    ...defaults,
     preference: 'en',
     resolvedLocale: 'en',
     revision: 2,
@@ -105,6 +122,9 @@ test('a failed atomic rename preserves the committed snapshot and file, cleans u
   expect(await store.read()).toEqual(committed)
   expect(JSON.parse(await fs.readFile(path, 'utf8'))).toEqual({
     version: 1,
+    textEditingEnabled: true,
+    speakerRecognitionEnabled: true,
+    onboardingDisposition: 'pending',
     localePreference: 'en',
   })
   expect(await fs.readdir(directory)).toEqual(['app-preferences.json'])
@@ -127,6 +147,7 @@ test('snapshot callers cannot mutate committed preferences and invalid writes ar
   result.preference = 'en'
   store.getSnapshot().revision = 100
   expect(store.getSnapshot()).toEqual({
+    ...defaults,
     preference: 'zh-CN',
     resolvedLocale: 'zh-CN',
     revision: 1,
@@ -143,4 +164,30 @@ test('stores write exclusively to their active userData location', async () => {
   await new AppPreferencesStore(harnessPath, () => ['en']).setLocale('zh-CN')
   expect((await new AppPreferencesStore(normalPath, () => []).read()).preference).toBe('en')
   expect((await new AppPreferencesStore(harnessPath, () => []).read()).preference).toBe('zh-CN')
+})
+
+test('theme migration cannot override explicit preferences, including across restarts', async () => {
+  const store = new AppPreferencesStore(path, () => ['en'])
+  await store.migrateTheme('light')
+  expect((await store.read()).themeId).toBe('light')
+  await store.setTheme('dark')
+  const restarted = new AppPreferencesStore(path, () => ['en'])
+  expect((await restarted.migrateTheme('light')).themeId).toBe('dark')
+})
+
+test('concurrent changes preserve other fields and onboarding is independent of features', async () => {
+  const store = new AppPreferencesStore(path, () => ['en'])
+  await Promise.all([
+    store.setTheme('light'),
+    store.setFeaturePreferences({ speakerRecognitionEnabled: false }),
+    store.setOnboardingDisposition('skipped'),
+    store.setLocale('zh-CN'),
+  ])
+  expect(await new AppPreferencesStore(path, () => ['en']).read()).toMatchObject({
+    themeId: 'light',
+    speakerRecognitionEnabled: false,
+    textEditingEnabled: true,
+    onboardingDisposition: 'skipped',
+    preference: 'zh-CN',
+  })
 })

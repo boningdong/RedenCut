@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 def _normalized(text: str) -> str:
@@ -81,12 +81,14 @@ def normalize_alignment(
     }
 
 
-def load_manifest_model(manifest_path: str, cache_root: str, model_id: str) -> Dict[str, str]:
+def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, model_paths: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     model = next((item for item in manifest["models"] if item["id"] == model_id), None)
     if model is None or model["capability"] != "alignment":
         raise ValueError(f"unknown alignment model: {model_id}")
-    snapshot = Path(cache_root) / model["id"] / model["revision"]
+    if model_paths is not None and model_id not in model_paths:
+        raise FileNotFoundError(f"managed model not available: {model_id}")
+    snapshot = Path(model_paths[model_id]) if model_paths is not None else Path(cache_root) / model["id"] / model["revision"]
     if not snapshot.is_dir():
         raise FileNotFoundError(f"alignment model is not provisioned: {model_id}")
     return {**model, "snapshot": str(snapshot)}
@@ -111,6 +113,7 @@ def align(request: Dict[str, Any]) -> Dict[str, Any]:
         os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
         os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
         request["models"]["alignment"],
+        request.get("modelPaths"),
     )
     text = "".join(unit["text"] for unit in request["transcriptUnits"])
     aligned = run_whisperx_alignment(

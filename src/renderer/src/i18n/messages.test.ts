@@ -24,9 +24,7 @@ it('keeps business reasons stable and safely retranslates retained errors', () =
 it('retains actionable installation guidance in Chinese without translating technical commands', () => {
   const t = createTranslator('zh-CN').t
   expect(publicMessage(t, { reason: 'whisper-missing' })).toContain('brew install whisper-cpp')
-  expect(publicMessage(t, { reason: 'speech-worker-missing' })).toContain(
-    'npm run speech:native:setup',
-  )
+  expect(publicMessage(t, { reason: 'speech-worker-missing' })).toContain('npm run setup:speech')
   expect(publicMessage(t, { reason: 'whisper-model-missing' })).toContain('~/.cache/whisper')
   expect(progressMessage(t, { stage: 'building-cache' })).toBe('正在建立缓存')
 })

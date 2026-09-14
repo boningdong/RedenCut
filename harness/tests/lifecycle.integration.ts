@@ -32,6 +32,12 @@ test('runs real isolated RedenCut, rebuilds the UI session on restart, and retai
     await expect(runtime.callUiTool('browser_click', { target: 'e1' }, identity)).rejects.toThrow(
       'SNAPSHOT_REQUIRED',
     )
+    await runtime.callUiTool('browser_snapshot', {}, identity)
+    await runtime.callUiTool(
+      'browser_click',
+      { target: 'button:text-is("Set up later")' },
+      identity,
+    )
     const snapshot = await runtime.callUiTool('browser_snapshot', {}, identity)
     expect(snapshot.isError).not.toBe(true)
     const text = snapshot.content
@@ -39,7 +45,7 @@ test('runs real isolated RedenCut, rebuilds the UI session on restart, and retai
       .map((item) => item.text)
       .join('\n')
     expect(text).toContain('Add Track')
-    const themeRef = text.match(/button "Switch to light theme"[^\n]*\[ref=([^\]]+)\]/)?.[1]
+    const themeRef = text.match(/button "Settings"[^\n]*\[ref=([^\]]+)\]/)?.[1]
     expect(themeRef).toBeTruthy()
     const clicked = await runtime.callUiTool('browser_click', { target: themeRef }, identity)
     expect(clicked.isError, JSON.stringify(clicked.content)).not.toBe(true)

@@ -1,12 +1,12 @@
-import type { TranscriptionProgress } from '../../shared/publicMessages'
+import type { TranscriptionProgress } from '../../../shared/publicMessages'
 import type {
   SessionJobResult,
   TranscriptProgressEvent,
   TranscriptionJobRequest,
-} from '../../shared/ipc.types'
-import type { AudioSourceId, Transcript } from '../../shared/project.types'
-import type { TranscriptionJobId } from '../../shared/transcriber.types'
-import type { SessionJobExecution } from '../project/SessionJobRegistry'
+} from '../../../shared/ipc.types'
+import type { AudioSourceId, Transcript } from '../../../shared/project.types'
+import type { TranscriptionJobId } from '../../../shared/transcriber.types'
+import type { SessionJobExecution } from '../../project/SessionJobRegistry'
 
 interface TranscriptionEngine {
   transcribe(

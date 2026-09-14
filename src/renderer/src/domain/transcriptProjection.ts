@@ -41,7 +41,7 @@ export function projectTranscript(
         ),
       )
       const attribution = new Map(
-        analysis.speakerAttribution.attributions.map((a) => [a.acousticEditUnitId, a]),
+        (analysis.speakerAttribution?.attributions ?? []).map((a) => [a.acousticEditUnitId, a]),
       )
       const nearest: Array<number | undefined> = []
       let previous: number | undefined

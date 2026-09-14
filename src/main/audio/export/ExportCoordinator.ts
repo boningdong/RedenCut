@@ -17,7 +17,7 @@ import {
   recordCleanupWarning,
   type CleanupWarningSink,
 } from '../../project/CleanupWarningSink'
-import { getFfmpegPath } from '../binaries'
+import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
 import { buildRenderArgs } from '../renderer'
 
 export interface ExportChild extends EventEmitter {

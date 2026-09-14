@@ -9,25 +9,47 @@ import {
   TranscriptArtifactSchema,
 } from './speech.types'
 
-export const SpeechArtifactSchema = z
+const base = z
   .object({
-    schemaVersion: z.literal(1),
     analysisRevisionId: AnalysisRevisionIdSchema,
     audioSourceId: AudioSourceIdSchema,
     sourceFingerprint: AudioSourceFingerprintSchema,
     transcript: TranscriptArtifactSchema,
     alignment: AlignmentArtifactSchema,
-    diarization: DiarizationArtifactSchema,
-    speakerAttribution: SpeakerAttributionArtifactSchema,
-    speakers: z.array(SpeakerSchema),
   })
   .strict()
+
+const completed = {
+  diarization: DiarizationArtifactSchema,
+  speakerAttribution: SpeakerAttributionArtifactSchema,
+  speakers: z.array(SpeakerSchema),
+}
+export const SpeechArtifactSchema = z
+  .union([
+    base.extend({ schemaVersion: z.literal(1), ...completed }).strict(),
+    base
+      .extend({
+        schemaVersion: z.literal(2),
+        diarizationStatus: z.literal('completed'),
+        ...completed,
+      })
+      .strict(),
+    base
+      .extend({
+        schemaVersion: z.literal(2),
+        diarizationStatus: z.literal('skipped-disabled'),
+        diarization: z.undefined().optional(),
+        speakerAttribution: z.undefined().optional(),
+        speakers: z.array(SpeakerSchema).max(0),
+      })
+      .strict(),
+  ])
   .superRefine((artifact, context) => {
     const revisionIds = [
       artifact.transcript.analysisRevisionId,
       artifact.alignment.analysisRevisionId,
-      artifact.diarization.analysisRevisionId,
-      artifact.speakerAttribution.analysisRevisionId,
+      ...(artifact.diarization ? [artifact.diarization.analysisRevisionId] : []),
+      ...(artifact.speakerAttribution ? [artifact.speakerAttribution.analysisRevisionId] : []),
       ...artifact.speakers.map((speaker) => speaker.analysisRevisionId),
     ]
     if (revisionIds.some((id) => id !== artifact.analysisRevisionId))
@@ -36,9 +58,9 @@ export const SpeechArtifactSchema = z
     const sourceIds = [
       artifact.transcript.audioSourceId,
       artifact.alignment.audioSourceId,
-      artifact.diarization.audioSourceId,
+      ...(artifact.diarization ? [artifact.diarization.audioSourceId] : []),
       ...artifact.alignment.acousticEditUnits.map((unit) => unit.audioSourceId),
-      ...artifact.diarization.turns.map((turn) => turn.audioSourceId),
+      ...(artifact.diarization?.turns ?? []).map((turn) => turn.audioSourceId),
     ]
     if (sourceIds.some((id) => id !== artifact.audioSourceId))
       issue(context, ['audioSourceId'], 'All artifacts must reference one AudioSource')
@@ -46,7 +68,8 @@ export const SpeechArtifactSchema = z
     if (
       artifact.transcript.sourceFingerprint.sha256 !== artifact.sourceFingerprint.sha256 ||
       artifact.alignment.sourceFingerprint.sha256 !== artifact.sourceFingerprint.sha256 ||
-      artifact.diarization.sourceFingerprint.sha256 !== artifact.sourceFingerprint.sha256
+      (artifact.diarization &&
+        artifact.diarization.sourceFingerprint.sha256 !== artifact.sourceFingerprint.sha256)
     )
       issue(context, ['sourceFingerprint'], 'All artifacts must share one source fingerprint')
 
@@ -57,8 +80,10 @@ export const SpeechArtifactSchema = z
       issue(context, ['alignment'], 'Alignment must reference the contained transcript revision')
 
     if (
-      artifact.speakerAttribution.alignmentArtifactId !== artifact.alignment.id ||
-      artifact.speakerAttribution.diarizationArtifactId !== artifact.diarization.id
+      artifact.speakerAttribution &&
+      artifact.diarization &&
+      (artifact.speakerAttribution.alignmentArtifactId !== artifact.alignment.id ||
+        artifact.speakerAttribution.diarizationArtifactId !== artifact.diarization.id)
     )
       issue(
         context,
@@ -90,21 +115,21 @@ export const SpeechArtifactSchema = z
       }
     }
 
-    for (const turn of artifact.diarization.turns)
+    for (const turn of artifact.diarization?.turns ?? [])
       if (!(turn.sourceStart < turn.sourceEnd))
         issue(context, ['diarization'], 'Diarization turn requires sourceStart < sourceEnd')
 
     const speakerIds = new Set(artifact.speakers.map((speaker) => speaker.id))
     if (speakerIds.size !== artifact.speakers.length)
       issue(context, ['speakers'], 'Speaker IDs must be unique')
-    for (const turn of artifact.diarization.turns)
+    for (const turn of artifact.diarization?.turns ?? [])
       if (!speakerIds.has(turn.speakerId))
         issue(context, ['diarization'], 'Diarization turn references unknown Speaker')
 
     const acousticIds = new Set(
       artifact.alignment.acousticEditUnits.map((acousticUnit) => acousticUnit.id),
     )
-    for (const attribution of artifact.speakerAttribution.attributions) {
+    for (const attribution of artifact.speakerAttribution?.attributions ?? []) {
       if (!acousticIds.has(attribution.acousticEditUnitId))
         issue(context, ['speakerAttribution'], 'Attribution references unknown AcousticEditUnit')
       const referencedSpeakers = [

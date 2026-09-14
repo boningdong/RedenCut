@@ -95,6 +95,30 @@ describe('ProjectTransitionCoordinator', () => {
     })
   })
 
+  it.each(['sample', 'empty'] as const)(
+    'preserves the dirty session when cancelling starter %s',
+    async (kind) => {
+      const controller = new WorkspaceController()
+      const current = await controller.initialize(
+        await mkdtemp(join(tmpdir(), 'redencut-starter-cancel-')),
+      )
+      const originalWorkspace = controller.workspace
+      const { coordinator, jobs, barrier, dependencies } = harness(controller, {
+        chooseDirtyAction: vi.fn(async () => 'cancel' as const),
+      })
+      expect(await coordinator.openStarter(sender(), request(current, true), kind)).toEqual({
+        outcome: 'stayed',
+        session: current,
+        reason: 'cancelled',
+      })
+      expect(controller.workspace).toBe(originalWorkspace)
+      expect(jobs.beginClosing).not.toHaveBeenCalled()
+      expect(jobs.cancelAndSettleToken).not.toHaveBeenCalled()
+      expect(barrier.wait).not.toHaveBeenCalled()
+      expect(dependencies.chooseOpenDestination).not.toHaveBeenCalled()
+    },
+  )
+
   it('reports save failure without selecting or preparing a candidate', async () => {
     const controller = new WorkspaceController()
     const parent = await mkdtemp(join(tmpdir(), 'redencut-transition-'))

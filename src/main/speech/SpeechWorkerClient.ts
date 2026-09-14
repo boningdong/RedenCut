@@ -1,3 +1,4 @@
+import { offlineEnvironment } from './inferenceEnvironment'
 import { spawn } from 'child_process'
 import type { EventEmitter } from 'events'
 import type { Readable, Writable } from 'stream'
@@ -63,7 +64,7 @@ export class SpeechWorkerClient {
     const child = this.options.spawn(this.command, this.args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: this.options.cwd,
-      env: this.options.env,
+      env: offlineEnvironment(this.options.env ?? process.env),
     })
     child.stderr.resume()
     return this.observe(child, request, signal, onProgress)

@@ -100,4 +100,26 @@ describe('SpeechWorkerClient', () => {
     controller.abort()
     await expect(operation).rejects.toMatchObject({ name: 'AbortError' })
   })
+  it('never forwards Hugging Face credentials to offline inference', async () => {
+    const child = new BrokenPipeChild()
+    const spawn = vi.fn(() => child)
+    await expect(
+      new SpeechWorkerClient('worker', [], {
+        spawn,
+        env: { HF_TOKEN: 'secret', HUGGING_FACE_HUB_TOKEN: 'secret', PATH: '/runtime' },
+      }).run(request, new AbortController().signal),
+    ).rejects.toThrow()
+    expect(spawn).toHaveBeenCalledWith(
+      'worker',
+      [],
+      expect.objectContaining({
+        env: {
+          PATH: '/runtime',
+          HF_HUB_OFFLINE: '1',
+          TRANSFORMERS_OFFLINE: '1',
+          HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
+        },
+      }),
+    )
+  })
 })

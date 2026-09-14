@@ -1,6 +1,17 @@
 import type { CSSProperties } from 'react'
 
 const paths = {
+  refresh: 'M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1',
+  gear: 'm9 3-1 3-3 1-2 3 2 2-1 3 3 2 1 3h4l1-3 3-1 2-3-2-2 1-3-3-2-1-3z M14 11.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+  globe: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18',
+  palette: 'M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h3a5 5 0 0 0 0-10z',
+  text: 'M4 5h16M4 10h12M4 15h16M4 20h9',
+  download: 'M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5',
+  arrow: 'M4 12h16m-6-6 6 6-6 6',
+  check: 'm5 12 4 4L19 6',
+  folder: 'M3 7V4h7l3 3h8v13H3z',
+  play: 'm7 4 14 8-14 8z',
+
   split: 'M4 4l16 16M4 20 20 4M8 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
   mute: 'M11 4 5 9H2v6h3l6 5V4m5 5 6 6m0-6-6 6',
   trash: 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7',

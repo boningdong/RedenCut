@@ -2,7 +2,9 @@ import type { PublicMessage } from '@shared/publicMessages'
 import type { ImportProgress } from '@shared/import.types'
 import { normalizePublicError, publicMessage, progressMessage } from './i18n/messages'
 import { useTranslation } from './i18n/useTranslation'
-import { LanguageSelector } from './components/LanguageSelector'
+import { SettingsDialog } from './components/settings/SettingsDialog'
+import { OnboardingDialog } from './components/onboarding/OnboardingDialog'
+import { useLocaleStore } from './stores/locale.store'
 import { LocaleNotice } from './components/LocaleNotice'
 import { attachRedactionPreview } from './actions/playbackActions'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -73,7 +75,10 @@ interface OpenOperationLedger {
   localEditRevision: number
 }
 
-type OpenOperationDescriptor = { kind: 'manual' } | { kind: 'pending'; requestId: string }
+type OpenOperationDescriptor =
+  | { kind: 'manual' }
+  | { kind: 'pending'; requestId: string }
+  | { kind: 'starter'; starterKind: 'sample' | 'empty'; onOutcome: (switched: boolean) => void }
 
 interface QueuedOpenOperation {
   descriptor: OpenOperationDescriptor
@@ -98,6 +103,10 @@ export default function App() {
   const [importState, setImportState] = useState<ImportState | null>(null)
   const [error, setError] = useState<PublicMessage | null>(null)
   const [showExport, setShowExport] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const showOnboarding = useLocaleStore(
+    (state) => state.hydrated && state.onboardingDisposition === 'pending',
+  )
   const playerRef = useRef<IAudioPlayer | null>(null)
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
@@ -418,11 +427,18 @@ export default function App() {
           const result =
             operation.descriptor.kind === 'manual'
               ? await window.electronAPI.project.openDialog(captured.request)
-              : await window.electronAPI.project.openPending({
-                  ...captured.request,
-                  requestId: operation.descriptor.requestId,
-                })
+              : operation.descriptor.kind === 'starter'
+                ? await window.electronAPI.project.openStarter(
+                    captured.request,
+                    operation.descriptor.starterKind,
+                  )
+                : await window.electronAPI.project.openPending({
+                    ...captured.request,
+                    requestId: operation.descriptor.requestId,
+                  })
           await applyOpenResult(result, captured.ledger)
+          if (operation.descriptor.kind === 'starter')
+            operation.descriptor.onOutcome(result.outcome === 'switched')
           operation.resolve()
         } catch (reason) {
           setError(normalizePublicError(reason))
@@ -717,7 +733,6 @@ export default function App() {
           </span>
         </div>
         <div className="project-actions">
-          <LanguageSelector />
           <span className="project-save-state">
             <i data-dirty={isDirty} />
             {isDirty ? t('app.unsaved') : t('app.saved')}
@@ -831,8 +846,29 @@ export default function App() {
             generatingStatus={generatingStatus}
           />
         )}
-        transport={(workspaceControls) => <TransportBar workspaceControls={workspaceControls} />}
+        transport={(workspaceControls) => (
+          <TransportBar
+            workspaceControls={workspaceControls}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        )}
       />
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+      {showOnboarding && (
+        <OnboardingDialog
+          onStart={async (starterKind) => {
+            let switched = false
+            await enqueueOpen({
+              kind: 'starter',
+              starterKind,
+              onOutcome: (value) => {
+                switched = value
+              },
+            })
+            return switched
+          }}
+        />
+      )}
       {showExport && exportDraft && session ? (
         <ExportModal session={session} draft={exportDraft} onClose={() => setShowExport(false)} />
       ) : null}

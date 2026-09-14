@@ -62,7 +62,7 @@ function toRendererSpeechAnalysis(
     acousticEditUnits,
     provenance: alignmentProvenance,
   } = artifact.alignment
-  const { id: diarizationId, turns, provenance: diarizationProvenance } = artifact.diarization
+  const diarization = artifact.diarization
   return {
     audioSourceId: artifact.audioSourceId,
     analysisRevisionId: artifact.analysisRevisionId,
@@ -74,7 +74,16 @@ function toRendererSpeechAnalysis(
       acousticEditUnits,
       provenance: alignmentProvenance,
     },
-    diarization: { id: diarizationId, turns, provenance: diarizationProvenance },
+    diarizationStatus: artifact.schemaVersion === 1 ? 'completed' : artifact.diarizationStatus,
+    ...(diarization
+      ? {
+          diarization: {
+            id: diarization.id,
+            turns: diarization.turns,
+            provenance: diarization.provenance,
+          },
+        }
+      : {}),
     speakerAttribution: artifact.speakerAttribution,
     speakers: artifact.speakers,
     speakerLabelOverrides: overrides,

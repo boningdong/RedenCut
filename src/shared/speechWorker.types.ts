@@ -8,10 +8,23 @@ export const SpeechWorkerRequestSchema = z
     audioPath: z.string().min(1),
     language: z.string().min(1),
     transcriptUnits: z.array(TranscriptUnitSchema),
-    models: z.object({ alignment: z.string().min(1), diarization: z.string().min(1) }).strict(),
-    config: z.object({ device: z.enum(['cpu', 'cuda', 'mps']).default('cpu') }).strict(),
+    models: z
+      .object({ alignment: z.string().min(1), diarization: z.string().min(1).optional() })
+      .strict(),
+    modelPaths: z.record(z.string(), z.string().min(1)).optional(),
+    config: z
+      .object({
+        device: z.enum(['cpu', 'cuda', 'mps']).default('cpu'),
+        speakerRecognitionEnabled: z.boolean().optional(),
+      })
+      .strict(),
   })
   .strict()
+  .refine(
+    (request) =>
+      request.config.speakerRecognitionEnabled === false || Boolean(request.models.diarization),
+    'Diarization model is required when speaker recognition is enabled',
+  )
 
 const envelope = { protocolVersion: z.literal(1), jobId: z.string().min(1) }
 export const WorkerAlignmentUnitSchema = z
@@ -58,12 +71,16 @@ export const SpeechWorkerResponseSchema = z.discriminatedUnion('type', [
               provenance: z.record(z.string(), z.unknown()),
             })
             .strict(),
-          diarization: z
-            .object({
-              turns: z.array(WorkerDiarizationTurnSchema),
-              provenance: z.record(z.string(), z.unknown()),
-            })
-            .strict(),
+          diarization: z.union([
+            z.object({ status: z.literal('skipped-disabled') }).strict(),
+            z
+              .object({
+                status: z.literal('completed').optional(),
+                turns: z.array(WorkerDiarizationTurnSchema),
+                provenance: z.record(z.string(), z.unknown()),
+              })
+              .strict(),
+          ]),
         })
         .strict(),
     })

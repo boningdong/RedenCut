@@ -222,13 +222,37 @@ function installApi(initial: RendererSession) {
   const saveProject = vi.fn<IElectronAPI['project']['save']>(async () => null)
   const saveProjectAs = vi.fn<IElectronAPI['project']['saveAs']>(async () => null)
   const api = {
+    resourcesOpenGuide: vi.fn(async () => {}),
+    resourcesGet: vi.fn(async () => ({ revision: 0, resources: [], baseReady: false })),
+    resourcesPrepare: vi.fn<IElectronAPI['resourcesPrepare']>(),
+    resourcesCancel: vi.fn<IElectronAPI['resourcesCancel']>(),
+    onResourcesChanged: vi.fn(() => vi.fn()),
+    modelAccessLocal: vi.fn(async () => ({ status: 'missing' as const })),
+    modelAccessVerifyLocal: vi.fn(),
+    modelAccessGet: vi.fn<IElectronAPI['modelAccessGet']>(async () => ({
+      status: 'unchecked',
+      hasToken: false,
+    })),
+    modelAccessVerify: vi.fn<IElectronAPI['modelAccessVerify']>(),
+    modelAccessClear: vi.fn<IElectronAPI['modelAccessClear']>(),
+    modelAccessOpenConditions: vi.fn<IElectronAPI['modelAccessOpenConditions']>(),
+    onModelAccessChanged: vi.fn(() => vi.fn()),
     appPreferences: {
       get: vi.fn<IElectronAPI['appPreferences']['get']>(async () => ({
+        themeId: 'dark',
+        themePreferenceSet: true,
+        textEditingEnabled: true,
+        speakerRecognitionEnabled: true,
+        onboardingDisposition: 'skipped',
         preference: 'system',
         resolvedLocale: 'en',
         revision: 0,
         warning: null,
       })),
+      setTheme: vi.fn<IElectronAPI['appPreferences']['setTheme']>(),
+      migrateTheme: vi.fn<IElectronAPI['appPreferences']['migrateTheme']>(),
+      setFeaturePreferences: vi.fn<IElectronAPI['appPreferences']['setFeaturePreferences']>(),
+      setOnboardingDisposition: vi.fn<IElectronAPI['appPreferences']['setOnboardingDisposition']>(),
       setLocale: vi.fn<IElectronAPI['appPreferences']['setLocale']>(),
       onChanged: vi.fn<IElectronAPI['appPreferences']['onChanged']>(() => vi.fn()),
     },
@@ -241,6 +265,11 @@ function installApi(initial: RendererSession) {
     },
     project: {
       initialize: vi.fn(async () => initial),
+      openStarter: vi.fn<IElectronAPI['project']['openStarter']>(async () => ({
+        outcome: 'stayed',
+        reason: 'cancelled',
+        session: initial,
+      })),
       openDialog,
       openPending,
       acknowledgeSwitch: vi.fn(async () => true),
@@ -365,7 +394,7 @@ describe('App transcription job identity', () => {
     const transcript = useTranscriptStore.getState()
     act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
     expect(screen.getByRole('button', { name: '导出' })).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: '语言' })).toBeTruthy()
+    expect(screen.queryByRole('combobox', { name: '语言' })).toBeNull()
     expect(getAudioPlayerInstance()).toBe(player)
     expect(mocks.players).toHaveLength(1)
     expect(mocks.destroyPlayer).not.toHaveBeenCalled()

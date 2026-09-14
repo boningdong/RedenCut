@@ -95,7 +95,9 @@ describe('SpeechAnalysisCoordinator', () => {
         throw new DOMException('cancelled', 'AbortError')
       }),
     }
-    const coordinator = new SpeechAnalysisCoordinator(transcriber, worker, crypto.randomUUID)
+    const coordinator = new SpeechAnalysisCoordinator(transcriber, worker, () =>
+      crypto.randomUUID(),
+    )
     const controller = new AbortController()
     controller.abort()
     await expect(
@@ -112,5 +114,117 @@ describe('SpeechAnalysisCoordinator', () => {
       ),
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(worker.run).not.toHaveBeenCalled()
+  })
+})
+
+describe('optional diarization', () => {
+  const input = {
+    jobId: 'job',
+    audioPath: '/tmp/a.wav',
+    audioSource: source,
+    language: 'auto',
+    alignmentModel: 'auto',
+    diarizationModel: 'diarization-default',
+    speakerRecognitionEnabled: false,
+    modelPaths: { 'alignment-en': '/managed/en' },
+  }
+  function transcription(language = 'en') {
+    return {
+      text: 'hello',
+      detectedLanguage: language,
+      verbatimCapability: 'best-effort-verbatim' as const,
+      evidence: [{ text: 'hello' }],
+      provenance: engine,
+    }
+  }
+  function alignment() {
+    return { units: [], unalignedTranscriptUnitIds: [], provenance: engine }
+  }
+  it('snapshots settings and returns no speaker data when disabled', async () => {
+    const mutable = structuredClone(input)
+    const transcriber = {
+      transcribe: vi.fn(async () => {
+        mutable.speakerRecognitionEnabled = true
+        mutable.modelPaths['alignment-en'] = '/changed'
+        return transcription()
+      }),
+    }
+    const worker = {
+      run: vi.fn(async () => ({
+        alignment: alignment(),
+        diarization: { status: 'skipped-disabled' as const },
+      })),
+    }
+    const stages: string[] = []
+    const result = await new SpeechAnalysisCoordinator(transcriber, worker, () =>
+      crypto.randomUUID(),
+    ).run(mutable, new AbortController().signal, (p) => stages.push(p.stage))
+    expect(result).toMatchObject({
+      schemaVersion: 2,
+      diarizationStatus: 'skipped-disabled',
+      speakers: [],
+    })
+    expect(result).not.toHaveProperty('diarization')
+    expect(result).not.toHaveProperty('speakerAttribution')
+    expect(stages).not.toContain('attributing-speakers')
+    expect(vi.mocked(worker.run).mock.calls[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          config: { device: 'cpu', speakerRecognitionEnabled: false },
+          modelPaths: { 'alignment-en': '/managed/en' },
+        }),
+      ]),
+    )
+  })
+  it('rejects unsupported language before alignment', async () => {
+    const worker = { run: vi.fn() }
+    const coordinator = new SpeechAnalysisCoordinator(
+      { transcribe: async () => transcription('fr') },
+      worker,
+      () => crypto.randomUUID(),
+    )
+    await expect(coordinator.run(input, new AbortController().signal)).rejects.toMatchObject({
+      reason: 'speech-language-unsupported',
+    })
+    expect(worker.run).not.toHaveBeenCalled()
+  })
+  it('rejects an unexpected skip rather than publishing it as success', async () => {
+    const worker = {
+      run: vi.fn(async () => ({
+        alignment: alignment(),
+        diarization: { status: 'skipped-disabled' as const },
+      })),
+    }
+    const coordinator = new SpeechAnalysisCoordinator(
+      { transcribe: async () => transcription() },
+      worker,
+      () => crypto.randomUUID(),
+    )
+    await expect(
+      coordinator.run({ ...input, speakerRecognitionEnabled: true }, new AbortController().signal),
+    ).rejects.toThrow('unexpected diarization branch')
+  })
+  it('keeps completed-with-no-speakers distinct from disabled', async () => {
+    const worker = {
+      run: vi.fn(async () => ({
+        alignment: alignment(),
+        diarization: { status: 'completed' as const, turns: [], provenance: engine },
+      })),
+    }
+    const coordinator = new SpeechAnalysisCoordinator(
+      { transcribe: async () => transcription() },
+      worker,
+      () => crypto.randomUUID(),
+    )
+    const result = await coordinator.run(
+      { ...input, speakerRecognitionEnabled: true },
+      new AbortController().signal,
+    )
+    expect(result).toMatchObject({
+      schemaVersion: 2,
+      diarizationStatus: 'completed',
+      diarization: { turns: [] },
+      speakers: [],
+    })
   })
 })

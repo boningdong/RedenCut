@@ -67,3 +67,8 @@ Click a speaker label to show or hide that speaker's transcript; this does not m
 Double-click the label or press F2 while it is focused to rename it.
 Enter saves the edited name and Escape cancels it.
 The separate color button opens a color picker; Apply color persists the choice and Escape dismisses the picker.
+
+## Settings and Onboarding Dialogs
+
+While a settings or onboarding dialog is open, keyboard input stays within the dialog and does not trigger background editor shortcuts.
+Escape closes settings or explicitly skips onboarding; dialog closure leaves active resource downloads running.

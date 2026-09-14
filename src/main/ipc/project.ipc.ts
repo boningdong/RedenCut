@@ -27,6 +27,12 @@ export function registerProjectIpc(
   ipcMain.handle('project:initialize', () =>
     toIpcResult(() => controller.describe(), diagnosticSink),
   )
+  ipcMain.handle('project:open-starter', (event, input: unknown, kind: unknown) =>
+    toIpcResult(() => {
+      if (kind !== 'sample' && kind !== 'empty') throw new PublicIpcError('invalid-request')
+      return transitions.openStarter(event.sender, openProjectRequest(input), kind)
+    }, diagnosticSink),
+  )
   ipcMain.handle('project:open-dialog', (event, input: unknown) =>
     toIpcResult(
       () => transitions.openDialog(event.sender, openProjectRequest(input)),

@@ -61,11 +61,13 @@ for (const shutdown of ['EOF', 'docker stop']) {
         assert.equal(Object.keys(container.HostConfig.PortBindings ?? {}).length, 0)
         runId = started.runId
         let identity = { runId, generation: started.generation }
+        await call('browser_snapshot', identity)
+        await call('browser_click', { ...identity, target: 'button:text-is("Set up later")' })
         const snapshot = await call('browser_snapshot', identity)
         assert.match(JSON.stringify(snapshot.content), /Add Track/)
         await call('browser_click', {
           ...identity,
-          target: 'button:has-text("☀"), button:has-text("🌙")',
+          target: 'button[aria-label="Settings"]',
         })
         const screen = await call('browser_take_screenshot', { ...identity, type: 'png' })
         const png = screen.content.find((item) => item.type === 'image')

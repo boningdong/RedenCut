@@ -1,5 +1,12 @@
+import type { ResourceSnapshot, ResourcePreparation } from './resources.types'
+import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from './modelAccess.types'
 import type { PublicMessage, TranscriptionProgress, SpeechProgress } from './publicMessages'
-import type { AppPreferencesSnapshot } from './appPreferences.types'
+import type {
+  AppPreferencesSnapshot,
+  ThemeId,
+  FeaturePreferences,
+  OnboardingDisposition,
+} from './appPreferences.types'
 import type { LocalePreference } from './i18n/locale.types'
 import type { WorkspaceLayout, WorkspaceLayoutReadResult } from './workspaceLayout.types'
 import type {
@@ -101,8 +108,24 @@ export interface RenderProgress {
 export interface RenderProgressEvent extends SessionJobRequest<ExportJobId>, RenderProgress {}
 
 export interface IElectronAPI {
+  resourcesGet(): Promise<ResourceSnapshot>
+  resourcesPrepare(target: ResourcePreparation): Promise<ResourceSnapshot>
+  resourcesOpenGuide(guide: 'tools' | 'python'): Promise<void>
+  resourcesCancel(): Promise<ResourceSnapshot>
+  onResourcesChanged(listener: (snapshot: ResourceSnapshot) => void): () => void
+  modelAccessLocal(): Promise<LocalModelLoginSnapshot>
+  modelAccessVerifyLocal(): Promise<ModelAccessSnapshot>
+  modelAccessGet(): Promise<ModelAccessSnapshot>
+  modelAccessVerify(token?: string): Promise<ModelAccessSnapshot>
+  modelAccessClear(): Promise<ModelAccessSnapshot>
+  modelAccessOpenConditions(): Promise<void>
+  onModelAccessChanged(listener: (snapshot: ModelAccessSnapshot) => void): () => void
   appPreferences: {
     get(): Promise<AppPreferencesSnapshot>
+    setTheme(themeId: ThemeId): Promise<AppPreferencesSnapshot>
+    migrateTheme(themeId: ThemeId): Promise<AppPreferencesSnapshot>
+    setFeaturePreferences(input: FeaturePreferences): Promise<AppPreferencesSnapshot>
+    setOnboardingDisposition(value: OnboardingDisposition): Promise<AppPreferencesSnapshot>
     setLocale(preference: LocalePreference): Promise<AppPreferencesSnapshot>
     onChanged(listener: (value: AppPreferencesSnapshot) => void): () => void
   }
@@ -117,6 +140,7 @@ export interface IElectronAPI {
   }
   project: {
     initialize(): Promise<RendererSession>
+    openStarter(request: OpenProjectRequest, kind: 'sample' | 'empty'): Promise<OpenProjectResult>
     openDialog(request: OpenProjectRequest): Promise<OpenProjectResult>
     openPending(request: OpenProjectRequest & { requestId: string }): Promise<OpenProjectResult>
     acknowledgeSwitch(event: ProjectSwitchEvent): Promise<boolean>

@@ -26,8 +26,11 @@ def run(input_stream: IO[str], output: IO[str]) -> int:
         emit(output, {**envelope, "type": "ready"})
         emit(output, {**envelope, "type": "progress", "stage": "aligning"})
         alignment = align(request)
-        emit(output, {**envelope, "type": "progress", "stage": "diarizing"})
-        diarization = diarize(request)
+        if request["config"].get("speakerRecognitionEnabled", True):
+            emit(output, {**envelope, "type": "progress", "stage": "diarizing"})
+            diarization = {"status": "completed", **diarize(request)}
+        else:
+            diarization = {"status": "skipped-disabled"}
         emit(output, {**envelope, "type": "result", "result": {
             "alignment": alignment, "diarization": diarization,
         }})

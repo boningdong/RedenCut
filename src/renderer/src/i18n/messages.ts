@@ -12,6 +12,7 @@ const reasonKeys = {
   'whisper-missing': 'errors.whisper-missing',
   'whisper-model-missing': 'errors.whisper-model-missing',
   'speech-worker-missing': 'errors.speech-worker-missing',
+  'speech-language-unsupported': 'errors.speech-language-unsupported',
   'speech-models-missing': 'errors.speech-models-missing',
   'workspace-invalid': 'errors.workspace-invalid',
   'workspace-version': 'errors.workspace-version',

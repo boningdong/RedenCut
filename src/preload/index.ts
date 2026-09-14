@@ -1,5 +1,12 @@
+import type { ResourceSnapshot, ResourcePreparation } from '../shared/resources.types'
+import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from '../shared/modelAccess.types'
 import type { PublicMessage } from '../shared/publicMessages'
-import type { AppPreferencesSnapshot } from '../shared/appPreferences.types'
+import type {
+  AppPreferencesSnapshot,
+  ThemeId,
+  FeaturePreferences,
+  OnboardingDisposition,
+} from '../shared/appPreferences.types'
 import type { LocalePreference } from '../shared/i18n/locale.types'
 import type { WorkspaceLayout, WorkspaceLayoutReadResult } from '../shared/workspaceLayout.types'
 import type { IpcRendererEvent } from 'electron'
@@ -54,7 +61,42 @@ ipcRenderer.on('project:pending-open', (_event, value: PendingProjectOpenEvent) 
 })
 
 const api = {
+  resourcesGet: () => invokeSafe<ResourceSnapshot>(invoke, 'resources:get'),
+  resourcesPrepare: (target: ResourcePreparation) =>
+    invokeSafe<ResourceSnapshot>(invoke, 'resources:prepare', target),
+  resourcesOpenGuide: (guide) => invokeSafe<void>(invoke, 'resources:open-guide', guide),
+  resourcesCancel: () => invokeSafe<ResourceSnapshot>(invoke, 'resources:cancel'),
+  onResourcesChanged: (listener: (value: ResourceSnapshot) => void) => {
+    const handler = (_event: IpcRendererEvent, value: ResourceSnapshot) => listener(value)
+    ipcRenderer.on('resources:changed', handler)
+    return () => {
+      ipcRenderer.off('resources:changed', handler)
+    }
+  },
+  modelAccessLocal: () => invokeSafe<LocalModelLoginSnapshot>(invoke, 'model-access:local'),
+  modelAccessVerifyLocal: () =>
+    invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:verify-local'),
+  modelAccessGet: () => invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:get'),
+  modelAccessVerify: (token?: string) =>
+    invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:verify', token),
+  modelAccessClear: () => invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:clear'),
+  modelAccessOpenConditions: () => invokeSafe<void>(invoke, 'model-access:open-conditions'),
+  onModelAccessChanged: (listener: (value: ModelAccessSnapshot) => void) => {
+    const handler = (_event: IpcRendererEvent, value: ModelAccessSnapshot) => listener(value)
+    ipcRenderer.on('model-access:changed', handler)
+    return () => {
+      ipcRenderer.off('model-access:changed', handler)
+    }
+  },
   appPreferences: {
+    setTheme: (value: ThemeId) =>
+      invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:set-theme', value),
+    migrateTheme: (value: ThemeId) =>
+      invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:migrate-theme', value),
+    setFeaturePreferences: (value: FeaturePreferences) =>
+      invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:set-features', value),
+    setOnboardingDisposition: (value: OnboardingDisposition) =>
+      invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:set-onboarding', value),
     get: () => invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:get'),
     setLocale: (preference: LocalePreference) =>
       invokeSafe<AppPreferencesSnapshot>(invoke, 'app-preferences:set-locale', preference),
@@ -73,6 +115,8 @@ const api = {
       invokeSafe<ImportCancellationResult>(invoke, 'audio:cancel-import', request),
   },
   project: {
+    openStarter: (request: OpenProjectRequest, kind: 'sample' | 'empty') =>
+      invokeSafe<OpenProjectResult>(invoke, 'project:open-starter', request, kind),
     initialize: () => invokeSafe<RendererSession>(invoke, 'project:initialize'),
     openDialog: (request: OpenProjectRequest) =>
       invokeSafe<OpenProjectResult>(invoke, 'project:open-dialog', request),

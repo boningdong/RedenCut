@@ -192,3 +192,34 @@ describe('validateSpeechArtifactReference', () => {
     ).toThrow('source fingerprint')
   })
 })
+
+it('reads v1 artifacts without upgrading or rewriting their representation', () => {
+  const legacy = artifact()
+  expect(SpeechArtifactSchema.parse(legacy)).toEqual(legacy)
+})
+
+it('requires skipped v2 artifacts to omit speaker outputs', () => {
+  const legacy = artifact()
+  const skipped = {
+    ...legacy,
+    schemaVersion: 2,
+    diarizationStatus: 'skipped-disabled',
+    diarization: undefined,
+    speakerAttribution: undefined,
+    speakers: [],
+  }
+  expect(SpeechArtifactSchema.safeParse(skipped).success).toBe(true)
+  expect(
+    SpeechArtifactSchema.safeParse({ ...skipped, diarization: legacy.diarization }).success,
+  ).toBe(false)
+  expect(
+    SpeechArtifactSchema.safeParse({ ...skipped, speakerAttribution: legacy.speakerAttribution })
+      .success,
+  ).toBe(false)
+  expect(SpeechArtifactSchema.safeParse({ ...skipped, speakers: legacy.speakers }).success).toBe(
+    false,
+  )
+  expect(
+    SpeechArtifactSchema.safeParse({ ...skipped, analysisRevisionId: crypto.randomUUID() }).success,
+  ).toBe(false)
+})

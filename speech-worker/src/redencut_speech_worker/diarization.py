@@ -4,7 +4,7 @@ import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 def normalize_turns(raw_turns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -26,12 +26,14 @@ def normalize_turns(raw_turns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return result
 
 
-def load_manifest_model(manifest_path: str, cache_root: str, model_id: str) -> Dict[str, str]:
+def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, model_paths: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     model = next((item for item in manifest["models"] if item["id"] == model_id), None)
     if model is None or model["capability"] != "diarization":
         raise ValueError(f"unknown diarization model: {model_id}")
-    snapshot = Path(cache_root) / model["id"] / model["revision"]
+    if model_paths is not None and model_id not in model_paths:
+        raise FileNotFoundError(f"managed model not available: {model_id}")
+    snapshot = Path(model_paths[model_id]) if model_paths is not None else Path(cache_root) / model["id"] / model["revision"]
     if not (snapshot / "config.yaml").is_file():
         raise FileNotFoundError(f"diarization model is not provisioned: {model_id}")
     return {**model, "snapshot": str(snapshot)}
@@ -61,6 +63,7 @@ def diarize(request: Dict[str, Any]) -> Dict[str, Any]:
         os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
         os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
         request["models"]["diarization"],
+        request.get("modelPaths"),
     )
     turns = normalize_turns(run_pyannote(
         audio_path=request["audioPath"], device=request["config"]["device"],

@@ -6,7 +6,7 @@ import type { PublicMessage, TranscriptionProgress } from './publicMessages'
 // The rest of the app never calls an engine directly — it always goes through
 // ITranscriber. This means swapping engines is a config change, not a rewrite.
 //
-// Implementations live in src/main/transcriber/:
+// Implementations live in src/main/speech/transcriber/:
 //   • WhisperTranscriber  — local whisper.cpp binary (Phase 2)
 //   • (future) CloudTranscriber — e.g. OpenAI Whisper API, AssemblyAI
 // ─────────────────────────────────────────────────────────────────────────────

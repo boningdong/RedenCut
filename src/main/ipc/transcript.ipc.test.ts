@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
   },
 }))
 
-vi.mock('../transcriber/whisper', () => ({
+vi.mock('../speech/transcriber/whisper', () => ({
   whisperTranscriber: {
     unavailableReason: vi.fn(async () => null),
     transcribe: mocks.transcribe,

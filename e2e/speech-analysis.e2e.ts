@@ -119,6 +119,8 @@ test('real speech analysis publishes an editable durable transcript and survives
   )
   expect(artifact.transcript.units.length).toBeGreaterThan(0)
   expect(artifact.alignment.acousticEditUnits.length).toBeGreaterThan(0)
+  expect(artifact.schemaVersion === 1 || artifact.diarizationStatus === 'completed').toBe(true)
+  if (!artifact.diarization) throw new Error('Expected completed diarization artifact')
   expect(artifact.diarization.turns.length).toBeGreaterThan(0)
 
   await session.restart()

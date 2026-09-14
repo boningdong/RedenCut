@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { getFfmpegPath } from '../audio/binaries'
+import { getFfmpegPath } from '../runtime/AppRuntimeLocator'
 
 export interface SpeechPcmInput {
   path: string

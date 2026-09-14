@@ -6,6 +6,7 @@ import type { SpeechWorkerRequest, SpeechWorkerResult } from '../../shared/speec
 import type { ITranscriber, TranscriptionResult } from '../../shared/transcriber.types'
 import { CanonicalTranscriptBuilder } from './CanonicalTranscriptBuilder'
 import { attributeSpeakers } from './SpeakerAttribution'
+import { TranscriberUnavailableError } from './transcriber/TranscriberUnavailableError'
 
 interface Worker {
   run(
@@ -21,7 +22,10 @@ interface AnalysisInput {
   audioSource: { id: string; fingerprint: AudioSourceFingerprint }
   language: string
   alignmentModel: string
-  diarizationModel: string
+  diarizationModel?: string
+  speakerRecognitionEnabled?: boolean
+  transcriptionModel?: string
+  modelPaths?: Record<string, string>
 }
 
 export interface SpeechAnalysisProgress {
@@ -42,14 +46,23 @@ export class SpeechAnalysisCoordinator {
     signal: AbortSignal,
     onProgress: (progress: SpeechAnalysisProgress) => void = () => {},
   ): Promise<SpeechArtifact> {
+    input = {
+      ...input,
+      audioSource: { ...input.audioSource, fingerprint: { ...input.audioSource.fingerprint } },
+      modelPaths: input.modelPaths ? { ...input.modelPaths } : undefined,
+    }
+    const speakerRecognitionEnabled = input.speakerRecognitionEnabled ?? true
     signal.throwIfAborted()
     onProgress({ stage: 'transcribing' })
     const transcription: TranscriptionResult = await this.transcriber.transcribe(
       input.audioPath,
-      { language: input.language },
+      { language: input.language, model: input.transcriptionModel },
       signal,
     )
     signal.throwIfAborted()
+    const language = (transcription.detectedLanguage || input.language).toLowerCase().split('-')[0]
+    if (!['zh', 'en'].includes(language))
+      throw new TranscriberUnavailableError('speech-language-unsupported')
     const analysisRevisionId = this.createId()
     const transcript: TranscriptArtifact = new CanonicalTranscriptBuilder(this.createId).build({
       result: transcription,
@@ -62,18 +75,19 @@ export class SpeechAnalysisCoordinator {
         protocolVersion: 1,
         jobId: input.jobId,
         audioPath: input.audioPath,
-        language: transcription.detectedLanguage || input.language,
+        language,
         transcriptUnits: transcript.units,
         models: {
           alignment:
             input.alignmentModel === 'auto'
-              ? transcription.detectedLanguage.toLowerCase().startsWith('zh')
+              ? language === 'zh'
                 ? 'alignment-zh'
                 : 'alignment-en'
               : input.alignmentModel,
-          diarization: input.diarizationModel,
+          ...(speakerRecognitionEnabled ? { diarization: input.diarizationModel } : {}),
         },
-        config: { device: 'cpu' },
+        modelPaths: input.modelPaths,
+        config: { device: 'cpu', speakerRecognitionEnabled },
       },
       signal,
       onProgress,
@@ -89,20 +103,12 @@ export class SpeechAnalysisCoordinator {
       granularity: unit.granularity,
       confidence: unit.confidence,
     }))
-    onProgress({ stage: 'attributing-speakers' })
-    const attributed = attributeSpeakers(
-      acousticEditUnits,
-      workerResult.diarization.turns,
-      this.createId,
-    )
-    const speakerByLabel = new Map(
-      attributed.speakers.map((speaker) => [speaker.diarizationLabel, speaker.id]),
-    )
-    const diarizationId = this.createId()
+    const diarization = workerResult.diarization
+    if (speakerRecognitionEnabled === (diarization.status === 'skipped-disabled'))
+      throw new Error('Speech worker returned an unexpected diarization branch')
     const createdAt = this.now()
-    onProgress({ stage: 'validating' })
-    return SpeechArtifactSchema.parse({
-      schemaVersion: 1,
+    const common = {
+      schemaVersion: 2,
       analysisRevisionId,
       audioSourceId: input.audioSource.id,
       sourceFingerprint: input.audioSource.fingerprint,
@@ -117,19 +123,38 @@ export class SpeechAnalysisCoordinator {
         acousticEditUnits,
         provenance: EngineProvenanceSchema.parse(workerResult.alignment.provenance),
       },
+    }
+    if (diarization.status === 'skipped-disabled') {
+      onProgress({ stage: 'validating' })
+      return SpeechArtifactSchema.parse({
+        ...common,
+        diarizationStatus: 'skipped-disabled',
+        speakers: [],
+      })
+    }
+    onProgress({ stage: 'attributing-speakers' })
+    const attributed = attributeSpeakers(acousticEditUnits, diarization.turns, this.createId)
+    const speakerByLabel = new Map(
+      attributed.speakers.map((speaker) => [speaker.diarizationLabel, speaker.id]),
+    )
+    const diarizationId = this.createId()
+    onProgress({ stage: 'validating' })
+    return SpeechArtifactSchema.parse({
+      ...common,
+      diarizationStatus: 'completed',
       diarization: {
         id: diarizationId,
         analysisRevisionId,
         audioSourceId: input.audioSource.id,
         sourceFingerprint: input.audioSource.fingerprint,
-        turns: workerResult.diarization.turns.map((turn) => ({
+        turns: diarization.turns.map((turn) => ({
           speakerId: speakerByLabel.get(turn.speakerLabel),
           audioSourceId: input.audioSource.id,
           sourceStart: turn.sourceStart,
           sourceEnd: turn.sourceEnd,
           confidence: turn.confidence,
         })),
-        provenance: EngineProvenanceSchema.parse(workerResult.diarization.provenance),
+        provenance: EngineProvenanceSchema.parse(diarization.provenance),
       },
       speakers: attributed.speakers.map((speaker) => ({ ...speaker, analysisRevisionId })),
       speakerAttribution: {

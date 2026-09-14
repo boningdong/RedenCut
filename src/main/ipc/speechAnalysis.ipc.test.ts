@@ -23,7 +23,7 @@ vi.mock('../speech/SpeechAnalysisCoordinator', () => ({
   },
 }))
 vi.mock('../speech/prepareSpeechAudio', () => ({ withSpeechAudio: mocks.prepare }))
-vi.mock('../transcriber/whisper', () => ({
+vi.mock('../speech/transcriber/whisper', () => ({
   whisperTranscriber: { unavailableReason: mocks.unavailableReason },
 }))
 vi.mock('fs', () => ({ existsSync: mocks.existsSync }))

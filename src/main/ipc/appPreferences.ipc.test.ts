@@ -52,15 +52,48 @@ test('gets preferences and broadcasts ordered snapshots exactly matching success
   const { get, set } = await setup()
   expect(await get()).toEqual({
     ok: true,
-    value: { preference: 'system', resolvedLocale: 'en', revision: 0, warning: null },
+    value: {
+      themeId: 'dark',
+      themePreferenceSet: false,
+      textEditingEnabled: true,
+      speakerRecognitionEnabled: true,
+      onboardingDisposition: 'pending',
+      preference: 'system',
+      resolvedLocale: 'en',
+      revision: 0,
+      warning: null,
+    },
   })
   const responses = await Promise.all([set('zh-CN'), set('en')])
   expect(responses).toEqual([
     {
       ok: true,
-      value: { preference: 'zh-CN', resolvedLocale: 'zh-CN', revision: 1, warning: null },
+      value: {
+        themeId: 'dark',
+        themePreferenceSet: false,
+        textEditingEnabled: true,
+        speakerRecognitionEnabled: true,
+        onboardingDisposition: 'pending',
+        preference: 'zh-CN',
+        resolvedLocale: 'zh-CN',
+        revision: 1,
+        warning: null,
+      },
     },
-    { ok: true, value: { preference: 'en', resolvedLocale: 'en', revision: 2, warning: null } },
+    {
+      ok: true,
+      value: {
+        themeId: 'dark',
+        themePreferenceSet: false,
+        textEditingEnabled: true,
+        speakerRecognitionEnabled: true,
+        onboardingDisposition: 'pending',
+        preference: 'en',
+        resolvedLocale: 'en',
+        revision: 2,
+        warning: null,
+      },
+    },
   ])
   expect(send.mock.calls).toEqual(
     responses.map((response) => [
@@ -92,7 +125,18 @@ test('failed writes publish no event, preserve state and redact filesystem diagn
   expect(JSON.stringify(response)).not.toContain(path)
   expect(send).not.toHaveBeenCalled()
   expect(sink).toHaveBeenCalled()
-  expect(await get()).toMatchObject({ ok: true, value: { preference: 'en', revision: 1 } })
+  expect(await get()).toMatchObject({
+    ok: true,
+    value: {
+      themeId: 'dark',
+      themePreferenceSet: false,
+      textEditingEnabled: true,
+      speakerRecognitionEnabled: true,
+      onboardingDisposition: 'pending',
+      preference: 'en',
+      revision: 1,
+    },
+  })
 })
 
 test('a closing window does not reject a committed preference or block other subscribers', async () => {
@@ -103,7 +147,17 @@ test('a closing window does not reject a committed preference or block other sub
   const response = await set('zh-CN')
   expect(response).toEqual({
     ok: true,
-    value: { preference: 'zh-CN', resolvedLocale: 'zh-CN', revision: 1, warning: null },
+    value: {
+      themeId: 'dark',
+      themePreferenceSet: false,
+      textEditingEnabled: true,
+      speakerRecognitionEnabled: true,
+      onboardingDisposition: 'pending',
+      preference: 'zh-CN',
+      resolvedLocale: 'zh-CN',
+      revision: 1,
+      warning: null,
+    },
   })
   expect(secondSend).toHaveBeenCalledWith('app-preferences:changed', store.getSnapshot())
   expect(sink).toHaveBeenCalled()

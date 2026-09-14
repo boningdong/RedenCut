@@ -29,7 +29,7 @@ export class McpTestSession {
     return this.currentPage
   }
 
-  async start(): Promise<void> {
+  async start(options: { keepOnboarding?: boolean } = {}): Promise<void> {
     const create = PlaywrightMcpAdapter.create.bind(PlaywrightMcpAdapter)
 
     // Observe the existing shared Context without replacing the real adapter or opening CDP.
@@ -47,6 +47,14 @@ export class McpTestSession {
     this.adopt((await this.call('redencut_start')).structuredContent as unknown as RuntimeStatus)
     console.error(`Visible UI E2E evidence: ${this.directory}`)
     await this.call('browser_snapshot')
+    if (!options.keepOnboarding) {
+      const skip = this.page.getByRole('button', { name: 'Set up later', exact: true })
+      await skip.waitFor({ state: 'visible', timeout: 15_000 })
+      if (await skip.count()) {
+        await this.call('browser_click', { target: 'button:text-is("Set up later")' })
+        await this.call('browser_snapshot')
+      }
+    }
   }
 
   async call(name: string, args: Record<string, unknown> = {}): Promise<CallToolResult> {

@@ -14,11 +14,17 @@ def inspect_runtime(
     package_versions: Dict[str, str],
     machine: str,
     backend: str,
+    speaker_recognition_enabled: bool = True,
+    model_ids: Optional[List[str]] = None,
 ) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     missing_model_ids: List[str] = []
     invalid_model_ids: List[str] = []
     for model in manifest["models"]:
+        if model_ids is not None and model["id"] not in model_ids:
+            continue
+        if not speaker_recognition_enabled and model["capability"] == "diarization":
+            continue
         snapshot = cache_root / model["id"] / model["revision"]
         if any(not (snapshot / relative_path).is_file() for relative_path in model["expectedFiles"]):
             missing_model_ids.append(model["id"])
@@ -62,6 +68,8 @@ def main(
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path, required=True)
+    parser.add_argument("--skip-diarization", action="store_true")
+    parser.add_argument("--model-id", action="append", dest="model_ids")
     arguments = parser.parse_args(argv)
 
     versions = package_versions or {
@@ -74,6 +82,8 @@ def main(
         package_versions=versions,
         machine=machine or platform.machine(),
         backend=backend or "cpu",
+        speaker_recognition_enabled=not arguments.skip_diarization,
+        model_ids=arguments.model_ids,
     )
     if arguments.as_json:
         print(json.dumps(result, separators=(",", ":"), sort_keys=True))
