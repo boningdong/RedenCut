@@ -44,7 +44,7 @@ it('retranslates active structured progress without restarting its elapsed clock
   useLocaleStore.setState({ resolvedLocale: 'en' })
   const status = { stage: 'aligning' as const, percent: undefined }
   render(<TranscriptPanel onGenerate={() => {}} isGenerating={true} generatingStatus={status} />)
-  expect(screen.getByText('aligning')).toBeTruthy()
+  expect(screen.getByText('Aligning transcript')).toBeTruthy()
   act(() => {
     vi.advanceTimersByTime(2000)
   })
@@ -52,5 +52,5 @@ it('retranslates active structured progress without restarting its elapsed clock
   act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
   expect(screen.getByText('正在对齐')).toBeTruthy()
   expect(screen.getByText('已用时 2秒')).toBeTruthy()
-  expect(screen.getByText('正在生成转写…')).toBeTruthy()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
 })

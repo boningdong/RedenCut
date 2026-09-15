@@ -781,3 +781,47 @@ describe('occurrence-scoped transcript muting', () => {
     expect(tl().undoStack).toHaveLength(1)
   })
 })
+
+it('atomically redacts continuous sibling clips, retains other occurrences and undoes once', () => {
+  const original = {
+    id: 'one',
+    trackId: 't',
+    audioSourceId: 'source',
+    sourceStart: 0,
+    sourceEnd: 2,
+    outputStart: 10,
+    gain: 1,
+    muted: false,
+    effects: [],
+  }
+  const next = { ...original, id: 'two', sourceStart: 2, sourceEnd: 4, outputStart: 12 }
+  const duplicate = { ...original, id: 'duplicate', outputStart: 30 }
+  const track = {
+    id: 't',
+    name: 't',
+    volume: 1,
+    muted: false,
+    solo: false,
+    color: '#fff',
+    effects: [],
+    clips: [original, next, duplicate],
+  }
+  useTimelineStore.setState({ tracks: [track] as never, undoStack: [], redoStack: [] })
+  expect(tl().muteTranscriptRange('t', [original, next] as never, { start: 1, end: 3 })).toBe(true)
+  expect(
+    tl().tracks[0].clips.map((c) => [c.sourceStart, c.sourceEnd, c.outputStart, c.muted]),
+  ).toEqual([
+    [0, 1, 10, false],
+    [1, 3, 11, true],
+    [3, 4, 13, false],
+    [0, 2, 30, false],
+  ])
+  expect(tl().undoStack).toHaveLength(1)
+  tl().undo()
+  expect(tl().tracks).toEqual([track])
+  const stale = { ...next, outputStart: 14 }
+  expect(tl().muteTranscriptRange('t', [original, stale] as never, { start: 1, end: 3 })).toBe(
+    false,
+  )
+  expect(tl().tracks).toEqual([track])
+})

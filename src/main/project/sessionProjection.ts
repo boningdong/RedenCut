@@ -61,6 +61,10 @@ function toRendererSpeechAnalysis(
     transcriptRevision,
     acousticEditUnits,
     provenance: alignmentProvenance,
+    validation,
+    recoveryVersion,
+    observations,
+    recoveryProvenance,
   } = artifact.alignment
   const diarization = artifact.diarization
   return {
@@ -73,6 +77,10 @@ function toRendererSpeechAnalysis(
       transcriptRevision,
       acousticEditUnits,
       provenance: alignmentProvenance,
+      ...(validation ? { validation } : {}),
+      ...(recoveryVersion ? { recoveryVersion } : {}),
+      ...(observations ? { observations } : {}),
+      ...(recoveryProvenance ? { recoveryProvenance } : {}),
     },
     diarizationStatus: artifact.schemaVersion === 1 ? 'completed' : artifact.diarizationStatus,
     ...(diarization

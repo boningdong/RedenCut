@@ -1,3 +1,4 @@
+import type { Track } from '@shared/project.types'
 import {
   findTranscriptOverlaps,
   type TranscriptOccurrence,
@@ -21,40 +22,59 @@ export interface AlignmentLine {
 }
 
 /** Reading continuity is separate from the exact clip identity required for safe edits. */
-export function dialogueScopes(units: TranscriptOccurrence[]): Map<string, string> {
+export function dialogueScopes(
+  units: TranscriptOccurrence[],
+  tracks?: Track[],
+): Map<string, string> {
   const scopes = new Map<string, string>()
-  const clips = [...new Map(units.map((unit) => [unit.scopeId, unit])).values()].sort(
-    (a, b) => (a.clip?.outputStart ?? a.orderTime) - (b.clip?.outputStart ?? b.orderTime),
-  )
-  const previousBySource = new Map<string, TranscriptOccurrence>()
-  for (const unit of clips) {
-    scopes.set(unit.scopeId, unit.scopeId)
+  const records = [...new Map(units.map((unit) => [unit.scopeId, unit])).values()]
+  for (const unit of records) scopes.set(unit.scopeId, unit.scopeId)
+  const groups = new Map<string, typeof records>()
+  for (const unit of records) {
     if (!unit.clip || !unit.analysis) continue
     const key = JSON.stringify([
       unit.track.id,
       unit.clip.audioSourceId,
       unit.analysis.analysisRevisionId,
     ])
-    const previous = previousBySource.get(key)
-    if (
-      previous &&
-      Math.abs(previous.clip.sourceEnd - unit.clip.sourceStart) < 1e-7 &&
-      Math.abs(
-        previous.clip.outputStart +
-          previous.clip.sourceEnd -
-          previous.clip.sourceStart -
-          unit.clip.outputStart,
-      ) < 1e-7
-    ) {
-      scopes.set(unit.scopeId, scopes.get(previous.scopeId)!)
+    const group = groups.get(key) ?? []
+    group.push(unit)
+    groups.set(key, group)
+  }
+  for (const group of groups.values()) {
+    const first = group[0]
+    const clips = (
+      tracks?.find((track) => track.id === first.track.id)?.clips ?? group.map((unit) => unit.clip)
+    )
+      .slice()
+      .sort((a, b) => a.outputStart - b.outputStart)
+    let previous: (typeof clips)[number] | undefined
+    let scope: string | undefined
+    for (const clip of clips) {
+      const unit = group.find((candidate) => candidate.clip.id === clip.id)
+      const continuous =
+        previous &&
+        previous.audioSourceId === clip.audioSourceId &&
+        Math.abs(previous.sourceEnd - clip.sourceStart) < 1e-7 &&
+        Math.abs(
+          previous.outputStart + previous.sourceEnd - previous.sourceStart - clip.outputStart,
+        ) < 1e-7
+      if (!continuous) scope = undefined
+      if (unit) {
+        scope ??= unit.scopeId
+        scopes.set(unit.scopeId, scope)
+      }
+      previous = clip
     }
-    previousBySource.set(key, unit)
   }
   return scopes
 }
 
-export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBlock[] {
-  const scopes = dialogueScopes(units)
+export function buildDialogueBlocks(
+  units: TranscriptOccurrence[],
+  tracks?: Track[],
+): DialogueBlock[] {
+  const scopes = dialogueScopes(units, tracks)
   const overlaps = findTranscriptOverlaps(units)
   let regions: Array<{ start: number; end: number; overlaps: TranscriptOverlap[] }> = []
   for (const overlap of overlaps) {
@@ -83,6 +103,52 @@ export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBloc
       ...regions.slice(last + 1),
     ]
   }
+  // Reading context may include a short boundary fragment; acoustic overlap remains exact.
+  // Bound the whole extension so a chain of tiny units cannot consume a later paragraph.
+  const contextRegion = new Map<string, number>()
+  regions.forEach((region, index) => {
+    const members = units.filter(
+      (unit) =>
+        !unit.muted &&
+        unit.outputStart !== null &&
+        unit.outputEnd !== null &&
+        unit.outputStart < region.end &&
+        unit.outputEnd > region.start,
+    )
+    for (const unit of units) {
+      if (unit.muted || unit.outputStart === null || unit.outputEnd === null) continue
+      const after = unit.outputStart >= region.end && unit.outputEnd <= region.end + 0.25
+      const before = unit.outputEnd <= region.start && unit.outputStart >= region.start - 0.25
+      if (!after && !before) continue
+      if (
+        regions.some(
+          (candidate) => unit.outputStart! < candidate.end && unit.outputEnd! > candidate.start,
+        )
+      )
+        continue
+      const neighbor = members.find(
+        (member) =>
+          scopes.get(member.scopeId) === scopes.get(unit.scopeId) &&
+          (member.speakerId ?? member.contextSpeakerId) ===
+            (unit.speakerId ?? unit.contextSpeakerId) &&
+          (after ? unit.outputStart! - member.outputEnd! : member.outputStart! - unit.outputEnd!) <=
+            0.05,
+      )
+      if (neighbor) contextRegion.set(unit.id, index)
+    }
+  })
+  for (const unit of units) {
+    if (unit.muted || unit.outputStart !== null || unit.unit.kind !== 'punctuation') continue
+    const anchor = units.find(
+      (candidate) =>
+        contextRegion.has(candidate.id) &&
+        candidate.scopeId === unit.scopeId &&
+        candidate.orderTime === unit.orderTime &&
+        (candidate.speakerId ?? candidate.contextSpeakerId) ===
+          (unit.speakerId ?? unit.contextSpeakerId),
+    )
+    if (anchor) contextRegion.set(unit.id, contextRegion.get(anchor.id)!)
+  }
   const cards: DialogueBlock[] = regions.map((r) => ({
     id: '',
     units: [],
@@ -94,20 +160,21 @@ export function buildDialogueBlocks(units: TranscriptOccurrence[]): DialogueBloc
   let lastAudibleScope: string | undefined
   for (const unit of units) {
     const scope = scopes.get(unit.scopeId)!
-    // Only suppressed interleaving may be skipped when joining natural text.
-    // A different audible occurrence begins a real conversational turn.
-    if (!unit.muted) {
+    // Suppressed or untimed interleaving is reading context, not evidence of a turn.
+    // A different timed audible occurrence begins a real conversational turn.
+    if (!unit.muted && unit.outputStart !== null && unit.outputEnd !== null) {
       if (lastAudibleScope !== undefined && lastAudibleScope !== scope)
         previousByScope.delete(lastAudibleScope)
       lastAudibleScope = scope
     }
     const hit = unit.muted
       ? -1
-      : regions.findIndex((r) =>
+      : (contextRegion.get(unit.id) ??
+        regions.findIndex((r) =>
           unit.outputStart !== null && unit.outputEnd !== null
             ? unit.outputStart < r.end && unit.outputEnd > r.start
             : unit.orderTime >= r.start && unit.orderTime < r.end,
-        )
+        ))
     if (hit >= 0) {
       cards[hit].units.push(unit)
       previousByScope.delete(scope)
@@ -156,8 +223,9 @@ export function layoutOverlapColumns(
   block: DialogueBlock,
   availableWidth: number,
   measure: (text: string) => number,
+  tracks?: Track[],
 ): AlignmentLine[] {
-  const scopes = dialogueScopes(block.units)
+  const scopes = dialogueScopes(block.units, tracks)
   const width = Math.max(40, availableWidth),
     assigned = new Set<string>(),
     columns: AlignmentColumn[] = []
@@ -183,12 +251,6 @@ export function layoutOverlapColumns(
             : u.outputStart < end && u.outputEnd! > start),
       )
       selected.forEach((u) => assigned.add(u.id))
-      const texts = new Map<string, string>()
-      for (const unit of selected) {
-        const key = `${scopes.get(unit.scopeId)}:${unit.speakerId ?? unit.contextSpeakerId ?? ''}`
-        texts.set(key, (texts.get(key) ?? '') + (unit.leadingSpace ? ' ' : '') + unit.unit.text)
-      }
-      const contentWidth = Math.max(8, ...[...texts.values()].map(measure)) + 4
       const continuingTrackIds = [
         ...new Set(
           block.units
@@ -205,13 +267,13 @@ export function layoutOverlapColumns(
       columns.push({
         start,
         end,
-        width: Math.min(width, contentWidth),
+        width: 0,
         units: selected,
         continuingTrackIds,
       })
     }
   }
-  // Untimed context in a natural gap follows its preceding speech without acquiring a timestamp.
+  // Reading context follows nearby speech without acquiring or changing acoustic timestamps.
   for (const unit of block.units.filter((u) => !assigned.has(u.id))) {
     let column = columns[0]
     for (const candidate of columns) if (candidate.start <= unit.orderTime) column = candidate
@@ -220,6 +282,12 @@ export function layoutOverlapColumns(
   const lines: AlignmentLine[] = []
   let used = 0
   for (const column of columns) {
+    const texts = new Map<string, string>()
+    for (const unit of column.units) {
+      const key = `${scopes.get(unit.scopeId)}:${unit.speakerId ?? unit.contextSpeakerId ?? ''}`
+      texts.set(key, (texts.get(key) ?? '') + (unit.leadingSpace ? ' ' : '') + unit.unit.text)
+    }
+    column.width = Math.min(width, Math.max(8, ...[...texts.values()].map(measure)) + 4)
     if (!lines.length || used + column.width > width) {
       lines.push({ columns: [] })
       used = 0

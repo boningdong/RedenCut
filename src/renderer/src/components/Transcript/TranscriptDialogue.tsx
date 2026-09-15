@@ -1,3 +1,4 @@
+import type { Track } from '@shared/project.types'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
@@ -17,8 +18,8 @@ function timestamp(time: number): string {
     .padStart(2, '0')}:${(time % 60).toFixed(2).padStart(5, '0')}`
 }
 type RenderUnit = (unit: TranscriptOccurrence) => ReactNode
-function lanes(units: TranscriptOccurrence[]) {
-  const scopes = dialogueScopes(units)
+function lanes(units: TranscriptOccurrence[], tracks?: Track[]) {
+  const scopes = dialogueScopes(units, tracks)
   const rows = new Map<string, TranscriptOccurrence[]>()
   for (const unit of units) {
     const id = `${scopes.get(unit.scopeId)}:${unit.speakerId ?? unit.contextSpeakerId ?? 'unknown'}`
@@ -42,7 +43,10 @@ function Speaker({ unit }: { unit: TranscriptOccurrence }) {
         <span>
           {speakerName(unit.analysis, unit.speakerId ?? unit.contextSpeakerId, (number) =>
             t('transcript.speakerNumber', { number }),
-          ) ?? unit.track.name}
+          ) ??
+            (unit.analysis.diarizationStatus === 'completed'
+              ? t('transcript.unassignedSpeaker')
+              : unit.track.name)}
         </span>
         <small>
           {timestamp(unit.orderTime)} · {unit.track.name}
@@ -54,14 +58,16 @@ function Speaker({ unit }: { unit: TranscriptOccurrence }) {
 }
 function ReadRows({
   units,
+  tracks,
   renderUnit,
 }: {
   units: TranscriptOccurrence[]
+  tracks?: Track[]
   renderUnit: RenderUnit
 }) {
   return (
     <>
-      {lanes(units).map((row) => (
+      {lanes(units, tracks).map((row) => (
         <div className="transcript-paragraph" key={row[0].id}>
           <Speaker unit={row[0]} />
           <div className="transcript-words">{row.map(renderUnit)}</div>
@@ -73,10 +79,12 @@ function ReadRows({
 
 function OverlapCard({
   block,
+  tracks,
   renderUnit,
   currentTime,
 }: {
   block: DialogueBlock
+  tracks?: Track[]
   renderUnit: RenderUnit
   currentTime: number
 }) {
@@ -104,10 +112,13 @@ function OverlapCard({
       context.font = ref.current
         ? getComputedStyle(ref.current.querySelector('.transcript-words') ?? ref.current).font
         : '15px sans-serif'
-    return layoutOverlapColumns(block, Math.max(40, width - 155), (text) =>
-      context ? context.measureText(text).width : text.length * 8,
+    return layoutOverlapColumns(
+      block,
+      Math.max(40, width - 155),
+      (text) => (context ? context.measureText(text).width : text.length * 8),
+      tracks,
     )
-  }, [block, width])
+  }, [block, width, tracks])
   return (
     <section
       className={`transcript-overlap${active ? ' is-live' : ''}`}
@@ -134,7 +145,7 @@ function OverlapCard({
       </div>
       {aligned ? (
         <div className="transcript-aligned">
-          {lanes(block.units).map((row) => (
+          {lanes(block.units, tracks).map((row) => (
             <div
               className="transcript-paragraph transcript-aligned-speaker"
               key={row[0].id}
@@ -206,21 +217,23 @@ function OverlapCard({
           ))}
         </div>
       ) : (
-        <ReadRows units={block.units} renderUnit={renderUnit} />
+        <ReadRows tracks={tracks} units={block.units} renderUnit={renderUnit} />
       )}
     </section>
   )
 }
 export function TranscriptDialogue({
   units,
+  tracks,
   renderUnit,
   currentTime,
 }: {
   units: TranscriptOccurrence[]
+  tracks?: Track[]
   renderUnit: RenderUnit
   currentTime: number
 }) {
-  const blocks = useMemo(() => buildDialogueBlocks(units), [units])
+  const blocks = useMemo(() => buildDialogueBlocks(units, tracks), [units, tracks])
   return (
     <div className="transcript-dialogue">
       {blocks.map((block) =>
@@ -228,11 +241,12 @@ export function TranscriptDialogue({
           <OverlapCard
             key={block.id}
             block={block}
+            tracks={tracks}
             renderUnit={renderUnit}
             currentTime={currentTime}
           />
         ) : (
-          <ReadRows key={block.id} units={block.units} renderUnit={renderUnit} />
+          <ReadRows tracks={tracks} key={block.id} units={block.units} renderUnit={renderUnit} />
         ),
       )}
     </div>

@@ -40,6 +40,29 @@ export class AcousticSelectionResolver {
       (id) => this.textById.get(id)?.kind === 'speech',
     )
     const unalignedUnitIds = requestedSpeechIds.filter((id) => !this.acousticByTranscript.has(id))
+    const canonicalSpeechIds = this.transcriptUnits
+      .filter((unit) => requestedSpeechIds.includes(unit.id))
+      .map((unit) => unit.id)
+    const firstBoundary = this.acousticByTranscript.get(canonicalSpeechIds[0])
+    const lastBoundary = this.acousticByTranscript.get(
+      canonicalSpeechIds[canonicalSpeechIds.length - 1],
+    )
+    const canonicalAcousticUnits = canonicalSpeechIds.flatMap((id) => {
+      const acoustic = this.acousticByTranscript.get(id)
+      return acoustic ? [acoustic] : []
+    })
+    const validBoundaries =
+      !!firstBoundary &&
+      !!lastBoundary &&
+      canonicalAcousticUnits.every(
+        (unit, index) =>
+          Number.isFinite(unit.sourceStart) &&
+          Number.isFinite(unit.sourceEnd) &&
+          unit.sourceEnd > unit.sourceStart &&
+          (index === 0 ||
+            (canonicalAcousticUnits[index - 1].sourceStart <= unit.sourceStart &&
+              canonicalAcousticUnits[index - 1].sourceEnd <= unit.sourceEnd)),
+      )
     const selectedAcousticIds = new Set(
       requestedSpeechIds.flatMap((id) => {
         const acoustic = this.acousticByTranscript.get(id)
@@ -50,6 +73,8 @@ export class AcousticSelectionResolver {
       selectedAcousticIds.has(unit.id),
     )
     const resolvedSet = new Set(selectedAcousticUnits.flatMap((unit) => unit.transcriptUnitIds))
+    // Internal raw text belongs to this continuous selection even without its own timestamp.
+    if (validBoundaries) for (const id of requestedSpeechIds) resolvedSet.add(id)
     const resolvedUnitIds = this.transcriptUnits
       .filter((unit) => resolvedSet.has(unit.id))
       .map((unit) => unit.id)
@@ -64,7 +89,7 @@ export class AcousticSelectionResolver {
       })),
       expanded,
       unalignedUnitIds,
-      editable: selectedAcousticUnits.length > 0 && unalignedUnitIds.length === 0,
+      editable: selectedAcousticUnits.length > 0 && validBoundaries,
     }
   }
 }

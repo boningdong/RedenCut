@@ -183,3 +183,58 @@ describe('mergeProjectDraft', () => {
     expect(() => mergeProjectDraft(authoritativeProject(), draft(authoritativeProject()))).toThrow()
   })
 })
+
+it.each(['pending', 'completed', 'skipped-disabled'])(
+  'preserves validated timing in %s speech sessions before UI editability checks',
+  (diarizationStatus) => {
+    const validation = { version: 1, method: 'audio-evidence' }
+    const artifact = {
+      schemaVersion: 2,
+      audioSourceId: source.id,
+      analysisRevisionId: 'revision',
+      diarizationStatus,
+      transcript: {
+        id: 'text',
+        revision: 1,
+        units: [],
+        mode: 'best-effort-verbatim',
+        provenance: {},
+      },
+      alignment: {
+        id: 'alignment',
+        transcriptArtifactId: 'text',
+        transcriptRevision: 1,
+        acousticEditUnits: [],
+        provenance: {},
+        validation,
+      },
+      speakers: [],
+    }
+    const session = toRendererSession(
+      {
+        project: { ...authoritativeProject(), audioSources: [] },
+        descriptor: workspace,
+        speechArtifacts: [artifact] as never,
+      },
+      token,
+      5,
+      [],
+    )
+    expect(session.speechAnalyses[0].alignment.validation).toEqual(validation)
+    expect(session.speechAnalyses[0].diarizationStatus).toBe(diarizationStatus)
+    const legacy = structuredClone(artifact)
+    delete (legacy.alignment as { validation?: unknown }).validation
+    expect(
+      toRendererSession(
+        {
+          project: { ...authoritativeProject(), audioSources: [] },
+          descriptor: workspace,
+          speechArtifacts: [legacy] as never,
+        },
+        token,
+        6,
+        [],
+      ).speechAnalyses[0].alignment.validation,
+    ).toBeUndefined()
+  },
+)

@@ -61,6 +61,7 @@ describe('canonical transcript editability', () => {
           ],
         },
         alignment: {
+          validation: { version: 1, method: 'audio-evidence' },
           id: 'alignment',
           transcriptArtifactId: 'transcript',
           transcriptRevision: 1,
@@ -94,6 +95,73 @@ describe('canonical transcript editability', () => {
     useLocaleStore.setState({ resolvedLocale: 'en' })
     setAudioPlayerInstance(null)
     window.getSelection()?.removeAllRanges()
+  })
+
+  it('filters unassigned speech explicitly and distinguishes all hidden from an empty timeline', () => {
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const toggle = screen.getByRole('button', { name: 'Show Unassigned speaker' })
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeTruthy()
+    fireEvent.click(toggle)
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeNull()
+    expect(screen.getByText('All speakers hidden')).toBeTruthy()
+    fireEvent.click(toggle)
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeTruthy()
+  })
+
+  it('keeps pending text visible when identified speakers are hidden', () => {
+    const analysis = useTranscriptStore.getState().analyses[0]
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        diarizationStatus: 'pending',
+        speakers: [
+          {
+            id: 'speaker' as never,
+            analysisRevisionId: analysis.analysisRevisionId,
+            diarizationLabel: 'SPEAKER_00',
+            defaultDisplayName: 'Guest',
+          },
+        ],
+      },
+    ])
+    useTranscriptStore.getState().toggleSpeakerVisibility(`${sourceId}:revision:speaker`)
+    render(
+      <TranscriptPanel
+        onGenerate={vi.fn()}
+        isGenerating
+        generatingStatus={{ stage: 'diarizing' }}
+      />,
+    )
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeTruthy()
+    expect(screen.queryByText('All speakers hidden')).toBeNull()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByText(/Text ready to edit/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Show Unassigned speaker' }))
+    expect(screen.getByText('All speakers hidden')).toBeTruthy()
+  })
+
+  it('keeps old text readable but prevents seek and redaction until timing is validated', () => {
+    const analysis = useTranscriptStore.getState().analyses[0]
+    const legacy = { ...analysis, alignment: { ...analysis.alignment, validation: undefined } }
+    useTranscriptStore.getState().loadAnalyses([legacy])
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: track.clips.map((c) => ({ ...c, muted: false })) }],
+    })
+    const seekTo = vi.fn()
+    setAudioPlayerInstance({ seekTo } as never)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const speech = document.querySelector('[data-unit-id="speech"]')!
+    expect(speech.textContent).toBe('觉')
+    expect(speech.getAttribute('data-acoustic-editable')).toBe('false')
+    fireEvent.click(speech)
+    expect(seekTo).not.toHaveBeenCalled()
+    const range = document.createRange()
+    range.selectNodeContents(speech)
+    window.getSelection()?.addRange(range)
+    fireEvent.keyDown(screen.getByTestId('canonical-transcript'), { code: 'Delete', key: 'Delete' })
+    expect(screen.queryByRole('button', { name: 'Confirm redaction' })).toBeNull()
+    expect(useTimelineStore.getState().tracks[0].clips[0].muted).toBe(false)
   })
 
   it('renders a complete named Generate action in both locales without changing the track', () => {
@@ -162,6 +230,7 @@ describe('canonical transcript editability', () => {
           ],
         },
         alignment: {
+          validation: { version: 1, method: 'audio-evidence' },
           ...analysis.alignment,
           acousticEditUnits: [
             {
@@ -382,7 +451,7 @@ describe('canonical transcript editability', () => {
       key: 'Backspace',
       code: 'Backspace',
     })
-    expect(screen.getByRole('status').textContent).toContain('multiple tracks or clip occurrences')
+    expect(screen.getByRole('status').textContent).toContain('continuous audio range on one track')
     expect(screen.queryByRole('button', { name: 'Confirm redaction' })).toBeNull()
     expect(useTimelineStore.getState().tracks.every((t) => t.clips.every((c) => !c.muted))).toBe(
       true,
@@ -441,6 +510,7 @@ describe('canonical transcript editability', () => {
           ],
         },
         alignment: {
+          validation: { version: 1, method: 'audio-evidence' },
           ...analysis.alignment,
           acousticEditUnits: [
             { ...analysis.alignment.acousticEditUnits[0], transcriptUnitIds: ['speech', 'other'] },
@@ -477,9 +547,9 @@ describe('canonical transcript editability', () => {
     act(() => useTimelineStore.getState().moveClip('clip', 8))
     expect(useEditorStore.getState().selection).toEqual({ start: 8.5, end: 9 })
   })
-  it('routes M through acoustic confirmation and changes only its selected occurrence', () => {
+  it('confirms exact grouped text and limits a partial acoustic edit to its selected occurrence', () => {
     const track = useTimelineStore.getState().tracks[0]
-    const chosen = { ...track.clips[0], muted: false }
+    const chosen = { ...track.clips[0], sourceStart: 0.75, muted: false }
     const duplicate = { ...chosen, id: 'duplicate' }
     useTimelineStore.setState({
       tracks: [{ ...track, clips: [chosen, duplicate] }],
@@ -497,6 +567,7 @@ describe('canonical transcript editability', () => {
           ],
         },
         alignment: {
+          validation: { version: 1, method: 'audio-evidence' },
           ...analysis.alignment,
           acousticEditUnits: [
             {
@@ -515,6 +586,11 @@ describe('canonical transcript editability', () => {
     window.getSelection()!.addRange(range)
     fireEvent.keyDown(screen.getByTestId('canonical-transcript'), { key: 'm', code: 'KeyM' })
     expect(useTimelineStore.getState().undoStack).toHaveLength(0)
+    expect(screen.getByRole('status').textContent).toContain(
+      'Redacting “你” requires including “你好”',
+    )
+    expect(element.getAttribute('data-partial')).toBe('true')
+    expect(element.getAttribute('title')).toContain('only the retained audio is editable')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm redaction' }))
     expect(
       useTimelineStore.getState().tracks[0].clips.find((clip) => clip.id === 'duplicate'),
@@ -524,8 +600,67 @@ describe('canonical transcript editability', () => {
         .getState()
         .tracks[0].clips.filter((clip) => clip.muted)
         .map((clip) => [clip.sourceStart, clip.sourceEnd]),
-    ).toEqual([[0.5, 1]])
+    ).toEqual([[0.75, 1]])
     expect(useTimelineStore.getState().undoStack).toHaveLength(1)
+  })
+  it('redacts a whole sentence around unmapped internal text while speakers are still generating', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: track.clips.map((clip) => ({ ...clip, muted: false })) }],
+    })
+    const analysis = useTranscriptStore.getState().analyses[0]
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        diarizationStatus: 'pending',
+        transcript: {
+          ...analysis.transcript,
+          units: [
+            { id: 'speech' as never, text: '我', kind: 'speech' },
+            { id: 'middle' as never, text: '嗯', kind: 'speech' },
+            { id: 'end' as never, text: '好', kind: 'speech' },
+          ],
+        },
+        alignment: {
+          ...analysis.alignment,
+          acousticEditUnits: [
+            { ...analysis.alignment.acousticEditUnits[0], sourceStart: 0.2, sourceEnd: 0.5 },
+            {
+              ...analysis.alignment.acousticEditUnits[0],
+              id: 'end-audio' as never,
+              transcriptUnitIds: ['end' as never],
+              sourceStart: 1,
+              sourceEnd: 1.5,
+            },
+          ],
+        },
+      },
+    ])
+    render(
+      <TranscriptPanel
+        onGenerate={vi.fn()}
+        isGenerating
+        generatingStatus={{ stage: 'diarizing' }}
+      />,
+    )
+    const range = document.createRange()
+    range.setStart(document.querySelector('[data-unit-id="speech"]')!.firstChild!, 0)
+    range.setEnd(document.querySelector('[data-unit-id="end"]')!.firstChild!, 1)
+    window.getSelection()!.addRange(range)
+    fireEvent.keyDown(screen.getByTestId('canonical-transcript'), { key: 'Delete', code: 'Delete' })
+    expect(
+      useTimelineStore
+        .getState()
+        .tracks[0].clips.filter((clip) => clip.muted)
+        .map((clip) => [clip.sourceStart, clip.sourceEnd]),
+    ).toEqual([[0.2, 1.5]])
+    expect(screen.queryByRole('button', { name: 'Confirm redaction' })).toBeNull()
+    expect(
+      useTranscriptStore
+        .getState()
+        .analyses[0].transcript.units.map((unit) => unit.text)
+        .join(''),
+    ).toBe('我嗯好')
   })
   it('does not clear a waveform-owned range on a delayed native selectionchange', () => {
     render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)

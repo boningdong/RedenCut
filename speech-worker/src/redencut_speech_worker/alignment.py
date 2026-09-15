@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import json
 import os
@@ -5,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from .alignment_quality import validate_audio_evidence
+from .alignment_recovery import resolve_alignment, retry_local_alignment
 from .alignment_segments import partition_units, prepare_segments
 
 
@@ -16,7 +19,10 @@ def normalize_alignment(
     transcript_units: List[Dict[str, Any]],
     aligned_words: List[Dict[str, Any]],
     aligned_chars: List[Dict[str, Any]],
+    *, audio=None, audio_offset=0,
 ) -> Dict[str, Any]:
+    if audio is not None:
+        return resolve_alignment(transcript_units, aligned_words, aligned_chars, audio, audio_offset)
     speech = [unit for unit in transcript_units if unit["kind"] == "speech"]
     aligned_ids = set()
     untimed_ids = set()
@@ -40,8 +46,11 @@ def normalize_alignment(
             matched.append(usable_chars[cursor - 1])
         if accumulated == target and matched:
             char_cursor = cursor
-            if not any(item.get("start") is not None and item.get("end") is not None for item in matched):
+            if (any(item.get("audioEvidenceRejected") for item in matched)
+                    or not any(item.get("start") is not None and item.get("end") is not None for item in matched)):
                 untimed_ids.add(unit["id"])
+            if any(item.get("audioEvidenceRejected") for item in matched):
+                continue
             if any(item.get("start") is None or item.get("end") is None or item["start"] >= item["end"] for item in matched):
                 continue
             scores = [float(item["score"]) for item in matched if item.get("score") is not None]
@@ -133,11 +142,23 @@ def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device:
         )
         chars = [dict(char) for segment in aligned.get("segments", []) for char in segment.get("chars", [])]
         words = [dict(word) for word in aligned.get("word_segments", [])]
-        for item in chars + words:
+        validate_audio_evidence(chars, clip)
+        validate_audio_evidence(words, clip)
+        raw_chars = copy.deepcopy(chars)
+        def infer_retry(retry_text, retry_clip):
+            return whisperx.align(
+                [{"start": 0.0, "end": len(retry_clip) / 16000, "text": retry_text}],
+                model, metadata, retry_clip, device, return_char_alignments=True,
+                interpolate_method="ignore",
+            )
+        chars = retry_local_alignment(chars, clip, infer_retry)
+        for item in chars + words + raw_chars:
             for key in ("start", "end"):
                 if item.get(key) is not None:
                     item[key] += offset
-        output.append({"text": window["text"], "chars": chars, "words": words})
+        output.append({"text": window["text"], "chars": chars, "words": words,
+                       "rawChars": raw_chars, "audio": clip, "audioOffset": offset,
+                       "contextStart": window["start"], "contextEnd": window["end"]})
         if on_progress is not None:
             on_progress(100 * (index + 1) / len(windows))
     return {"segments": output, "word_segments": [word for segment in output for word in segment["words"]]}
@@ -163,20 +184,34 @@ def align(request: Dict[str, Any], on_progress: Optional[Callable[[float], None]
         device=request["config"]["device"], model_path=model["snapshot"],
         segments=segments, on_progress=on_progress,
     )
-    normalized = {"units": [], "unalignedTranscriptUnitIds": []}
+    normalized = {"units": [], "unalignedTranscriptUnitIds": [], "observations": [], "recoveryVersion": 1}
     results = iter(aligned.get("segments", []))
     for group in groups:
         if not group:
             continue
         segment = next(results, {})
-        part = normalize_alignment(group, segment.get("words", []), segment.get("chars", []))
+        words = list(segment.get("words", []))
+        if segment.get("contextStart") is not None:
+            words.append({"word": segment["text"], "start": segment["contextStart"], "end": segment["contextEnd"], "contextCandidate": True})
+        part = resolve_alignment(group, words, segment.get("chars", []), segment.get("audio"), segment.get("audioOffset", 0))
+        raw = resolve_alignment(group, segment.get("words", []), segment.get("rawChars", segment.get("chars", [])), segment.get("audio"), segment.get("audioOffset", 0))
+        normalized["observations"].extend(raw["observations"])
+        normalized["observations"].extend({**observation, "timingOrigin": "local-realigned"}
+            for observation, unit in zip(part["observations"], [u for u in group if u["kind"] == "speech"])
+            if any(unit["id"] in timing["transcriptUnitIds"] and timing["timingOrigin"] == "local-realigned" for timing in part["units"]))
         normalized["units"].extend(part["units"])
         normalized["unalignedTranscriptUnitIds"].extend(part["unalignedTranscriptUnitIds"])
+    normalized["validation"] = {"version": 1, "method": "audio-evidence"}
     normalized["provenance"] = {
         "engineId": "whisperx", "engineVersion": "3.8.6",
         "modelId": model["repository"], "modelVersion": model["revision"],
         "configHash": hashlib.sha256(json.dumps(request["config"], sort_keys=True).encode()).hexdigest(),
         "artifactSchemaVersion": 1,
         "createdAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    normalized["recoveryProvenance"] = {
+        "algorithmId": "bounded-alignment-recovery", "algorithmVersion": "1",
+        "configHash": normalized["provenance"]["configHash"], "artifactSchemaVersion": 1,
+        "createdAt": normalized["provenance"]["createdAt"],
     }
     return normalized

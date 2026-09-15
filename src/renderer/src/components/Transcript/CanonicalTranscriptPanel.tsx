@@ -1,6 +1,6 @@
-import { SpeechBatchProgress } from './SpeechBatchProgress'
+import { hasValidatedTiming } from '../../domain/transcriptReliability'
+import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 import { useTranslation } from '../../i18n/useTranslation'
-import { progressMessage } from '../../i18n/messages'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
@@ -16,7 +16,7 @@ import {
 import type { TranscriptPanelProps } from './TranscriptPanel'
 import { TranscriptDialogue } from './TranscriptDialogue'
 import { SpeakerLabels } from './SpeakerLabels'
-import { speakerKey } from '../../domain/speakerPresentation'
+import { speakerKey, unassignedSpeakerKey } from '../../domain/speakerPresentation'
 import { useSpeakerColors } from '../../hooks/useSpeakerColors'
 import './transcript.css'
 
@@ -37,13 +37,26 @@ export function CanonicalTranscriptPanel({
   const setSelection = useEditorStore((s) => s.setSelection)
   const colors = useSpeakerColors()
   const hidden = useTranscriptStore((s) => s.hiddenSpeakerKeys)
+  const allUnits = useMemo(() => projectTranscript(analyses, tracks), [analyses, tracks])
+  const unassignedSourceIds = useMemo(
+    () => [
+      ...new Set(
+        allUnits
+          .filter((u) => !u.speakerId && !u.contextSpeakerId)
+          .map((u) => u.analysis.audioSourceId),
+      ),
+    ],
+    [allUnits],
+  )
   const units = useMemo(
     () =>
-      projectTranscript(analyses, tracks).filter((u) => {
+      allUnits.filter((u) => {
         const speaker = u.speakerId ?? u.contextSpeakerId
-        return !speaker || !hidden.includes(speakerKey(u.analysis, speaker))
+        return !hidden.includes(
+          speaker ? speakerKey(u.analysis, speaker) : unassignedSpeakerKey(u.analysis),
+        )
       }),
-    [analyses, tracks, hidden],
+    [allUnits, hidden],
   )
   const container = useRef<HTMLDivElement>(null)
   const elements = useRef(new Map<string, HTMLSpanElement>())
@@ -59,11 +72,12 @@ export function CanonicalTranscriptPanel({
         const element = elements.current.get(u.id)
         return element ? range.intersectsNode(element) : false
       }),
+      tracks,
     )
     return resolved
       ? { ...resolved, workspaceToken: useEditorStore.getState().session?.workspaceToken }
       : null
-  }, [units])
+  }, [units, tracks])
   useEffect(() => {
     const change = () => {
       const selected = resolveNative()
@@ -96,12 +110,15 @@ export function CanonicalTranscriptPanel({
     (selected: SessionSelection) => {
       if (!selected.editable) return
       const { track, clip, analysis } = selected.occurrence
-      const selectedSpeaker = selected.occurrence.speakerId ?? selected.occurrence.contextSpeakerId
       if (
-        selectedSpeaker &&
-        useTranscriptStore
-          .getState()
-          .hiddenSpeakerKeys.includes(speakerKey(analysis, selectedSpeaker))
+        selected.occurrences.some((u) => {
+          const speaker = u.speakerId ?? u.contextSpeakerId
+          return useTranscriptStore
+            .getState()
+            .hiddenSpeakerKeys.includes(
+              speaker ? speakerKey(u.analysis, speaker) : unassignedSpeakerKey(u.analysis),
+            )
+        })
       ) {
         setPending(null)
         setScopeMessage('hiddenSpeaker')
@@ -127,7 +144,15 @@ export function CanonicalTranscriptPanel({
         setScopeMessage('changedClip')
         return
       }
-      useTimelineStore.getState().muteClipRanges(track.id, clip.id, selected.sourceRanges)
+      if (
+        !useTimelineStore
+          .getState()
+          .muteTranscriptRange(track.id, selected.clips, selected.sourceRanges[0])
+      ) {
+        setPending(null)
+        setScopeMessage('changedClip')
+        return
+      }
       window.getSelection()?.removeAllRanges()
       setSelection(null)
       setPending(null)
@@ -157,7 +182,9 @@ export function CanonicalTranscriptPanel({
     const current =
       editable && !u.muted && currentTime >= u.outputStart! && currentTime < u.outputEnd!
     const highlighted =
-      pending?.occurrence.scopeId === u.scopeId && pending.resolvedUnitIds.includes(u.unit.id)
+      pending?.occurrence.track.id === u.track.id &&
+      pending.clips.some((c) => c.id === u.clip.id) &&
+      pending.resolvedUnitIds.includes(u.unit.id)
     const speaker = u.speakerId ?? u.contextSpeakerId
     const color = speaker ? colors.get(speakerKey(u.analysis, speaker)) : undefined
     return (
@@ -173,6 +200,8 @@ export function CanonicalTranscriptPanel({
         data-clip-id={u.clip.id}
         data-unit-kind={u.unit.kind}
         data-acoustic-editable={editable}
+        data-timing-origin={u.timingOrigin}
+        data-acoustic-unit-size={u.acousticUnitSize}
         data-current={current}
         data-playing={current}
         data-partial={u.partial}
@@ -182,14 +211,26 @@ export function CanonicalTranscriptPanel({
         title={
           u.unit.kind === 'punctuation'
             ? t('transcript.punctuationHint')
-            : !editable
-              ? t('transcript.unalignedHint')
-              : u.ambiguous
-                ? t('transcript.uncertainHint')
-                : t(u.partial ? 'transcript.partialUnitHint' : 'transcript.unitHint', {
-                    name: u.track.name,
-                    seconds: u.outputStart!.toFixed(2),
-                  })
+            : !hasValidatedTiming(u.analysis)
+              ? t('transcript.unverifiedHint')
+              : !editable
+                ? t('transcript.unalignedHint')
+                : u.ambiguous
+                  ? t('transcript.uncertainHint')
+                  : t(
+                      u.partial
+                        ? 'transcript.partialUnitHint'
+                        : u.timingOrigin === 'anchor-inferred' ||
+                            u.timingOrigin === 'group-fallback'
+                          ? 'transcript.estimatedUnitHint'
+                          : (u.acousticUnitSize ?? 1) > 1
+                            ? 'transcript.groupedUnitHint'
+                            : 'transcript.unitHint',
+                      {
+                        name: u.track.name,
+                        seconds: u.outputStart!.toFixed(2),
+                      },
+                    )
         }
         onClick={() => {
           if (editable && window.getSelection()?.isCollapsed)
@@ -252,6 +293,7 @@ export function CanonicalTranscriptPanel({
             tracks.some((t) => t.clips.some((c) => c.audioSourceId === a.audioSourceId)),
           )}
           isGenerating={isGenerating}
+          unassignedSourceIds={unassignedSourceIds}
         />
         <div className="transcript-generation">
           {missing.map((track) => (
@@ -260,11 +302,7 @@ export function CanonicalTranscriptPanel({
             </button>
           ))}
           <button disabled={isGenerating} onClick={() => onGenerate()}>
-            {isGenerating
-              ? generatingStatus
-                ? progressMessage(t, generatingStatus)
-                : t('transcript.analyzing')
-              : t('transcript.generate')}
+            {t('transcript.generate')}
           </button>
           {onRegenerate && (
             <button disabled={isGenerating} onClick={onRegenerate}>
@@ -273,14 +311,6 @@ export function CanonicalTranscriptPanel({
           )}
         </div>
       </div>
-      {analyses.some((analysis) => analysis.diarizationStatus === 'pending') && (
-        <div role="status">{t('transcript.pendingSpeakers')}</div>
-      )}
-      <SpeechBatchProgress
-        isGenerating={isGenerating}
-        status={generatingStatus}
-        onCancel={onCancel}
-      />
       <div
         ref={container}
         contentEditable
@@ -294,10 +324,32 @@ export function CanonicalTranscriptPanel({
         onKeyDown={keyDown}
         className="transcript-document"
       >
-        <TranscriptDialogue units={units} renderUnit={renderUnit} currentTime={currentTime} />
-        {!units.length && <p>{t('transcript.emptyTimeline')}</p>}
+        <TranscriptDialogue
+          units={units}
+          tracks={tracks}
+          renderUnit={renderUnit}
+          currentTime={currentTime}
+        />
+        {!units.length && (
+          <p>{t(allUnits.length ? 'transcript.allSpeakersHidden' : 'transcript.emptyTimeline')}</p>
+        )}
       </div>
-      <div className="transcript-footer">{t('transcript.editHint')}</div>
+      <TranscriptStatusFooter
+        isGenerating={isGenerating}
+        status={generatingStatus}
+        textReady={allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart !== null)}
+        onCancel={onCancel}
+      >
+        {!isGenerating && analyses.some((analysis) => analysis.diarizationStatus === 'pending') && (
+          <div role="status">{t('transcript.pendingSpeakers')}</div>
+        )}
+
+        {allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart === null) && (
+          <div className="transcript-review-notice" role="note">
+            {t('transcript.needsReview')} · {t('transcript.reviewHint')}
+          </div>
+        )}
+      </TranscriptStatusFooter>
       {scopeMessage && (
         <div role="status" className="transcript-confirmation">
           {t(`transcript.${scopeMessage}`)}
@@ -307,14 +359,16 @@ export function CanonicalTranscriptPanel({
         <div role="status" className="transcript-confirmation">
           {pending.scopeConflict
             ? t('transcript.scopeConflict')
-            : pending.expanded
-              ? t('transcript.expandedRedaction', {
-                  requested: pendingText(pending.requestedUnitIds),
-                  resolved: pendingText(pending.resolvedUnitIds),
-                })
-              : pending.unalignedUnitIds.length
-                ? t('transcript.unalignedSelection')
-                : t('transcript.punctuationSelection')}
+            : !hasValidatedTiming(pending.occurrence.analysis)
+              ? t('transcript.unverifiedHint')
+              : pending.expanded
+                ? t('transcript.expandedRedaction', {
+                    requested: pendingText(pending.requestedUnitIds),
+                    resolved: pendingText(pending.resolvedUnitIds),
+                  })
+                : pending.unalignedUnitIds.length
+                  ? t('transcript.unalignedSelection')
+                  : t('transcript.punctuationSelection')}
           <div>
             {pending.editable && (
               <button onClick={() => apply(pending)}>{t('transcript.confirmRedaction')}</button>

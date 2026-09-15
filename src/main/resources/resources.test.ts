@@ -272,7 +272,11 @@ it('validates the shipped manifest and rejects masked or unauthenticated integri
   const actual = ModelManifestSchema.parse(
     JSON.parse(await readFile(join(process.cwd(), 'speech-worker/models.json'), 'utf8')),
   )
-  expect(actual.models.find((m) => m.id === 'transcription-default')?.files[0].size).toBe(147951465)
+  expect(actual.models.find((m) => m.id === 'transcription-default')?.files[0]).toEqual({
+    path: 'ggml-small.bin',
+    size: 487601967,
+    sha256: '1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b',
+  })
   expect(
     ModelDefinitionSchema.safeParse({
       ...model,

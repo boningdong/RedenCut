@@ -77,3 +77,31 @@ it('validates isolated requests and rejects mixed phase results', () => {
     SpeechWorkerResponseSchema.safeParse({ ...envelope, result: { phase: 'alignment' } }).success,
   ).toBe(false)
 })
+
+it('preserves audio validation through the worker protocol without trusting legacy output', () => {
+  const legacy = {
+    protocolVersion: 1,
+    jobId: 'job',
+    type: 'result',
+    result: {
+      phase: 'alignment',
+      alignment: {
+        units: [],
+        unalignedTranscriptUnitIds: [],
+        provenance: {},
+      },
+    },
+  }
+  expect(SpeechWorkerResponseSchema.parse(legacy)).toEqual(legacy)
+  const validated = {
+    ...legacy,
+    result: {
+      ...legacy.result,
+      alignment: {
+        ...legacy.result.alignment,
+        validation: { version: 1, method: 'audio-evidence' },
+      },
+    },
+  }
+  expect(SpeechWorkerResponseSchema.parse(validated)).toEqual(validated)
+})

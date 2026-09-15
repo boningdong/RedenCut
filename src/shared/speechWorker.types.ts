@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { TranscriptUnitSchema } from './speech.types'
+import {
+  AlignmentValidationSchema,
+  AlignmentObservationSchema,
+  AlignmentTimingOriginSchema,
+  AlgorithmProvenanceSchema,
+  TranscriptUnitSchema,
+} from './speech.types'
 
 export const SpeechWorkerRequestSchema = z
   .object({
@@ -72,6 +78,8 @@ export const WorkerAlignmentUnitSchema = z
     transcriptUnitIds: z.array(z.string().uuid()).min(1),
     sourceStart: z.number().finite().nonnegative(),
     sourceEnd: z.number().finite().nonnegative(),
+    timingOrigin: AlignmentTimingOriginSchema.optional(),
+    evidenceAnchorTextUnitIds: z.array(z.string().uuid()).min(1).optional(),
     granularity: z.enum(['character', 'word', 'phrase', 'utterance']),
     confidence: z.number().min(0).max(1).optional(),
   })
@@ -109,6 +117,10 @@ export const SpeechWorkerResponseSchema = z.discriminatedUnion('type', [
             .object({
               units: z.array(WorkerAlignmentUnitSchema),
               unalignedTranscriptUnitIds: z.array(z.string().uuid()),
+              validation: AlignmentValidationSchema.optional(),
+              recoveryVersion: z.literal(1).optional(),
+              observations: z.array(AlignmentObservationSchema).optional(),
+              recoveryProvenance: AlgorithmProvenanceSchema.optional(),
               provenance: z.record(z.string(), z.unknown()),
             })
             .strict()

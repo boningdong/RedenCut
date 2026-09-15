@@ -18,7 +18,7 @@ it('shows stage elapsed without invented percentage and resets on transition', (
     <SpeechProgressStatus status={{ stage: 'diarizing', stageStartedAtMs: 5000 }} />,
   )
   expect(screen.getByText(/5s/)).toBeTruthy()
-  expect(screen.queryByRole('progressbar')).toBeNull()
+  expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBeNull()
   act(() => {
     vi.advanceTimersByTime(2000)
   })
@@ -42,6 +42,7 @@ it('keeps cancellation available past advisory estimate and localizes retained s
     vi.advanceTimersByTime(2000)
   })
   expect(screen.getByText(/longer than estimated/)).toBeTruthy()
+  expect(screen.getByText(/longer than estimated/).closest('details')).toBeNull()
   expect(cancel).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(cancel).toHaveBeenCalledOnce()

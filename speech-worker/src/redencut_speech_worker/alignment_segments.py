@@ -31,12 +31,16 @@ def prepare_segments(text: str, segments: Optional[List[Dict[str, Any]]], durati
             raise ValueError("Alignment segment timing must be finite, ordered and non-overlapping")
         if end - start > MAX_SEGMENT_SECONDS:
             raise ValueError("Alignment search exceeds 30 seconds; finer transcription timing is required")
-        # Whisper may round its final timestamp a few milliseconds past EOF.
-        if start > duration or end > duration + 0.05:
-            raise ValueError("Alignment segment timing is outside the audio")
+        # Recognition may describe a truncated final utterance beyond EOF. Its
+        # search context can only intersect existing samples, never invent them.
         padding = min(CONTEXT_SECONDS, (MAX_SEGMENT_SECONDS - (end - start)) / 2)
-        output.append({"text": segment["text"], "start": start if start == end else max(0.0, start - padding),
-                       "end": end if start == end else min(duration, end + padding)})
+        if start >= duration:
+            search_start = search_end = duration
+        elif start == end:
+            search_start = search_end = start
+        else:
+            search_start, search_end = max(0.0, start - padding), min(duration, end + padding)
+        output.append({"text": segment["text"], "start": search_start, "end": search_end})
         previous_end = end
     return output
 

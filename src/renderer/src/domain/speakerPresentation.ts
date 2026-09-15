@@ -2,6 +2,11 @@ import type { RendererSpeechAnalysis, SpeakerId } from '@shared/speech.types'
 import type { Track } from '@shared/project.types'
 import { TRACK_COLORS, trackPresentationColor } from '@shared/trackColors'
 
+/** Unassigned is a visibility category, never a synthetic speaker identity. */
+export function unassignedSpeakerKey(analysis: RendererSpeechAnalysis): string {
+  return `${analysis.audioSourceId}:unassigned`
+}
+
 export function speakerKey(analysis: RendererSpeechAnalysis, id: SpeakerId): string {
   return `${analysis.audioSourceId}:${analysis.analysisRevisionId}:${id}`
 }

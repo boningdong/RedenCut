@@ -128,6 +128,13 @@ interface TimelineState {
     ranges: Array<{ start: number; end: number }>,
   ): void
 
+  /** Apply one continuous source selection to an exact, unchanged clip chain. */
+  muteTranscriptRange(
+    trackId: string,
+    expectedClips: Clip[],
+    range: { start: number; end: number },
+  ): boolean
+
   /**
    * Remove a specific clip by ID from its track.
    * Clears selectedClipId if it matches the removed clip.
@@ -421,6 +428,95 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId,
     }))
     markTimelineEdited()
+  },
+
+  muteTranscriptRange(trackId, expectedClips, range) {
+    const { tracks } = get()
+    const track = tracks.find((t) => t.id === trackId)
+    const clips = [...expectedClips].sort((a, b) => a.outputStart - b.outputStart)
+    if (
+      !track ||
+      !clips.length ||
+      !Number.isFinite(range.start) ||
+      !Number.isFinite(range.end) ||
+      range.end <= range.start
+    )
+      return false
+    if (
+      new Set(clips.map((c) => c.id)).size !== clips.length ||
+      clips.some((c, i) => {
+        const current = track.clips.find((x) => x.id === c.id)
+        return (
+          !current ||
+          JSON.stringify(current) !== JSON.stringify(c) ||
+          c.audioSourceId !== clips[0].audioSourceId ||
+          (i > 0 &&
+            (Math.abs(clips[i - 1].sourceEnd - c.sourceStart) > 1e-7 ||
+              Math.abs(
+                clips[i - 1].outputStart +
+                  clips[i - 1].sourceEnd -
+                  clips[i - 1].sourceStart -
+                  c.outputStart,
+              ) > 1e-7))
+        )
+      })
+    )
+      return false
+    if (range.start < clips[0].sourceStart || range.end > clips[clips.length - 1].sourceEnd)
+      return false
+    const targeted = new Set(clips.map((c) => c.id))
+    const start = clips[0].outputStart + range.start - clips[0].sourceStart
+    const end = clips[0].outputStart + range.end - clips[0].sourceStart
+    // Never include a second overlapping occurrence merely because its source time matches.
+    if (
+      clips.length > 1 &&
+      track.clips.some(
+        (c) =>
+          !targeted.has(c.id) &&
+          c.outputStart < end &&
+          c.outputStart + c.sourceEnd - c.sourceStart > start,
+      )
+    )
+      return false
+    if (!clips.some((c) => !c.muted && c.sourceStart < range.end && c.sourceEnd > range.start))
+      return true
+    const pieces = splitAndMute(clips, start, end, trackId)
+    const merged: Clip[] = []
+    for (const piece of pieces) {
+      const previous = merged[merged.length - 1]
+      if (
+        previous?.muted &&
+        piece.muted &&
+        previous.audioSourceId === piece.audioSourceId &&
+        previous.gain === piece.gain &&
+        JSON.stringify(previous.effects) === JSON.stringify(piece.effects) &&
+        Math.abs(previous.sourceEnd - piece.sourceStart) < 1e-7 &&
+        Math.abs(
+          previous.outputStart + previous.sourceEnd - previous.sourceStart - piece.outputStart,
+        ) < 1e-7
+      ) {
+        merged[merged.length - 1] = { ...previous, sourceEnd: piece.sourceEnd }
+      } else merged.push(piece)
+    }
+    const before = cloneTracks(tracks)
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId
+          ? {
+              ...t,
+              clips: t.clips.flatMap((c) =>
+                c.id === clips[0].id ? merged : targeted.has(c.id) ? [] : [c],
+              ),
+            }
+          : t,
+      ),
+      undoStack: [...state.undoStack, { before, wordIds: [], label: 'Mute transcript selection' }],
+      redoStack: [],
+      selectedClipId:
+        state.selectedClipId && targeted.has(state.selectedClipId) ? null : state.selectedClipId,
+    }))
+    markTimelineEdited()
+    return true
   },
 
   // ── removeClip ──────────────────────────────────────────────────────────────

@@ -239,3 +239,87 @@ it('accepts pending text artifacts but rejects speaker outputs on pending artifa
     SpeechArtifactSchema.safeParse({ ...pending, diarization: legacy.diarization }).success,
   ).toBe(false)
 })
+
+it.each(['pending', 'completed', 'skipped-disabled'] as const)(
+  'preserves alignment validation independently of %s diarization',
+  (diarizationStatus) => {
+    const original = artifact()
+    const candidate = {
+      ...original,
+      schemaVersion: 2,
+      diarizationStatus,
+      alignment: { ...original.alignment, validation: { version: 1, method: 'audio-evidence' } },
+      ...(diarizationStatus === 'completed'
+        ? {}
+        : {
+            diarization: undefined,
+            speakerAttribution: undefined,
+            speakers: [],
+          }),
+    }
+    expect(SpeechArtifactSchema.parse(candidate).alignment).toMatchObject({
+      validation: { version: 1, method: 'audio-evidence' },
+    })
+  },
+)
+
+function recoveredArtifact() {
+  const original = artifact()
+  return {
+    ...original,
+    alignment: {
+      ...original.alignment,
+      recoveryVersion: 1,
+      recoveryProvenance: original.speakerAttribution.provenance,
+      observations: [
+        {
+          transcriptUnitIds: [UNIT_A],
+          candidateStart: -1,
+          candidateEnd: -2,
+          confidence: 2,
+          audioEvidence: 'unknown',
+          reason: 'invalid-bounds',
+        },
+      ],
+      acousticEditUnits: original.alignment.acousticEditUnits.map((unit) => ({
+        ...unit,
+        timingOrigin: 'aligned',
+        evidenceAnchorTextUnitIds: [UNIT_B],
+      })),
+    },
+  }
+}
+
+it('retains rejected candidate bounds and scores without applying final timing constraints', () => {
+  const candidate = recoveredArtifact()
+  expect(SpeechArtifactSchema.parse(candidate)).toEqual(candidate)
+})
+
+it('rejects observations and evidence anchors referencing non-speech or unknown text units', () => {
+  for (const id of [PUNCTUATION, crypto.randomUUID()]) {
+    const observation = recoveredArtifact()
+    observation.alignment.observations[0].transcriptUnitIds = [id]
+    expect(() => SpeechArtifactSchema.parse(observation)).toThrow('Observation')
+    const anchor = recoveredArtifact()
+    anchor.alignment.acousticEditUnits[0].evidenceAnchorTextUnitIds = [id]
+    expect(() => SpeechArtifactSchema.parse(anchor)).toThrow('anchor')
+  }
+})
+
+it('requires versioned recovery provenance and timing origins without upgrading legacy markers', () => {
+  const candidate = recoveredArtifact()
+  const withoutProvenance = { ...candidate.alignment, recoveryProvenance: undefined }
+  expect(() => SpeechArtifactSchema.parse({ ...candidate, alignment: withoutProvenance })).toThrow(
+    'Recovery',
+  )
+  const missingOrigin = {
+    ...candidate,
+    alignment: {
+      ...candidate.alignment,
+      acousticEditUnits: artifact().alignment.acousticEditUnits,
+    },
+  }
+  expect(() => SpeechArtifactSchema.parse(missingOrigin)).toThrow('timing origin')
+  expect(SpeechArtifactSchema.parse(artifact()).alignment).not.toHaveProperty('recoveryVersion')
+  expect(SpeechArtifactSchema.parse(candidate).alignment).not.toHaveProperty('validation')
+})

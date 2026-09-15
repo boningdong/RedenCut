@@ -121,3 +121,31 @@ it('keeps a color-only edit independent of the display locale and preserves an o
   act(() => useLocaleStore.setState({ resolvedLocale: 'en' }))
   expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('My custom guest')
 })
+
+it('keeps unassigned visibility source scoped across refreshed speaker results', () => {
+  const other = { ...analysis, audioSourceId: 'other' as never }
+  const { rerender } = render(
+    <SpeakerLabels
+      analyses={[analysis, other]}
+      isGenerating
+      unassignedSourceIds={['source', 'other']}
+    />,
+  )
+  const toggles = screen.getAllByRole('button', { name: 'Show Unassigned speaker' })
+  fireEvent.click(toggles[0])
+  expect(toggles[0].getAttribute('aria-pressed')).toBe('false')
+  expect(toggles[1].getAttribute('aria-pressed')).toBe('true')
+  rerender(
+    <SpeakerLabels
+      analyses={[{ ...analysis, analysisRevisionId: 'new' as never }, other]}
+      isGenerating={false}
+      unassignedSourceIds={['source', 'other']}
+    />,
+  )
+  expect(
+    screen
+      .getAllByRole('button', { name: 'Show Unassigned speaker' })[0]
+      .getAttribute('aria-pressed'),
+  ).toBe('false')
+  expect(useTranscriptStore.getState().hiddenSpeakerKeys).toEqual(['source:unassigned'])
+})

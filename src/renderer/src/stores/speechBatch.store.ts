@@ -12,6 +12,7 @@ interface SpeechBatchState {
   update: (status: SpeechProgress, progress?: SpeechBatchProgress) => void
   finish: (summary?: SpeechBatchSummary) => void
   finishCancelled: () => void
+  dismissSummary: () => void
   reset: () => void
 }
 const initial = {
@@ -30,5 +31,6 @@ export const useSpeechBatchStore = create<SpeechBatchState>()((set) => ({
     set({ isGenerating: false, generatingStatus: null, progress: null, summary: summary ?? null }),
   finishCancelled: () =>
     set({ isGenerating: false, generatingStatus: null, progress: null, cancelled: true }),
+  dismissSummary: () => set({ summary: null, cancelled: false }),
   reset: () => set(initial),
 }))

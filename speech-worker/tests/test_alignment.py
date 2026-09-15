@@ -16,6 +16,46 @@ UNITS = [
 
 
 class AlignmentTest(unittest.TestCase):
+    def validated_alignment(self, audio, score=.9, segments=None):
+        fake = SimpleNamespace(load_audio=lambda _: audio,
+            load_align_model=Mock(return_value=(object(), {})), align=Mock(return_value={
+                "segments": [{"chars": [{"char": "a", "start": .1, "end": .2, "score": score}]}],
+                "word_segments": [{"word": "a", "start": .1, "end": .2, "score": .99}]}))
+        with patch.dict(sys.modules, {"whisperx": fake}):
+            result = run_whisperx_alignment(audio_path="audio.wav", text="a", language="en",
+                device="cpu", model_path="model", segments=segments)
+        segment = result["segments"][0]
+        return normalize_alignment([{"id": "a", "text": "a", "kind": "speech"}],
+                                   segment["words"], segment["chars"])
+
+    def test_high_confidence_digital_silence_has_no_edit_bounds(self):
+        result = self.validated_alignment(np.zeros(16000, dtype=np.float32), .99)
+        self.assertEqual([], result["units"])
+        self.assertEqual(["a"], result["unalignedTranscriptUnitIds"])
+
+    def test_zero_score_cannot_be_readmitted_by_word_fallback(self):
+        result = self.validated_alignment(np.ones(16000, dtype=np.float32) * .1, 0)
+        self.assertEqual([], result["units"])
+        self.assertEqual(["a"], result["unalignedTranscriptUnitIds"])
+
+    def test_quiet_positive_score_keeps_original_bounds(self):
+        audio = (np.sin(np.arange(16000) * .1) * 1e-8).astype(np.float32)
+        result = self.validated_alignment(audio, .001)
+        self.assertEqual([], result["unalignedTranscriptUnitIds"])
+        self.assertEqual((.1, .2), (result["units"][0]["sourceStart"], result["units"][0]["sourceEnd"]))
+
+    def test_audio_evidence_is_checked_before_absolute_offset(self):
+        audio = np.zeros(10 * 16000, dtype=np.float32)
+        audio[int(4.85 * 16000):int(4.95 * 16000)] = .01
+        result = self.validated_alignment(audio, .8,
+            [{"text": "a", "sourceStart": 5, "sourceEnd": 6}])
+        self.assertEqual([], result["unalignedTranscriptUnitIds"])
+        self.assertAlmostEqual(4.85, result["units"][0]["sourceStart"])
+
+    def test_nonfinite_audio_cannot_support_an_edit(self):
+        result = self.validated_alignment(np.full(16000, np.nan, dtype=np.float32))
+        self.assertEqual([], result["units"])
+
     def test_fallback_rejects_interpolated_words_without_any_timed_characters(self):
         result = normalize_alignment([
             {"id": "a", "kind": "speech", "text": "hello"},
@@ -70,7 +110,7 @@ class AlignmentTest(unittest.TestCase):
             calls.append(segments[0]["text"])
             return {"segments": [{"chars": [{"char": segments[0]["text"], "start": .1, "end": .2}]}],
                     "word_segments": []}
-        fake = SimpleNamespace(load_audio=lambda _: np.zeros(3877 * 16000, dtype=np.float32),
+        fake = SimpleNamespace(load_audio=lambda _: np.ones(3877 * 16000, dtype=np.float32),
                                load_align_model=Mock(return_value=(object(), {})), align=infer)
         progress = []
         with patch.dict(sys.modules, {"whisperx": fake}):
@@ -85,7 +125,7 @@ class AlignmentTest(unittest.TestCase):
         fake.load_align_model.assert_called_once()
 
     def test_zero_duration_recognition_is_unaligned_without_blocking_later_segments(self):
-        fake = SimpleNamespace(load_audio=lambda _: np.zeros(10 * 16000, dtype=np.float32),
+        fake = SimpleNamespace(load_audio=lambda _: np.ones(10 * 16000, dtype=np.float32),
             load_align_model=Mock(return_value=(object(), {})), align=Mock(return_value={
                 "segments": [{"chars": [{"char": "得", "start": .1, "end": .2}]}], "word_segments": []}))
         progress = []
@@ -151,6 +191,7 @@ class AlignmentTest(unittest.TestCase):
                  "id": "alignment-zh", "repository": "repo", "revision": "rev", "snapshot": "/models/alignment-zh/rev"
              }):
             result = align(request)
+        self.assertEqual({"version": 1, "method": "audio-evidence"}, result["validation"])
         self.assertEqual("/models/alignment-zh/rev", run_alignment.call_args.kwargs["model_path"])
         self.assertEqual(["u1", "u2", "u3"], result["unalignedTranscriptUnitIds"])
 

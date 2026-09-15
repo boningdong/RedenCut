@@ -104,3 +104,75 @@ it('renders deleted words inline with a single speaker label across audio fragme
   expect(document.querySelector('.transcript-words')?.textContent).toBe('word-0word-1word-2')
   expect(document.querySelector('s')?.textContent).toBe('word-1')
 })
+
+it('renders short boundary context inside the card without marking its time as simultaneous', () => {
+  const units = [
+    occurrence('a', 'a', 6.984, 8.533),
+    occurrence('b', 'b', 6.984, 8.533),
+    occurrence('tail', 'a', 8.535, 8.555, '楚'),
+  ]
+  render(
+    <TranscriptDialogue
+      units={units}
+      currentTime={8.54}
+      renderUnit={(u) => <span>{u.unit.text}</span>}
+    />,
+  )
+  const card = document.querySelector('.transcript-overlap')!
+  expect(card.textContent).toContain('楚')
+  expect(card.classList.contains('is-live')).toBe(false)
+  expect(card.getAttribute('data-overlap-end')).toBe('8.533')
+})
+
+it('renders one reading row across a silent interstitial clip', () => {
+  const clips = [0, 1, 2].map((index) => ({
+    id: `clip-${index}`,
+    audioSourceId: 'source',
+    sourceStart: index * 0.3,
+    sourceEnd: (index + 1) * 0.3,
+    outputStart: index * 0.3,
+  }))
+  const units = [0, 2].map(
+    (index) =>
+      ({
+        ...occurrence(`word-${index}`, 'a', index * 0.3, (index + 1) * 0.3),
+        scopeId: `clip-${index}`,
+        clip: clips[index],
+      }) as TranscriptOccurrence,
+  )
+  const tracks = [{ ...units[0].track, clips: clips as TranscriptOccurrence['clip'][] }]
+  render(
+    <TranscriptDialogue
+      units={units}
+      tracks={tracks}
+      currentTime={0}
+      renderUnit={(u) => <span>{u.unit.text}</span>}
+    />,
+  )
+  expect(document.querySelectorAll('.transcript-paragraph')).toHaveLength(1)
+  expect(document.querySelector('.transcript-words')?.textContent).toBe('word-0word-2')
+})
+
+it('labels unattributed completed diarization as unassigned while skipped analysis uses its source track', () => {
+  const base = occurrence('word', 'source track', 0, 1)
+  const { rerender } = render(
+    <TranscriptDialogue
+      units={[{ ...base, analysis: { ...base.analysis, diarizationStatus: 'completed' } }]}
+      currentTime={0}
+      renderUnit={(u) => <span>{u.unit.text}</span>}
+    />,
+  )
+  expect(document.querySelector('.transcript-speaker > div > span')?.textContent).toBe(
+    'Unassigned speaker',
+  )
+  rerender(
+    <TranscriptDialogue
+      units={[{ ...base, analysis: { ...base.analysis, diarizationStatus: 'skipped-disabled' } }]}
+      currentTime={0}
+      renderUnit={(u) => <span>{u.unit.text}</span>}
+    />,
+  )
+  expect(document.querySelector('.transcript-speaker > div > span')?.textContent).toBe(
+    'source track',
+  )
+})

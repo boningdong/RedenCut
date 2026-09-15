@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
+import type { SpeechBatchProgress } from '@shared/speechBatch.types'
 import { useTranslation } from '../../i18n/useTranslation'
 import { progressMessage } from '../../i18n/messages'
 
 interface SpeechProgressStatusProps {
   status: SpeechProgress | TranscriptionProgress | null
+  progress?: SpeechBatchProgress | null
+  textReady?: boolean
   onCancel?: () => void
 }
 
@@ -13,7 +16,12 @@ export function SpeechProgressStatus(props: SpeechProgressStatusProps) {
   return <TimedSpeechProgressStatus key={props.status?.stage ?? 'preparing'} {...props} />
 }
 
-function TimedSpeechProgressStatus({ status, onCancel }: SpeechProgressStatusProps) {
+function TimedSpeechProgressStatus({
+  status,
+  progress,
+  textReady,
+  onCancel,
+}: SpeechProgressStatusProps) {
   const { t } = useTranslation()
   const [now, setNow] = useState(Date.now)
   const [localStartedAt] = useState(Date.now)
@@ -29,25 +37,26 @@ function TimedSpeechProgressStatus({ status, onCancel }: SpeechProgressStatusPro
   const percent = status?.percent
   const overrun =
     mainStartedAt !== undefined && estimate !== undefined && now - mainStartedAt > estimate
+  const phase = progress
+    ? t(progress.phase === 'text' ? 'transcript.batchText' : 'transcript.batchSpeakers')
+    : status
+      ? progressMessage(t, status)
+      : t('transcript.generating')
   return (
-    <div className="transcript-progress">
-      <div role="status">
-        {status && <div>{t('transcript.generating')}</div>}
-        <span>{status ? progressMessage(t, status) : t('transcript.generating')}</span>
-        {percent !== undefined && (
-          <span
-            role="progressbar"
-            aria-label={status ? progressMessage(t, status) : t('transcript.generating')}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-          >
-            {' '}
-            · {Math.round(percent)}%
-          </span>
-        )}
-        {elapsed !== undefined && (
-          <span style={{ marginLeft: '0.5em' }}>
+    <div className="transcript-progress" role="status">
+      <div className="transcript-progress-row">
+        <span className="transcript-progress-phase">
+          {progress
+            ? t('transcript.batchPosition', {
+                phase,
+                index: progress.sourceIndex,
+                count: progress.sourceCount,
+              })
+            : phase}
+        </span>
+        <span className="transcript-progress-meta">
+          {textReady && <span>{t('transcript.textReady')} · </span>}
+          <span>
             {t('transcript.elapsed', {
               time:
                 elapsed < 60
@@ -58,15 +67,48 @@ function TimedSpeechProgressStatus({ status, onCancel }: SpeechProgressStatusPro
                     }),
             })}
           </span>
+        </span>
+        <span
+          className="transcript-progress-meter"
+          role="progressbar"
+          aria-label={phase}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          data-indeterminate={percent === undefined || undefined}
+        >
+          <span className="transcript-progress-track" aria-hidden="true">
+            <span
+              className="transcript-progress-fill"
+              style={{
+                width: percent === undefined ? '32%' : `${Math.max(0, Math.min(100, percent))}%`,
+              }}
+            />
+          </span>
+          {percent !== undefined && (
+            <span className="transcript-progress-percent">{Math.round(percent)}%</span>
+          )}
+        </span>
+        {onCancel && (
+          <button className="transcript-status-action" onClick={onCancel}>
+            {t('common.cancel')}
+          </button>
         )}
-        {estimate !== undefined && (
-          <p>
-            {t('transcript.stageEstimate', { minutes: Math.max(1, Math.round(estimate / 60000)) })}
-          </p>
-        )}
-        {overrun && <p>{t('transcript.estimateOverrun')}</p>}
       </div>
-      {onCancel && <button onClick={onCancel}>{t('common.cancel')}</button>}
+      {(progress || estimate !== undefined) && (
+        <details className="transcript-progress-details">
+          <summary>{t('transcript.analysisDetails')}</summary>
+          {progress && <div className="transcript-progress-filename">{progress.displayName}</div>}
+          {estimate !== undefined && (
+            <p>
+              {t('transcript.stageEstimate', {
+                minutes: Math.max(1, Math.round(estimate / 60000)),
+              })}
+            </p>
+          )}
+        </details>
+      )}
+      {overrun && <p className="transcript-progress-meta">{t('transcript.estimateOverrun')}</p>}
     </div>
   )
 }

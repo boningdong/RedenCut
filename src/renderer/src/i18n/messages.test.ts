@@ -25,7 +25,7 @@ it('retains actionable installation guidance in Chinese without translating tech
   const t = createTranslator('zh-CN').t
   expect(publicMessage(t, { reason: 'whisper-missing' })).toContain('brew install whisper-cpp')
   expect(publicMessage(t, { reason: 'speech-worker-missing' })).toContain('npm run setup:speech')
-  expect(publicMessage(t, { reason: 'whisper-model-missing' })).toContain('~/.cache/whisper')
+  expect(publicMessage(t, { reason: 'whisper-model-missing' })).toContain('打开设置')
   expect(progressMessage(t, { stage: 'building-cache' })).toBe('正在建立缓存')
 })
 

@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation'
 import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
-import { SpeechBatchProgress } from './SpeechBatchProgress'
+import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 // ─────────────────────────────────────────────────────────────────────────────
 // TranscriptPanel
 //
@@ -513,11 +513,6 @@ function LegacyTranscriptPanel({
         )}
       </div>
       {/* ── Body ────────────────────────────────────────────────────────── */}
-      <SpeechBatchProgress
-        isGenerating={isGenerating}
-        status={generatingStatus}
-        onCancel={onCancel}
-      />
       {!hasAnyWords && tracks.length === 0 ? (
         <EmptyTranscriptState noTracks />
       ) : !hasAnyWords ? (
@@ -603,6 +598,11 @@ function LegacyTranscriptPanel({
           })}
         </div>
       )}
+      <TranscriptStatusFooter
+        isGenerating={isGenerating}
+        status={generatingStatus}
+        onCancel={onCancel}
+      />
     </div>
   )
 }
@@ -615,6 +615,8 @@ function EmptyTranscriptState({ noTracks = false }: { noTracks?: boolean }) {
     <div
       style={{
         flex: 1,
+        minHeight: 0,
+        overflow: 'auto',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

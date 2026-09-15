@@ -43,3 +43,51 @@ describe('AcousticSelectionResolver', () => {
     })
   })
 })
+
+const bracketedUnits = ['left', 'middle', 'right'].map((id) => ({ id, kind: 'speech' as const }))
+const bracketedAudio = [
+  { id: 'left-audio', transcriptUnitIds: ['left'], sourceStart: 1, sourceEnd: 2 },
+  { id: 'right-audio', transcriptUnitIds: ['right'], sourceStart: 3, sourceEnd: 4 },
+]
+it('allows unmapped internal speech enclosed by valid outer boundaries', () => {
+  expect(
+    new AcousticSelectionResolver(bracketedUnits, bracketedAudio).resolve([
+      'right',
+      'middle',
+      'left',
+    ]),
+  ).toMatchObject({
+    editable: true,
+    expanded: false,
+    resolvedUnitIds: ['left', 'middle', 'right'],
+    unalignedUnitIds: ['middle'],
+  })
+})
+it.each([['middle', 'right'], ['left', 'middle'], ['middle']])(
+  'blocks unmapped selection boundaries: %j',
+  (...ids) => {
+    expect(
+      new AcousticSelectionResolver(bracketedUnits, bracketedAudio).resolve(ids).editable,
+    ).toBe(false)
+  },
+)
+it('rejects reversed acoustic boundaries instead of widening the edit', () => {
+  const reversed = bracketedAudio.map((unit, index) => ({
+    ...unit,
+    sourceStart: index ? 1 : 3,
+    sourceEnd: index ? 2 : 4,
+  }))
+  expect(
+    new AcousticSelectionResolver(bracketedUnits, reversed).resolve(['left', 'right']).editable,
+  ).toBe(false)
+})
+it('rejects mapped internal speech outside the outer acoustic boundaries', () => {
+  const audio = [
+    ...bracketedAudio,
+    { id: 'middle-audio', transcriptUnitIds: ['middle'], sourceStart: 6, sourceEnd: 7 },
+  ]
+  expect(
+    new AcousticSelectionResolver(bracketedUnits, audio).resolve(['left', 'middle', 'right'])
+      .editable,
+  ).toBe(false)
+})

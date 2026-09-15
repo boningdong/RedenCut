@@ -7,51 +7,68 @@ import { SpeechProgressStatus } from './SpeechProgressStatus'
 export function SpeechBatchProgress({
   isGenerating,
   status,
+  textReady,
   onCancel,
 }: {
   isGenerating: boolean
   status: SpeechProgress | TranscriptionProgress | null
+  textReady?: boolean
   onCancel?: () => void
 }) {
   const { t } = useTranslation()
   const progress = useSpeechBatchStore((state) => state.progress)
   const cancelled = useSpeechBatchStore((state) => state.cancelled)
   const summary = useSpeechBatchStore((state) => state.summary)
+  const dismiss = useSpeechBatchStore((state) => state.dismissSummary)
+  if (isGenerating)
+    return (
+      <SpeechProgressStatus
+        key={progress?.audioSourceId}
+        status={status}
+        progress={progress}
+        textReady={textReady}
+        onCancel={onCancel}
+      />
+    )
+  if (!summary && !cancelled) return null
   return (
-    <>
-      {isGenerating && (
-        <>
-          {progress && (
-            <div role="status">
-              {t('transcript.batchSource', {
-                phase: t(
-                  progress.phase === 'text' ? 'transcript.batchText' : 'transcript.batchSpeakers',
-                ),
-                index: progress.sourceIndex,
-                count: progress.sourceCount,
-                name: progress.displayName,
-              })}
-            </div>
+    <div role="status" className="transcript-progress transcript-progress-complete">
+      <div className="transcript-progress-row">
+        <span>
+          {t(
+            summary?.cancelled || cancelled
+              ? 'transcript.batchStopped'
+              : summary?.failures.length
+                ? 'transcript.analysisFailed'
+                : 'transcript.analysisComplete',
           )}
-          <SpeechProgressStatus key={progress?.audioSourceId} status={status} onCancel={onCancel} />
-        </>
-      )}
-      {cancelled && !summary && <div role="status">{t('transcript.batchStopped')}</div>}
+        </span>
+        <button
+          className="transcript-status-action"
+          aria-label={t('transcript.dismissAnalysis')}
+          onClick={dismiss}
+        >
+          ×
+        </button>
+      </div>
       {summary && (
-        <div role="status">
-          {t(summary.cancelled ? 'transcript.batchCancelled' : 'transcript.batchComplete', {
-            count: summary.sourceCount,
-            completed: summary.completedCount,
-            reused: summary.reusedCount,
-            failed: summary.failures.length,
-          })}
+        <details className="transcript-progress-details">
+          <summary>{t('transcript.analysisDetails')}</summary>
+          <p>
+            {t(summary.cancelled ? 'transcript.batchCancelled' : 'transcript.batchComplete', {
+              count: summary.sourceCount,
+              completed: summary.completedCount,
+              reused: summary.reusedCount,
+              failed: summary.failures.length,
+            })}
+          </p>
           {summary.failures.map((failure) => (
             <div key={`${failure.audioSourceId}:${failure.phase}`}>
               {failure.displayName}: {publicMessage(t, failure.error)}
             </div>
           ))}
-        </div>
+        </details>
       )}
-    </>
+    </div>
   )
 }

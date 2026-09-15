@@ -5,10 +5,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { TRACK_COLORS } from '@shared/trackColors'
 import type { RendererSpeechAnalysis, SpeakerId } from '@shared/speech.types'
+import { useTimelineStore } from '../../stores/timeline.store'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useSpeakerColors } from '../../hooks/useSpeakerColors'
-import { speakerKey, speakerName } from '../../domain/speakerPresentation'
+import { speakerKey, speakerName, unassignedSpeakerKey } from '../../domain/speakerPresentation'
 
 const choices = [
   '#dc8b9c',
@@ -337,15 +338,62 @@ function SpeakerTag({
   )
 }
 
+function UnassignedTag({
+  analysis,
+  showSource,
+}: {
+  analysis: RendererSpeechAnalysis
+  showSource: boolean
+}) {
+  const { t } = useTranslation()
+  const tracks = useTimelineStore((state) => state.tracks)
+  const sourceName = tracks.find((track) =>
+    track.clips.some((clip) => clip.audioSourceId === analysis.audioSourceId),
+  )?.name
+  const key = unassignedSpeakerKey(analysis)
+  const hidden = useTranscriptStore((state) => state.hiddenSpeakerKeys.includes(key))
+  const label =
+    showSource && sourceName
+      ? t('transcript.unassignedSource', { name: sourceName })
+      : t('transcript.unassignedSpeaker')
+  return (
+    <div className={`speaker-tag${hidden ? ' is-hidden' : ''}`}>
+      <button
+        className="speaker-name-button"
+        aria-label={t('transcript.show', { name: label })}
+        aria-pressed={!hidden}
+        onClick={() => {
+          window.getSelection()?.removeAllRanges()
+          useEditorStore.getState().setSelection(null)
+          useTranscriptStore.getState().toggleSpeakerVisibility(key)
+        }}
+      >
+        {label}
+      </button>
+    </div>
+  )
+}
+
 export function SpeakerLabels({
   analyses,
   isGenerating,
+  unassignedSourceIds = [],
 }: {
+  unassignedSourceIds?: string[]
   analyses: RendererSpeechAnalysis[]
   isGenerating: boolean
 }) {
   return (
     <div className="transcript-speaker-labels">
+      {analyses
+        .filter((analysis) => unassignedSourceIds.includes(analysis.audioSourceId))
+        .map((analysis) => (
+          <UnassignedTag
+            key={unassignedSpeakerKey(analysis)}
+            analysis={analysis}
+            showSource={unassignedSourceIds.length > 1}
+          />
+        ))}
       {analyses.flatMap((analysis) =>
         analysis.speakers.map((speaker) => (
           <SpeakerTag

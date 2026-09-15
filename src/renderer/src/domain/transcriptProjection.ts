@@ -1,3 +1,4 @@
+import { hasValidatedTiming } from './transcriptReliability'
 import type { Clip, Track } from '@shared/project.types'
 import type { RendererSpeechAnalysis, TranscriptUnit, SpeakerId } from '@shared/speech.types'
 
@@ -20,6 +21,8 @@ export interface TranscriptOccurrence {
   speakerId?: SpeakerId
   contextSpeakerId?: SpeakerId
   ambiguous: boolean
+  timingOrigin?: RendererSpeechAnalysis['alignment']['acousticEditUnits'][number]['timingOrigin']
+  acousticUnitSize?: number
 }
 export interface TranscriptOverlap {
   start: number
@@ -110,8 +113,8 @@ export function projectTranscript(
           unit,
           sourceStart,
           sourceEnd,
-          outputStart,
-          outputEnd,
+          outputStart: hasValidatedTiming(analysis) ? outputStart : null,
+          outputEnd: hasValidatedTiming(analysis) ? outputEnd : null,
           orderTime,
           leadingSpace:
             index > 0 &&
@@ -130,6 +133,8 @@ export function projectTranscript(
               ? attribution.get(anchor.id)?.speakerId
               : undefined,
           ambiguous: speaker?.ambiguous ?? false,
+          timingOrigin: acoustic?.timingOrigin,
+          acousticUnitSize: acoustic?.transcriptUnitIds.length,
         })
       }
     }

@@ -15,6 +15,7 @@ const analysis = (source = 'source'): RendererSpeechAnalysis =>
       ],
     },
     alignment: {
+      validation: { version: 1, method: 'audio-evidence' },
       acousticEditUnits: [
         { id: 'acoustic', transcriptUnitIds: ['a'], sourceStart: 1, sourceEnd: 3 },
       ],
@@ -109,4 +110,42 @@ describe('timeline transcript projection', () => {
       'Hello. uncertain',
     )
   })
+})
+
+it('keeps legacy text readable without advertising unverified playback or overlap bounds', () => {
+  const legacy = analysis()
+  delete legacy.alignment.validation
+  const units = projectTranscript([legacy], [track('a'), track('b')])
+  expect(
+    units
+      .filter((u) => u.unit.kind === 'speech')
+      .every((u) => u.outputStart === null && u.outputEnd === null),
+  ).toBe(true)
+  expect(units.map((u) => u.unit.text)).toContain('Hello')
+  expect(findTranscriptOverlaps(units)).toEqual([])
+})
+
+it('preserves shared recovered timing metadata instead of presenting fabricated character precision', () => {
+  const recovered = analysis()
+  recovered.transcript.units = [
+    { id: 'a', text: '乙', kind: 'speech' },
+    { id: 'b', text: '丙', kind: 'speech' },
+  ] as never
+  recovered.alignment.acousticEditUnits = [
+    {
+      id: 'group',
+      transcriptUnitIds: ['a', 'b'],
+      sourceStart: 1,
+      sourceEnd: 2,
+      timingOrigin: 'anchor-inferred',
+      granularity: 'phrase',
+    },
+  ] as never
+  const units = projectTranscript([recovered], [track('a')])
+  expect(
+    units.map((u) => [u.outputStart, u.outputEnd, u.timingOrigin, u.acousticUnitSize]),
+  ).toEqual([
+    [1, 2, 'anchor-inferred', 2],
+    [1, 2, 'anchor-inferred', 2],
+  ])
 })

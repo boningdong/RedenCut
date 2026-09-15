@@ -29,7 +29,10 @@ it('shows source and phase with actual stage progress and cancellation', () => {
       onCancel={cancel}
     />,
   )
-  expect(screen.getByText('Transcript and alignment · 2 of 3 · Voice.wav')).toBeTruthy()
+  expect(screen.getByText('Transcript and alignment · 2 of 3')).toBeTruthy()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+  expect(screen.queryByText('Generating transcript…')).toBeNull()
+  expect(screen.getByText('Voice.wav').closest('details')?.open).toBe(false)
   expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('35')
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(cancel).toHaveBeenCalledOnce()
@@ -50,8 +53,19 @@ it('localizes retained cancellation and per-source failures', () => {
     ],
   })
   render(<SpeechBatchProgress isGenerating={false} status={null} />)
-  expect(screen.getByText(/Analysis cancelled/)).toBeTruthy()
+  expect(screen.getByText('Analysis cancelled. Published text is retained.')).toBeTruthy()
   expect(screen.getByText(/Voice.wav: The operation could not be completed/)).toBeTruthy()
   act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
-  expect(screen.getByText(/分析已取消/)).toBeTruthy()
+  expect(screen.getByText('分析已取消，已生成的文本会保留。')).toBeTruthy()
+})
+
+it('keeps a compact dismissible success with counts in collapsed details', () => {
+  useSpeechBatchStore
+    .getState()
+    .finish({ sourceCount: 2, completedCount: 1, reusedCount: 1, cancelled: false, failures: [] })
+  render(<SpeechBatchProgress isGenerating={false} status={null} />)
+  expect(screen.getByText('Analysis complete')).toBeTruthy()
+  expect(screen.getByText(/1 completed, 1 reused/).closest('details')?.open).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Dismiss analysis status' }))
+  expect(screen.queryByRole('status')).toBeNull()
 })

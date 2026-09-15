@@ -198,11 +198,17 @@
   position: relative;
 }
 .transcript-footer {
-  padding: 8px 17px;
-  font-size: 10px;
+  padding: 10px 17px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--color-text-muted);
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
+  max-height: 40%;
+  overflow-y: auto;
+}
+.transcript-footer:empty {
+  display: none;
 }
 .transcript-confirmation {
   margin: 10px;
@@ -213,11 +219,6 @@
 }
 .transcript-confirmation button {
   margin: 8px 5px 0 0;
-}
-.transcript-progress {
-  padding: 8px 17px;
-  font-size: 11px;
-  color: var(--color-accent-light);
 }
 @container (max-width:450px) {
   .transcript-paragraph {
@@ -386,4 +387,120 @@
 .speaker-popover button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+.transcript-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.transcript-progress-row {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+.transcript-progress-phase {
+  color: var(--color-text-primary);
+}
+.transcript-status-action {
+  margin-left: 0;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.transcript-status-action:hover {
+  background: var(--color-bg-elevated);
+}
+.transcript-progress-meta,
+.transcript-progress-details {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  margin: 0;
+}
+.transcript-progress > .transcript-progress-meta,
+.transcript-progress-details[open] {
+  grid-column: 1 / -1;
+}
+.transcript-progress-details[open] {
+  margin-top: 6px;
+}
+.transcript-progress-details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.transcript-progress-details p {
+  margin: 4px 0;
+}
+.transcript-progress-filename {
+  overflow-wrap: anywhere;
+}
+.transcript-review-notice {
+  padding: 4px 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.transcript-progress-meter {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.transcript-progress-track {
+  display: block;
+  width: clamp(64px, 10vw, 144px);
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--color-border);
+}
+.transcript-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent-light);
+  transition: width 200ms ease;
+}
+.transcript-progress-percent {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.transcript-progress-meter[data-indeterminate] .transcript-progress-fill {
+  animation: transcript-progress-sweep 1.8s ease-in-out infinite alternate;
+}
+@keyframes transcript-progress-sweep {
+  to {
+    transform: translateX(210%);
+  }
+}
+.transcript-progress-complete .transcript-status-action {
+  margin-left: auto;
+}
+.transcript-status-action:focus-visible,
+.transcript-progress-details summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .transcript-progress-fill {
+    transition: none;
+  }
+  .transcript-progress-meter[data-indeterminate] .transcript-progress-fill {
+    animation: none;
+  }
 }

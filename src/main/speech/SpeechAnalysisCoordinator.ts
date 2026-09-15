@@ -166,6 +166,10 @@ export class SpeechAnalysisCoordinator {
       sourceEnd: unit.sourceEnd,
       granularity: unit.granularity,
       confidence: unit.confidence,
+      ...(unit.timingOrigin ? { timingOrigin: unit.timingOrigin } : {}),
+      ...(unit.evidenceAnchorTextUnitIds
+        ? { evidenceAnchorTextUnitIds: unit.evidenceAnchorTextUnitIds }
+        : {}),
     }))
     const common = {
       schemaVersion: 2,
@@ -181,7 +185,19 @@ export class SpeechAnalysisCoordinator {
         audioSourceId: input.audioSource.id,
         sourceFingerprint: input.audioSource.fingerprint,
         acousticEditUnits,
+        ...(workerResult.alignment.recoveryVersion
+          ? { recoveryVersion: workerResult.alignment.recoveryVersion }
+          : {}),
+        ...(workerResult.alignment.observations
+          ? { observations: workerResult.alignment.observations }
+          : {}),
+        ...(workerResult.alignment.recoveryProvenance
+          ? { recoveryProvenance: workerResult.alignment.recoveryProvenance }
+          : {}),
         provenance: EngineProvenanceSchema.parse(workerResult.alignment.provenance),
+        ...(workerResult.alignment.validation
+          ? { validation: workerResult.alignment.validation }
+          : {}),
       },
     }
     if (phase) {

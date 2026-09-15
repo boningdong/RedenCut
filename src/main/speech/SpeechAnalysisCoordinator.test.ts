@@ -43,6 +43,7 @@ describe('SpeechAnalysisCoordinator', () => {
                 granularity: 'phrase' as const,
               },
             ],
+            validation: { version: 1 as const, method: 'audio-evidence' as const },
             unalignedTranscriptUnitIds: [],
             provenance: engine,
           },
@@ -87,6 +88,9 @@ describe('SpeechAnalysisCoordinator', () => {
       ['得', 'speech'],
       ['。', 'punctuation'],
     ])
+    expect(artifact.alignment).toMatchObject({
+      validation: { version: 1, method: 'audio-evidence' },
+    })
     expect(artifact.alignment.acousticEditUnits[0].transcriptUnitIds).toHaveLength(2)
     expect(artifact.speakers[0].defaultDisplayName).toBe('Speaker 1')
   })
@@ -281,7 +285,12 @@ it('publishes text before speakers and enriches without changing text identities
       request.phase === 'alignment'
         ? {
             phase: 'alignment' as const,
-            alignment: { units: [], unalignedTranscriptUnitIds: [], provenance: engine },
+            alignment: {
+              units: [],
+              unalignedTranscriptUnitIds: [],
+              provenance: engine,
+              validation: { version: 1 as const, method: 'audio-evidence' as const },
+            },
           }
         : {
             phase: 'diarization' as const,
@@ -300,7 +309,11 @@ it('publishes text before speakers and enriches without changing text identities
   }
   const signal = new AbortController().signal
   const pending = await coordinator.transcribeAndAlign(input, signal)
-  expect(pending).toMatchObject({ diarizationStatus: 'pending', speakers: [] })
+  expect(pending).toMatchObject({
+    diarizationStatus: 'pending',
+    speakers: [],
+    alignment: { validation: { version: 1, method: 'audio-evidence' } },
+  })
   expect(worker.run).toHaveBeenCalledTimes(1)
   const completed = await coordinator.identifySpeakers(input, pending, signal)
   expect(completed).toMatchObject({
@@ -328,7 +341,11 @@ it('publishes text before speakers and enriches without changing text identities
     ),
   ).rejects.toThrow('source does not match')
   expect(worker.run).toHaveBeenCalledTimes(2)
-  expect(pending).toMatchObject({ diarizationStatus: 'pending', speakers: [] })
+  expect(pending).toMatchObject({
+    diarizationStatus: 'pending',
+    speakers: [],
+    alignment: { validation: { version: 1, method: 'audio-evidence' } },
+  })
   const disabled = await coordinator.transcribeAndAlign(
     { ...input, speakerRecognitionEnabled: false },
     signal,

@@ -69,6 +69,33 @@ export const TranscriptArtifactSchema = z
 
 const finiteTime = z.number().nonnegative().refine(Number.isFinite, 'Expected finite source time')
 
+export const AlignmentTimingOriginSchema = z.enum([
+  'aligned',
+  'local-realigned',
+  'anchor-inferred',
+  'group-fallback',
+])
+
+// Candidate bounds and scores are diagnostics, including rejected ranges and scores.
+export const AlignmentObservationSchema = z
+  .object({
+    transcriptUnitIds: z.array(TranscriptUnitIdSchema).min(1),
+    candidateStart: z.number().finite().optional(),
+    candidateEnd: z.number().finite().optional(),
+    confidence: z.number().finite().optional(),
+    audioEvidence: z.enum(['silence', 'non-silent', 'unknown']),
+    reason: z.enum([
+      'accepted',
+      'low-score',
+      'silence',
+      'invalid-bounds',
+      'missing-timing',
+      'conflict',
+    ]),
+    timingOrigin: z.enum(['aligned', 'local-realigned']).optional(),
+  })
+  .strict()
+
 export const AcousticEditUnitSchema = z
   .object({
     id: AcousticEditUnitIdSchema,
@@ -76,9 +103,16 @@ export const AcousticEditUnitSchema = z
     audioSourceId: AudioSourceIdSchema,
     sourceStart: finiteTime,
     sourceEnd: finiteTime,
+    timingOrigin: AlignmentTimingOriginSchema.optional(),
+    evidenceAnchorTextUnitIds: z.array(TranscriptUnitIdSchema).min(1).optional(),
     granularity: z.enum(['character', 'word', 'phrase', 'utterance']),
     confidence: z.number().min(0).max(1).optional(),
   })
+  .strict()
+
+// Absence means legacy bounds have not passed the current audio evidence check.
+export const AlignmentValidationSchema = z
+  .object({ version: z.literal(1), method: z.literal('audio-evidence') })
   .strict()
 
 export const AlignmentArtifactSchema = z
@@ -90,6 +124,10 @@ export const AlignmentArtifactSchema = z
     audioSourceId: AudioSourceIdSchema,
     sourceFingerprint: AudioSourceFingerprintSchema,
     acousticEditUnits: z.array(AcousticEditUnitSchema),
+    validation: AlignmentValidationSchema.optional(),
+    recoveryVersion: z.literal(1).optional(),
+    observations: z.array(AlignmentObservationSchema).optional(),
+    recoveryProvenance: AlgorithmProvenanceSchema.optional(),
     provenance: EngineProvenanceSchema,
   })
   .strict()
@@ -160,7 +198,15 @@ export interface RendererSpeechAnalysis {
   transcript: Pick<TranscriptArtifact, 'id' | 'revision' | 'units' | 'mode' | 'provenance'>
   alignment: Pick<
     AlignmentArtifact,
-    'id' | 'transcriptArtifactId' | 'transcriptRevision' | 'acousticEditUnits' | 'provenance'
+    | 'id'
+    | 'transcriptArtifactId'
+    | 'transcriptRevision'
+    | 'acousticEditUnits'
+    | 'provenance'
+    | 'validation'
+    | 'recoveryVersion'
+    | 'observations'
+    | 'recoveryProvenance'
   >
   diarization?: Pick<DiarizationArtifact, 'id' | 'turns' | 'provenance'>
   diarizationStatus?: 'completed' | 'skipped-disabled' | 'pending'

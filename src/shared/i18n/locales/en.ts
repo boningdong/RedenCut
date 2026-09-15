@@ -218,6 +218,21 @@ export const englishResources = {
     channelCount: '{{count}} channels',
   },
   transcript: {
+    batchPosition: '{{phase}} · {{index}} of {{count}}',
+    textReady: 'Text ready to edit',
+    analysisDetails: 'Details',
+    analysisComplete: 'Analysis complete',
+    analysisFailed: 'Analysis finished with issues',
+    dismissAnalysis: 'Dismiss analysis status',
+    unassignedSpeaker: 'Unassigned speaker',
+    unassignedSource: 'Unassigned · {{name}}',
+    allSpeakersHidden: 'All speakers hidden',
+    reviewHint:
+      'Some text has no verified audio timing. Review or re-analyze before editing audio.',
+    needsReview: 'Needs review',
+    unverifiedHint:
+      'Timing has not been verified. Re-analyze this source before seeking or redacting from text.',
+
     batchStopped: 'Analysis cancelled. Published text is retained.',
     batchSource: '{{phase}} · {{index}} of {{count}} · {{name}}',
     batchText: 'Transcript and alignment',
@@ -245,8 +260,7 @@ export const englishResources = {
     unalignedHint: 'Speech could not be aligned and cannot be edited',
     uncertainHint: 'Speaker uncertain · same-track separation unavailable',
     emptyTimeline: 'No transcript in the current timeline.',
-    editHint:
-      'Select text to redact audio · Click speech to seek · Overlap uses aligned audio boundaries',
+    statusLabel: 'Transcription status',
     confirmRedaction: 'Confirm redaction',
     speaker: 'Speaker',
     speakerColor: 'Speaker color',
@@ -280,6 +294,9 @@ export const englishResources = {
     useColor: 'Use {{color}}',
     machineLabel: 'Machine label {{label}}. Click to show or hide · Double-click or F2 to rename',
     unitHint: '{{name}} · {{seconds}}s',
+    estimatedUnitHint:
+      '{{name}} · about {{seconds}}s · Approximate audio range; may include a pause',
+    groupedUnitHint: '{{name}} · {{seconds}}s · These characters share one audio range',
     partialUnitHint:
       '{{name}} · {{seconds}}s · Partial acoustic unit: only the retained audio is editable',
     elapsed: '{{time}} elapsed',
@@ -290,7 +307,7 @@ export const englishResources = {
     expandedRedaction:
       'Redacting “{{requested}}” requires including “{{resolved}}” to preserve acoustic boundaries.',
     scopeConflict:
-      'Selection spans multiple tracks or clip occurrences. Select text from one track and clip to redact its audio.',
+      'The selected text does not cover a continuous audio range on one track. Include intervening text, including hidden speakers, or select a smaller range.',
     unalignedSelection:
       'This selection includes speech that cannot be aligned reliably and cannot be redacted.',
     punctuationSelection:
@@ -345,8 +362,8 @@ export const englishResources = {
     'starting-transcription': 'Starting transcription…',
     'parsing-transcript': 'Parsing transcript…',
     transcribing: 'transcribing',
-    aligning: 'aligning',
-    diarizing: 'diarizing',
+    aligning: 'Aligning transcript',
+    diarizing: 'Recognizing speakers',
     'attributing-speakers': 'attributing speakers',
     validating: 'validating',
     publishing: 'publishing',
@@ -380,7 +397,7 @@ export const englishResources = {
     'whisper-missing':
       'whisper-cli not found. Install with: brew install whisper-cpp. Then restart the app.',
     'whisper-model-missing':
-      'No Whisper model found. Download ggml-base.bin from https://huggingface.co/ggerganov/whisper.cpp/tree/main into ~/.cache/whisper, then restart the app.',
+      'No transcription model is ready. Open Settings to prepare the speech models.',
     'speech-worker-missing': 'Speech worker is not installed. Run: npm run setup:speech',
     'speech-language-unsupported':
       'Text alignment currently supports Chinese and English. This recording uses an unsupported language.',

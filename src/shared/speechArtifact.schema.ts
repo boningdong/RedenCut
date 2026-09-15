@@ -94,10 +94,34 @@ export const SpeechArtifactSchema = z
     const transcriptIndex = new Map(
       artifact.transcript.units.map((unit, index) => [unit.id, { unit, index }]),
     )
+    const recovery = artifact.alignment
+    if (
+      recovery.recoveryVersion !== undefined &&
+      (!recovery.observations || !recovery.recoveryProvenance)
+    )
+      issue(context, ['alignment'], 'Recovery requires observations and algorithm provenance')
+    for (const observation of recovery.observations ?? []) {
+      if (
+        observation.transcriptUnitIds.some((id) => transcriptIndex.get(id)?.unit.kind !== 'speech')
+      )
+        issue(
+          context,
+          ['alignment', 'observations'],
+          'Observation may reference only a speech TranscriptUnit',
+        )
+    }
     const membership = new Set<string>()
     for (const acousticUnit of artifact.alignment.acousticEditUnits) {
       if (!(acousticUnit.sourceStart < acousticUnit.sourceEnd))
         issue(context, ['alignment'], 'AcousticEditUnit requires sourceStart < sourceEnd')
+      if (recovery.recoveryVersion !== undefined && !acousticUnit.timingOrigin)
+        issue(context, ['alignment'], 'Recovered AcousticEditUnit requires a timing origin')
+      if (
+        acousticUnit.evidenceAnchorTextUnitIds?.some(
+          (id) => transcriptIndex.get(id)?.unit.kind !== 'speech',
+        )
+      )
+        issue(context, ['alignment'], 'Evidence anchor may reference only a speech TranscriptUnit')
       const indexed = acousticUnit.transcriptUnitIds.map((id) => transcriptIndex.get(id))
       if (indexed.some((value) => !value || value.unit.kind !== 'speech'))
         issue(context, ['alignment'], 'AcousticEditUnit may reference only a speech TranscriptUnit')
