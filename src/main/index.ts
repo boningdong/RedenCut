@@ -1,3 +1,4 @@
+import appIcon from './assets/icons/macos/neon-dark-lavender.xcassets/AppIcon.appiconset/1024-mac.png?asset'
 import { LocalHuggingFaceLogin } from './speech/huggingface/LocalHuggingFaceLogin'
 import { DevelopmentEnvironmentChecker } from './runtime/DevelopmentEnvironmentChecker'
 import { createModelLoadValidator } from './resources/validateModelLoad'
@@ -49,6 +50,7 @@ const harnessMode = configureHarnessStartup(app, process.env)
 
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
+    icon: appIcon,
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -83,6 +85,7 @@ startApplicationLifecycle({
     ])
   },
   initialize: async () => {
+    if (process.platform === 'darwin') app.dock?.setIcon(appIcon)
     const appPreferences = new AppPreferencesStore(
       join(app.getPath('userData'), 'app-preferences.json'),
       () => app.getPreferredSystemLanguages(),
