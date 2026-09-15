@@ -42,3 +42,38 @@ describe('speech worker protocol', () => {
     ).toThrow()
   })
 })
+
+it('validates isolated requests and rejects mixed phase results', () => {
+  const alignment = { ...request, phase: 'alignment', models: { alignment: 'alignment-en' } }
+  expect(SpeechWorkerRequestSchema.safeParse(alignment).success).toBe(true)
+  const diarization = {
+    protocolVersion: 1,
+    jobId: 'job',
+    audioPath: '/a.wav',
+    phase: 'diarization',
+    models: { diarization: 'diarization-default' },
+    config: { device: 'cpu' },
+  }
+  expect(SpeechWorkerRequestSchema.safeParse(diarization).success).toBe(true)
+  expect(SpeechWorkerRequestSchema.safeParse({ ...diarization, transcriptUnits: [] }).success).toBe(
+    false,
+  )
+  const envelope = { protocolVersion: 1, jobId: 'job', type: 'result' }
+  const result = {
+    phase: 'diarization',
+    diarization: { status: 'completed', turns: [], provenance: {} },
+  }
+  expect(SpeechWorkerResponseSchema.safeParse({ ...envelope, result }).success).toBe(true)
+  expect(
+    SpeechWorkerResponseSchema.safeParse({
+      ...envelope,
+      result: {
+        ...result,
+        alignment: { units: [], unalignedTranscriptUnitIds: [], provenance: {} },
+      },
+    }).success,
+  ).toBe(false)
+  expect(
+    SpeechWorkerResponseSchema.safeParse({ ...envelope, result: { phase: 'alignment' } }).success,
+  ).toBe(false)
+})

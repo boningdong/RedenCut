@@ -431,3 +431,32 @@ describe('ImportCoordinator transaction', () => {
     expect(remove).toHaveBeenCalledTimes(3)
   })
 })
+
+it('merges the prepared import into metadata and timeline saved during preparation', async () => {
+  const started = deferred()
+  const resume = deferred()
+  const { coordinator, workspace, sourcePath } = await setup({
+    build: async (request) => {
+      started.resolve()
+      await resume.promise
+      return buildStagedCache(request)
+    },
+  })
+  const pending = coordinator.import(
+    IMPORT_ID,
+    sourcePath,
+    'copy',
+    workspace.project,
+    commitToWorkspace(workspace),
+  )
+  await started.promise
+  await workspace.save({
+    ...workspace.project,
+    export: { ...workspace.project.export, targetLUFS: -9 },
+  })
+  resume.resolve()
+  const result = await pending
+  expect(result.project.export.targetLUFS).toBe(-9)
+  expect(workspace.project.audioSources).toHaveLength(1)
+  expect(workspace.project.tracks).toHaveLength(1)
+})

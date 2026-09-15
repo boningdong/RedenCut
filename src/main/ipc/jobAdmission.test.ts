@@ -121,9 +121,10 @@ function controllerStub() {
       workspace = { ...workspace, root }
     },
     assertCurrent: vi.fn(),
+    assertWorkspaceCurrent: vi.fn(),
     resolveOriginal,
     captureOriginalResolver: vi.fn(() => resolveOriginal),
-    runTransition: vi.fn(async (expected, operation) =>
+    runBackgroundTransition: vi.fn(async (expected, operation) =>
       operation({
         commitImport: vi.fn(async (_project: ProjectFile) =>
           session(expected.workspaceToken, expected.revision + 1),
@@ -393,7 +394,7 @@ describe('IPC job admission', () => {
     await secondResult
   })
 
-  it('binds a selection token to the exact sender, workspace token, and revision', async () => {
+  it('binds a selection token to the selected workspace token', async () => {
     const controller = controllerStub()
     const jobs = new SessionJobRegistry()
     registerAudioIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
@@ -404,8 +405,8 @@ describe('IPC job admission', () => {
       revision: 1,
     })) as { value: { token: string } }
 
-    const wrongRevision = await mocks.handlers.get('audio:start-import')!(owner, {
-      workspaceToken: TOKEN_A,
+    const wrongWorkspace = await mocks.handlers.get('audio:start-import')!(owner, {
+      workspaceToken: TOKEN_B,
       revision: 2,
       jobId: 'job-1',
       selectionToken: selection.value.token,
@@ -413,7 +414,7 @@ describe('IPC job admission', () => {
       draft: emptyDraft(),
     })
 
-    expect(wrongRevision).toMatchObject({ ok: false, error: { code: 'invalid-request' } })
+    expect(wrongWorkspace).toMatchObject({ ok: false, error: { code: 'invalid-request' } })
     expect(mocks.importInstances[0].import).not.toHaveBeenCalled()
   })
 
@@ -607,11 +608,11 @@ describe('IPC job admission', () => {
     await importing
   })
 
-  it('drops progress after the request envelope becomes stale', async () => {
+  it('drops progress after the workspace token becomes stale', async () => {
     const controller = controllerStub()
     const jobs = new SessionJobRegistry()
     let current = true
-    controller.assertCurrent.mockImplementation(() => {
+    controller.assertWorkspaceCurrent.mockImplementation(() => {
       if (!current) throw new Error('Stale workspace token')
     })
     registerAudioIpc(controller as unknown as WorkspaceController, jobs, vi.fn())
@@ -642,6 +643,43 @@ describe('IPC job admission', () => {
     progress({ displayName: 'selected.wav', stage: 'building-cache', percent: 0.75 })
 
     expect(event.sender.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('accepts a selected file after a speech revision and keeps import progress alive', async () => {
+    const controller = controllerStub()
+    registerAudioIpc(
+      controller as unknown as WorkspaceController,
+      new SessionJobRegistry(),
+      vi.fn(),
+    )
+    mocks.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected.wav'] })
+    const event = { sender: sender() }
+    const selection = (await mocks.handlers.get('audio:select-import-file')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })) as { value: { token: string } }
+    let revision = 2
+    controller.assertCurrent.mockImplementation((expected: unknown) => {
+      if ((expected as { revision: number }).revision !== revision)
+        throw new Error('Stale workspace revision')
+    })
+    const pending = deferred<{ project: ProjectFile }>()
+    mocks.nextImportResult = pending.promise
+    const importing = mocks.handlers.get('audio:start-import')!(event, {
+      workspaceToken: TOKEN_A,
+      revision: 2,
+      jobId: 'job-1',
+      selectionToken: selection.value.token,
+      mode: 'copy',
+      draft: emptyDraft(),
+    })
+    await vi.waitFor(() => expect(mocks.importInstances[0].import).toHaveBeenCalled())
+    revision = 3
+    const progress = mocks.importInstances[0].import.mock.calls[0][5] as (value: unknown) => void
+    progress({ displayName: 'selected.wav', stage: 'building-cache', percent: 0.5 })
+    expect(event.sender.send).toHaveBeenCalledTimes(1)
+    pending.resolve({ project: createEmptyProject() })
+    await expect(importing).resolves.toMatchObject({ ok: true })
   })
 
   it('sender destruction cancels through the admitted job and awaits its settlement', async () => {

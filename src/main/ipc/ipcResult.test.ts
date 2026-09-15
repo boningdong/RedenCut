@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { SpeechAnalysisError } from '../speech/SpeechAnalysisError'
 import { PublicIpcError, toIpcResult } from './ipcResult'
 
 describe('IPC result sanitization', () => {
@@ -38,4 +39,18 @@ describe('IPC result sanitization', () => {
       },
     })
   })
+})
+
+it('retains safe speech stage and failure kind while hiding diagnostics', async () => {
+  const result = await toIpcResult(() => {
+    throw new SpeechAnalysisError(
+      'diarizing',
+      Object.assign(new Error('/private/model'), { kind: 'protocol' }),
+    )
+  }, vi.fn())
+  expect(result).toMatchObject({
+    ok: false,
+    error: { reason: 'speech-diarizing', failureKind: 'protocol' },
+  })
+  expect(JSON.stringify(result)).not.toContain('/private')
 })

@@ -8,6 +8,7 @@ export function unwrapIpcResult<T>(result: IpcResult<T>): T {
     code: result.error.code,
     reason: result.error.reason,
     message: result.error.message,
+    ...(result.error.failureKind ? { failureKind: result.error.failureKind } : {}),
   }
   throw error
 }

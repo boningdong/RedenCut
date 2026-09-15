@@ -28,3 +28,17 @@ it('retains actionable installation guidance in Chinese without translating tech
   expect(publicMessage(t, { reason: 'whisper-model-missing' })).toContain('~/.cache/whisper')
   expect(progressMessage(t, { stage: 'building-cache' })).toBe('正在建立缓存')
 })
+
+it('localizes structured speech failures and discards unknown failure details', () => {
+  const retained = normalizePublicError({
+    reason: 'speech-diarizing',
+    failureKind: 'startup',
+    message: '/private',
+  })
+  expect(retained).toEqual({ reason: 'speech-diarizing', failureKind: 'startup' })
+  expect(publicMessage(createTranslator('en').t, retained)).toContain('could not start')
+  expect(publicMessage(createTranslator('zh-CN').t, retained)).toContain('无法启动')
+  expect(normalizePublicError({ reason: 'speech-aligning', failureKind: '/private' })).toEqual({
+    reason: 'speech-aligning',
+  })
+})

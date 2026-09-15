@@ -4,7 +4,7 @@ import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 def normalize_turns(raw_turns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -39,7 +39,7 @@ def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, mode
     return {**model, "snapshot": str(snapshot)}
 
 
-def run_pyannote(*, audio_path: str, device: str, model_path: str) -> List[Dict[str, Any]]:
+def run_pyannote(*, audio_path: str, device: str, model_path: str, on_progress: Optional[Callable[[], None]] = None) -> List[Dict[str, Any]]:
     import torch
     import whisperx
     from pyannote.audio import Pipeline
@@ -50,7 +50,13 @@ def run_pyannote(*, audio_path: str, device: str, model_path: str) -> List[Dict[
     if pipeline is None:
         raise RuntimeError("pyannote failed to load the provisioned pipeline")
     pipeline.to(torch.device(device))
-    output = pipeline({"waveform": waveform, "sample_rate": 16000})
+    def hook(step_name, step_artifact, file=None, total=None, completed=None):
+        # Counts restart for each pyannote substep and cannot represent the
+        # entire diarization stage. Forward real hook activity without a percent.
+        if on_progress is not None:
+            on_progress()
+
+    output = pipeline({"waveform": waveform, "sample_rate": 16000}, hook=hook)
     annotation = getattr(output, "speaker_diarization", output)
     return [
         {"label": label, "start": float(segment.start), "end": float(segment.end)}
@@ -58,7 +64,7 @@ def run_pyannote(*, audio_path: str, device: str, model_path: str) -> List[Dict[
     ]
 
 
-def diarize(request: Dict[str, Any]) -> Dict[str, Any]:
+def diarize(request: Dict[str, Any], on_progress: Optional[Callable[[], None]] = None) -> Dict[str, Any]:
     model = load_manifest_model(
         os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
         os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
@@ -67,7 +73,7 @@ def diarize(request: Dict[str, Any]) -> Dict[str, Any]:
     )
     turns = normalize_turns(run_pyannote(
         audio_path=request["audioPath"], device=request["config"]["device"],
-        model_path=model["snapshot"],
+        model_path=model["snapshot"], on_progress=on_progress,
     ))
     return {
         "turns": turns,

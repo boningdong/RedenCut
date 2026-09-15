@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { ITranscriber } from '../../shared/transcriber.types'
 import { SpeechAnalysisCoordinator } from './SpeechAnalysisCoordinator'
 
 const source = {
@@ -22,7 +23,7 @@ describe('SpeechAnalysisCoordinator', () => {
         text: '觉得。',
         detectedLanguage: 'zh',
         verbatimCapability: 'best-effort-verbatim' as const,
-        evidence: [{ text: '觉得。' }],
+        evidence: [{ text: '觉得。', sourceStart: 0.7, sourceEnd: 1.3 }],
         provenance: engine,
       })),
     }
@@ -71,6 +72,9 @@ describe('SpeechAnalysisCoordinator', () => {
       (progress) => stages.push(progress.stage),
     )
 
+    expect(worker.run.mock.calls[0][0]).toMatchObject({
+      alignmentSegments: [{ text: '觉得。', sourceStart: 0.7, sourceEnd: 1.3 }],
+    })
     expect(stages).toEqual([
       'transcribing',
       'aligning',
@@ -140,6 +144,39 @@ describe('optional diarization', () => {
   function alignment() {
     return { units: [], unalignedTranscriptUnitIds: [], provenance: engine }
   }
+  it('forwards real recognition percentages before switching to alignment', async () => {
+    const transcriber: Pick<ITranscriber, 'transcribe'> = {
+      transcribe: async (_audio, _options, _signal, onProgress) => {
+        onProgress?.({ stage: 'detecting-silence' })
+        onProgress?.({ stage: 'transcribing', percent: 0 })
+        onProgress?.({ stage: 'transcribing', percent: 42 })
+        onProgress?.({ stage: 'transcribing', percent: 100 })
+        onProgress?.({ stage: 'parsing-transcript' })
+        return transcription()
+      },
+    }
+    const worker = {
+      run: vi.fn(async (_request, _signal, onProgress) => {
+        onProgress?.({ stage: 'aligning', percent: 5 })
+        return { alignment: alignment(), diarization: { status: 'skipped-disabled' as const } }
+      }),
+    }
+    const progress = vi.fn()
+    await new SpeechAnalysisCoordinator(transcriber, worker, () => crypto.randomUUID()).run(
+      input,
+      new AbortController().signal,
+      progress,
+    )
+    expect(progress.mock.calls.map(([event]) => event)).toEqual([
+      { stage: 'transcribing' },
+      { stage: 'transcribing', percent: 0 },
+      { stage: 'transcribing', percent: 42 },
+      { stage: 'transcribing', percent: 100 },
+      { stage: 'aligning', percent: 5 },
+      { stage: 'validating' },
+    ])
+  })
+
   it('snapshots settings and returns no speaker data when disabled', async () => {
     const mutable = structuredClone(input)
     const transcriber = {
@@ -227,4 +264,74 @@ describe('optional diarization', () => {
       speakers: [],
     })
   })
+})
+
+it('publishes text before speakers and enriches without changing text identities', async () => {
+  const transcriber = {
+    transcribe: vi.fn(async () => ({
+      text: 'hello',
+      detectedLanguage: 'en',
+      verbatimCapability: 'best-effort-verbatim' as const,
+      evidence: [{ text: 'hello' }],
+      provenance: engine,
+    })),
+  }
+  const worker = {
+    run: vi.fn(async (request) =>
+      request.phase === 'alignment'
+        ? {
+            phase: 'alignment' as const,
+            alignment: { units: [], unalignedTranscriptUnitIds: [], provenance: engine },
+          }
+        : {
+            phase: 'diarization' as const,
+            diarization: { status: 'completed' as const, turns: [], provenance: engine },
+          },
+    ),
+  }
+  const coordinator = new SpeechAnalysisCoordinator(transcriber, worker, () => crypto.randomUUID())
+  const input = {
+    jobId: 'job',
+    audioPath: '/tmp/a.wav',
+    audioSource: source,
+    language: 'en',
+    alignmentModel: 'alignment-en',
+    diarizationModel: 'diarization-default',
+  }
+  const signal = new AbortController().signal
+  const pending = await coordinator.transcribeAndAlign(input, signal)
+  expect(pending).toMatchObject({ diarizationStatus: 'pending', speakers: [] })
+  expect(worker.run).toHaveBeenCalledTimes(1)
+  const completed = await coordinator.identifySpeakers(input, pending, signal)
+  expect(completed).toMatchObject({
+    diarizationStatus: 'completed',
+    analysisRevisionId: pending.analysisRevisionId,
+    transcript: pending.transcript,
+    alignment: pending.alignment,
+  })
+  expect(transcriber.transcribe).toHaveBeenCalledTimes(1)
+  expect(worker.run.mock.calls[1][0]).toMatchObject({ phase: 'diarization' })
+  expect(worker.run.mock.calls[1][0]).not.toHaveProperty('transcriptUnits')
+  const cancelled = new AbortController()
+  cancelled.abort()
+  await expect(
+    coordinator.identifySpeakers(input, pending, cancelled.signal),
+  ).rejects.toMatchObject({ name: 'AbortError' })
+  await expect(
+    coordinator.identifySpeakers(
+      {
+        ...input,
+        audioSource: { ...source, fingerprint: { ...source.fingerprint, sha256: 'c'.repeat(64) } },
+      },
+      pending,
+      signal,
+    ),
+  ).rejects.toThrow('source does not match')
+  expect(worker.run).toHaveBeenCalledTimes(2)
+  expect(pending).toMatchObject({ diarizationStatus: 'pending', speakers: [] })
+  const disabled = await coordinator.transcribeAndAlign(
+    { ...input, speakerRecognitionEnabled: false },
+    signal,
+  )
+  expect(disabled).toMatchObject({ diarizationStatus: 'skipped-disabled', speakers: [] })
 })

@@ -218,6 +218,19 @@ export const englishResources = {
     channelCount: '{{count}} channels',
   },
   transcript: {
+    batchStopped: 'Analysis cancelled. Published text is retained.',
+    batchSource: '{{phase}} · {{index}} of {{count}} · {{name}}',
+    batchText: 'Transcript and alignment',
+    batchSpeakers: 'Speaker recognition',
+    batchComplete:
+      'Analysis finished: {{completed}} completed, {{reused}} reused, {{failed}} failed ({{count}} sources).',
+    batchCancelled:
+      'Analysis cancelled: {{completed}} completed, {{reused}} reused, {{failed}} failed ({{count}} sources). Published text is retained.',
+    pendingSpeakers: 'Text is ready. Speaker recognition is pending.',
+
+    stageEstimate: 'Estimated stage duration: about {{minutes}} min',
+    estimateOverrun:
+      'This stage is taking longer than estimated. Analysis is still running; you can cancel at any time.',
     generateTrack: 'Generate {{name}}',
     allTracks: 'All tracks',
     allRemaining: 'All remaining',
@@ -343,6 +356,13 @@ export const englishResources = {
     ready: 'ready',
   },
   errors: {
+    speechFailureDetail: '{{stageMessage}} {{detail}}',
+    speechStartup: 'The local process could not start. Check the speech runtime installation.',
+    speechProcessExit:
+      'The local process stopped unexpectedly. Retry; if it persists, check available memory and the speech runtime.',
+    speechProtocol:
+      'The local process returned an invalid response. Check the speech runtime installation and retry.',
+
     loadPreferences:
       'Language settings could not be loaded. English is being used until you retry or choose a language.',
     savePreferences: 'Language could not be saved. Please try again.',

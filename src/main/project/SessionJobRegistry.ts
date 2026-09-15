@@ -73,6 +73,17 @@ export class SessionJobRegistry {
     )
   }
 
+  async cancelAndSettleKinds(
+    token: WorkspaceToken,
+    kinds: readonly SessionJobKind[],
+  ): Promise<void> {
+    await this.cancelAndSettleAll(
+      [...this.jobs.values()].filter(
+        (job) => job.workspaceToken === token && kinds.includes(job.kind),
+      ),
+    )
+  }
+
   async cancelAndSettleSender(senderId: number): Promise<void> {
     await this.cancelAndSettleAll(
       [...this.jobs.values()].filter((job) => job.senderId === senderId),

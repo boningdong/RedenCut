@@ -1,7 +1,10 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+import numpy as np
+import sys
+from types import SimpleNamespace
 
-from redencut_speech_worker.alignment import align, normalize_alignment
+from redencut_speech_worker.alignment import align, normalize_alignment, run_whisperx_alignment
 
 
 UNITS = [
@@ -13,6 +16,106 @@ UNITS = [
 
 
 class AlignmentTest(unittest.TestCase):
+    def test_fallback_rejects_interpolated_words_without_any_timed_characters(self):
+        result = normalize_alignment([
+            {"id": "a", "kind": "speech", "text": "hello"},
+            {"id": "b", "kind": "speech", "text": "123"},
+        ], [{"word": "hello", "start": 1, "end": 2}, {"word": "123", "start": 1, "end": 2}], [
+            *[{"char": c, "start": 1, "end": 2} for c in "hello"],
+            *[{"char": c} for c in "123"],
+        ])
+        self.assertEqual(["b"], result["unalignedTranscriptUnitIds"])
+
+    def test_context_is_included_in_the_inference_duration_limit(self):
+        def infer(segments, model, metadata, audio, device, **kwargs):
+            self.assertLessEqual(len(audio), 30 * 16000)
+            return {"segments": [], "word_segments": []}
+        fake = SimpleNamespace(load_audio=lambda _: np.zeros(61 * 16000, dtype=np.float32),
+                               load_align_model=Mock(return_value=(object(), {})), align=infer)
+        with patch.dict(sys.modules, {"whisperx": fake}):
+            run_whisperx_alignment(audio_path="audio.wav", text="hello", language="en",
+                device="cpu", model_path="model", segments=[
+                    {"text": "hello", "sourceStart": 10, "sourceEnd": 40}])
+
+    def test_partial_word_timing_does_not_block_the_next_word(self):
+        units = [{"id": "a", "kind": "speech", "text": "ab"}, {"id": "c", "kind": "speech", "text": "c"}]
+        result = normalize_alignment(units, [], [
+            {"char": "a", "start": 0, "end": .1}, {"char": "b"},
+            {"char": "c", "start": .2, "end": .3},
+        ])
+        self.assertEqual(["a"], result["unalignedTranscriptUnitIds"])
+        self.assertEqual(["c"], result["units"][0]["transcriptUnitIds"])
+
+    def test_word_fallback_does_not_reassign_an_earlier_repeated_word(self):
+        units = [{"id": "a", "kind": "speech", "text": "go"}, {"id": "b", "kind": "speech", "text": "go"}]
+        result = normalize_alignment(units, [
+            {"word": "go", "start": 0, "end": .2}, {"word": "go", "start": 1, "end": 1.2},
+        ], [{"char": "g", "start": 0, "end": .1}, {"char": "o", "start": .1, "end": .2}])
+        self.assertEqual(1, result["units"][1]["sourceStart"])
+
+    def test_missing_character_timing_does_not_shift_later_units(self):
+        result = normalize_alignment(UNITS[:3], [], [
+            {"char": "觉"},
+            {"char": "得", "start": 0.96, "end": 1.18},
+        ])
+        self.assertEqual(["u1"], result["unalignedTranscriptUnitIds"])
+        self.assertEqual(["u2"], result["units"][0]["transcriptUnitIds"])
+
+    def test_long_audio_is_inferred_in_bounded_windows_with_absolute_results(self):
+        calls = []
+        def infer(segments, model, metadata, audio, device, **kwargs):
+            self.assertLessEqual(len(audio), 30 * 16000)
+            self.assertEqual("ignore", kwargs.get("interpolate_method"))
+            self.assertEqual(0, segments[0]["start"])
+            calls.append(segments[0]["text"])
+            return {"segments": [{"chars": [{"char": segments[0]["text"], "start": .1, "end": .2}]}],
+                    "word_segments": []}
+        fake = SimpleNamespace(load_audio=lambda _: np.zeros(3877 * 16000, dtype=np.float32),
+                               load_align_model=Mock(return_value=(object(), {})), align=infer)
+        progress = []
+        with patch.dict(sys.modules, {"whisperx": fake}):
+            result = run_whisperx_alignment(audio_path="audio.wav", text="觉得", language="zh",
+                device="cpu", model_path="model", segments=[
+                    {"text": "觉", "sourceStart": 0, "sourceEnd": 10},
+                    {"text": "得", "sourceStart": 3800, "sourceEnd": 3810},
+                ], on_progress=progress.append)
+        self.assertEqual(["觉", "得"], calls)
+        self.assertAlmostEqual(3799.85, result["segments"][1]["chars"][0]["start"])
+        self.assertEqual([50, 100], progress)
+        fake.load_align_model.assert_called_once()
+
+    def test_zero_duration_recognition_is_unaligned_without_blocking_later_segments(self):
+        fake = SimpleNamespace(load_audio=lambda _: np.zeros(10 * 16000, dtype=np.float32),
+            load_align_model=Mock(return_value=(object(), {})), align=Mock(return_value={
+                "segments": [{"chars": [{"char": "得", "start": .1, "end": .2}]}], "word_segments": []}))
+        progress = []
+        with patch.dict(sys.modules, {"whisperx": fake}):
+            result = run_whisperx_alignment(audio_path="audio.wav", text="觉得", language="zh",
+                device="cpu", model_path="model", segments=[
+                    {"text": "觉", "sourceStart": 1, "sourceEnd": 1},
+                    {"text": "得", "sourceStart": 2, "sourceEnd": 3}], on_progress=progress.append)
+        self.assertEqual([], result["segments"][0]["chars"])
+        self.assertAlmostEqual(1.85, result["segments"][1]["chars"][0]["start"])
+        fake.align.assert_called_once()
+        self.assertEqual([50, 100], progress)
+
+    def test_long_audio_without_timing_never_reaches_inference(self):
+        fake = SimpleNamespace(load_audio=lambda _: np.zeros(61 * 16000, dtype=np.float32),
+                               load_align_model=Mock(return_value=(object(), {})), align=Mock(return_value={}))
+        with patch.dict(sys.modules, {"whisperx": fake}), self.assertRaisesRegex(ValueError, "timing"):
+            run_whisperx_alignment(audio_path="audio.wav", text="hello", language="en",
+                                   device="cpu", model_path="model")
+        fake.align.assert_not_called()
+
+    def test_oversized_timed_segment_never_reaches_inference(self):
+        fake = SimpleNamespace(load_audio=lambda _: np.zeros(61 * 16000, dtype=np.float32),
+                               load_align_model=Mock(return_value=(object(), {})), align=Mock(return_value={}))
+        with patch.dict(sys.modules, {"whisperx": fake}), self.assertRaisesRegex(ValueError, "30"):
+            run_whisperx_alignment(audio_path="audio.wav", text="hello", language="en",
+                device="cpu", model_path="model", segments=[
+                    {"text": "hello", "sourceStart": 0, "sourceEnd": 61}])
+        fake.align.assert_not_called()
+
     def test_groups_units_when_only_a_phrase_boundary_is_reliable(self):
         result = normalize_alignment(UNITS, [
             {"word": "觉得", "start": 0.75, "end": 1.18, "score": 0.9},

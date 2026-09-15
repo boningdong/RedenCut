@@ -6,10 +6,33 @@ export const SpeechWorkerRequestSchema = z
     protocolVersion: z.literal(1),
     jobId: z.string().min(1),
     audioPath: z.string().min(1),
-    language: z.string().min(1),
-    transcriptUnits: z.array(TranscriptUnitSchema),
+    phase: z.enum(['alignment', 'diarization']).optional(),
+    language: z.string().min(1).optional(),
+    transcriptUnits: z.array(TranscriptUnitSchema).optional(),
+    // Recognition timing bounds the acoustic search; it is never an edit boundary.
+    alignmentSegments: z
+      .array(
+        z
+          .object({
+            text: z.string(),
+            sourceStart: z.number().finite().nonnegative().optional(),
+            sourceEnd: z.number().finite().nonnegative().optional(),
+          })
+          .strict()
+          .refine(
+            (segment) =>
+              segment.sourceStart === undefined ||
+              segment.sourceEnd === undefined ||
+              segment.sourceStart <= segment.sourceEnd,
+            'Invalid alignment search range',
+          ),
+      )
+      .optional(),
     models: z
-      .object({ alignment: z.string().min(1), diarization: z.string().min(1).optional() })
+      .object({
+        alignment: z.string().min(1).optional(),
+        diarization: z.string().min(1).optional(),
+      })
       .strict(),
     modelPaths: z.record(z.string(), z.string().min(1)).optional(),
     config: z
@@ -20,11 +43,28 @@ export const SpeechWorkerRequestSchema = z
       .strict(),
   })
   .strict()
-  .refine(
-    (request) =>
-      request.config.speakerRecognitionEnabled === false || Boolean(request.models.diarization),
-    'Diarization model is required when speaker recognition is enabled',
-  )
+  .superRefine((request, context) => {
+    const fail = (message: string) => context.addIssue({ code: 'custom', message })
+    if (
+      request.phase !== 'diarization' &&
+      (!request.language || !request.transcriptUnits || !request.models.alignment)
+    )
+      fail('Alignment requires language, transcript units and alignment model')
+    if (
+      request.phase === 'diarization' &&
+      (request.language !== undefined ||
+        request.transcriptUnits !== undefined ||
+        request.alignmentSegments !== undefined ||
+        request.models.alignment !== undefined)
+    )
+      fail('Diarization-only requests must omit alignment inputs')
+    if (
+      request.phase !== 'alignment' &&
+      (request.phase === 'diarization' || request.config.speakerRecognitionEnabled !== false) &&
+      !request.models.diarization
+    )
+      fail('Diarization model is required when speaker recognition is enabled')
+  })
 
 const envelope = { protocolVersion: z.literal(1), jobId: z.string().min(1) }
 export const WorkerAlignmentUnitSchema = z
@@ -64,25 +104,41 @@ export const SpeechWorkerResponseSchema = z.discriminatedUnion('type', [
       type: z.literal('result'),
       result: z
         .object({
+          phase: z.enum(['alignment', 'diarization']).optional(),
           alignment: z
             .object({
               units: z.array(WorkerAlignmentUnitSchema),
               unalignedTranscriptUnitIds: z.array(z.string().uuid()),
               provenance: z.record(z.string(), z.unknown()),
             })
-            .strict(),
-          diarization: z.union([
-            z.object({ status: z.literal('skipped-disabled') }).strict(),
-            z
-              .object({
-                status: z.literal('completed').optional(),
-                turns: z.array(WorkerDiarizationTurnSchema),
-                provenance: z.record(z.string(), z.unknown()),
-              })
-              .strict(),
-          ]),
+            .strict()
+            .optional(),
+          diarization: z
+            .union([
+              z.object({ status: z.literal('skipped-disabled') }).strict(),
+              z
+                .object({
+                  status: z.literal('completed').optional(),
+                  turns: z.array(WorkerDiarizationTurnSchema),
+                  provenance: z.record(z.string(), z.unknown()),
+                })
+                .strict(),
+            ])
+            .optional(),
         })
-        .strict(),
+        .strict()
+        .superRefine((result, context) => {
+          const valid =
+            result.phase === 'alignment'
+              ? Boolean(result.alignment) && result.diarization === undefined
+              : result.phase === 'diarization'
+                ? result.alignment === undefined &&
+                  result.diarization?.status !== 'skipped-disabled' &&
+                  Boolean(result.diarization)
+                : Boolean(result.alignment && result.diarization)
+          if (!valid)
+            context.addIssue({ code: 'custom', message: 'Worker result does not match phase' })
+        }),
     })
     .strict(),
   z

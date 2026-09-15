@@ -1,3 +1,4 @@
+import type { SpeechBatchScope, SpeechBatchProgress, SpeechBatchSummary } from './speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from './resources.types'
 import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from './modelAccess.types'
 import type { PublicMessage, TranscriptionProgress, SpeechProgress } from './publicMessages'
@@ -36,7 +37,7 @@ export interface PendingProjectOpenEvent {
   displayName: string
 }
 
-export interface IpcError {
+export interface IpcError extends PublicMessage {
   code: 'stale-session' | 'cancelled' | 'invalid-request' | 'operation-failed'
   message: string
   reason: PublicMessage['reason']
@@ -65,12 +66,15 @@ export interface TranscriptionJobRequest extends SessionJobRequest<Transcription
   language?: string
 }
 
-export interface SpeechAnalysisJobRequest extends SessionJobRequest<SpeechAnalysisJobId> {
-  audioSourceId: AudioSourceId
+export type SpeechAnalysisJobRequest = SessionJobRequest<SpeechAnalysisJobId> & {
   language: string
   draft: ProjectDraft
+  mode?: 'missing' | 'regenerate'
   confirmSpeakerLabelReset?: boolean
-}
+} & (
+    | { audioSourceId: AudioSourceId; scope?: never }
+    | { scope: SpeechBatchScope; audioSourceId?: never }
+  )
 
 export interface ExportJobRequest extends SessionJobRequest<ExportJobId> {
   draft: ProjectDraft
@@ -94,9 +98,10 @@ export interface TranscriptProgressEvent extends SessionJobRequest<Transcription
   status: TranscriptionProgress
 }
 
-export interface SpeechAnalysisProgressEvent extends SessionJobRequest<SpeechAnalysisJobId> {
-  stage: SpeechProgress['stage']
-  percent?: number
+export interface SpeechAnalysisProgressEvent
+  extends SessionJobRequest<SpeechAnalysisJobId>, SpeechProgress {
+  batch?: SpeechBatchProgress
+  session?: RendererSession
 }
 
 export interface RenderProgress {
@@ -160,7 +165,9 @@ export interface IElectronAPI {
     checkAvailability(): Promise<PublicMessage | null>
     start(
       request: SpeechAnalysisJobRequest,
-    ): Promise<SessionJobResult<RendererSession, SpeechAnalysisJobId>>
+    ): Promise<
+      SessionJobResult<RendererSession, SpeechAnalysisJobId> & { batch?: SpeechBatchSummary }
+    >
     cancel(
       request: CancelSessionJobRequest<SpeechAnalysisJobId>,
     ): Promise<TranscriptionCancellationResult>

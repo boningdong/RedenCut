@@ -38,6 +38,14 @@ class BrokenPipeChild extends EventEmitter {
 }
 
 describe('SpeechWorkerClient', () => {
+  it('does not mislabel a valid worker failure as malformed protocol', async () => {
+    const error = await new SpeechWorkerClient(process.execPath, [fixture, 'worker-error'])
+      .run(request, new AbortController().signal)
+      .catch((error) => error)
+    expect(error).toBeInstanceOf(Error)
+    expect(error.message).toContain('model computation failed')
+    expect(error.kind).not.toBe('protocol')
+  })
   it('runs one correlated JSONL job, reports progress, and ignores stderr diagnostics', async () => {
     const progress = vi.fn()
     const result = await new SpeechWorkerClient(process.execPath, [fixture, 'success']).run(
@@ -45,7 +53,7 @@ describe('SpeechWorkerClient', () => {
       new AbortController().signal,
       progress,
     )
-    expect(result.alignment.unalignedTranscriptUnitIds).toEqual([request.transcriptUnits[0].id])
+    expect(result.alignment?.unalignedTranscriptUnitIds).toEqual([request.transcriptUnits?.[0].id])
     expect(progress).toHaveBeenCalledWith({ stage: 'aligning', percent: 50 })
   })
 
@@ -64,7 +72,7 @@ describe('SpeechWorkerClient', () => {
       new AbortController().signal,
     )
 
-    expect(result.alignment.unalignedTranscriptUnitIds).toHaveLength(30_000)
+    expect(result.alignment?.unalignedTranscriptUnitIds).toHaveLength(30_000)
   })
 
   it('rejects without an uncaught EPIPE when the worker cannot start', async () => {
@@ -89,16 +97,42 @@ describe('SpeechWorkerClient', () => {
     expect(child.kill).toHaveBeenCalledOnce()
   })
 
+  it('retains a bounded diagnostic tail when the worker exits without a result', async () => {
+    const error = await new SpeechWorkerClient(process.execPath, [fixture, 'crash'])
+      .run(request, new AbortController().signal)
+      .catch((error: unknown) => error)
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toContain('allocation failed')
+    expect((error as Error).message.length).toBeLessThan(17_000)
+  })
+
   it('terminates and reaps the worker before cancellation settles', async () => {
     const controller = new AbortController()
     const operation = new SpeechWorkerClient(process.execPath, [fixture, 'hang'], {
-      overallTimeoutMs: 5_000,
-      noProgressTimeoutMs: 5_000,
       terminateGraceMs: 100,
     }).run(request, controller.signal)
     await new Promise((resolve) => setTimeout(resolve, 30))
     controller.abort()
     await expect(operation).rejects.toMatchObject({ name: 'AbortError' })
+  })
+  it('keeps a quiet computation alive beyond the old worker deadlines', async () => {
+    vi.useFakeTimers()
+    try {
+      const child = new BrokenPipeChild()
+      child.stdin.end = vi.fn(() => child.stdin)
+      const controller = new AbortController()
+      const operation = new SpeechWorkerClient('worker', [], { spawn: () => child }).run(
+        request,
+        controller.signal,
+      )
+      const rejected = expect(operation).rejects.toMatchObject({ name: 'AbortError' })
+      await vi.advanceTimersByTimeAsync(31 * 60_000)
+      expect(child.kill).not.toHaveBeenCalled()
+      controller.abort()
+      await rejected
+    } finally {
+      vi.useRealTimers()
+    }
   })
   it('never forwards Hugging Face credentials to offline inference', async () => {
     const child = new BrokenPipeChild()

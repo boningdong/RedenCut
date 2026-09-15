@@ -223,3 +223,19 @@ it('requires skipped v2 artifacts to omit speaker outputs', () => {
     SpeechArtifactSchema.safeParse({ ...skipped, analysisRevisionId: crypto.randomUUID() }).success,
   ).toBe(false)
 })
+
+it('accepts pending text artifacts but rejects speaker outputs on pending artifacts', () => {
+  const legacy = artifact()
+  const pending = {
+    ...legacy,
+    schemaVersion: 2,
+    diarizationStatus: 'pending',
+    diarization: undefined,
+    speakerAttribution: undefined,
+    speakers: [],
+  }
+  expect(SpeechArtifactSchema.safeParse(pending).success).toBe(true)
+  expect(
+    SpeechArtifactSchema.safeParse({ ...pending, diarization: legacy.diarization }).success,
+  ).toBe(false)
+})

@@ -1,3 +1,5 @@
+import { ImportCoordinator } from '../audio/import/ImportCoordinator'
+import { SpeechArtifactSchema } from '../../shared/speechArtifact.schema'
 import { createHash } from 'crypto'
 import {
   mkdir,
@@ -745,4 +747,291 @@ it('resolves speech PCM only from the captured source cache and rejects stale or
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+function backgroundArtifact(controller: WorkspaceController) {
+  const fingerprint = controller.workspace.project.audioSources[0].fingerprint
+  const analysisRevisionId = '550e8400-e29b-41d4-a716-446655440001'
+  const transcriptId = '550e8400-e29b-41d4-a716-446655440002'
+  const provenance = {
+    engineId: 'test',
+    engineVersion: '1',
+    modelId: 'test',
+    configHash: 'b'.repeat(64),
+    artifactSchemaVersion: 1,
+    createdAt: '2026-09-09T00:00:00.000Z',
+  }
+  return SpeechArtifactSchema.parse({
+    schemaVersion: 2,
+    diarizationStatus: 'skipped-disabled',
+    speakers: [],
+    analysisRevisionId,
+    audioSourceId: SOURCE_ID,
+    sourceFingerprint: fingerprint,
+    transcript: {
+      id: transcriptId,
+      revision: 1,
+      analysisRevisionId,
+      audioSourceId: SOURCE_ID,
+      sourceFingerprint: fingerprint,
+      units: [],
+      mode: 'best-effort-verbatim',
+      provenance,
+    },
+    alignment: {
+      id: '550e8400-e29b-41d4-a716-446655440004',
+      analysisRevisionId,
+      transcriptArtifactId: transcriptId,
+      transcriptRevision: 1,
+      audioSourceId: SOURCE_ID,
+      sourceFingerprint: fingerprint,
+      acousticEditUnits: [],
+      provenance,
+    },
+  })
+}
+
+it('commits background speech into the latest timeline and rejects an obsolete analysis guard', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-background-')))
+  const session = await controller.open(root)
+  const guard = controller.captureBackgroundSpeechGuard(session, SOURCE_ID)
+  const artifact = backgroundArtifact(controller)
+  const saved = await controller.save(request(session, draftWithLufs(session, -10)))
+  const result = await controller.commitBackgroundSpeechAnalysis(guard, artifact)
+  expect(result.revision).toBe(saved.revision + 1)
+  expect(result.draft.export.targetLUFS).toBe(-10)
+  expect(result.speechAnalyses).toHaveLength(1)
+  await expect(controller.commitBackgroundSpeechAnalysis(guard, artifact)).rejects.toThrow('stale')
+  expect(() => controller.assertCurrent(session)).toThrow('Stale workspace revision')
+  const stageGuard = controller.captureBackgroundSpeechGuard(result, SOURCE_ID)
+  await controller.commitBackgroundSpeechAnalysis(stageGuard, {
+    ...artifact,
+    transcript: { ...artifact.transcript, revision: 2 },
+    alignment: { ...artifact.alignment, transcriptRevision: 2 },
+  })
+  await expect(controller.commitBackgroundSpeechAnalysis(stageGuard, artifact)).rejects.toThrow(
+    'artifact is stale',
+  )
+})
+
+it('rejects background speech after source replacement or workspace switch', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-background-')))
+  const session = await controller.open(root)
+  const guard = controller.captureBackgroundSpeechGuard(session, SOURCE_ID)
+  const artifact = backgroundArtifact(controller)
+  await controller.workspace.save({
+    ...controller.workspace.project,
+    audioSources: controller.workspace.project.audioSources.map((source) => ({
+      ...source,
+      fingerprint: { ...source.fingerprint, sha256: 'f'.repeat(64) },
+    })),
+  })
+  await expect(controller.commitBackgroundSpeechAnalysis(guard, artifact)).rejects.toThrow(
+    'fingerprint',
+  )
+  await controller.workspace.save({
+    ...controller.workspace.project,
+    audioSources: controller.workspace.project.audioSources.map((source) => ({
+      ...source,
+      fingerprint: artifact.sourceFingerprint,
+    })),
+  })
+  await controller.open(await emptyPackage(await mkdtemp(join(tmpdir(), 'redencut-next-')), 'next'))
+  await expect(controller.commitBackgroundSpeechAnalysis(guard, artifact)).rejects.toThrow(
+    'Stale workspace token',
+  )
+})
+
+it.each(['speech-first', 'import-first'])(
+  'preserves speech and imported sources when completion is %s',
+  async (order) => {
+    const root = await packageWithoutCache()
+    await writeValidCache(root)
+    const controller = new WorkspaceController()
+    await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-concurrent-')))
+    const session = await controller.open(root)
+    const guard = controller.captureBackgroundSpeechGuard(session, SOURCE_ID)
+    const resolvePcm = controller.captureBackgroundSpeechPcmResolver(session)
+    const artifact = backgroundArtifact(controller)
+    const ready = deferred()
+    const release = deferred()
+    const coordinator = new ImportCoordinator(controller.workspace, {
+      probe: async () => controller.workspace.project.audioSources[0].metadata,
+      createId: () => '00000000-0000-4000-8000-000000000002',
+      availableBytes: async () => Number.MAX_SAFE_INTEGER,
+      builder: {
+        build: async (request) => {
+          const manifest = generatedManifest(request)
+          await mkdir(join(request.projectRoot, 'cache', request.audioSourceId, 'waveform'), {
+            recursive: true,
+          })
+          await writeFile(
+            join(request.projectRoot, manifest.pcm.file),
+            new Uint8Array(manifest.pcm.byteLength),
+          )
+          for (const level of manifest.waveform.levels)
+            await writeFile(
+              join(request.projectRoot, level.file),
+              new Uint8Array(level.bucketCount * 8),
+            )
+          await writeFile(
+            join(request.projectRoot, 'cache', request.audioSourceId, 'manifest.json'),
+            JSON.stringify(manifest),
+          )
+          ready.resolve()
+          await release.promise
+          return manifest
+        },
+      },
+    })
+    const imported = coordinator.import(
+      '00000000-0000-4000-8000-000000000003',
+      join(root, 'media', SOURCE_ID, 'source.wav'),
+      'reference',
+      controller.workspace.project,
+      (commit, signal) =>
+        controller.runBackgroundTransition(
+          session,
+          (transaction) => commit((project) => transaction.commitImport(project)),
+          signal,
+        ),
+    )
+    await ready.promise
+    if (order === 'speech-first') await controller.commitBackgroundSpeechAnalysis(guard, artifact)
+    release.resolve()
+    await imported
+    if (order === 'import-first') await controller.commitBackgroundSpeechAnalysis(guard, artifact)
+    const latest = await controller.describe()
+    expect(latest.sources).toHaveLength(2)
+    expect(latest.draft.tracks).toHaveLength(2)
+    expect(latest.speechAnalyses).toHaveLength(1)
+    expect((await resolvePcm(SOURCE_ID)).sampleRate).toBe(48000)
+    expect(() => controller.captureBackgroundSpeechGuard(session, SOURCE_ID)).not.toThrow()
+  },
+)
+
+it('aborts a queued speech publication before it can acquire the workspace mutex', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-cancel-')))
+  const session = await controller.open(root)
+  const guard = controller.captureBackgroundSpeechGuard(session, SOURCE_ID)
+  const entered = deferred()
+  const release = deferred()
+  const holding = controller.runTransition(session, async () => {
+    entered.resolve()
+    await release.promise
+  })
+  await entered.promise
+  const abort = new AbortController()
+  let failure: unknown
+  const committing = controller
+    .commitBackgroundSpeechAnalysis(guard, backgroundArtifact(controller), abort.signal)
+    .catch((error) => {
+      failure = error
+    })
+  abort.abort()
+  await new Promise((resolve) => setImmediate(resolve))
+  const rejectedWhileQueued = failure instanceof DOMException && failure.name === 'AbortError'
+  release.resolve()
+  await Promise.all([holding, committing])
+  expect(rejectedWhileQueued).toBe(true)
+  expect(controller.workspace.project.speechArtifacts).toHaveLength(0)
+})
+
+it('aborts a final snapshot queued behind the transaction cancelling its job', async () => {
+  const controller = new WorkspaceController()
+  const session = await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-snapshot-')))
+  const entered = deferred()
+  const release = deferred()
+  const holding = controller.runTransition(session, async () => {
+    entered.resolve()
+    await release.promise
+  })
+  await entered.promise
+  const abort = new AbortController()
+  let failure: unknown
+  const describing = controller.describe(abort.signal).catch((error) => {
+    failure = error
+  })
+  abort.abort()
+  await new Promise((resolve) => setImmediate(resolve))
+  const rejectedWhileQueued = failure instanceof DOMException && failure.name === 'AbortError'
+  release.resolve()
+  await Promise.all([holding, describing])
+  expect(rejectedWhileQueued).toBe(true)
+})
+
+it('rejects regeneration when a speaker label was edited after admission', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-speaker-race-')))
+  const session = await controller.open(root)
+  const text = backgroundArtifact(controller)
+  const speakerId = '550e8400-e29b-41d4-a716-446655440007'
+  const diarizationId = '550e8400-e29b-41d4-a716-446655440006'
+  const completed = SpeechArtifactSchema.parse({
+    ...text,
+    diarizationStatus: 'completed',
+    speakers: [
+      {
+        id: speakerId,
+        analysisRevisionId: text.analysisRevisionId,
+        diarizationLabel: 'SPEAKER_00',
+        defaultDisplayName: 'Speaker 1',
+      },
+    ],
+    diarization: {
+      id: diarizationId,
+      analysisRevisionId: text.analysisRevisionId,
+      audioSourceId: SOURCE_ID,
+      sourceFingerprint: text.sourceFingerprint,
+      turns: [],
+      provenance: text.transcript.provenance,
+    },
+    speakerAttribution: {
+      analysisRevisionId: text.analysisRevisionId,
+      alignmentArtifactId: text.alignment.id,
+      diarizationArtifactId: diarizationId,
+      attributions: [],
+      provenance: {
+        algorithmId: 'overlap',
+        algorithmVersion: '1',
+        configHash: 'c'.repeat(64),
+        artifactSchemaVersion: 1,
+        createdAt: '2026-09-09T00:00:00.000Z',
+      },
+    },
+  })
+  const analyzed = await controller.commitBackgroundSpeechAnalysis(
+    controller.captureBackgroundSpeechGuard(session, SOURCE_ID),
+    completed,
+  )
+  const guard = controller.captureBackgroundSpeechGuard(analyzed, SOURCE_ID)
+  await controller.renameSpeaker({
+    ...analyzed,
+    audioSourceId: SOURCE_ID,
+    analysisRevisionId: completed.analysisRevisionId,
+    speakerId: completed.speakers[0].id,
+    displayName: 'Host',
+  })
+  const revision = '550e8400-e29b-41d4-a716-446655440009'
+  const regenerated = SpeechArtifactSchema.parse({
+    ...text,
+    analysisRevisionId: revision,
+    transcript: { ...text.transcript, analysisRevisionId: revision },
+    alignment: { ...text.alignment, analysisRevisionId: revision },
+  })
+  await expect(controller.commitBackgroundSpeechAnalysis(guard, regenerated)).rejects.toThrow(
+    'speaker labels',
+  )
+  expect(controller.workspace.project.speakerLabelOverrides[0].displayName).toBe('Host')
 })

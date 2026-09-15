@@ -88,7 +88,6 @@ export function registerAudioIpc(
         !selection ||
         selection.senderId !== event.sender.id ||
         selection.workspaceToken !== request.workspaceToken ||
-        selection.revision !== request.revision ||
         selection.expiresAt < Date.now()
       )
         throw new PublicIpcError('invalid-request')
@@ -114,7 +113,7 @@ export function registerAudioIpc(
             request.mode,
             project,
             (commit, signal) =>
-              controller.runTransition(
+              controller.runBackgroundTransition(
                 request,
                 (transaction) =>
                   commit((preparedProject) => transaction.commitImport(preparedProject)),
@@ -123,7 +122,7 @@ export function registerAudioIpc(
             (progress) => {
               if (event.sender.isDestroyed()) return
               try {
-                controller.assertCurrent(request)
+                controller.assertWorkspaceCurrent(request)
               } catch {
                 return
               }

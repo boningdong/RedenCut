@@ -29,7 +29,9 @@ export type PublicReason =
   | 'speech-attributing-speakers'
   | 'speech-validating'
   | 'speech-publishing'
+export type SpeechFailureKind = 'startup' | 'process-exit' | 'protocol'
 export interface PublicMessage {
+  failureKind?: SpeechFailureKind
   reason: PublicReason
 }
 export type TranscriptionProgress = {
@@ -37,7 +39,15 @@ export type TranscriptionProgress = {
   percent?: number
 }
 export type SpeechProgress = {
+  stageStartedAtMs?: number
+  estimatedDurationMs?: number
   stage:
-    'transcribing' | 'aligning' | 'diarizing' | 'attributing-speakers' | 'validating' | 'publishing'
+    | 'preparing-audio'
+    | 'transcribing'
+    | 'aligning'
+    | 'diarizing'
+    | 'attributing-speakers'
+    | 'validating'
+    | 'publishing'
   percent?: number
 }

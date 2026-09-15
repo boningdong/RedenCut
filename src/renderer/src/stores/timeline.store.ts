@@ -97,6 +97,9 @@ interface TimelineState {
   /** Refresh authoritative source descriptors without discarding visible edit history. */
   refreshAudioSources(audioSources: RendererAudioSource[]): void
 
+  /** Add imported tracks to the baseline of live state and existing edit history. */
+  appendImportedTracks(tracks: Track[]): void
+
   /** Register a managed source by stable identity. Not undoable. */
   addAudioSource(audioSource: RendererAudioSource): AudioSourceId
 
@@ -248,6 +251,27 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   refreshAudioSources(audioSources) {
     set({ audioSources })
+  },
+
+  appendImportedTracks(importedTracks) {
+    if (importedTracks.length === 0) return
+    set((state) => {
+      const appendMissing = (tracks: Track[]) => {
+        const ids = new Set(tracks.map((track) => track.id))
+        const additions = importedTracks.filter((track) => !ids.has(track.id))
+        return additions.length ? [...tracks, ...cloneTracks(additions)] : tracks
+      }
+      // Import establishes a non-undoable baseline; older clip edits must retain that baseline.
+      const rebase = (entry: HistoryEntry): HistoryEntry => ({
+        ...entry,
+        before: appendMissing(entry.before),
+      })
+      return {
+        tracks: appendMissing(state.tracks),
+        undoStack: state.undoStack.map(rebase),
+        redoStack: state.redoStack.map(rebase),
+      }
+    })
   },
 
   // ── addAudioSource ─────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 # Speech process reliability
 
-Status: conversational design approved; written specification awaiting review.
+Status: approved and implemented; short full-pipeline calibration passed, full-length run stopped at the user’s request after demonstrating sustained progress beyond the former worker timeout. Final verification is recorded in the task report.
 Scope: roadmap item 1 only, before source queues, checkpoints and project people.
 
 ## Goal and boundaries
@@ -39,7 +39,7 @@ Parser failures trigger managed cleanup rather than leaving inference running.
 prepareSpeechAudio.ts keeps ffmpeg conversion and temporary file cleanup while adopting managed execution.
 transcriber/whisper.ts adopts managed execution for leading-silence detection and transcription, consumes stdout, and parses stderr progress across chunk boundaries, including multiple records per chunk.
 SpeechWorkerClient.ts retains protocol validation, job identity, line-size bounds and result validation while delegating lifecycle handling.
-Python __main__.py and diarization.py forward supported pyannote hook events as structured progress while reserving stdout for JSONL.
+Python **main**.py and diarization.py forward supported pyannote hook events as structured progress while reserving stdout for JSONL.
 Hooks without meaningful completed/total report activity or substage, not an invented percentage.
 Do not add an independent heartbeat that is treated as proof of inference progress.
 

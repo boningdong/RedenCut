@@ -1,3 +1,4 @@
+import { manageProcess, ProcessExecutionError } from '../processes/ManagedProcess'
 import { spawn } from 'child_process'
 import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
@@ -28,64 +29,43 @@ export async function withSpeechAudio<T>(
   }
 }
 
-function normalize(input: SpeechPcmInput, output: string, signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted()
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      getFfmpegPath(),
-      [
-        '-v',
-        'error',
-        '-nostdin',
-        '-f',
-        'f32le',
-        '-ar',
-        String(input.sampleRate),
-        '-ac',
-        String(input.channels),
-        '-i',
-        input.path,
-        '-ar',
-        '16000',
-        '-ac',
-        '1',
-        '-c:a',
-        'pcm_s16le',
-        output,
-      ],
-      { stdio: ['ignore', 'ignore', 'pipe'] },
+async function normalize(
+  input: SpeechPcmInput,
+  output: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const operation = manageProcess(
+    () =>
+      spawn(
+        getFfmpegPath(),
+        [
+          '-v',
+          'error',
+          '-nostdin',
+          '-f',
+          'f32le',
+          '-ar',
+          String(input.sampleRate),
+          '-ac',
+          String(input.channels),
+          '-i',
+          input.path,
+          '-ar',
+          '16000',
+          '-ac',
+          '1',
+          '-c:a',
+          'pcm_s16le',
+          output,
+        ],
+        { stdio: ['ignore', 'ignore', 'pipe'] },
+      ),
+    signal,
+  )
+  const exit = await operation.completed
+  if (exit.code !== 0)
+    throw new ProcessExecutionError(
+      'process-exit',
+      `Speech audio conversion failed (${exit.code}): ${exit.diagnostics}`,
     )
-    let diagnostic = ''
-    let failure: unknown
-    let killTimer: ReturnType<typeof setTimeout> | undefined
-    const terminate = (error: unknown) => {
-      if (failure) return
-      failure = error
-      child.kill('SIGTERM')
-      killTimer = setTimeout(() => child.kill('SIGKILL'), 2000)
-    }
-    const abort = () =>
-      terminate(new DOMException('Speech audio preparation cancelled', 'AbortError'))
-    const timeout = setTimeout(
-      () => terminate(new Error('Speech audio preparation timed out')),
-      5 * 60_000,
-    )
-    child.stderr.on('data', (chunk: Buffer) => {
-      diagnostic = (diagnostic + chunk.toString()).slice(-4096)
-    })
-    child.once('error', (error) => {
-      failure = error
-    })
-    child.once('close', (code) => {
-      clearTimeout(timeout)
-      if (killTimer) clearTimeout(killTimer)
-      signal.removeEventListener('abort', abort)
-      if (failure) reject(failure)
-      else if (code !== 0)
-        reject(new Error(`Speech audio conversion failed (${code}): ${diagnostic}`))
-      else resolve()
-    })
-    signal.addEventListener('abort', abort, { once: true })
-    if (signal.aborted) abort()
-  })
 }

@@ -1,3 +1,5 @@
+import { createSpeechBatchHandler } from './speechBatch.ipc'
+import { ProjectFileSchema } from '../../shared/project.types'
 import type { ResourceManager } from '../resources/ResourceManager'
 import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
 import type { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
@@ -5,7 +7,7 @@ import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUn
 import { randomUUID } from 'crypto'
 import { existsSync } from 'fs'
 import { join, dirname } from 'path'
-import { homedir } from 'os'
+import { homedir, platform, arch, cpus } from 'os'
 import { ipcMain } from 'electron'
 import type {
   CancelSessionJobRequest,
@@ -16,6 +18,12 @@ import type {
 import type { TranscriptionCancellationResult } from '../../shared/transcriber.types'
 import type { SessionJobRegistry } from '../project/SessionJobRegistry'
 import type { WorkspaceController } from '../project/WorkspaceController'
+import { SpeechStagePolicy } from '../speech/SpeechStagePolicy'
+import {
+  measuredSpeechProfiles,
+  measuredSpeechConfiguration,
+} from '../speech/measuredSpeechProfiles'
+import type { SpeechProgress } from '../../shared/publicMessages'
 import { SpeechAnalysisCoordinator } from '../speech/SpeechAnalysisCoordinator'
 import { withSpeechAudio } from '../speech/prepareSpeechAudio'
 import { SpeechAnalysisError, type SpeechFailureStage } from '../speech/SpeechAnalysisError'
@@ -57,16 +65,17 @@ export function registerSpeechAnalysisIpc(
   const modelCache =
     process.env.REDENCUT_SPEECH_MODEL_CACHE ??
     join(homedir(), 'Library', 'Caches', 'RedenCut', 'speech-models')
+  const workerEnvironment = {
+    ...process.env,
+    PYTHONPATH: join(workerRoot, 'src'),
+    REDENCUT_SPEECH_MANIFEST: manifest,
+    REDENCUT_SPEECH_MODEL_CACHE: modelCache,
+    HF_HUB_OFFLINE: '1',
+    TRANSFORMERS_OFFLINE: '1',
+  }
   const worker = new SpeechWorkerClient(python, ['-m', 'redencut_speech_worker'], {
     cwd: workerRoot,
-    env: {
-      ...process.env,
-      PYTHONPATH: join(workerRoot, 'src'),
-      REDENCUT_SPEECH_MANIFEST: manifest,
-      REDENCUT_SPEECH_MODEL_CACHE: modelCache,
-      HF_HUB_OFFLINE: '1',
-      TRANSFORMERS_OFFLINE: '1',
-    },
+    env: workerEnvironment,
   })
   const coordinator = new SpeechAnalysisCoordinator(whisperTranscriber, worker, randomUUID)
 
@@ -98,115 +107,197 @@ export function registerSpeechAnalysisIpc(
     }, diagnosticSink),
   )
 
+  const runBatch = createSpeechBatchHandler({
+    controller,
+    jobs,
+    coordinator,
+    diagnosticSink,
+    prepare: async () => {
+      if (!python || !existsSync(python))
+        throw new TranscriberUnavailableError('speech-worker-missing')
+      const preferences = services ? await services.preferences.read() : undefined
+      const modelPaths = services ? await services.resources.getModelPaths() : undefined
+      let transcriptionModel: string | undefined
+      if (services && modelPaths) {
+        const model = services.resources.models.find(
+          (model) => model.capability === 'transcription',
+        )!
+        if (
+          !preferences?.textEditingEnabled ||
+          !modelPaths[model.id] ||
+          !modelPaths['alignment-zh'] ||
+          !modelPaths['alignment-en'] ||
+          (preferences.speakerRecognitionEnabled && !modelPaths['diarization-default'])
+        )
+          throw new TranscriberUnavailableError('speech-models-missing')
+        transcriptionModel = join(modelPaths[model.id], model.files[0].path)
+        managedWhisper = transcriptionModel
+      }
+      const unavailable = await whisperTranscriber.unavailableReason()
+      if (unavailable)
+        throw new TranscriberUnavailableError(
+          unavailable.reason as ConstructorParameters<typeof TranscriberUnavailableError>[0],
+        )
+      if (!existsSync(manifest) || (!services && !existsSync(modelCache)))
+        throw new TranscriberUnavailableError('speech-models-missing')
+      return {
+        speakerRecognitionEnabled: preferences?.speakerRecognitionEnabled ?? true,
+        modelPaths,
+        transcriptionModel,
+        configuration: measuredSpeechConfiguration({
+          platform: platform(),
+          architecture: arch(),
+          cpuModels: cpus().map((cpu) => cpu.model),
+          device: 'cpu',
+          modelPaths,
+          environment: workerEnvironment,
+        }),
+      }
+    },
+  })
+
+  const activeAnalyses = new Set<string>()
   ipcMain.handle('speech-analysis:start', (event, input: unknown) =>
     toIpcResult(
       async (): Promise<
         SessionJobResult<Awaited<ReturnType<WorkspaceController['describe']>>, SpeechAnalysisJobId>
       > => {
         const request = parseStartRequest(input)
-        controller.assertCurrent(request)
-        const source = controller.workspace.project.audioSources.find(
-          (candidate) => candidate.id === request.audioSourceId,
-        )
-        if (!source) throw new PublicIpcError('invalid-request')
-        if (
-          controller.workspace.project.speakerLabelOverrides.some(
-            (override) => override.audioSourceId === request.audioSourceId,
-          ) &&
-          !request.confirmSpeakerLabelReset
-        )
-          throw new PublicIpcError('invalid-request')
-        if (services && !python) throw new TranscriberUnavailableError('speech-worker-missing')
-        const preferences = services ? await services.preferences.read() : undefined
-        const modelPaths = services ? await services.resources.getModelPaths() : undefined
-        let transcriptionModel: string | undefined
-        if (services && modelPaths) {
-          const model = services.resources.models.find(
-            (model) => model.capability === 'transcription',
-          )!
-          if (
-            !preferences?.textEditingEnabled ||
-            !modelPaths[model.id] ||
-            !modelPaths['alignment-zh'] ||
-            !modelPaths['alignment-en'] ||
-            (preferences.speakerRecognitionEnabled && !modelPaths['diarization-default'])
-          )
-            throw new TranscriberUnavailableError('speech-models-missing')
-          transcriptionModel = join(modelPaths[model.id], model.files[0].path)
-          managedWhisper = transcriptionModel
-        }
-        const resolvePcm = controller.captureSpeechPcmResolver(request)
-        const identity = {
-          kind: 'speech-analysis' as const,
-          jobId: request.jobId,
-          senderId: event.sender.id,
-          workspaceToken: request.workspaceToken,
-          revision: request.revision,
-        }
-        const abortController = new AbortController()
-        const settled = (async () => {
-          let stage: SpeechFailureStage = 'preparing-audio'
-          try {
-            const pcm = await resolvePcm(request.audioSourceId)
-            const artifact = await withSpeechAudio(pcm, abortController.signal, (audioPath) =>
-              coordinator.run(
-                {
-                  jobId: request.jobId,
-                  audioPath,
-                  audioSource: source,
-                  language: request.language,
-                  alignmentModel: 'auto',
-                  diarizationModel: 'diarization-default',
-                  speakerRecognitionEnabled: preferences?.speakerRecognitionEnabled ?? true,
-                  modelPaths,
-                  transcriptionModel,
-                },
-                abortController.signal,
-                (progress) => {
-                  stage = progress.stage
-                  if (!event.sender.isDestroyed())
-                    event.sender.send('speech-analysis:progress', { ...identity, ...progress })
-                },
-              ),
-            )
-            abortController.signal.throwIfAborted()
-            stage = 'publishing'
-            if (!event.sender.isDestroyed())
-              event.sender.send('speech-analysis:progress', { ...identity, stage: 'publishing' })
-            const session = await controller.commitSpeechAnalysis(request, artifact, request.draft)
-            return {
-              jobId: request.jobId,
-              workspaceToken: request.workspaceToken,
-              revision: request.revision,
-              value: session,
-            }
-          } catch (error) {
-            if (abortController.signal.aborted) abortController.signal.throwIfAborted()
-            if (error instanceof DOMException && error.name === 'AbortError') throw error
-            if (
-              error instanceof TranscriberUnavailableError ||
-              error instanceof PublicIpcError ||
-              (error instanceof Error &&
-                (error.message === 'Stale workspace token' ||
-                  error.message === 'Stale workspace revision'))
-            )
-              throw error
-            throw new SpeechAnalysisError(stage, error)
-          }
-        })()
-        const unregister = jobs.register(identity, () => ({
-          cancel: () => abortController.abort(),
-          settled,
-        }))
-        const cancelSenderJobs = () => {
-          void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
-        }
-        event.sender.once('destroyed', cancelSenderJobs)
+        if (activeAnalyses.has(request.workspaceToken)) throw new PublicIpcError('invalid-request')
+        activeAnalyses.add(request.workspaceToken)
         try {
-          return await settled
+          if (request.scope) return await runBatch(event, request)
+          controller.assertCurrent(request)
+          const source = controller.workspace.project.audioSources.find(
+            (candidate) => candidate.id === request.audioSourceId,
+          )
+          if (!source) throw new PublicIpcError('invalid-request')
+          if (
+            controller.workspace.project.speakerLabelOverrides.some(
+              (override) => override.audioSourceId === request.audioSourceId,
+            ) &&
+            !request.confirmSpeakerLabelReset
+          )
+            throw new PublicIpcError('invalid-request')
+          if (services && !python) throw new TranscriberUnavailableError('speech-worker-missing')
+          const identity = {
+            kind: 'speech-analysis' as const,
+            jobId: request.jobId,
+            senderId: event.sender.id,
+            workspaceToken: request.workspaceToken,
+            revision: request.revision,
+          }
+          const abortController = new AbortController()
+          const run = async () => {
+            let stage: SpeechFailureStage = 'preparing-audio'
+            let configuration = 'uncalibrated'
+            const trackProgress = new SpeechStagePolicy(
+              measuredSpeechProfiles,
+            ).createProgressTracker(source.metadata?.durationSeconds ?? 0, () => configuration)
+            const reportProgress = (progress: SpeechProgress) => {
+              stage = progress.stage
+              if (!event.sender.isDestroyed())
+                event.sender.send('speech-analysis:progress', {
+                  ...identity,
+                  ...trackProgress(progress),
+                })
+            }
+            try {
+              if (event.sender.isDestroyed()) abortController.abort()
+              abortController.signal.throwIfAborted()
+              reportProgress({ stage: 'preparing-audio' })
+              const preferences = services ? await services.preferences.read() : undefined
+              abortController.signal.throwIfAborted()
+              const modelPaths = services ? await services.resources.getModelPaths() : undefined
+              abortController.signal.throwIfAborted()
+              let transcriptionModel: string | undefined
+              if (services && modelPaths) {
+                const model = services.resources.models.find(
+                  (model) => model.capability === 'transcription',
+                )!
+                if (
+                  !preferences?.textEditingEnabled ||
+                  !modelPaths[model.id] ||
+                  !modelPaths['alignment-zh'] ||
+                  !modelPaths['alignment-en'] ||
+                  (preferences.speakerRecognitionEnabled && !modelPaths['diarization-default'])
+                )
+                  throw new TranscriberUnavailableError('speech-models-missing')
+                transcriptionModel = join(modelPaths[model.id], model.files[0].path)
+                managedWhisper = transcriptionModel
+              }
+              configuration = measuredSpeechConfiguration({
+                platform: platform(),
+                architecture: arch(),
+                cpuModels: cpus().map((cpu) => cpu.model),
+                device: 'cpu',
+                modelPaths,
+                environment: workerEnvironment,
+              })
+              const resolvePcm = controller.captureSpeechPcmResolver(request)
+              abortController.signal.throwIfAborted()
+              const pcm = await resolvePcm(source.id)
+              const artifact = await withSpeechAudio(pcm, abortController.signal, (audioPath) =>
+                coordinator.run(
+                  {
+                    jobId: request.jobId,
+                    audioPath,
+                    audioSource: source,
+                    language: request.language,
+                    alignmentModel: 'auto',
+                    diarizationModel: 'diarization-default',
+                    speakerRecognitionEnabled: preferences?.speakerRecognitionEnabled ?? true,
+                    modelPaths,
+                    transcriptionModel,
+                  },
+                  abortController.signal,
+                  reportProgress,
+                ),
+              )
+              abortController.signal.throwIfAborted()
+              reportProgress({ stage: 'publishing' })
+              const session = await controller.commitSpeechAnalysis(
+                request,
+                artifact,
+                request.draft,
+              )
+              return {
+                jobId: request.jobId,
+                workspaceToken: request.workspaceToken,
+                revision: request.revision,
+                value: session,
+              }
+            } catch (error) {
+              if (abortController.signal.aborted) abortController.signal.throwIfAborted()
+              if (error instanceof DOMException && error.name === 'AbortError') throw error
+              if (
+                error instanceof TranscriberUnavailableError ||
+                error instanceof PublicIpcError ||
+                (error instanceof Error &&
+                  (error.message === 'Stale workspace token' ||
+                    error.message === 'Stale workspace revision'))
+              )
+                throw error
+              throw new SpeechAnalysisError(stage, error)
+            }
+          }
+          let settled!: ReturnType<typeof run>
+          const unregister = jobs.register(identity, () => {
+            settled = run()
+            return { cancel: () => abortController.abort(), settled }
+          })
+          const cancelSenderJobs = () => {
+            void jobs.cancelAndSettleSender(event.sender.id).catch(diagnosticSink)
+          }
+          event.sender.once('destroyed', cancelSenderJobs)
+          try {
+            return await settled
+          } finally {
+            event.sender.removeListener('destroyed', cancelSenderJobs)
+            unregister()
+          }
         } finally {
-          event.sender.removeListener('destroyed', cancelSenderJobs)
-          unregister()
+          activeAnalyses.delete(request.workspaceToken)
         }
       },
       diagnosticSink,
@@ -230,6 +321,38 @@ function parseStartRequest(input: unknown): SpeechAnalysisJobRequest {
   const precondition = requireSessionPrecondition(input)
   if (!input || typeof input !== 'object') throw new PublicIpcError('invalid-request')
   const candidate = input as Partial<SpeechAnalysisJobRequest>
+  if (candidate.scope !== undefined) {
+    if (
+      candidate.audioSourceId !== undefined ||
+      typeof candidate.language !== 'string' ||
+      !candidate.draft ||
+      !candidate.scope ||
+      typeof candidate.scope !== 'object' ||
+      (candidate.scope.kind !== 'all' &&
+        !(
+          candidate.scope.kind === 'track' &&
+          typeof candidate.scope.trackId === 'string' &&
+          candidate.scope.trackId.length > 0
+        )) ||
+      (candidate.mode !== undefined &&
+        candidate.mode !== 'missing' &&
+        candidate.mode !== 'regenerate')
+    )
+      throw new PublicIpcError('invalid-request')
+    const tracks = ProjectFileSchema.shape.tracks.parse(candidate.draft.tracks)
+    return {
+      ...precondition,
+      jobId: requireJobId(candidate.jobId) as SpeechAnalysisJobId,
+      scope:
+        candidate.scope.kind === 'all'
+          ? { kind: 'all' }
+          : { kind: 'track', trackId: candidate.scope.trackId },
+      language: candidate.language,
+      draft: { ...candidate.draft, tracks },
+      mode: candidate.mode,
+      ...(candidate.confirmSpeakerLabelReset === true ? { confirmSpeakerLabelReset: true } : {}),
+    }
+  }
   if (
     typeof candidate.audioSourceId !== 'string' ||
     typeof candidate.language !== 'string' ||

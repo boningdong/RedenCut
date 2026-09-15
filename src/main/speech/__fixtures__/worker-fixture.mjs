@@ -6,6 +6,15 @@ lines.once('line', (line) => {
   const request = JSON.parse(line)
   const emit = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
   const envelope = { protocolVersion: 1, jobId: request.jobId }
+  if (mode === 'worker-error') {
+    emit({ ...envelope, type: 'error', code: 'worker-failed', message: 'model computation failed' })
+    return
+  }
+  if (mode === 'crash') {
+    process.stderr.write('x'.repeat(100_000) + '\nallocation failed');
+    process.exitCode = 2;
+    return;
+  }
   if (mode === 'hang') {
     emit({ ...envelope, type: 'ready' })
     const keepAlive = setInterval(() => {}, 1000)

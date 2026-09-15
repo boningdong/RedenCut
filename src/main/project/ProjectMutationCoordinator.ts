@@ -27,9 +27,20 @@ export class ProjectMutationCoordinator {
   ) {}
 
   save(request: ProjectMutationRequest): Promise<RendererSession> {
-    return this.controller.runTransition(request, async (transaction) =>
-      (await this.begin(transaction)).save(request.draft),
-    )
+    return this.controller.runTransition(request, async (transaction) => {
+      const token = transaction.precondition.workspaceToken
+      this.jobs.beginClosing(token)
+      try {
+        try {
+          await this.jobs.cancelAndSettleKinds(token, ['transcription', 'export'])
+        } catch (error) {
+          throw new SessionMutationSettlementError(error)
+        }
+        return await transaction.save(request.draft)
+      } finally {
+        this.jobs.reopen(token)
+      }
+    })
   }
 
   saveAs(destination: string, request: ProjectMutationRequest): Promise<RendererSession> {

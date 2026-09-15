@@ -163,7 +163,7 @@ export interface RendererSpeechAnalysis {
     'id' | 'transcriptArtifactId' | 'transcriptRevision' | 'acousticEditUnits' | 'provenance'
   >
   diarization?: Pick<DiarizationArtifact, 'id' | 'turns' | 'provenance'>
-  diarizationStatus?: 'completed' | 'skipped-disabled'
+  diarizationStatus?: 'completed' | 'skipped-disabled' | 'pending'
   speakerAttribution?: SpeakerAttributionArtifact
   speakers: Speaker[]
   speakerLabelOverrides: Array<{ speakerId: SpeakerId; displayName: string; color?: string }>

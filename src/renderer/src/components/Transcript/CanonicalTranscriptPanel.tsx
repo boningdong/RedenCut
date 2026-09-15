@@ -1,3 +1,4 @@
+import { SpeechBatchProgress } from './SpeechBatchProgress'
 import { useTranslation } from '../../i18n/useTranslation'
 import { progressMessage } from '../../i18n/messages'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -24,8 +25,10 @@ type SessionSelection = OccurrenceSelection & { workspaceToken: string | undefin
 export function CanonicalTranscriptPanel({
   workspaceControls,
   onGenerate,
+  onRegenerate,
   isGenerating,
   generatingStatus,
+  onCancel,
   analyses,
 }: TranscriptPanelProps & { analyses: RendererSpeechAnalysis[] }) {
   const { t } = useTranslation()
@@ -261,15 +264,23 @@ export function CanonicalTranscriptPanel({
               ? generatingStatus
                 ? progressMessage(t, generatingStatus)
                 : t('transcript.analyzing')
-              : t('transcript.reanalyze')}
+              : t('transcript.generate')}
           </button>
+          {onRegenerate && (
+            <button disabled={isGenerating} onClick={onRegenerate}>
+              {t('transcript.reanalyze')}
+            </button>
+          )}
         </div>
       </div>
-      {isGenerating && (
-        <div role="status" className="transcript-progress">
-          {generatingStatus ? progressMessage(t, generatingStatus) : t('transcript.generating')}
-        </div>
+      {analyses.some((analysis) => analysis.diarizationStatus === 'pending') && (
+        <div role="status">{t('transcript.pendingSpeakers')}</div>
       )}
+      <SpeechBatchProgress
+        isGenerating={isGenerating}
+        status={generatingStatus}
+        onCancel={onCancel}
+      />
       <div
         ref={container}
         contentEditable

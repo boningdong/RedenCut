@@ -320,15 +320,11 @@ describe('reset', () => {
     ts().setWords([makeWord('w1', 0, 5, true)])
     ts().toggleShowMutedWords() // now false
     ts().setSelectedWordIds(new Set(['w1']))
-    ts().setIsGenerating(true)
-    ts().setGeneratingStatus({ stage: 'aligning' })
 
     ts().reset()
 
     expect(ts().words).toHaveLength(0)
     expect(ts().showMutedWords).toBe(true)
     expect(ts().selectedWordIds.size).toBe(0)
-    expect(ts().isGenerating).toBe(false)
-    expect(ts().generatingStatus).toBeNull()
   })
 })

@@ -25,13 +25,14 @@ export class SpeechArtifactStore {
   prepare(input: SpeechArtifact): PreparedSpeechArtifact {
     const artifact = SpeechArtifactSchema.parse(input)
     const bytes = Buffer.from(`${stableStringify(artifact)}\n`, 'utf8')
-    const artifactPath = `speech/${artifact.audioSourceId}/revision-${artifact.analysisRevisionId}.json`
+    const artifactSha256 = sha256(bytes)
+    const artifactPath = `speech/${artifact.audioSourceId}/revision-${artifact.analysisRevisionId}-${artifactSha256}.json`
     const reference = SpeechArtifactRefSchema.parse({
       audioSourceId: artifact.audioSourceId,
       analysisRevisionId: artifact.analysisRevisionId,
       sourceFingerprint: artifact.sourceFingerprint,
       artifactPath,
-      artifactSha256: sha256(bytes),
+      artifactSha256,
       artifactByteLength: bytes.byteLength,
       artifactSchemaVersion: artifact.schemaVersion,
       summary: {

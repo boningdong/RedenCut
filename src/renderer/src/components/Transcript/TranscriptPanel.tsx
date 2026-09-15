@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation'
 import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
-import { progressMessage } from '../../i18n/messages'
+import { SpeechBatchProgress } from './SpeechBatchProgress'
 // ─────────────────────────────────────────────────────────────────────────────
 // TranscriptPanel
 //
@@ -40,8 +40,10 @@ export interface TranscriptPanelProps {
   workspaceControls?: React.ReactNode
   /** Called when the user clicks "Generate Transcript". Optionally scoped to a track. */
   onGenerate: (trackId?: string) => void
+  onRegenerate?: () => void
   /** True while transcription is running. */
   isGenerating: boolean
+  onCancel?: () => void
   /** Status message during generation. */
   generatingStatus: SpeechProgress | TranscriptionProgress | null
 }
@@ -60,6 +62,7 @@ function LegacyTranscriptPanel({
   onGenerate,
   isGenerating,
   generatingStatus,
+  onCancel,
 }: TranscriptPanelProps) {
   const { t } = useTranslation()
   const currentTime = usePlaybackStore((s) => s.currentTime)
@@ -102,7 +105,7 @@ function LegacyTranscriptPanel({
 
   // Tracks with no words yet — these appear in the Generate dropdown
   const ungeneratedTracks = useMemo(
-    () => tracks.filter((t) => !words.some((w) => w.trackId === t.id)),
+    () => tracks.filter((t) => t.clips.length > 0 && !words.some((w) => w.trackId === t.id)),
     [tracks, words],
   )
 
@@ -510,9 +513,12 @@ function LegacyTranscriptPanel({
         )}
       </div>
       {/* ── Body ────────────────────────────────────────────────────────── */}
-      {isGenerating ? (
-        <GeneratingState status={generatingStatus} />
-      ) : !hasAnyWords && tracks.length === 0 ? (
+      <SpeechBatchProgress
+        isGenerating={isGenerating}
+        status={generatingStatus}
+        onCancel={onCancel}
+      />
+      {!hasAnyWords && tracks.length === 0 ? (
         <EmptyTranscriptState noTracks />
       ) : !hasAnyWords ? (
         <EmptyTranscriptState />
@@ -640,117 +646,5 @@ function EmptyTranscriptState({ noTracks = false }: { noTracks?: boolean }) {
         {noTracks ? t('transcript.addTrackHint') : t('transcript.generateHint')}
       </p>
     </div>
-  )
-}
-
-function GeneratingState({ status }: { status: SpeechProgress | TranscriptionProgress | null }) {
-  const { t } = useTranslation()
-  const [elapsed, setElapsed] = useState(0)
-
-  useEffect(() => {
-    const start = Date.now()
-    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  // Read progress independently of translated stage text.
-  const pct = status?.percent ?? null
-
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 'var(--space-3)',
-        padding: 'var(--space-4)',
-        textAlign: 'center',
-      }}
-    >
-      <SpinnerIcon />
-      <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-        {t('transcript.generating')}
-      </p>
-
-      {/* Progress bar — shown once whisper starts reporting percentages */}
-      {pct !== null && (
-        <div style={{ width: 180, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div
-            style={{
-              width: '100%',
-              height: 3,
-              backgroundColor: 'var(--color-bg-elevated)',
-              borderRadius: 2,
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${pct}%`,
-                height: '100%',
-                backgroundColor: 'var(--color-accent)',
-                transition: 'width 0.4s ease',
-              }}
-            />
-          </div>
-          <span
-            style={{
-              color: 'var(--color-text-muted)',
-              fontSize: 'var(--text-xs)',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {pct}%
-          </span>
-        </div>
-      )}
-
-      {status && pct === null && (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', maxWidth: 200 }}>
-          {progressMessage(t, status)}
-        </p>
-      )}
-
-      {elapsed > 0 && (
-        <p
-          style={{
-            color: 'var(--color-text-muted)',
-            fontSize: 'var(--text-xs)',
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {t('transcript.elapsed', {
-            time:
-              elapsed < 60
-                ? t('transcript.seconds', { seconds: elapsed })
-                : t('transcript.minutesSeconds', {
-                    minutes: Math.floor(elapsed / 60),
-                    seconds: elapsed % 60,
-                  }),
-          })}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function SpinnerIcon() {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="var(--color-accent)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      style={{ animation: 'spin 1s linear infinite' }}
-    >
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      <circle cx="12" cy="12" r="10" strokeOpacity="0.2" />
-      <path d="M12 2 a10 10 0 0 1 10 10" />
-    </svg>
   )
 }

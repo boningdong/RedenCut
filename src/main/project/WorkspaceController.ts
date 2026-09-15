@@ -1,3 +1,8 @@
+import {
+  assertSpeechGuard,
+  captureSpeechGuard,
+  type BackgroundSpeechGuard,
+} from './BackgroundCommitPolicy'
 import { tmpdir } from 'node:os'
 import { createStarterWorkspace } from './createStarterWorkspace'
 import { randomUUID } from 'crypto'
@@ -85,8 +90,11 @@ export class WorkspaceController {
     return this.current
   }
 
-  async describe(): Promise<RendererSession> {
-    return this.mutex.runExclusive(() => this.describeState(this.captureState()))
+  async describe(signal?: AbortSignal): Promise<RendererSession> {
+    return this.mutex.runExclusive(() => {
+      signal?.throwIfAborted()
+      return this.describeState(this.captureState())
+    }, signal)
   }
 
   async save(request: ProjectMutationRequest): Promise<RendererSession> {
@@ -129,6 +137,35 @@ export class WorkspaceController {
     return this.runTransition(expected, (transaction) =>
       transaction.commitSpeechAnalysis(artifact, draft),
     )
+  }
+
+  assertWorkspaceCurrent(expected: Pick<SessionPrecondition, 'workspaceToken'>): void {
+    if (!this.current || !this.workspaceToken)
+      throw new Error('Project workspace has not been initialized')
+    if (expected.workspaceToken !== this.workspaceToken) throw new Error('Stale workspace token')
+  }
+
+  captureBackgroundSpeechGuard(
+    expected: SessionPrecondition,
+    audioSourceId: AudioSourceId,
+  ): BackgroundSpeechGuard {
+    this.assertWorkspaceCurrent(expected)
+    return captureSpeechGuard(this.workspace.project, expected, audioSourceId)
+  }
+
+  async commitBackgroundSpeechAnalysis(
+    guard: BackgroundSpeechGuard,
+    artifact: SpeechArtifact,
+    signal?: AbortSignal,
+  ): Promise<RendererSession> {
+    return this.mutex.runExclusive(async () => {
+      signal?.throwIfAborted()
+      this.assertWorkspaceCurrent(guard)
+      assertSpeechGuard(this.workspace.project, guard)
+      if (artifact.audioSourceId !== guard.audioSourceId)
+        throw new Error('Speech analysis source is stale')
+      return this.commitSpeechAnalysisState(this.captureState(), artifact)
+    }, signal)
   }
 
   async renameSpeaker(request: RenameSpeakerRequest): Promise<RendererSession> {
@@ -201,8 +238,26 @@ export class WorkspaceController {
     operation: (transaction: WorkspaceTransaction) => Promise<T>,
     signal?: AbortSignal,
   ): Promise<T> {
+    return this.executeTransition(expected, operation, signal, true)
+  }
+
+  async runBackgroundTransition<T>(
+    expected: SessionPrecondition,
+    operation: (transaction: WorkspaceTransaction) => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.executeTransition(expected, operation, signal, false)
+  }
+
+  private async executeTransition<T>(
+    expected: SessionPrecondition,
+    operation: (transaction: WorkspaceTransaction) => Promise<T>,
+    signal: AbortSignal | undefined,
+    strict: boolean,
+  ): Promise<T> {
     return this.mutex.runExclusive(async () => {
-      this.assertCurrent(expected)
+      if (strict) this.assertCurrent(expected)
+      else this.assertWorkspaceCurrent(expected)
       const state = this.captureState()
       const transactionRetiredWorkspaces = new Set<ProjectWorkspace>()
       const transaction: WorkspaceTransaction = {
@@ -270,11 +325,25 @@ export class WorkspaceController {
 
   captureSpeechPcmResolver(expected: SessionPrecondition) {
     this.assertCurrent(expected)
+    return this.captureBackgroundSpeechPcmResolver(expected)
+  }
+
+  captureBackgroundSpeechPcmResolver(expected: SessionPrecondition) {
+    this.assertWorkspaceCurrent(expected)
     const workspace = this.workspace
     const sources = new Map(workspace.project.audioSources.map((source) => [source.id, source]))
     return async (audioSourceId: AudioSourceId) => {
+      this.assertWorkspaceCurrent(expected)
       const source = sources.get(audioSourceId)
       if (!source) throw new Error(`Unknown audio source: ${audioSourceId}`)
+      const currentSource = this.workspace.project.audioSources.find(
+        (source) => source.id === audioSourceId,
+      )
+      if (
+        !currentSource ||
+        JSON.stringify(currentSource.fingerprint) !== JSON.stringify(source.fingerprint)
+      )
+        throw new Error('Speech analysis source fingerprint is stale')
       const store = new AudioSourceCacheStore(workspace.root)
       const manifest = await store.validate(source)
       if (!manifest) throw new Error('Speech audio cache is invalid')
@@ -387,7 +456,7 @@ export class WorkspaceController {
   private async commitSpeechAnalysisState(
     state: TransactionState,
     artifact: SpeechArtifact,
-    draft: ProjectDraft,
+    draft?: ProjectDraft,
   ): Promise<RendererSession> {
     const workspace = state.workspace
     const source = workspace.project.audioSources.find(
@@ -400,7 +469,7 @@ export class WorkspaceController {
       source.fingerprint.sha256 !== artifact.sourceFingerprint.sha256
     )
       throw new Error('Speech analysis source fingerprint is stale')
-    const baseProject = mergeProjectDraft(workspace.project, draft)
+    const baseProject = draft ? mergeProjectDraft(workspace.project, draft) : workspace.project
     const descriptors = await this.descriptors(workspace, baseProject, 'full')
     const store = new SpeechArtifactStore(workspace.root)
     const staged = await store.stage(store.prepare(artifact))
@@ -416,9 +485,18 @@ export class WorkspaceController {
           ),
           reference,
         ],
-        speakerLabelOverrides: baseProject.speakerLabelOverrides.filter(
-          (override) => override.audioSourceId !== artifact.audioSourceId,
-        ),
+        speakerLabelOverrides: baseProject.speakerLabelOverrides
+          .filter(
+            (override) =>
+              override.audioSourceId !== artifact.audioSourceId ||
+              (override.analysisRevisionId === artifact.analysisRevisionId &&
+                artifact.speakers.some((speaker) => speaker.id === override.speakerId)),
+          )
+          .map((override) =>
+            override.audioSourceId === artifact.audioSourceId
+              ? { ...override, speechArtifactSha256: reference.artifactSha256 }
+              : override,
+          ),
       })
       await workspace.save(project)
       this.advanceRetainingWorkspace(state, workspace)

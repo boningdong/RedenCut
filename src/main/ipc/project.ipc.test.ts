@@ -168,8 +168,8 @@ describe('project IPC', () => {
     expect(barrier.acknowledge).toHaveBeenCalledWith(9, acknowledgement)
   })
 
-  it.each(['import', 'transcription', 'export'] as const)(
-    'closes admission and settles an active %s before Save advances its revision',
+  it.each(['import', 'transcription', 'export', 'speech-analysis'] as const)(
+    'preserves the ordinary Save lifecycle for an active %s job',
     async (kind) => {
       const parent = await mkdtemp(join(tmpdir(), 'redencut-project-ipc-'))
       roots.push(parent)
@@ -204,19 +204,37 @@ describe('project IPC', () => {
         vi.fn(),
       )
 
-      let saveResolved = false
-      const saving = Promise.resolve(
-        mocks.handlers.get('project:save')!(
-          { sender: sender() },
-          { ...current, draft: current.draft },
-        ),
-      ).then((value) => {
-        saveResolved = true
-        return value
+      const saving = mocks.handlers.get('project:save')!(
+        { sender: sender() },
+        { ...current, draft: current.draft },
+      )
+      if (kind === 'transcription' || kind === 'export') {
+        await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
+        let saveResolved = false
+        void Promise.resolve(saving).then(() => {
+          saveResolved = true
+        })
+        await Promise.resolve()
+        expect(saveResolved).toBe(false)
+        expect(() =>
+          jobs.register(
+            {
+              kind: 'import',
+              jobId: 'during-settlement',
+              senderId: 7,
+              workspaceToken: current.workspaceToken,
+              revision: current.revision,
+            },
+            () => ({ cancel: vi.fn(), settled: Promise.resolve() }),
+          ),
+        ).toThrow('Session is closing')
+        settleJob()
+      }
+      await expect(saving).resolves.toMatchObject({
+        ok: true,
+        value: { workspaceToken: current.workspaceToken, revision: current.revision + 1 },
       })
-
-      await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
-      expect(saveResolved).toBe(false)
+      if (kind === 'import' || kind === 'speech-analysis') expect(cancel).not.toHaveBeenCalled()
       expect(() =>
         jobs.register(
           {
@@ -224,17 +242,12 @@ describe('project IPC', () => {
             jobId: 'late-import',
             senderId: 7,
             workspaceToken: current.workspaceToken,
-            revision: current.revision,
+            revision: current.revision + 1,
           },
           () => ({ cancel: vi.fn(), settled: Promise.resolve() }),
         ),
-      ).toThrow('Session is closing')
-
+      ).not.toThrow()
       settleJob()
-      await expect(saving).resolves.toMatchObject({
-        ok: true,
-        value: { workspaceToken: current.workspaceToken, revision: 3 },
-      })
     },
   )
 

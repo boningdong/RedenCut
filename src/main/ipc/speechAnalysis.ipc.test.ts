@@ -1,6 +1,7 @@
+import type * as Os from 'os'
 import { EventEmitter } from 'events'
 import type { IpcResult } from '../../shared/ipc.types'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
 
@@ -10,6 +11,15 @@ const mocks = vi.hoisted(() => ({
   unavailableReason: vi.fn(),
   existsSync: vi.fn(),
   prepare: vi.fn(),
+  platform: vi.fn(() => 'unknown'),
+  architecture: vi.fn(() => 'unknown'),
+  cpus: vi.fn(() => [{ model: 'unknown' }]),
+}))
+vi.mock('os', async (importOriginal) => ({
+  ...(await importOriginal<typeof Os>()),
+  platform: mocks.platform,
+  arch: mocks.architecture,
+  cpus: mocks.cpus,
 }))
 vi.mock('electron', () => ({
   ipcMain: {
@@ -24,12 +34,15 @@ vi.mock('../speech/SpeechAnalysisCoordinator', () => ({
 }))
 vi.mock('../speech/prepareSpeechAudio', () => ({ withSpeechAudio: mocks.prepare }))
 vi.mock('../speech/transcriber/whisper', () => ({
-  whisperTranscriber: { unavailableReason: mocks.unavailableReason },
+  whisperTranscriber: { unavailableReason: mocks.unavailableReason, setModelResolver: vi.fn() },
 }))
 vi.mock('fs', () => ({ existsSync: mocks.existsSync }))
 import { registerSpeechAnalysisIpc } from './speechAnalysis.ipc'
 
 beforeEach(() => {
+  mocks.platform.mockReturnValue('unknown')
+  mocks.architecture.mockReturnValue('unknown')
+  mocks.cpus.mockReturnValue([{ model: 'unknown' }])
   mocks.handlers.clear()
   mocks.unavailableReason.mockResolvedValue(null)
   mocks.existsSync.mockReturnValue(true)
@@ -37,10 +50,12 @@ beforeEach(() => {
   mocks.prepare.mockReset()
 })
 
-function setup() {
+afterEach(() => vi.unstubAllEnvs())
+
+function setup(services?: Parameters<typeof registerSpeechAnalysisIpc>[3]) {
   const sources = [
     { id: 'first', fingerprint: { sha256: 'wav-original' } },
-    { id: 'second', fingerprint: { sha256: 'm4a-original' } },
+    { id: 'second', fingerprint: { sha256: 'm4a-original' }, metadata: { durationSeconds: 300 } },
   ]
   const resolvePcm = vi.fn(async (id: string) => ({
     path: `/cache/${id}/audio.f32le`,
@@ -50,6 +65,9 @@ function setup() {
   const controller = {
     workspace: { project: { audioSources: sources, speakerLabelOverrides: [] } },
     assertCurrent: vi.fn(),
+    assertWorkspaceCurrent: vi.fn(),
+    captureBackgroundSpeechPcmResolver: () => resolvePcm,
+    describe: vi.fn(async () => ({ workspaceToken: 'workspace', revision: 3 })),
     captureOriginalResolver: () => async (id: string) => `/media/${id}.m4a`,
     captureSpeechPcmResolver: () => resolvePcm,
     commitSpeechAnalysis: vi.fn(async () => ({ revision: 3 })),
@@ -63,10 +81,11 @@ function setup() {
     controller as unknown as WorkspaceController,
     new SessionJobRegistry(),
     diagnostics,
+    services,
   )
   const sender = Object.assign(new EventEmitter(), {
     id: 1,
-    isDestroyed: () => false,
+    isDestroyed: (): boolean => false,
     send: vi.fn(),
   })
   const start = (audioSourceId = 'second') =>
@@ -81,7 +100,7 @@ function setup() {
         draft: {},
       },
     )
-  return { start, controller, resolvePcm, sources, diagnostics }
+  return { start, controller, resolvePcm, sources, diagnostics, sender }
 }
 
 it('generates a second imported M4A source from normalized cached PCM while retaining its original identity', async () => {
@@ -137,4 +156,182 @@ it('returns stable availability reasons for missing engines, workers and models'
   expect(await availability()).toEqual({ ok: true, value: { reason: 'speech-worker-missing' } })
   mocks.existsSync.mockReturnValueOnce(true).mockReturnValue(false)
   expect(await availability()).toEqual({ ok: true, value: { reason: 'speech-models-missing' } })
+})
+
+it('timestamps preparation, real stage progress and publication using main-owned transitions', async () => {
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(1000)
+  try {
+    const { start, sender } = setup()
+    mocks.run.mockImplementation(async (_input, _signal, progress) => {
+      clock.mockReturnValue(2000)
+      progress({ stage: 'diarizing', percent: 10 })
+      clock.mockReturnValue(100000)
+      progress({ stage: 'diarizing' })
+      return { artifact: true }
+    })
+    expect((await start()).ok).toBe(true)
+    expect(sender.send.mock.calls.map((call) => call[1])).toEqual([
+      expect.objectContaining({ stage: 'preparing-audio', stageStartedAtMs: 1000 }),
+      expect.objectContaining({ stage: 'diarizing', percent: 10, stageStartedAtMs: 2000 }),
+      expect.objectContaining({ stage: 'diarizing', stageStartedAtMs: 2000 }),
+      expect.objectContaining({ stage: 'publishing', stageStartedAtMs: 100000 }),
+    ])
+    expect(sender.send.mock.calls[2][1]).not.toHaveProperty('percent')
+    expect(sender.send.mock.calls[2][1]).not.toHaveProperty('estimatedDurationMs')
+  } finally {
+    clock.mockRestore()
+  }
+})
+
+function deferredPreferences() {
+  let resolve!: (value: { textEditingEnabled: boolean; speakerRecognitionEnabled: boolean }) => void
+  const read = vi.fn(
+    () =>
+      new Promise<{ textEditingEnabled: boolean; speakerRecognitionEnabled: boolean }>((done) => {
+        resolve = done
+      }),
+  )
+  const services = {
+    preferences: { read },
+    resources: {
+      getModelPaths: vi.fn(async () => ({
+        whisper: '/models/whisper',
+        'alignment-zh': '/models/zh',
+        'alignment-en': '/models/en',
+      })),
+      models: [{ id: 'whisper', capability: 'transcription', files: [{ path: 'model.bin' }] }],
+    },
+    runtime: { getSpeechPythonPath: () => '/python' },
+    manifestPath: '/worker/models.json',
+  } as unknown as NonNullable<Parameters<typeof registerSpeechAnalysisIpc>[3]>
+  return {
+    services,
+    read,
+    resolve: (speakerRecognitionEnabled = false) =>
+      resolve({ textEditingEnabled: true, speakerRecognitionEnabled }),
+  }
+}
+
+it('owns cancellation before awaiting resource preferences', async () => {
+  const preferences = deferredPreferences()
+  const { start, sender, controller } = setup(preferences.services)
+  const running = start()
+  expect(preferences.read).toHaveBeenCalledOnce()
+  const cancelling = mocks.handlers.get('speech-analysis:cancel')!(
+    { sender },
+    { workspaceToken: 'workspace', revision: 2, jobId: 'job-second' },
+  )
+  preferences.resolve()
+  expect(await cancelling).toEqual({ ok: true, value: 'cancelled' })
+  expect(await running).toMatchObject({ ok: false, error: { reason: 'cancelled' } })
+  expect(mocks.prepare).not.toHaveBeenCalled()
+  expect(controller.commitSpeechAnalysis).not.toHaveBeenCalled()
+})
+
+it.each(['before-start', 'during-preferences'] as const)(
+  'does not launch analysis for a destroyed sender: %s',
+  async (when) => {
+    const preferences = deferredPreferences()
+    const { start, sender } = setup(preferences.services)
+    let destroyed = when === 'before-start'
+    sender.isDestroyed = () => destroyed
+    const running = start()
+    if (when === 'during-preferences') {
+      destroyed = true
+      sender.emit('destroyed')
+    }
+    if (preferences.read.mock.calls.length) preferences.resolve()
+    expect(await running).toMatchObject({ ok: false, error: { reason: 'cancelled' } })
+    expect(mocks.prepare).not.toHaveBeenCalled()
+    expect(sender.listenerCount('destroyed')).toBe(0)
+  },
+)
+
+it('does not launch a second execution when the same job is already registered', async () => {
+  const preferences = deferredPreferences()
+  const { start } = setup(preferences.services)
+  const first = start()
+  const duplicate = await start()
+  expect(duplicate).toMatchObject({ ok: false })
+  expect(preferences.read).toHaveBeenCalledOnce()
+  preferences.resolve()
+  expect(await first).toMatchObject({ ok: true })
+  expect(mocks.prepare).toHaveBeenCalledOnce()
+})
+
+it('forwards only a matching measured diarization estimate after managed models resolve', async () => {
+  for (const key of Object.keys(process.env))
+    if (
+      /^(OMP_|MKL_|OPENBLAS_|BLIS_|VECLIB_|NUMEXPR_|GOTO_|TBB_|BLAS_|ACCELERATE_|TORCH_NUM_)/.test(
+        key,
+      )
+    )
+      vi.stubEnv(key, undefined)
+  vi.stubEnv('OMP_NUM_THREADS', '4')
+  mocks.platform.mockReturnValue('darwin')
+  mocks.architecture.mockReturnValue('arm64')
+  mocks.cpus.mockReturnValue(Array.from({ length: 10 }, () => ({ model: 'Apple M4' })))
+  const preferences = deferredPreferences()
+  vi.mocked(preferences.services.resources.getModelPaths).mockResolvedValue({
+    whisper: '/models/whisper',
+    'alignment-zh': '/models/zh',
+    'alignment-en': '/models/en',
+    'diarization-default': '/models/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee',
+  })
+  const { start, sender } = setup(preferences.services)
+  mocks.run.mockImplementation(async (_input, _signal, progress) => {
+    progress({ stage: 'diarizing' })
+    return { artifact: true }
+  })
+  const running = start()
+  const preparation = sender.send.mock.calls[0][1]
+  expect(preparation).toMatchObject({
+    stage: 'preparing-audio',
+    stageStartedAtMs: expect.any(Number),
+  })
+  expect(preparation).not.toHaveProperty('estimatedDurationMs')
+  preferences.resolve(true)
+  expect(await running).toMatchObject({ ok: true })
+  expect(sender.send.mock.calls.find((call) => call[1].stage === 'diarizing')?.[1]).toMatchObject({
+    estimatedDurationMs: 324359,
+    stageStartedAtMs: expect.any(Number),
+  })
+})
+
+it('routes an explicit empty all-tracks batch through resource preflight without starting engines', async () => {
+  const { sender, controller } = setup()
+  const result = await mocks.handlers.get('speech-analysis:start')!(
+    { sender },
+    {
+      workspaceToken: 'workspace',
+      revision: 2,
+      jobId: 'all',
+      scope: { kind: 'all' },
+      language: 'auto',
+      draft: { tracks: [] },
+    },
+  )
+  expect(result).toMatchObject({
+    ok: true,
+    value: { batch: { sourceCount: 0, completedCount: 0 } },
+  })
+  expect(controller.assertWorkspaceCurrent).toHaveBeenCalled()
+  expect(mocks.run).not.toHaveBeenCalled()
+})
+it('rejects unavailable shared transcription runtime before beginning a batch', async () => {
+  const { sender } = setup()
+  mocks.unavailableReason.mockResolvedValue({ reason: 'whisper-missing' })
+  const result = await mocks.handlers.get('speech-analysis:start')!(
+    { sender },
+    {
+      workspaceToken: 'workspace',
+      revision: 2,
+      jobId: 'all',
+      scope: { kind: 'all' },
+      language: 'auto',
+      draft: { tracks: [] },
+    },
+  )
+  expect(result).toMatchObject({ ok: false, error: { reason: 'whisper-missing' } })
+  expect(mocks.prepare).not.toHaveBeenCalled()
 })

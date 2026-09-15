@@ -27,6 +27,7 @@ it('rejects with a plain whitelisted descriptor that contextBridge can copy', as
     code: 'operation-failed' as const,
     reason: 'speech-aligning' as const,
     message: 'Speech alignment failed.',
+    failureKind: 'protocol' as const,
   }
   const result = {
     ok: false as const,

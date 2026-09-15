@@ -1,7 +1,9 @@
+import { SpeechStagePolicy } from '../SpeechStagePolicy'
 import { offlineEnvironment } from '../inferenceEnvironment'
 import { TranscriberUnavailableError } from './TranscriberUnavailableError'
 import type { PublicMessage, TranscriptionProgress } from '../../../shared/publicMessages'
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn } from 'child_process'
+import { manageProcess, ProcessExecutionError } from '../../processes/ManagedProcess'
 import { mkdtemp, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -67,21 +69,16 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
     return 0
   }
 
-  const proc = spawn(
-    ffmpegPath,
-    ['-i', audioFilePath, '-t', '30', '-af', 'silencedetect=n=-40dB:d=0.1', '-f', 'null', '-'],
-    { stdio: ['ignore', 'ignore', 'pipe'], env: offlineEnvironment(process.env) },
-  )
+  const launch = () =>
+    spawn(
+      ffmpegPath,
+      ['-i', audioFilePath, '-t', '30', '-af', 'silencedetect=n=-40dB:d=0.1', '-f', 'null', '-'],
+      { stdio: ['ignore', 'ignore', 'pipe'], env: offlineEnvironment(process.env) },
+    )
   const decoder = new StringDecoder('utf8')
   let tail = ''
   let leadingInterval = false
   let decision: number | undefined
-  let killed = false
-  const killOnce = () => {
-    if (killed) return
-    killed = true
-    proc.kill()
-  }
   const inspect = (line: string) => {
     const markers = line.matchAll(/silence_(start|end):\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/g)
     for (const marker of markers) {
@@ -95,7 +92,6 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
         decision = leadingInterval ? Math.max(0, Math.round(seconds * 1000)) : 0
       }
       if (decision !== undefined) {
-        killOnce()
         return
       }
     }
@@ -110,25 +106,27 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
     if (flush && tail) inspect(tail)
   }
 
-  return new Promise<number>((resolve, reject) => {
-    let aborted = signal.aborted
-    const onAbort = () => {
-      aborted = true
-      killOnce()
-    }
-    proc.stderr!.on('data', (chunk: Buffer) => consume(decoder.write(chunk)))
-    proc.once('error', () => {
-      // Detection is optional. Process errors resolve to zero after close/reap.
-    })
-    proc.once('close', () => {
-      signal.removeEventListener('abort', onAbort)
-      if (decision === undefined) consume(decoder.end(), true)
-      if (aborted) reject(abortError())
-      else resolve(decision ?? 0)
-    })
-    signal.addEventListener('abort', onAbort, { once: true })
-    if (signal.aborted) onAbort()
+  const operation = manageProcess(launch, signal, {
+    onStderr: (chunk) => {
+      if (decision === undefined) consume(decoder.write(chunk))
+      if (decision !== undefined) operation.fail(new Error('Leading silence decision complete'))
+    },
   })
+  // This optimization only reads 30 seconds. A stalled probe must not block recognition.
+  const timeout = setTimeout(
+    () => operation.fail(new Error('Leading silence probe exceeded its execution budget')),
+    SpeechStagePolicy.leadingSilenceProbeBudgetMs,
+  )
+  try {
+    const exit = await operation.completed
+    if (decision === undefined) consume(decoder.end(), true)
+    return exit.code === 0 ? (decision ?? 0) : 0
+  } catch {
+    throwIfAborted(signal)
+    return decision ?? 0
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 // ── WhisperTranscriber ────────────────────────────────────────────────────────
@@ -219,22 +217,33 @@ export class WhisperTranscriber implements ITranscriber {
       // ── Spawn with streaming stderr for real-time progress ──────────────
       // execFileAsync collects output only at the end; spawn lets us read
       // stderr line-by-line so we can forward percentage updates to the UI.
-      const proc = spawn(binary, args, { env: offlineEnvironment(process.env) })
       let lastPct = -1
-      proc.stderr!.on('data', (chunk: Buffer) => {
-        if (signal.aborted) return
-        const match = chunk.toString().match(/progress\s*=\s*(\d+)\s*%/i)
-        if (!match) return
-        const pct = parseInt(match[1], 10)
-        if (pct !== lastPct) {
-          lastPct = pct
-          onProgress?.({ stage: 'transcribing', percent: pct })
-        }
-      })
-      await waitForProcess(proc, signal, {
-        timeoutMs: 20 * 60 * 1000,
-        timeoutMessage: 'Transcription timed out after 20 minutes',
-      })
+      let progressTail = ''
+      const operation = manageProcess(
+        () => spawn(binary, args, { env: offlineEnvironment(process.env) }),
+        signal,
+        {
+          onStderr: (chunk) => {
+            const text = progressTail + chunk.toString('utf8')
+            let consumed = 0
+            for (const match of text.matchAll(/progress\s*=\s*(\d+)\s*%/gi)) {
+              consumed = match.index + match[0].length
+              const pct = Number(match[1])
+              if (pct >= 0 && pct <= 100 && pct > lastPct) {
+                lastPct = pct
+                onProgress?.({ stage: 'transcribing', percent: pct })
+              }
+            }
+            progressTail = text.slice(consumed).slice(-4096)
+          },
+        },
+      )
+      const exit = await operation.completed
+      if (exit.code !== 0)
+        throw new ProcessExecutionError(
+          'process-exit',
+          `whisper-cli exited with code ${exit.code}, signal ${exit.signal ?? 'none'}: ${exit.diagnostics}`,
+        )
 
       throwIfAborted(signal)
       onProgress?.({ stage: 'parsing-transcript' })
@@ -295,55 +304,6 @@ export class WhisperTranscriber implements ITranscriber {
     if (cleanupError !== undefined) throw cleanupError
     return result!
   }
-}
-
-interface ProcessWaitOptions {
-  allowNonZero?: boolean
-  timeoutMs?: number
-  timeoutMessage?: string
-}
-
-function waitForProcess(
-  child: ChildProcess,
-  signal: AbortSignal,
-  options: ProcessWaitOptions = {},
-): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    let killed = false
-    let processError: unknown
-    let aborted = signal.aborted
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    const killOnce = () => {
-      if (killed) return
-      killed = true
-      child.kill()
-    }
-    const onAbort = () => {
-      aborted = true
-      killOnce()
-    }
-    const finish = (code: number | null) => {
-      if (timeout) clearTimeout(timeout)
-      signal.removeEventListener('abort', onAbort)
-      if (aborted) reject(abortError())
-      else if (processError !== undefined) reject(processError)
-      else if (code === 0 || options.allowNonZero) resolve()
-      else reject(new Error(`whisper-cli exited with code ${code}`))
-    }
-
-    child.once('error', (error) => {
-      processError = error
-    })
-    child.once('close', finish)
-    signal.addEventListener('abort', onAbort, { once: true })
-    if (options.timeoutMs !== undefined) {
-      timeout = setTimeout(() => {
-        processError = new Error(options.timeoutMessage ?? 'Process timed out')
-        killOnce()
-      }, options.timeoutMs)
-    }
-    if (signal.aborted) onAbort()
-  })
 }
 
 function throwIfAborted(signal: AbortSignal): void {

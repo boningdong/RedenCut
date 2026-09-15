@@ -207,6 +207,18 @@ export const simplifiedChineseResources = {
     channelCount: '{{count}} 个声道',
   },
   transcript: {
+    batchStopped: '分析已取消，已生成的文本会保留。',
+    batchSource: '{{phase}} · {{index}} / {{count}} · {{name}}',
+    batchText: '转写与对齐',
+    batchSpeakers: '说话人识别',
+    batchComplete:
+      '分析完成：完成 {{completed}}，复用 {{reused}}，失败 {{failed}}（共 {{count}} 个音源）。',
+    batchCancelled:
+      '分析已取消：完成 {{completed}}，复用 {{reused}}，失败 {{failed}}（共 {{count}} 个音源）。已生成的文本会保留。',
+    pendingSpeakers: '文本已就绪，说话人识别待完成。',
+
+    stageEstimate: '本阶段预计约 {{minutes}} 分钟',
+    estimateOverrun: '此阶段已超出预计时间。分析仍在运行；你可以随时取消。',
     generateTrack: '生成 {{name}} 的转写',
     allTracks: '所有轨道',
     allRemaining: '所有剩余轨道',
@@ -324,6 +336,11 @@ export const simplifiedChineseResources = {
     ready: '就绪',
   },
   errors: {
+    speechFailureDetail: '{{stageMessage}} {{detail}}',
+    speechStartup: '本地进程无法启动。请检查语音运行环境的安装。',
+    speechProcessExit: '本地进程意外停止。请重试；如果问题仍然存在，请检查可用内存和语音运行环境。',
+    speechProtocol: '本地进程返回了无效响应。请检查语音运行环境的安装并重试。',
+
     loadPreferences: '无法加载语言设置。在重试或选择语言之前，将使用英语。',
     savePreferences: '无法保存语言设置。请重试。',
     invalidPreferences: '语言设置无效，已使用默认设置。',

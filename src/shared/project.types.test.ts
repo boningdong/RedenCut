@@ -86,21 +86,24 @@ describe('ProjectFileSchema', () => {
     expect(() => ProjectFileSchema.parse({ ...managedProject(), version: 1 })).toThrow()
   })
 
-  it('accepts a readable speech artifact reference bound to its source and revision', () => {
-    const project = managedProject()
-    project.speechArtifacts.push({
-      audioSourceId: SOURCE_ID,
-      analysisRevisionId: ANALYSIS_REVISION_ID,
-      sourceFingerprint: project.audioSources[0].fingerprint,
-      artifactPath: `speech/${SOURCE_ID}/revision-${ANALYSIS_REVISION_ID}.json`,
-      artifactSha256: 'b'.repeat(64),
-      artifactByteLength: 4096,
-      artifactSchemaVersion: 1,
-      summary: { transcriptUnitCount: 12, acousticEditUnitCount: 8, speakerCount: 2 },
-    })
+  it.each(['legacy', 'content-addressed'])(
+    'accepts a %s speech artifact reference bound to its source and revision',
+    (kind) => {
+      const project = managedProject()
+      project.speechArtifacts.push({
+        audioSourceId: SOURCE_ID,
+        analysisRevisionId: ANALYSIS_REVISION_ID,
+        sourceFingerprint: project.audioSources[0].fingerprint,
+        artifactPath: `speech/${SOURCE_ID}/revision-${ANALYSIS_REVISION_ID}${kind === 'content-addressed' ? `-${'b'.repeat(64)}` : ''}.json`,
+        artifactSha256: 'b'.repeat(64),
+        artifactByteLength: 4096,
+        artifactSchemaVersion: 1,
+        summary: { transcriptUnitCount: 12, acousticEditUnitCount: 8, speakerCount: 2 },
+      })
 
-    expect(ProjectFileSchema.parse(project).speechArtifacts).toHaveLength(1)
-  })
+      expect(ProjectFileSchema.parse(project).speechArtifacts).toHaveLength(1)
+    },
+  )
 
   it('rejects a speech artifact path that does not match its stable IDs', () => {
     const project = managedProject()

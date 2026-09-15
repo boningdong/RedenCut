@@ -1,3 +1,4 @@
+import { useSpeechBatchStore } from './stores/speechBatch.store'
 import type { PublicMessage } from '@shared/publicMessages'
 import type { ImportProgress } from '@shared/import.types'
 import { normalizePublicError, publicMessage, progressMessage } from './i18n/messages'
@@ -111,6 +112,11 @@ export default function App() {
   const playerSubscriptions = useRef<(() => void)[]>([])
   const initialized = useRef(false)
   const transcriptJob = useRef<TranscriptJobIdentity | null>(null)
+  const observedBackgroundTracks = useRef<{
+    workspaceToken: WorkspaceToken
+    ids: Set<string>
+  } | null>(null)
+  const cancelledTranscriptJob = useRef<TranscriptJobIdentity | null>(null)
   const importJob = useRef<(SessionPrecondition & { jobId: string }) | null>(null)
   const loadCoordinator = useRef<SessionLoadCoordinator<RendererSessionLoad> | null>(null)
   const lastSwitchTransition = useRef<string | null>(null)
@@ -125,8 +131,8 @@ export default function App() {
   const loadEditorSession = useEditorStore((state) => state.loadSession)
   const acknowledgeSave = useEditorStore((state) => state.acknowledgeSave)
   const tracks = useTimelineStore((state) => state.tracks)
-  const isGenerating = useTranscriptStore((state) => state.isGenerating)
-  const generatingStatus = useTranscriptStore((state) => state.generatingStatus)
+  const isGenerating = useSpeechBatchStore((state) => state.isGenerating)
+  const generatingStatus = useSpeechBatchStore((state) => state.generatingStatus)
 
   const destroyPlayer = useCallback(async (): Promise<void> => {
     const player = playerRef.current
@@ -212,8 +218,7 @@ export default function App() {
 
   const invalidateTranscriptJob = useCallback(() => {
     transcriptJob.current = null
-    useTranscriptStore.getState().setIsGenerating(false)
-    useTranscriptStore.getState().setGeneratingStatus(null)
+    useSpeechBatchStore.getState().reset()
   }, [])
 
   const invalidateImportJob = useCallback(() => {
@@ -223,7 +228,7 @@ export default function App() {
 
   const invalidateImportJobForSession = useCallback(
     (appliedSession: SessionPrecondition | null) => {
-      if (importJob.current && !sameSession(appliedSession, importJob.current))
+      if (importJob.current && !sessionMatchesTranscriptJob(appliedSession, importJob.current))
         invalidateImportJob()
     },
     [invalidateImportJob],
@@ -246,7 +251,9 @@ export default function App() {
       importLedger?: RendererSessionLoad['importLedger'],
       retainVisibleEditorState = false,
     ) => {
-      invalidateTranscriptJob()
+      if (useEditorStore.getState().session?.workspaceToken !== result.workspaceToken)
+        useSpeechBatchStore.getState().reset()
+      invalidateTranscriptJobForSession(result)
       invalidateImportJobForSession(result)
       return loadCoordinator.current!.load({
         session: result,
@@ -254,7 +261,7 @@ export default function App() {
         importLedger,
       })
     },
-    [invalidateImportJobForSession, invalidateTranscriptJob],
+    [invalidateImportJobForSession, invalidateTranscriptJobForSession],
   )
 
   useEffect(() => {
@@ -281,7 +288,7 @@ export default function App() {
           current.workspaceToken === progress.workspaceToken &&
           current.revision === progress.revision &&
           importJobMatches(importJob.current, progress) &&
-          sameSession(editorSession, progress)
+          sessionMatchesTranscriptJob(editorSession, progress)
             ? {
                 ...current,
                 displayName: progress.displayName,
@@ -294,19 +301,90 @@ export default function App() {
     [],
   )
 
+  const applyBackgroundSession = useCallback(
+    async (incoming: RendererSession, submittedDraft: ProjectDraft) => {
+      const player = playerRef.current
+      const before = useEditorStore.getState().session
+      if (!before || before.workspaceToken !== incoming.workspaceToken) return
+      for (const source of incoming.sources) {
+        if (!before.sources.some((existing) => existing.id === source.id)) {
+          await player?.registerAudioSource(
+            source.id,
+            new ContinuousPcmSampleProvider(source.cache),
+          )
+        }
+      }
+      const latest = useEditorStore.getState().session
+      if (
+        !latest ||
+        latest.workspaceToken !== incoming.workspaceToken ||
+        player !== playerRef.current
+      )
+        return
+      if (incoming.revision < latest.revision) return
+      const visible = snapshotDraft()!
+      if (observedBackgroundTracks.current?.workspaceToken !== incoming.workspaceToken)
+        observedBackgroundTracks.current = {
+          workspaceToken: incoming.workspaceToken,
+          ids: new Set(),
+        }
+      const submittedIds = observedBackgroundTracks.current.ids
+      for (const track of [...submittedDraft.tracks, ...latest.draft.tracks])
+        submittedIds.add(track.id)
+      const visibleIds = new Set(visible.tracks.map((track) => track.id))
+      const additions = incoming.draft.tracks.filter(
+        (track) => !submittedIds.has(track.id) && !visibleIds.has(track.id),
+      )
+      for (const track of incoming.draft.tracks) submittedIds.add(track.id)
+      useTimelineStore.getState().appendImportedTracks(additions)
+      const mergedTracks = useTimelineStore.getState().tracks
+      const published = { ...incoming, draft: { ...visible, tracks: mergedTracks } }
+      useTimelineStore.getState().refreshAudioSources(published.sources)
+      useTranscriptStore.getState().loadAnalyses(published.speechAnalyses)
+      loadEditorSession(published, true)
+      player?.setTracks(mergedTracks)
+      setWaveforms((previous) => {
+        const next = new Map(previous)
+        for (const source of published.sources)
+          if (!next.has(source.id))
+            next.set(source.id, new BinaryWaveformDataProvider(source.cache))
+        return next
+      })
+    },
+    [loadEditorSession],
+  )
+
+  const speechDraft = useRef<ProjectDraft | null>(null)
   useEffect(
     () =>
       window.electronAPI.on.speechAnalysisProgress((progress) => {
         const current = useEditorStore.getState().session
         if (
-          transcriptJobMatches(transcriptJob.current, progress) &&
-          sessionMatchesTranscriptJob(current, progress)
+          !transcriptJobMatches(transcriptJob.current, progress) ||
+          !sessionMatchesTranscriptJob(current, progress)
         )
-          useTranscriptStore
-            .getState()
-            .setGeneratingStatus({ stage: progress.stage, percent: progress.percent })
+          return
+        useSpeechBatchStore.getState().update(
+          {
+            stage: progress.stage,
+            percent: progress.percent,
+            stageStartedAtMs: progress.stageStartedAtMs,
+            estimatedDurationMs: progress.estimatedDurationMs,
+          },
+          progress.batch,
+        )
+        if (progress.session && speechDraft.current)
+          void applyBackgroundSession(progress.session, speechDraft.current).catch(
+            (reason: unknown) => {
+              if (
+                transcriptJobMatches(transcriptJob.current, progress) &&
+                sessionMatchesTranscriptJob(useEditorStore.getState().session, progress)
+              )
+                setError(normalizePublicError(reason))
+            },
+          )
       }),
-    [],
+    [applyBackgroundSession],
   )
 
   const applyOpenResult = useCallback(
@@ -536,11 +614,9 @@ export default function App() {
       if (
         !submittedDraft ||
         !submittedSession ||
-        submittedSession.workspaceToken !== selectionSession.workspaceToken ||
-        submittedSession.revision !== selectionSession.revision
+        submittedSession.workspaceToken !== selectionSession.workspaceToken
       )
         return
-      const submittedLocalEditRevision = useEditorStore.getState().localEditRevision
       const id = crypto.randomUUID()
       setImportState({
         id,
@@ -574,13 +650,9 @@ export default function App() {
         if (
           importJobMatches(importJob.current, identity) &&
           importJobMatches(imported, identity) &&
-          latestSession?.workspaceToken === imported.workspaceToken &&
-          latestSession.revision === imported.revision
+          latestSession?.workspaceToken === imported.workspaceToken
         ) {
-          await loadSession(imported.value, {
-            submittedDraft,
-            submittedLocalEditRevision,
-          })
+          await applyBackgroundSession(imported.value, submittedDraft)
         }
       } catch (reason) {
         const identity = {
@@ -590,7 +662,7 @@ export default function App() {
         }
         if (
           importJobMatches(importJob.current, identity) &&
-          sameSession(useEditorStore.getState().session, identity)
+          sessionMatchesTranscriptJob(useEditorStore.getState().session, identity)
         )
           setError(normalizePublicError(reason))
       } finally {
@@ -601,12 +673,12 @@ export default function App() {
         }
         if (
           importJobMatches(importJob.current, identity) &&
-          sameSession(useEditorStore.getState().session, identity)
+          sessionMatchesTranscriptJob(useEditorStore.getState().session, identity)
         )
           invalidateImportJob()
       }
     },
-    [importState, invalidateImportJob, loadSession, snapshot],
+    [importState, invalidateImportJob, applyBackgroundSession, snapshot],
   )
 
   const cancelImport = useCallback(async () => {
@@ -623,13 +695,15 @@ export default function App() {
   }, [enqueueOpen])
 
   const generateTranscript = useCallback(
-    async (trackId?: string) => {
-      const track =
-        useTimelineStore.getState().tracks.find((candidate) => candidate.id === trackId) ??
-        useTimelineStore.getState().tracks[0]
-      const sourceId = track?.clips[0]?.audioSourceId
+    async (trackId?: string, mode: 'missing' | 'regenerate' = 'missing') => {
+      const selectedTracks = useTimelineStore
+        .getState()
+        .tracks.filter((track) => trackId === undefined || track.id === trackId)
+      const sourceIds = new Set(
+        selectedTracks.flatMap((track) => track.clips.map((clip) => clip.audioSourceId)),
+      )
       const currentSession = useEditorStore.getState().session
-      if (!track || !sourceId || !currentSession) return
+      if (!sourceIds.size || !currentSession || transcriptJob.current) return
       const jobId = crypto.randomUUID() as SpeechAnalysisJobId
       const job = {
         jobId,
@@ -637,27 +711,37 @@ export default function App() {
         revision: currentSession.revision,
       }
       transcriptJob.current = job
-      useTranscriptStore.getState().setIsGenerating(true)
-      useTranscriptStore.getState().setGeneratingStatus(null)
+      useSpeechBatchStore.getState().begin()
       setError(null)
       try {
         const draft = snapshotDraft()
         if (!draft) return
-        const existingAnalysis = useTranscriptStore
-          .getState()
-          .analyses.find((analysis) => analysis.audioSourceId === sourceId)
-        const confirmSpeakerLabelReset = Boolean(
-          existingAnalysis?.speakerLabelOverrides.length &&
-          window.confirm(t('dialogs.resetSpeakerNames')),
-        )
-        if (existingAnalysis?.speakerLabelOverrides.length && !confirmSpeakerLabelReset) return
+        speechDraft.current = draft
+        const resetsLabels =
+          mode === 'regenerate' &&
+          useTranscriptStore
+            .getState()
+            .analyses.some(
+              (analysis) =>
+                sourceIds.has(analysis.audioSourceId) && analysis.speakerLabelOverrides.length > 0,
+            )
+        const confirmSpeakerLabelReset =
+          resetsLabels && window.confirm(t('dialogs.resetSpeakerNames'))
+        if (resetsLabels && !confirmSpeakerLabelReset) return
         const unavailable = await window.electronAPI.speechAnalysis.checkAvailability()
+        if (
+          transcriptJobMatches(cancelledTranscriptJob.current, job) ||
+          !transcriptJobMatches(transcriptJob.current, job) ||
+          !sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
+        )
+          return
         if (unavailable) throw unavailable
         const generated = await window.electronAPI.speechAnalysis.start({
           workspaceToken: currentSession.workspaceToken,
           revision: currentSession.revision,
           jobId,
-          audioSourceId: sourceId,
+          scope: trackId === undefined ? { kind: 'all' } : { kind: 'track', trackId },
+          mode,
           language: 'auto',
           draft,
           ...(confirmSpeakerLabelReset ? { confirmSpeakerLabelReset: true } : {}),
@@ -669,32 +753,43 @@ export default function App() {
           !sessionMatchesTranscriptJob(latest, job)
         )
           return
-        // Analysis publishes metadata for existing sources. Keep the live graph and player:
-        // the returned draft was captured before edits made while recognition was running.
-        const published = {
-          ...generated.value,
-          draft: { ...generated.value.draft, tracks: useTimelineStore.getState().tracks },
-        }
-        invalidateImportJobForSession(published)
-        useTimelineStore.getState().refreshAudioSources(published.sources)
-        useTranscriptStore.getState().loadAnalyses(published.speechAnalyses)
-        loadEditorSession(published, true)
+        await applyBackgroundSession(generated.value, draft)
+        if (
+          !transcriptJobMatches(transcriptJob.current, job) ||
+          !sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
+        )
+          return
+        useSpeechBatchStore.getState().finish(generated.batch)
       } catch (reason) {
         if (
           transcriptJobMatches(transcriptJob.current, job) &&
           sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
         )
-          setError(normalizePublicError(reason))
+          if (transcriptJobMatches(cancelledTranscriptJob.current, job))
+            useSpeechBatchStore.getState().finishCancelled()
+          else setError(normalizePublicError(reason))
       } finally {
         if (transcriptJobMatches(transcriptJob.current, job)) {
           transcriptJob.current = null
-          useTranscriptStore.getState().setIsGenerating(false)
-          useTranscriptStore.getState().setGeneratingStatus(null)
+          if (useSpeechBatchStore.getState().isGenerating) useSpeechBatchStore.getState().finish()
         }
       }
     },
-    [invalidateImportJobForSession, loadEditorSession, t],
+    [applyBackgroundSession, t],
   )
+
+  const cancelSpeechAnalysis = useCallback(() => {
+    const job = transcriptJob.current
+    if (!job) return
+    cancelledTranscriptJob.current = job
+    void window.electronAPI.speechAnalysis.cancel(job).catch((reason: unknown) => {
+      if (
+        transcriptJobMatches(transcriptJob.current, job) &&
+        sessionMatchesTranscriptJob(useEditorStore.getState().session, job)
+      )
+        setError(normalizePublicError(reason))
+    })
+  }, [])
 
   const primarySource = session?.sources[0]
   const projectDuration = tracks
@@ -842,8 +937,10 @@ export default function App() {
           <TranscriptPanel
             workspaceControls={workspaceControls}
             onGenerate={(trackId) => void generateTranscript(trackId)}
+            onRegenerate={() => void generateTranscript(undefined, 'regenerate')}
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
+            onCancel={cancelSpeechAnalysis}
           />
         )}
         transport={(workspaceControls) => (
@@ -891,7 +988,7 @@ function sessionMatchesTranscriptJob(
   session: SessionPrecondition | null,
   job: SessionPrecondition,
 ): boolean {
-  return session?.workspaceToken === job.workspaceToken && session.revision === job.revision
+  return session?.workspaceToken === job.workspaceToken
 }
 
 function importJobMatches(

@@ -1,3 +1,4 @@
+from contextlib import redirect_stdout
 import json
 import sys
 from typing import IO, Any, Dict
@@ -24,16 +25,25 @@ def run(input_stream: IO[str], output: IO[str]) -> int:
         job_id = request["jobId"]
         envelope = {"protocolVersion": 1, "jobId": job_id}
         emit(output, {**envelope, "type": "ready"})
-        emit(output, {**envelope, "type": "progress", "stage": "aligning"})
-        alignment = align(request)
-        if request["config"].get("speakerRecognitionEnabled", True):
-            emit(output, {**envelope, "type": "progress", "stage": "diarizing"})
-            diarization = {"status": "completed", **diarize(request)}
-        else:
-            diarization = {"status": "skipped-disabled"}
-        emit(output, {**envelope, "type": "result", "result": {
-            "alignment": alignment, "diarization": diarization,
-        }})
+        phase = request.get("phase")
+        result = {"phase": phase} if phase else {}
+        # Third-party libraries may print; stdout is reserved for our JSONL protocol.
+        if phase != "diarization":
+            emit(output, {**envelope, "type": "progress", "stage": "aligning"})
+            with redirect_stdout(sys.stderr):
+                result["alignment"] = align(request, on_progress=lambda percent: emit(output, {
+                    **envelope, "type": "progress", "stage": "aligning", "percent": percent,
+                }))
+        if phase != "alignment":
+            if phase == "diarization" or request["config"].get("speakerRecognitionEnabled", True):
+                emit(output, {**envelope, "type": "progress", "stage": "diarizing"})
+                with redirect_stdout(sys.stderr):
+                    result["diarization"] = {"status": "completed", **diarize(request, on_progress=lambda: emit(output, {
+                        **envelope, "type": "progress", "stage": "diarizing",
+                    }))}
+            else:
+                result["diarization"] = {"status": "skipped-disabled"}
+        emit(output, {**envelope, "type": "result", "result": result})
         return 0
     except Exception as error:
         emit(output, {

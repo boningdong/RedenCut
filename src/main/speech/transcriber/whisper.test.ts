@@ -27,6 +27,7 @@ import { WhisperTranscriber } from './whisper'
 
 class FakeChild extends EventEmitter {
   readonly stderr = new EventEmitter()
+  readonly stdout = new EventEmitter()
   readonly kill = vi.fn(() => true)
 }
 
@@ -59,6 +60,70 @@ describe('WhisperTranscriber cancellation', () => {
     mocks.rm.mockReset()
     mocks.rm.mockResolvedValue(undefined)
     mocks.existsSync.mockClear()
+  })
+
+  it('parses fragmented and multiple progress records while draining stdout', async () => {
+    const silence = new FakeChild()
+    const whisper = new FakeChild()
+    mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
+    const progress = vi.fn()
+    const operation = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+      '/source.wav',
+      {},
+      new AbortController().signal,
+      progress,
+    )
+    await waitForSpawnCount(1)
+    silence.emit('close', 0)
+    await waitForSpawnCount(2)
+    expect(whisper.stdout.listenerCount('data')).toBeGreaterThan(0)
+    whisper.stderr.emit('data', Buffer.from('progress = 1'))
+    whisper.stderr.emit('data', Buffer.from('2%\nprogress = 34%\nprogress = 56%\n'))
+    whisper.emit('close', 0)
+    await operation
+    expect(
+      progress.mock.calls.filter(([p]) => p.stage === 'transcribing').map(([p]) => p.percent),
+    ).toEqual([12, 34, 56])
+  })
+  it('continues transcribing past twenty minutes until explicitly cancelled', async () => {
+    vi.useFakeTimers()
+    const abort = new AbortController()
+    const { whisper, transcription } = await advanceToWhisper(abort.signal)
+    const result = transcription.catch((error: unknown) => error)
+    try {
+      await vi.advanceTimersByTimeAsync(21 * 60_000)
+      expect(whisper.kill).not.toHaveBeenCalled()
+      abort.abort()
+      whisper.emit('close', null)
+      expect(await result).toMatchObject({ name: 'AbortError' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('abandons a stalled optional silence probe and continues recognition', async () => {
+    const silence = new FakeChild()
+    const whisper = new FakeChild()
+    mocks.spawn.mockReturnValueOnce(silence).mockReturnValueOnce(whisper)
+    vi.useFakeTimers()
+    try {
+      const operation = new WhisperTranscriber(() => '/managed/ggml-base.bin').transcribe(
+        '/source.wav',
+        {},
+        new AbortController().signal,
+      )
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(silence.kill).toHaveBeenCalledWith('SIGTERM')
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(silence.kill).toHaveBeenCalledWith('SIGKILL')
+      silence.emit('close', null)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mocks.spawn).toHaveBeenCalledTimes(2)
+      whisper.emit('close', 0)
+      await operation
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('retains an actionable missing-engine reason on the legacy IPC error path', async () => {

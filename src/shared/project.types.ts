@@ -269,7 +269,11 @@ export const ProjectFileSchema = z
         })
       }
       const expectedPath = `speech/${reference.audioSourceId}/revision-${reference.analysisRevisionId}.json`
-      if (reference.artifactPath !== expectedPath) {
+      const contentAddressedPath = `speech/${reference.audioSourceId}/revision-${reference.analysisRevisionId}-${reference.artifactSha256}.json`
+      if (
+        reference.artifactPath !== expectedPath &&
+        reference.artifactPath !== contentAddressedPath
+      ) {
         context.addIssue({
           code: 'custom',
           path: ['speechArtifacts', referenceIndex, 'artifactPath'],

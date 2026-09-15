@@ -1,3 +1,4 @@
+import { useSpeechBatchStore } from './stores/speechBatch.store'
 import type { PublicMessage } from '@shared/publicMessages'
 // @vitest-environment jsdom
 
@@ -95,17 +96,24 @@ vi.mock('./components/Transcript/TranscriptPanel', () => ({
   TranscriptPanel: ({
     workspaceControls,
     onGenerate,
+    onRegenerate,
     isGenerating,
     generatingStatus,
+    onCancel,
   }: {
     workspaceControls?: React.ReactNode
-    onGenerate: (trackId: string) => void
+    onGenerate: (trackId?: string) => void
+    onRegenerate?: () => void
     isGenerating: boolean
+    onCancel?: () => void
     generatingStatus: { stage: string } | null
   }) => (
     <div>
       {workspaceControls}
       <button onClick={() => onGenerate('track-1')}>Generate transcript</button>
+      <button onClick={onCancel}>Cancel speech</button>
+      <button onClick={onRegenerate}>Regenerate transcript</button>
+      <button onClick={() => onGenerate()}>Generate all</button>
       <span data-testid="generation-state">
         {String(isGenerating)}:{generatingStatus?.stage}
       </span>
@@ -350,6 +358,7 @@ describe('App transcription job identity', () => {
     useEditorStore.getState().reset()
     useTimelineStore.getState().reset()
     useTranscriptStore.getState().reset()
+    useSpeechBatchStore.getState().reset()
     mocks.registerAudioSource.mockReset()
     mocks.registerAudioSource.mockResolvedValue(undefined)
     mocks.destroyPlayer.mockReset()
@@ -515,21 +524,104 @@ describe('App transcription job identity', () => {
       ]),
     )
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
     expect(confirm).toHaveBeenLastCalledWith(
       'Re-analysis will reset your custom speaker names. Continue?',
     )
     expect(requests).toHaveLength(0)
     act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
     expect(confirm).toHaveBeenLastCalledWith('重新分析将重置自定义说话人名称。是否继续？')
     expect(requests).toHaveLength(0)
     confirm.mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
     await waitFor(() => expect(requests).toHaveLength(1))
     expect(requests[0].request.confirmSpeakerLabelReset).toBe(true)
     confirm.mockRestore()
   })
+
+  it('does not dispatch analysis when cancelled during availability lookup', async () => {
+    const { api, requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+    const availability = deferred<null>()
+    vi.mocked(api.speechAnalysis.checkAvailability).mockReturnValueOnce(availability.promise)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(api.speechAnalysis.checkAvailability).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel speech' }))
+    await act(async () => availability.resolve(null))
+    expect(requests).toHaveLength(0)
+    expect(useSpeechBatchStore.getState().isGenerating).toBe(false)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('retains published text and reports cancellation when the stopped batch rejects', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { requests, progress } = await renderInitialized(initial)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    const published = {
+      ...initial,
+      revision: 2,
+      speechAnalyses: [{ audioSourceId: SOURCE_A } as never],
+    }
+    await act(async () =>
+      progress()({ ...requests[0].request, stage: 'diarizing', session: published }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel speech' }))
+    await act(async () => requests[0].deferred.reject({ reason: 'operation-cancelled' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(useSpeechBatchStore.getState().cancelled).toBe(true)
+    expect(useSpeechBatchStore.getState().isGenerating).toBe(false)
+    expect(useTranscriptStore.getState().analyses).toEqual(published.speechAnalyses)
+  })
+
+  it('forwards timing only for the active job and cancels that job', async () => {
+    const { api, requests, progress } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    const status = {
+      stage: 'diarizing' as const,
+      stageStartedAtMs: 1000,
+      estimatedDurationMs: 5000,
+    }
+    act(() => progress()({ ...requests[0].request, ...status }))
+    expect(useSpeechBatchStore.getState().generatingStatus).toMatchObject(status)
+    act(() =>
+      progress()({
+        ...requests[0].request,
+        workspaceToken: TOKEN_B,
+        stage: 'aligning',
+        stageStartedAtMs: 9000,
+      }),
+    )
+    expect(useSpeechBatchStore.getState().generatingStatus).toMatchObject(status)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel speech' }))
+    expect(api.speechAnalysis.cancel).toHaveBeenCalledWith({
+      jobId: requests[0].request.jobId,
+      workspaceToken: TOKEN_A,
+      revision: 1,
+    })
+  })
+
+  it.each(['workspace', 'current'] as const)(
+    'scopes asynchronous cancellation errors to the current job and workspace: %s',
+    async (transition) => {
+      const { api, requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+      const cancellation = deferred<'not-found'>()
+      vi.mocked(api.speechAnalysis.cancel).mockReturnValueOnce(cancellation.promise)
+      fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+      await waitFor(() => expect(requests).toHaveLength(1))
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel speech' }))
+      if (transition === 'workspace') {
+        act(() => useEditorStore.setState({ session: session(TOKEN_B, 1, SOURCE_B, 'B') }))
+      }
+      await act(async () => {
+        cancellation.reject({ reason: 'operation-failed' })
+      })
+      if (transition === 'current')
+        expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.')
+      else expect(screen.queryByRole('alert')).toBeNull()
+    },
+  )
 
   it('applies the authoritative speech-analysis session without making analysis a local edit', async () => {
     const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
@@ -540,7 +632,7 @@ describe('App transcription job identity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
     await waitFor(() => expect(requests).toHaveLength(1))
     act(() => progress()({ ...requests[0].request, stage: 'aligning', percent: 50 }))
-    expect(useTranscriptStore.getState().generatingStatus).toEqual({
+    expect(useSpeechBatchStore.getState().generatingStatus).toEqual({
       stage: 'aligning',
       percent: 50,
     })
@@ -554,7 +646,7 @@ describe('App transcription job identity', () => {
     await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
     expect(requests[0].request.draft).not.toHaveProperty('transcript')
     expect(useTranscriptStore.getState().analyses).toEqual(published.speechAnalyses)
-    expect(useTranscriptStore.getState().isGenerating).toBe(false)
+    expect(useSpeechBatchStore.getState().isGenerating).toBe(false)
     expect(useEditorStore.getState().isDirty).toBe(false)
   })
 
@@ -647,7 +739,7 @@ describe('App transcription job identity', () => {
     },
   )
 
-  it('invalidates an r1 import before an earlier keyboard Save applies r2 and ignores its late failure', async () => {
+  it('keeps an r1 import active across an ordinary save revision and reports its failure', async () => {
     const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
     const saved = session(TOKEN_A, 2, SOURCE_A, 'Saved')
     const importing = deferred<Awaited<ReturnType<IElectronAPI['audio']['startImport']>>>()
@@ -672,7 +764,7 @@ describe('App transcription job identity', () => {
     saving.resolve(saved)
 
     await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
-    expect(screen.queryByText(/Importing late\.mp3/)).toBeNull()
+    expect(screen.queryByText(/Importing late\.mp3/)).not.toBeNull()
     act(() =>
       importProgress()({
         workspaceToken: TOKEN_A,
@@ -688,7 +780,7 @@ describe('App transcription job identity', () => {
 
     expect(useEditorStore.getState().session).toEqual(saved)
     expect(screen.queryByText(/Importing late\.mp3/)).toBeNull()
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.')
   })
 
   it.each(['Save', 'Save As'] as const)(
@@ -765,17 +857,14 @@ describe('App transcription job identity', () => {
     expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.')
   })
 
-  it('invalidates an awaited session commit before destroying its prepared player and acknowledging', async () => {
+  it('ignores import registration completion after a project switch', async () => {
     const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
     const imported = session(TOKEN_A, 2, SOURCE_B, 'Imported')
     const { api, willSwitch } = await renderInitialized(initial)
-    const oldTeardown = deferred<void>()
-    const stalePreparedTeardown = deferred<void>()
-    mocks.destroyPlayer
-      .mockReturnValueOnce(oldTeardown.promise)
-      .mockReturnValueOnce(stalePreparedTeardown.promise)
+    const registration = deferred<void>()
+    mocks.registerAudioSource.mockReturnValueOnce(registration.promise)
     api.audio.selectImportFile.mockResolvedValueOnce({
-      token: 'opaque-selection',
+      token: 'selection',
       displayName: 'Imported.mp3',
     })
     api.audio.startImport.mockResolvedValueOnce({
@@ -784,39 +873,175 @@ describe('App transcription job identity', () => {
       jobId: 'job-a',
       value: imported,
     })
-    api.project.acknowledgeSwitch.mockImplementationOnce(async () => {
-      expect(getAudioPlayerInstance()).toBeNull()
-      return true
-    })
-
     fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
-    await waitFor(() => expect(mocks.players).toHaveLength(2))
-    await waitFor(() => expect(mocks.players[0].destroy).toHaveBeenCalledTimes(1))
-    expect(getAudioPlayerInstance()).toBeNull()
-
-    const switching = Promise.resolve(
-      willSwitch()({
-        transitionId: 'transition-during-load-commit',
-        workspaceToken: TOKEN_A,
-        revision: 1,
-      }),
-    )
-    await Promise.resolve()
-    expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
-
-    oldTeardown.resolve()
-    await waitFor(() => expect(mocks.players[1].destroy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocks.registerAudioSource).toHaveBeenCalledTimes(2))
+    await act(async () => {
+      await willSwitch()({ transitionId: 'switch-import', workspaceToken: TOKEN_A, revision: 1 })
+    })
+    await act(async () => registration.resolve())
     expect(useEditorStore.getState().session?.revision).toBe(1)
     expect(getAudioPlayerInstance()).toBeNull()
-    expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
+    expect(api.project.acknowledgeSwitch).toHaveBeenCalled()
+  })
 
-    stalePreparedTeardown.resolve()
-    await switching
-    expect(api.project.acknowledgeSwitch).toHaveBeenCalledWith({
-      transitionId: 'transition-during-load-commit',
-      workspaceToken: TOKEN_A,
-      revision: 1,
+  it.each(['import-first', 'speech-first'] as const)(
+    'reconciles %s completion with local edits and active progress',
+    async (order) => {
+      const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+      const added = session(TOKEN_A, 2, SOURCE_B, 'B')
+      added.draft.tracks[0].id = 'track-added'
+      const imported = {
+        ...initial,
+        revision: 2,
+        sources: [...initial.sources, ...added.sources],
+        draft: { ...initial.draft, tracks: [...initial.draft.tracks, ...added.draft.tracks] },
+      }
+      const analyzed = {
+        ...imported,
+        revision: 3,
+        speechAnalyses: [{ audioSourceId: SOURCE_A } as never],
+      }
+      const { api, requests, progress } = await renderInitialized(initial)
+      const pendingImport = deferred<Awaited<ReturnType<IElectronAPI['audio']['startImport']>>>()
+      api.audio.selectImportFile.mockResolvedValueOnce({ token: 'selection', displayName: 'B.mp3' })
+      api.audio.startImport.mockReturnValueOnce(pendingImport.promise)
+      fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
+      await waitFor(() => expect(requests).toHaveLength(1))
+      fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
+      await waitFor(() => expect(api.audio.startImport).toHaveBeenCalledTimes(1))
+      const importRequest = api.audio.startImport.mock.calls[0][0]
+      const player = getAudioPlayerInstance()
+      act(() => {
+        useTimelineStore.getState().updateTrack('track-1', { name: 'Edited' })
+        useTimelineStore.getState().setSelectedClipId('clip-A')
+        useTimelineStore.getState().splitAt(5)
+        const second = useTimelineStore.getState().tracks[0].clips[1]
+        useTimelineStore.getState().moveClip(second.id, 7)
+        useTimelineStore.getState().undo()
+      })
+      const publish = async () => {
+        await act(async () =>
+          progress()({ ...requests[0].request, stage: 'diarizing', session: analyzed }),
+        )
+      }
+      const finishImport = async () => {
+        await act(async () => pendingImport.resolve({ ...importRequest, value: imported }))
+      }
+      if (order === 'import-first') {
+        await finishImport()
+        await publish()
+      } else {
+        await publish()
+        await finishImport()
+      }
+      expect(useEditorStore.getState().session?.revision).toBe(3)
+      expect(useTimelineStore.getState().tracks.map((track) => track.name)).toEqual([
+        'Edited',
+        'Notes',
+        'Primary',
+      ])
+      expect(useTranscriptStore.getState().analyses).toEqual(analyzed.speechAnalyses)
+      expect(useSpeechBatchStore.getState().isGenerating).toBe(true)
+      expect(useSpeechBatchStore.getState().generatingStatus?.stage).toBe('diarizing')
+      expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
+      act(() => useTimelineStore.getState().redo())
+      expect(useTimelineStore.getState().tracks[0].clips[1].outputStart).toBe(7)
+      expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
+        true,
+      )
+      act(() => {
+        useTimelineStore.getState().undo()
+        useTimelineStore.getState().undo()
+      })
+      expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(1)
+      expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
+        true,
+      )
+      act(() => useTimelineStore.getState().redo())
+      expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
+      expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
+        true,
+      )
+      expect(getAudioPlayerInstance()).toBe(player)
+      expect(useEditorStore.getState().isDirty).toBe(true)
+      act(() => useTimelineStore.getState().removeTrack('track-added'))
+      for (const revision of [4, 5]) {
+        await act(async () =>
+          progress()({
+            ...requests[0].request,
+            stage: 'diarizing',
+            session: { ...analyzed, revision },
+          }),
+        )
+        expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
+          false,
+        )
+      }
+    },
+  )
+
+  it('ignores an old terminal summary after switching and starting a new batch during source registration', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { api, requests, willSwitch } = await renderInitialized(initial)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    const registration = deferred<void>()
+    mocks.registerAudioSource.mockReturnValueOnce(registration.promise)
+    await act(async () =>
+      requests[0].deferred.resolve({
+        ...requests[0].request,
+        value: session(TOKEN_A, 2, SOURCE_B, 'Imported'),
+      }),
+    )
+    await waitFor(() => expect(mocks.registerAudioSource).toHaveBeenCalledTimes(2))
+    await act(async () =>
+      willSwitch()({ transitionId: 'switch-terminal', workspaceToken: TOKEN_A, revision: 1 }),
+    )
+    api.project.openDialog.mockResolvedValueOnce({
+      outcome: 'switched',
+      session: session(TOKEN_B, 1, SOURCE_B, 'B'),
     })
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
+    await waitFor(() => expect(requests).toHaveLength(2))
+    await act(async () => registration.resolve())
+    expect(useSpeechBatchStore.getState().isGenerating).toBe(true)
+    expect(useSpeechBatchStore.getState().summary).toBeNull()
+    expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B)
+  })
+
+  it('admits a selected import when speech advances the revision while the picker is open', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { api, requests, progress } = await renderInitialized(initial)
+    const selection = deferred<{ token: string; displayName: string } | null>()
+    api.audio.selectImportFile.mockReturnValueOnce(selection.promise)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0].request.scope).toEqual({ kind: 'track', trackId: 'track-1' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
+    await act(async () =>
+      progress()({
+        ...requests[0].request,
+        stage: 'diarizing',
+        session: { ...initial, revision: 2 },
+      }),
+    )
+    await act(async () => selection.resolve({ token: 'selection', displayName: 'B.wav' }))
+    expect(api.audio.startImport).toHaveBeenCalledWith(
+      expect.objectContaining({ revision: 2, selectionToken: 'selection' }),
+    )
+    expect(useSpeechBatchStore.getState().isGenerating).toBe(true)
+  })
+
+  it('admits all sources after an empty first track and uses a track scope for track generation', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    initial.draft.tracks.unshift({ ...initial.draft.tracks[0], id: 'empty', clips: [] })
+    const { requests } = await renderInitialized(initial)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0].request).toMatchObject({ scope: { kind: 'all' }, mode: 'missing' })
+    expect(requests[0].request.draft.tracks).toHaveLength(3)
   })
 
   it('submits dirty path-free opens and applies an advanced stayed rollback session', async () => {

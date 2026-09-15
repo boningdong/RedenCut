@@ -80,6 +80,7 @@ export class ImportCoordinator {
   ): Promise<ImportResult<CommitValue>> {
     if (!AudioSourceIdSchema.safeParse(importId).success) throw new Error('Invalid import ID')
     if (this.active) throw new Error('Another audio import is already active')
+    const admissionProject = ProjectFileSchema.parse(this.workspace.project)
     const controller = new AbortController()
     const active = { id: importId, controller, state: 'preparing' as ImportJobState }
     this.active = active
@@ -178,7 +179,21 @@ export class ImportCoordinator {
           durablePath = join(finalMediaRoot, safeMediaName(displayName))
           source.fingerprint.modifiedTimeMs = (await stat(durablePath)).mtimeMs
         }
-        committedProject = appendImportedSource(project, source)
+        const latest = this.workspace.project
+        committedProject = appendImportedSource(
+          {
+            ...latest,
+            tracks:
+              JSON.stringify(latest.tracks) === JSON.stringify(admissionProject.tracks)
+                ? project.tracks
+                : latest.tracks,
+            export:
+              JSON.stringify(latest.export) === JSON.stringify(admissionProject.export)
+                ? project.export
+                : latest.export,
+          },
+          source,
+        )
         const committedValue = await commitProject(committedProject)
         active.state = 'committed'
         return committedValue

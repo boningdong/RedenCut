@@ -109,7 +109,9 @@ describe('SpeechArtifactStore', () => {
     const first = store.prepare(artifact())
     const second = store.prepare(artifact())
     expect(first.bytes.equals(second.bytes)).toBe(true)
-    expect(first.reference.artifactPath).toBe(`speech/${ids.source}/revision-${ids.revision}.json`)
+    expect(first.reference.artifactPath).toBe(
+      `speech/${ids.source}/revision-${ids.revision}-${first.reference.artifactSha256}.json`,
+    )
     const staged = await store.stage(first)
     await store.publish(staged)
     await expect(store.load(first.reference)).resolves.toEqual(artifact())

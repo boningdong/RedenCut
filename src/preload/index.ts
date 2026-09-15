@@ -1,3 +1,4 @@
+import type { SpeechBatchSummary } from '../shared/speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from '../shared/resources.types'
 import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from '../shared/modelAccess.types'
 import type { PublicMessage } from '../shared/publicMessages'
@@ -145,11 +146,9 @@ const api = {
     checkAvailability: () =>
       invokeSafe<PublicMessage | null>(invoke, 'speech-analysis:check-availability'),
     start: (request: SpeechAnalysisJobRequest) =>
-      invokeSafe<SessionJobResult<RendererSession, SpeechAnalysisJobId>>(
-        invoke,
-        'speech-analysis:start',
-        request,
-      ),
+      invokeSafe<
+        SessionJobResult<RendererSession, SpeechAnalysisJobId> & { batch?: SpeechBatchSummary }
+      >(invoke, 'speech-analysis:start', request),
     cancel: (request: CancelSessionJobRequest<SpeechAnalysisJobId>) =>
       invokeSafe<TranscriptionCancellationResult>(invoke, 'speech-analysis:cancel', request),
   },

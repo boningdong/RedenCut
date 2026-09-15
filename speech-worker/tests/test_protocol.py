@@ -22,6 +22,27 @@ def request():
 
 
 class ProtocolTest(unittest.TestCase):
+    def test_accepts_segment_timing_and_rejects_invalid_ranges(self):
+        candidate = request()
+        candidate["alignmentSegments"] = [{"text": "hello", "sourceStart": 1, "sourceEnd": 2}]
+        self.assertEqual(candidate, parse_request(candidate))
+        for start, end in [(2, 1), (-1, 2), (0, float("inf")), (True, 2)]:
+            candidate["alignmentSegments"][0].update(sourceStart=start, sourceEnd=end)
+            with self.assertRaises(ProtocolError):
+                parse_request(candidate)
+
+    def test_alignment_progress_and_library_output_keep_jsonl_clean(self):
+        output = io.StringIO()
+        def alignment(request, on_progress):
+            print("library diagnostic")
+            on_progress(50)
+            return {"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}}
+        with patch("redencut_speech_worker.__main__.align", side_effect=alignment), patch(
+            "redencut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}}):
+            self.assertEqual(0, run(io.StringIO(json.dumps(request())), output))
+        messages = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertIn(50, [m.get("percent") for m in messages])
+
     def test_rejects_unknown_versions_and_secret_fields(self):
         candidate = request()
         candidate["protocolVersion"] = 2
@@ -74,3 +95,28 @@ class ProtocolTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class PhaseTest(unittest.TestCase):
+    def test_diarization_only_never_aligns_or_invents_percent(self):
+        candidate = request()
+        candidate.update(phase="diarization")
+        candidate.pop("transcriptUnits")
+        candidate.pop("language")
+        candidate["models"].pop("alignment")
+        output = io.StringIO()
+        with patch("redencut_speech_worker.__main__.align") as alignment, patch("redencut_speech_worker.__main__.diarize", return_value={"turns": [], "provenance": {}}):
+            self.assertEqual(0, run(io.StringIO(json.dumps(candidate)), output))
+            alignment.assert_not_called()
+        messages = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertNotIn("alignment", messages[-1]["result"])
+        self.assertTrue(all("percent" not in m for m in messages))
+
+    def test_alignment_only_does_not_diarize(self):
+        candidate = request()
+        candidate["phase"] = "alignment"
+        candidate["models"].pop("diarization")
+        output = io.StringIO()
+        with patch("redencut_speech_worker.__main__.align", return_value={"units": [], "unalignedTranscriptUnitIds": [], "provenance": {}}), patch("redencut_speech_worker.__main__.diarize") as diarization:
+            self.assertEqual(0, run(io.StringIO(json.dumps(candidate)), output))
+            diarization.assert_not_called()
+        self.assertNotIn("diarization", json.loads(output.getvalue().splitlines()[-1])["result"])

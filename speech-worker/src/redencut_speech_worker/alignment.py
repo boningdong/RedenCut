@@ -3,7 +3,9 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+from .alignment_segments import partition_units, prepare_segments
 
 
 def _normalized(text: str) -> str:
@@ -17,10 +19,11 @@ def normalize_alignment(
 ) -> Dict[str, Any]:
     speech = [unit for unit in transcript_units if unit["kind"] == "speech"]
     aligned_ids = set()
+    untimed_ids = set()
     output = []
 
     char_cursor = 0
-    usable_chars = [char for char in aligned_chars if char.get("start") is not None and char.get("end") is not None]
+    usable_chars = aligned_chars
     for unit in speech:
         target = _normalized(unit["text"])
         if not target:
@@ -36,6 +39,11 @@ def normalize_alignment(
             accumulated += candidate
             matched.append(usable_chars[cursor - 1])
         if accumulated == target and matched:
+            char_cursor = cursor
+            if not any(item.get("start") is not None and item.get("end") is not None for item in matched):
+                untimed_ids.add(unit["id"])
+            if any(item.get("start") is None or item.get("end") is None or item["start"] >= item["end"] for item in matched):
+                continue
             scores = [float(item["score"]) for item in matched if item.get("score") is not None]
             output.append({
                 "transcriptUnitIds": [unit["id"]],
@@ -47,11 +55,9 @@ def normalize_alignment(
             aligned_ids.add(unit["id"])
             char_cursor = cursor
 
-    remaining = [unit for unit in speech if unit["id"] not in aligned_ids]
+    remaining = speech
     remaining_cursor = 0
     for word in aligned_words:
-        if word.get("start") is None or word.get("end") is None:
-            continue
         target = _normalized(str(word.get("word", "")))
         if not target:
             continue
@@ -63,6 +69,10 @@ def normalize_alignment(
             accumulated += _normalized(remaining[cursor]["text"])
             cursor += 1
         if accumulated != target:
+            continue
+        remaining_cursor = cursor
+        if (word.get("start") is None or word.get("end") is None or word["start"] >= word["end"]
+                or any(unit["id"] in aligned_ids or unit["id"] in untimed_ids for unit in matched_units)):
             continue
         output.append({
             "transcriptUnitIds": [unit["id"] for unit in matched_units],
@@ -94,21 +104,46 @@ def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, mode
     return {**model, "snapshot": str(snapshot)}
 
 
-def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device: str, model_path: str) -> Dict[str, Any]:
+def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device: str,
+                           model_path: str, segments: Optional[List[Dict[str, Any]]] = None,
+                           on_progress: Optional[Callable[[float], None]] = None) -> Dict[str, Any]:
     import whisperx
 
     audio = whisperx.load_audio(audio_path)
-    duration = len(audio) / 16000
+    windows = prepare_segments(text, segments, len(audio) / 16000)
+    if not windows:
+        return {"segments": [], "word_segments": []}
     model, metadata = whisperx.load_align_model(
         language_code=language, device=device, model_name=model_path, model_cache_only=True,
     )
-    return whisperx.align(
-        [{"start": 0.0, "end": duration, "text": text}], model, metadata,
-        audio, device, return_char_alignments=True,
-    )
+    output = []
+    for index, window in enumerate(windows):
+        first, last = int(window["start"] * 16000), int(window["end"] * 16000)
+        offset = first / 16000
+        clip = audio[first:last]
+        if last <= first:
+            # A zero-duration recognition artifact has no acoustic evidence to refine.
+            output.append({"text": window["text"], "chars": [], "words": []})
+            if on_progress is not None:
+                on_progress(100 * (index + 1) / len(windows))
+            continue
+        aligned = whisperx.align(
+            [{"start": 0.0, "end": len(clip) / 16000, "text": window["text"]}],
+            model, metadata, clip, device, return_char_alignments=True, interpolate_method="ignore",
+        )
+        chars = [dict(char) for segment in aligned.get("segments", []) for char in segment.get("chars", [])]
+        words = [dict(word) for word in aligned.get("word_segments", [])]
+        for item in chars + words:
+            for key in ("start", "end"):
+                if item.get(key) is not None:
+                    item[key] += offset
+        output.append({"text": window["text"], "chars": chars, "words": words})
+        if on_progress is not None:
+            on_progress(100 * (index + 1) / len(windows))
+    return {"segments": output, "word_segments": [word for segment in output for word in segment["words"]]}
 
 
-def align(request: Dict[str, Any]) -> Dict[str, Any]:
+def align(request: Dict[str, Any], on_progress: Optional[Callable[[float], None]] = None) -> Dict[str, Any]:
     model = load_manifest_model(
         os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
         os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
@@ -116,12 +151,27 @@ def align(request: Dict[str, Any]) -> Dict[str, Any]:
         request.get("modelPaths"),
     )
     text = "".join(unit["text"] for unit in request["transcriptUnits"])
+    segments = request.get("alignmentSegments")
+    if segments:
+        groups = partition_units(request["transcriptUnits"], [segment["text"] for segment in segments])
+        # Preserve spaces required by English aligners; canonical units omit whitespace.
+        text = " ".join(segment["text"] for segment in segments)
+    else:
+        groups = [request["transcriptUnits"]]
     aligned = run_whisperx_alignment(
         audio_path=request["audioPath"], text=text, language=request["language"],
         device=request["config"]["device"], model_path=model["snapshot"],
+        segments=segments, on_progress=on_progress,
     )
-    chars = [item for segment in aligned.get("segments", []) for item in segment.get("chars", [])]
-    normalized = normalize_alignment(request["transcriptUnits"], aligned.get("word_segments", []), chars)
+    normalized = {"units": [], "unalignedTranscriptUnitIds": []}
+    results = iter(aligned.get("segments", []))
+    for group in groups:
+        if not group:
+            continue
+        segment = next(results, {})
+        part = normalize_alignment(group, segment.get("words", []), segment.get("chars", []))
+        normalized["units"].extend(part["units"])
+        normalized["unalignedTranscriptUnitIds"].extend(part["unalignedTranscriptUnitIds"])
     normalized["provenance"] = {
         "engineId": "whisperx", "engineVersion": "3.8.6",
         "modelId": model["repository"], "modelVersion": model["revision"],

@@ -37,7 +37,12 @@ function mapError(error: unknown): IpcError {
   if (error instanceof TranscriberUnavailableError)
     return { code: 'operation-failed', reason: error.reason, message: error.message }
   if (error instanceof SpeechAnalysisError)
-    return { code: 'operation-failed', reason: `speech-${error.stage}`, message: error.message }
+    return {
+      code: 'operation-failed',
+      reason: `speech-${error.stage}`,
+      message: error.message,
+      ...(error.failureKind ? { failureKind: error.failureKind } : {}),
+    }
   if (error instanceof PublicIpcError)
     return { code: error.code, reason: error.code, message: SAFE_MESSAGES[error.code] }
   if (error instanceof DOMException && error.name === 'AbortError')

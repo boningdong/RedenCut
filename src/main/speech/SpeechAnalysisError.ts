@@ -1,3 +1,4 @@
+import type { SpeechFailureKind } from '../../shared/publicMessages'
 import type { SpeechAnalysisProgress } from './SpeechAnalysisCoordinator'
 
 export type SpeechFailureStage = SpeechAnalysisProgress['stage'] | 'preparing-audio' | 'publishing'
@@ -15,11 +16,19 @@ const messages: Record<SpeechFailureStage, string> = {
 
 /** Fixed public messages; the underlying engine/filesystem cause stays in main diagnostics. */
 export class SpeechAnalysisError extends Error {
+  readonly failureKind?: SpeechFailureKind
   constructor(
     readonly stage: SpeechFailureStage,
     cause: unknown,
   ) {
     super(messages[stage], { cause })
     this.name = 'SpeechAnalysisError'
+    if (
+      cause &&
+      typeof cause === 'object' &&
+      'kind' in cause &&
+      (cause.kind === 'startup' || cause.kind === 'process-exit' || cause.kind === 'protocol')
+    )
+      this.failureKind = cause.kind
   }
 }

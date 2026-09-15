@@ -1,4 +1,3 @@
-import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
 // ─────────────────────────────────────────────────────────────────────────────
 // Transcript Store (Zustand)
 //
@@ -51,12 +50,6 @@ interface TranscriptState {
    */
   ensureTrackVisible: (trackId: string) => void
 
-  /** True while a transcription job is running. */
-  isGenerating: boolean
-
-  /** Structured stage pushed from main; translated only at presentation time. */
-  generatingStatus: SpeechProgress | TranscriptionProgress | null
-
   // ── Actions ────────────────────────────────────────────────────────────────
   setWords: (words: Word[]) => void
 
@@ -73,9 +66,6 @@ interface TranscriptState {
   clearSelection: () => void
 
   toggleShowMutedWords: () => void
-
-  setIsGenerating: (generating: boolean) => void
-  setGeneratingStatus: (status: SpeechProgress | TranscriptionProgress | null) => void
 
   /**
    * Shifts every word's start and end timestamps by `offsetSeconds`.
@@ -103,8 +93,6 @@ const initialState = {
   selectedWordIds: new Set<string>(),
   showMutedWords: true,
   visibleTrackIds: [] as string[],
-  isGenerating: false,
-  generatingStatus: null,
 }
 
 export const useTranscriptStore = create<TranscriptState>()((set) => ({
@@ -159,9 +147,6 @@ export const useTranscriptStore = create<TranscriptState>()((set) => ({
         ? s.visibleTrackIds
         : [...s.visibleTrackIds, trackId],
     })),
-
-  setIsGenerating: (generating) => set({ isGenerating: generating }),
-  setGeneratingStatus: (status) => set({ generatingStatus: status }),
 
   shiftTimestamps: (offsetSeconds) =>
     set((s) => ({

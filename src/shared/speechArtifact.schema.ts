@@ -37,7 +37,7 @@ export const SpeechArtifactSchema = z
     base
       .extend({
         schemaVersion: z.literal(2),
-        diarizationStatus: z.literal('skipped-disabled'),
+        diarizationStatus: z.enum(['skipped-disabled', 'pending']),
         diarization: z.undefined().optional(),
         speakerAttribution: z.undefined().optional(),
         speakers: z.array(SpeakerSchema).max(0),

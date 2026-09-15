@@ -34,15 +34,34 @@ const reasonKeys = {
 /** Whitelist known reasons; never preserve arbitrary Error.message or other private fields. */
 export function normalizePublicError(error: unknown): PublicMessage {
   if (error && typeof error === 'object') {
-    const candidate = error as { reason?: unknown; code?: unknown }
+    const candidate = error as { reason?: unknown; code?: unknown; failureKind?: unknown }
     const reason = candidate.reason ?? candidate.code
     if (typeof reason === 'string' && Object.prototype.hasOwnProperty.call(reasonKeys, reason))
-      return { reason: reason as PublicReason }
+      return {
+        reason: reason as PublicReason,
+        ...(reason.startsWith('speech-') &&
+        (candidate.failureKind === 'startup' ||
+          candidate.failureKind === 'process-exit' ||
+          candidate.failureKind === 'protocol')
+          ? { failureKind: candidate.failureKind }
+          : {}),
+      }
   }
   return { reason: 'operation-failed' }
 }
+const failureKindKeys = {
+  startup: 'errors.speechStartup',
+  'process-exit': 'errors.speechProcessExit',
+  protocol: 'errors.speechProtocol',
+} as const
 export function publicMessage(t: TFunction, message: PublicMessage): string {
-  return t(reasonKeys[message.reason])
+  const stageMessage = t(reasonKeys[message.reason])
+  return message.failureKind
+    ? t('errors.speechFailureDetail', {
+        stageMessage,
+        detail: t(failureKindKeys[message.failureKind]),
+      })
+    : stageMessage
 }
 
 const progressKeys = {
@@ -54,6 +73,7 @@ const progressKeys = {
   publishing: 'progress.publishing',
   ready: 'progress.ready',
   preparing: 'progress.preparing',
+  'preparing-audio': 'progress.preparing',
   'detecting-silence': 'progress.detecting-silence',
   'starting-transcription': 'progress.starting-transcription',
   'parsing-transcript': 'progress.parsing-transcript',
