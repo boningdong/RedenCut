@@ -107,7 +107,7 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
 
         // ── M — Mute selected region ───────────────────────────────────────
         case 'KeyM': {
-          if (!selection) break
+          if (!selection && !useTimelineStore.getState().selectedClipId) break
           e.preventDefault()
           muteSelection()
           break
@@ -143,7 +143,12 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         // If a drag-selection is active: add a mute.
         case 'Delete':
         case 'Backspace': {
-          if (!useTimelineStore.getState().selectedClipId && !selection) break
+          if (
+            !useTimelineStore.getState().selectedClipId &&
+            !useTimelineStore.getState().timelineSelection &&
+            !selection
+          )
+            break
           e.preventDefault()
           deleteSelection()
           break

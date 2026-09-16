@@ -497,7 +497,8 @@ summary:focus-visible,
     border-color 0.14s,
     background 0.14s;
 }
-.waveform-clip:hover {
+.waveform-clip:hover:not(:has(.clip-redaction:hover)),
+.audio-panel-view[data-redaction-bypass='true'] .waveform-clip:hover {
   border-color: color-mix(in srgb, var(--track-color) 75%, var(--color-bg-primary));
   background: color-mix(in srgb, var(--track-color) 12%, var(--color-bg-primary));
 }
@@ -566,4 +567,60 @@ summary:focus-visible,
 .audio-add-track:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* Redactions own hover independently from their containing clip. */
+.clip-redaction {
+  border: 1px solid #a997bf;
+  border-radius: 4px;
+  background: repeating-linear-gradient(135deg, #2b233be0 0 5px, #40324ee0 5px 10px);
+}
+.clip-redaction:hover,
+.clip-redaction[data-selected='true'],
+.clip-redaction:has(> button:not(.redaction-cycle):focus-visible) {
+  border-color: #ddc3ff;
+  background: repeating-linear-gradient(135deg, #382947df 0 5px, #574066df 5px 10px);
+}
+/* Mask and grip carry focus without duplicate outlines around the edge buttons. */
+.clip-redaction > button:not(.redaction-cycle):focus-visible {
+  outline: none;
+}
+.redaction-edge::after {
+  content: '';
+  position: absolute;
+  top: 35%;
+  bottom: 35%;
+  left: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  opacity: 0;
+}
+.clip-redaction:hover .redaction-edge::after,
+.clip-redaction[data-selected='true'] .redaction-edge::after {
+  opacity: 1;
+}
+.redaction-edge:focus-visible::after {
+  background: #ddc3ff;
+  opacity: 1;
+}
+.audio-panel-view[data-redaction-bypass='true'] .clip-redaction,
+.audio-panel-view[data-redaction-bypass='true'] .clip-redaction * {
+  pointer-events: none;
+}
+.audio-panel-view[data-redaction-bypass='true'] .clip-redaction {
+  opacity: 0.5;
+}
+.redaction-cycle {
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  height: 17px;
+  min-width: 17px;
+  padding: 0 3px;
+  font-size: 10px;
+  border-radius: 3px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  cursor: pointer;
 }

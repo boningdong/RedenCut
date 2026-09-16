@@ -1,4 +1,5 @@
 import type { ProjectFile } from '@shared/project.types'
+import { retainedClipSegments } from '@shared/ClipRedactions'
 import {
   redactionSkipRanges,
   redactedTimelineDuration,
@@ -38,6 +39,7 @@ export function buildRenderArgs(
     if (tracks[i].muted || (anySolo && !tracks[i].solo)) continue
     const nonMuted = tracks[i].clips
       .filter((c) => !c.muted)
+      .flatMap(retainedClipSegments)
       .sort((a, b) => a.outputStart - b.outputStart)
     if (nonMuted.length > 0) {
       activeTrackClips.push({ trackIdx: i, clips: nonMuted })

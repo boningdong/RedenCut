@@ -32,7 +32,13 @@ function fixture() {
       solo: false,
       clips: [
         { outputStart: 0, sourceStart: 0, sourceEnd: 2, muted: false },
-        { outputStart: 2, sourceStart: 2, sourceEnd: 5, muted: true },
+        {
+          outputStart: 2,
+          sourceStart: 2,
+          sourceEnd: 5,
+          muted: false,
+          redactions: [{ id: 'r', sourceStart: 2, sourceEnd: 5 }],
+        },
         { outputStart: 5, sourceStart: 5, sourceEnd: 10, muted: false },
       ],
     },

@@ -10,7 +10,8 @@ Use a new isolated Docker project and prepared `mandarin-short-female.wav`; a se
 ## Preparation
 
 Create a clearly visible interior redacted interval through supported editing controls, with retained audio before and after it.
-Use actual transcript selection when validating transcript redaction; otherwise split a clip and redact the intended interior portion with the documented waveform selection controls.
+Use actual transcript selection when validating transcript redaction; otherwise select a waveform range and redact it.
+Clicking a clip twice leaves its waveform range selected without selecting the clip object; M then creates an overlay, while M on a selected clip toggles ordinary mute.
 Record the chosen interval from visible ruler/clip geometry and identify the redacted track.
 Do not confuse track-level Mute, a removed clip's empty gap, or naturally silent source material with a redacted clip interval.
 Choose an interval long enough that before/inside/after observations distinguish a jump from ordinary elapsed playback.

@@ -9,7 +9,8 @@ Use the [keyboard contract](../../docs/key-mappings.md) for exact mappings and s
 
 ## Preparation
 
-Use a speech-enabled harness for the transcript focus checkpoint and generate the transcript through the visible UI.
+For transcript focus and selection, open a disposable [saved transcript fixture](../fixtures/projects/README.md) using the [transcript editing workflow](transcript-editing-workflow.md); generation is not required.
+Use a speech-enabled harness and the speech analysis scenario when specifically accepting live generation.
 Record the tested modifier explicitly: Control in the Linux harness, Command on a supported macOS acceptance surface.
 Do not infer native macOS shortcut behavior from Linux results.
 Choose useful split, selection and seek positions from the current ruler and waveform geometry.
@@ -47,6 +48,6 @@ Keep platform modifier differences and recovery from stale focus visible in the 
 ## Scope
 
 This scenario checks user-visible shortcut routing, selection scope, playback controls and persistence, not audible output or sample-level accuracy.
-Use real transcript generation for focus/selection behavior; transcription quality and speaker accuracy remain separate acceptance work.
+Use saved real analysis for focus/selection behavior; live generation, transcription quality and speaker accuracy remain separate acceptance work.
 The Docker MCP cannot certify the native macOS menu system or OS-reserved shortcuts.
 Do not substitute toolbar actions, private stores or synthetic keyboard handlers for the required key presses.

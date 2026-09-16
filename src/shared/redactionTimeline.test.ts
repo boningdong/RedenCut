@@ -16,7 +16,8 @@ function track(
       outputStart: start,
       sourceStart: 0,
       sourceEnd: end - start,
-      muted: redacted,
+      muted: false,
+      redactions: redacted ? [{ id: 'r', sourceStart: 0, sourceEnd: end - start }] : [],
     })),
   } as Track
 }

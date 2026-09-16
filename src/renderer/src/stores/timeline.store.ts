@@ -18,8 +18,7 @@
 // Undo model:
 //   Each mutating operation saves a full snapshot of tracks[] before the
 //   change. This is safe because tracks hold metadata only (no audio data).
-//   wordIds are stored alongside each entry so undo can also reverse
-//   transcript strikethroughs.
+//   Transcript coverage is derived from these same clip snapshots.
 //
 // Relationship to other stores:
 //   editor.store   — path-free session, isDirty, waveform selection, preview mode
@@ -28,10 +27,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand'
-import type { AudioSourceId, Clip, Track } from '@shared/project.types'
+import type { AudioSourceId, Clip, ClipRedaction, Track } from '@shared/project.types'
 import type { RendererAudioSource } from '@shared/session.types'
 import { useEditorStore } from './editor.store'
-import { useTranscriptStore } from './transcript.store'
+import { redactionCoverage } from '@shared/ClipRedactions'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -44,7 +43,11 @@ function nextId(prefix: string): string {
 function cloneTracks(tracks: Track[]): Track[] {
   return tracks.map((t) => ({
     ...t,
-    clips: t.clips.map((c) => ({ ...c, effects: [...c.effects] })),
+    clips: t.clips.map((c) => ({
+      ...c,
+      effects: [...c.effects],
+      redactions: c.redactions?.map((r) => ({ ...r })),
+    })),
     effects: [...t.effects],
   }))
 }
@@ -60,8 +63,6 @@ function markTimelineEdited(): void {
 interface HistoryEntry {
   /** Snapshot of tracks[] BEFORE this operation — restored on undo. */
   before: Track[]
-  /** Transcript word IDs that were muted by this operation (un-muted on undo). */
-  wordIds: string[]
   /** Human-readable description for debugging. */
   label: string
 }
@@ -75,7 +76,6 @@ interface TimelineState {
   /**
    * Populated by undo(); cleared by any new mutation.
    * Each entry holds a snapshot of tracks[] before the operation was undone,
-   * along with the word IDs that were un-muted so redo can re-mute them.
    */
   redoStack: HistoryEntry[]
 
@@ -112,24 +112,21 @@ interface TimelineState {
   // ── Clip operations ────────────────────────────────────────────────────────
 
   /**
-   * Mute all clips within [startTime, endTime] on the given track.
-   * Clips are split at the boundaries so the region can be independently
-   * muted/unmuted.
+   * Add clip-owned redactions within an output-time range on one track.
    *
    * Routes by trackId because one source may be referenced by multiple tracks.
    *
-   * @param wordIds  Transcript word IDs muted together with this operation.
    */
-  muteRange(trackId: string, startTime: number, endTime: number, wordIds?: string[]): void
-  /** Mute source-time ranges in one exact clip occurrence as a single undoable edit. */
-  muteClipRanges(
+  redactRange(trackId: string, startTime: number, endTime: number): void
+  /** Redact source-time ranges in one exact clip occurrence as a single undoable edit. */
+  redactClipRanges(
     trackId: string,
     clipId: string,
     ranges: Array<{ start: number; end: number }>,
   ): void
 
   /** Apply one continuous source selection to an exact, unchanged clip chain. */
-  muteTranscriptRange(
+  redactTranscriptRange(
     trackId: string,
     expectedClips: Clip[],
     range: { start: number; end: number },
@@ -142,10 +139,9 @@ interface TimelineState {
   removeClip(clipId: string): void
 
   /**
-   * Unmute a specific clip by ID, reversing its associated transcript words.
-   * If the clip is adjacent to other unmuted clips it is merged back.
+   * Restore ordinary clip audibility without changing its overlays or boundaries.
    */
-  unmuteClip(clipId: string, wordIds?: string[]): void
+  unmuteClip(clipId: string): void
 
   /**
    * Split the clip that contains `time` into two clips at that point.
@@ -163,6 +159,19 @@ interface TimelineState {
 
   /** ID of the clip the user has clicked on the waveform. null = none. */
   selectedClipId: string | null
+  timelineSelection:
+    | { kind: 'clip'; clipId: string }
+    | { kind: 'redaction'; clipId: string; redactionId: string }
+    | null
+  selectRedaction(clipId: string, redactionId: string): void
+  updateRedaction(
+    clipId: string,
+    redactionId: string,
+    range: Pick<ClipRedaction, 'sourceStart' | 'sourceEnd'>,
+    mode?: 'resize' | 'move',
+  ): void
+  removeRedaction(clipId: string, redactionId: string): void
+  setClipMuted(clipId: string, muted: boolean): void
   setSelectedClipId(id: string | null): void
 
   /** ID of the currently selected track. Used by splitAt to target the right track. */
@@ -199,6 +208,7 @@ const initialState = {
   undoStack: [] as HistoryEntry[],
   redoStack: [] as HistoryEntry[],
   selectedClipId: null as string | null,
+  timelineSelection: null as TimelineState['timelineSelection'],
   selectedTrackId: null as string | null,
 }
 
@@ -241,6 +251,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: [],
       selectedTrackId: null,
       selectedClipId: null,
+      timelineSelection: null,
     })
   },
 
@@ -253,6 +264,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: [],
       selectedTrackId: null,
       selectedClipId: null,
+      timelineSelection: null,
     })
   },
 
@@ -328,7 +340,12 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   // ── removeTrack ─────────────────────────────────────────────────────────────
   removeTrack(trackId) {
     if (!get().tracks.some((track) => track.id === trackId)) return
-    set((s) => ({ tracks: s.tracks.filter((t) => t.id !== trackId) }))
+    set((s) => ({
+      tracks: s.tracks.filter((t) => t.id !== trackId),
+      selectedClipId: null,
+      timelineSelection: null,
+      selectedTrackId: s.selectedTrackId === trackId ? null : s.selectedTrackId,
+    }))
     markTimelineEdited()
   },
 
@@ -341,19 +358,19 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     markTimelineEdited()
   },
 
-  // ── muteRange ───────────────────────────────────────────────────────────────
-  muteRange(trackId, startTime, endTime, wordIds = []) {
+  // ── redactRange ───────────────────────────────────────────────────────────────
+  redactRange(trackId, startTime, endTime) {
     const { tracks } = get()
     const track = tracks.find((t) => t.id === trackId)
     if (!track) {
-      console.warn(`[Timeline] muteRange — no track found for trackId=${trackId}`)
+      console.warn(`[Timeline] redactRange — no track found for trackId=${trackId}`)
       return
     }
 
     // Snapshot before mutation
     const before = cloneTracks(tracks)
 
-    const newClips = splitAndMute(track.clips, startTime, endTime, track.id)
+    const newClips = addRedactions(track.clips, startTime, endTime, track.id)
     if (
       newClips.length === track.clips.length &&
       newClips.every((clip, index) => clip === track.clips[index])
@@ -365,22 +382,18 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),
       undoStack: [
         ...s.undoStack,
-        { before, wordIds, label: `mute [${startTime.toFixed(1)}–${endTime.toFixed(1)}]` },
+        { before, label: `Redact [${startTime.toFixed(1)}–${endTime.toFixed(1)}]` },
       ],
       redoStack: [], // any new mutation invalidates the redo future
     }))
     markTimelineEdited()
-
-    if (wordIds.length > 0) {
-      useTranscriptStore.getState().muteWords(wordIds)
-    }
   },
 
-  muteClipRanges(trackId, clipId, ranges) {
+  redactClipRanges(trackId, clipId, ranges) {
     const { tracks } = get()
     const track = tracks.find((item) => item.id === trackId)
     const clip = track?.clips.find((item) => item.id === clipId)
-    if (!track || !clip || clip.muted || ranges.length === 0) return
+    if (!track || !clip || ranges.length === 0) return
     if (
       ranges.some(
         (range) =>
@@ -404,13 +417,14 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!merged.length) return
     let replacement = [clip]
     for (const range of merged) {
-      replacement = splitAndMute(
+      replacement = addRedactions(
         replacement,
         clip.outputStart + range.start - clip.sourceStart,
         clip.outputStart + range.end - clip.sourceStart,
         trackId,
       )
     }
+    if (replacement[0] === clip) return
     const before = cloneTracks(tracks)
     set((state) => ({
       tracks: state.tracks.map((item) =>
@@ -423,14 +437,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
             }
           : item,
       ),
-      undoStack: [...state.undoStack, { before, wordIds: [], label: 'Mute transcript selection' }],
+      undoStack: [...state.undoStack, { before, label: 'Redact transcript selection' }],
       redoStack: [],
-      selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId,
     }))
     markTimelineEdited()
   },
 
-  muteTranscriptRange(trackId, expectedClips, range) {
+  redactTranscriptRange(trackId, expectedClips, range) {
     const { tracks } = get()
     const track = tracks.find((t) => t.id === trackId)
     const clips = [...expectedClips].sort((a, b) => a.outputStart - b.outputStart)
@@ -478,26 +491,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       )
     )
       return false
-    if (!clips.some((c) => !c.muted && c.sourceStart < range.end && c.sourceEnd > range.start))
-      return true
-    const pieces = splitAndMute(clips, start, end, trackId)
-    const merged: Clip[] = []
-    for (const piece of pieces) {
-      const previous = merged[merged.length - 1]
-      if (
-        previous?.muted &&
-        piece.muted &&
-        previous.audioSourceId === piece.audioSourceId &&
-        previous.gain === piece.gain &&
-        JSON.stringify(previous.effects) === JSON.stringify(piece.effects) &&
-        Math.abs(previous.sourceEnd - piece.sourceStart) < 1e-7 &&
-        Math.abs(
-          previous.outputStart + previous.sourceEnd - previous.sourceStart - piece.outputStart,
-        ) < 1e-7
-      ) {
-        merged[merged.length - 1] = { ...previous, sourceEnd: piece.sourceEnd }
-      } else merged.push(piece)
-    }
+    if (!clips.some((c) => c.sourceStart < range.end && c.sourceEnd > range.start)) return true
+    const pieces = addRedactions(clips, start, end, trackId)
+    if (pieces.every((clip, index) => clip === clips[index])) return true
     const before = cloneTracks(tracks)
     set((state) => ({
       tracks: state.tracks.map((t) =>
@@ -505,15 +501,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
           ? {
               ...t,
               clips: t.clips.flatMap((c) =>
-                c.id === clips[0].id ? merged : targeted.has(c.id) ? [] : [c],
+                c.id === clips[0].id ? pieces : targeted.has(c.id) ? [] : [c],
               ),
             }
           : t,
       ),
-      undoStack: [...state.undoStack, { before, wordIds: [], label: 'Mute transcript selection' }],
+      undoStack: [...state.undoStack, { before, label: 'Redact transcript selection' }],
       redoStack: [],
-      selectedClipId:
-        state.selectedClipId && targeted.has(state.selectedClipId) ? null : state.selectedClipId,
     }))
     markTimelineEdited()
     return true
@@ -534,43 +528,17 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks: s.tracks.map((t) =>
         t.id === track.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
       ),
-      undoStack: [...s.undoStack, { before, wordIds: [], label: `remove clip ${clipId}` }],
+      undoStack: [...s.undoStack, { before, label: `remove clip ${clipId}` }],
       redoStack: [],
       selectedClipId: s.selectedClipId === clipId ? null : s.selectedClipId,
+      timelineSelection: s.timelineSelection?.clipId === clipId ? null : s.timelineSelection,
     }))
     markTimelineEdited()
   },
 
   // ── unmuteClip ──────────────────────────────────────────────────────────────
-  unmuteClip(clipId, wordIds = []) {
-    const { tracks } = get()
-    const track = tracks.find((t) => t.clips.some((c) => c.id === clipId))
-    if (!track) return
-
-    const before = cloneTracks(tracks)
-
-    // Set clip unmuted, then merge adjacent unmuted clips
-    const updated = track.clips.map((c) => (c.id === clipId ? { ...c, muted: false } : c))
-    const merged = mergeAdjacentUnmuted(updated)
-
-    // Find wordIds from undo stack if not provided
-    const resolvedWordIds =
-      wordIds.length > 0 ? wordIds : findWordIdsForClip(get().undoStack, clipId)
-
-    set((s) => ({
-      tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: merged } : t)),
-      undoStack: [
-        ...s.undoStack,
-        { before, wordIds: resolvedWordIds, label: `unmute clip ${clipId}` },
-      ],
-      redoStack: [], // new mutation invalidates the redo future
-      selectedClipId: null,
-    }))
-    markTimelineEdited()
-
-    if (resolvedWordIds.length > 0) {
-      useTranscriptStore.getState().unmuteWords(resolvedWordIds)
-    }
+  unmuteClip(clipId) {
+    get().setClipMuted(clipId, false)
   },
 
   // ── splitAt ─────────────────────────────────────────────────────────────────
@@ -603,6 +571,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       ...targetClip,
       id: nextId('clip'),
       sourceEnd: targetClip.sourceStart + offset,
+      redactions: (targetClip.redactions ?? [])
+        .filter((r) => r.sourceStart < targetClip.sourceStart + offset)
+        .map((r) => ({
+          ...r,
+          id: nextId('redaction'),
+          sourceEnd: Math.min(r.sourceEnd, targetClip.sourceStart + offset),
+        })),
       // outputStart unchanged — left clip starts where it always started
     }
     const right: Clip = {
@@ -610,6 +585,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       id: nextId('clip'),
       sourceStart: targetClip.sourceStart + offset,
       outputStart: time,
+      redactions: (targetClip.redactions ?? [])
+        .filter((r) => r.sourceEnd > targetClip.sourceStart + offset)
+        .map((r) => ({
+          ...r,
+          id: nextId('redaction'),
+          sourceStart: Math.max(r.sourceStart, targetClip.sourceStart + offset),
+        })),
     }
 
     set((s) => ({
@@ -618,8 +600,10 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
           ? { ...t, clips: t.clips.flatMap((c) => (c.id === targetClip!.id ? [left, right] : [c])) }
           : t,
       ),
-      undoStack: [...s.undoStack, { before, wordIds: [], label: `split at ${time.toFixed(1)}` }],
+      undoStack: [...s.undoStack, { before, label: `split at ${time.toFixed(1)}` }],
       redoStack: [], // new mutation invalidates the redo future
+      selectedClipId: null,
+      timelineSelection: null,
     }))
     markTimelineEdited()
   },
@@ -695,7 +679,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
       return {
         tracks: newTracks,
-        undoStack: [...s.undoStack, { before, wordIds: [], label: `move clip ${clipId}` }],
+        undoStack: [...s.undoStack, { before, label: `move clip ${clipId}` }],
         redoStack: [], // new mutation invalidates the redo future
       }
     })
@@ -704,7 +688,113 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── selectedClipId ──────────────────────────────────────────────────────────
   setSelectedClipId(id) {
-    set({ selectedClipId: id })
+    set({ selectedClipId: id, timelineSelection: id ? { kind: 'clip', clipId: id } : null })
+  },
+
+  selectRedaction(clipId, redactionId) {
+    const track = get().tracks.find((t) =>
+      t.clips.some((c) => c.id === clipId && c.redactions?.some((r) => r.id === redactionId)),
+    )
+    if (!track) return
+    set({
+      selectedClipId: null,
+      selectedTrackId: track.id,
+      timelineSelection: { kind: 'redaction', clipId, redactionId },
+    })
+  },
+
+  updateRedaction(clipId, redactionId, range, mode = 'resize') {
+    const { tracks } = get()
+    const clip = tracks.flatMap((t) => t.clips).find((c) => c.id === clipId)
+    const redaction = clip?.redactions?.find((r) => r.id === redactionId)
+    // A translation keeps hidden trim metadata and the original duration.
+    // It cannot move the visible part beyond the clip or extend hidden overhang.
+    const delta = redaction ? range.sourceStart - redaction.sourceStart : 0
+    const validMove =
+      clip &&
+      redaction &&
+      mode === 'move' &&
+      Math.abs(range.sourceEnd - redaction.sourceEnd - delta) < 1e-9 &&
+      range.sourceStart >= Math.min(clip.sourceStart, redaction.sourceStart) &&
+      range.sourceEnd <= Math.max(clip.sourceEnd, redaction.sourceEnd)
+    if (
+      !clip ||
+      !redaction ||
+      !Number.isFinite(range.sourceStart) ||
+      !Number.isFinite(range.sourceEnd) ||
+      (mode === 'move' && !validMove) ||
+      (!validMove &&
+        range.sourceStart !== redaction.sourceStart &&
+        (range.sourceStart < clip.sourceStart || range.sourceStart >= clip.sourceEnd)) ||
+      (!validMove &&
+        range.sourceEnd !== redaction.sourceEnd &&
+        (range.sourceEnd > clip.sourceEnd || range.sourceEnd <= clip.sourceStart)) ||
+      range.sourceEnd <= range.sourceStart ||
+      (range.sourceStart === redaction.sourceStart && range.sourceEnd === redaction.sourceEnd)
+    )
+      return
+    set((s) => ({
+      tracks: tracks.map((t) => ({
+        ...t,
+        clips: t.clips.map((c) =>
+          c.id === clipId
+            ? {
+                ...c,
+                redactions: c.redactions?.map((r) =>
+                  r.id === redactionId ? { ...r, ...range } : r,
+                ),
+              }
+            : c,
+        ),
+      })),
+      undoStack: [...s.undoStack, { before: cloneTracks(tracks), label: 'Edit redaction' }],
+      redoStack: [],
+    }))
+    markTimelineEdited()
+  },
+
+  removeRedaction(clipId, redactionId) {
+    const { tracks } = get()
+    if (
+      !tracks.some((t) =>
+        t.clips.some((c) => c.id === clipId && c.redactions?.some((r) => r.id === redactionId)),
+      )
+    )
+      return
+    set((s) => ({
+      tracks: tracks.map((t) => ({
+        ...t,
+        clips: t.clips.map((c) =>
+          c.id === clipId
+            ? {
+                ...c,
+                redactions: c.redactions?.filter((r) => r.id !== redactionId),
+              }
+            : c,
+        ),
+      })),
+      undoStack: [...s.undoStack, { before: cloneTracks(tracks), label: 'Remove redaction' }],
+      redoStack: [],
+      timelineSelection: null,
+    }))
+    markTimelineEdited()
+  },
+
+  setClipMuted(clipId, muted) {
+    const { tracks } = get()
+    if (!tracks.some((t) => t.clips.some((c) => c.id === clipId && c.muted !== muted))) return
+    set((s) => ({
+      tracks: tracks.map((t) => ({
+        ...t,
+        clips: t.clips.map((c) => (c.id === clipId ? { ...c, muted } : c)),
+      })),
+      undoStack: [
+        ...s.undoStack,
+        { before: cloneTracks(tracks), label: muted ? 'Mute clip' : 'Unmute clip' },
+      ],
+      redoStack: [],
+    }))
+    markTimelineEdited()
   },
 
   // ── selectedTrackId ─────────────────────────────────────────────────────────
@@ -720,10 +810,8 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
     // Capture current state as a redo entry so we can re-apply this op.
     // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
-    // and its `wordIds` are re-muted on redo.
     const redoEntry: HistoryEntry = {
       before: cloneTracks(tracks),
-      wordIds: entry.wordIds,
       label: entry.label,
     }
 
@@ -732,11 +820,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       undoStack: s.undoStack.slice(0, -1),
       redoStack: [...s.redoStack, redoEntry],
       selectedClipId: null,
+      timelineSelection: null,
     }))
     markTimelineEdited()
-    if (entry.wordIds.length > 0) {
-      useTranscriptStore.getState().unmuteWords(entry.wordIds)
-    }
   },
 
   // ── redo ────────────────────────────────────────────────────────────────────
@@ -748,7 +834,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     // Capture current (pre-redo) state as an undo entry so the user can undo again.
     const undoEntry: HistoryEntry = {
       before: cloneTracks(tracks),
-      wordIds: entry.wordIds,
       label: entry.label,
     }
 
@@ -757,11 +842,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: s.redoStack.slice(0, -1),
       undoStack: [...s.undoStack, undoEntry],
       selectedClipId: null,
+      timelineSelection: null,
     }))
     markTimelineEdited()
-    if (entry.wordIds.length > 0) {
-      useTranscriptStore.getState().muteWords(entry.wordIds)
-    }
   },
 
   // ── getAllClips / getPrimaryClips ────────────────────────────────────────────
@@ -785,11 +868,9 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
 // ── Clip surgery helpers ───────────────────────────────────────────────────────
 
-/**
- * Split clips in a track so that [startTime, endTime] forms its own clip
- * segment, then mark all clips within that range as muted.
- */
-function splitAndMute(clips: Clip[], startTime: number, endTime: number, trackId: string): Clip[] {
+/** Add source-relative overlays, preserving the underlying clip occurrences. */
+function addRedactions(clips: Clip[], startTime: number, endTime: number, trackId: string): Clip[] {
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) return clips
   const result: Clip[] = []
 
   for (const clip of clips) {
@@ -804,87 +885,20 @@ function splitAndMute(clips: Clip[], startTime: number, endTime: number, trackId
     const muteOutputEnd = Math.min(clipOutputEnd, endTime)
     const effectiveMuteStart = clip.sourceStart + (muteOutputStart - clip.outputStart)
     const effectiveMuteEnd = clip.sourceStart + (muteOutputEnd - clip.outputStart)
-
-    // Left remainder (before the mute region)
-    if (clip.sourceStart < effectiveMuteStart) {
-      result.push({
-        ...clip,
-        id: nextId('clip'),
-        sourceEnd: effectiveMuteStart,
-        outputStart: clip.outputStart,
-      })
+    if (redactionCoverage(clip, effectiveMuteStart, effectiveMuteEnd) === 'full') {
+      result.push(clip)
+      continue
     }
 
-    // The muted segment inherits audioSourceId from the source clip.
     result.push({
       ...clip,
-      id: nextId('clip'),
       trackId,
-      sourceStart: effectiveMuteStart,
-      sourceEnd: effectiveMuteEnd,
-      outputStart: muteOutputStart,
-      muted: true,
+      redactions: [
+        ...(clip.redactions ?? []),
+        { id: nextId('redaction'), sourceStart: effectiveMuteStart, sourceEnd: effectiveMuteEnd },
+      ],
     })
-
-    // Right remainder (after the mute region)
-    if (clip.sourceEnd > effectiveMuteEnd) {
-      result.push({
-        ...clip,
-        id: nextId('clip'),
-        sourceStart: effectiveMuteEnd,
-        outputStart: muteOutputEnd,
-      })
-    }
   }
 
   return result
-}
-
-/**
- * Merge adjacent unmuted clips of the same source file into one.
- * Applied after an unmute operation to keep the clip list tidy.
- *
- * A pair of clips is mergeable only when they are adjacent in BOTH source
- * space (sourceEnd ≈ sourceStart) AND output space (outputEnd ≈ outputStart).
- * Clips that have been repositioned (outputStart ≠ sourceStart) are NOT merged
- * even if their source ranges are contiguous.
- */
-function mergeAdjacentUnmuted(clips: Clip[]): Clip[] {
-  if (clips.length === 0) return clips
-  // Sort by output position — the order clips appear on the timeline
-  const sorted = [...clips].sort((a, b) => a.outputStart - b.outputStart)
-  const merged: Clip[] = [sorted[0]]
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = merged[merged.length - 1]
-    const curr = sorted[i]
-    const prevOutputEnd = prev.outputStart + (prev.sourceEnd - prev.sourceStart)
-    if (
-      !prev.muted &&
-      !curr.muted &&
-      prev.audioSourceId === curr.audioSourceId &&
-      prev.trackId === curr.trackId &&
-      Math.abs(prev.sourceEnd - curr.sourceStart) < 0.001 && // source adjacent
-      Math.abs(prevOutputEnd - curr.outputStart) < 0.001 // output adjacent
-    ) {
-      // Merge: extend prev's source range; output position unchanged
-      merged[merged.length - 1] = { ...prev, sourceEnd: curr.sourceEnd }
-    } else {
-      merged.push(curr)
-    }
-  }
-  return merged
-}
-
-/** Search the undo stack for wordIds associated with a specific clip. */
-function findWordIdsForClip(undoStack: HistoryEntry[], clipId: string): string[] {
-  // Walk from newest to oldest — return wordIds from the most recent entry
-  // that appears to have created this clip (heuristic: check if the clip
-  // existed after this entry's before-snapshot).
-  for (let i = undoStack.length - 1; i >= 0; i--) {
-    const entry = undoStack[i]
-    const wasAbsent = !entry.before.some((t) => t.clips.some((c) => c.id === clipId))
-    if (wasAbsent && entry.wordIds.length > 0) return entry.wordIds
-  }
-  return []
 }

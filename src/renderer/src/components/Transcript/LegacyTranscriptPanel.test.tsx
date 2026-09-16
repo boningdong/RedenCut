@@ -24,7 +24,8 @@ const track: Track = {
       sourceStart: 0,
       sourceEnd: 2,
       outputStart: 0,
-      muted: true,
+      muted: false,
+      redactions: [{ id: 'r', sourceStart: 0, sourceEnd: 1 }],
       gain: 1,
       effects: [],
     },
@@ -51,7 +52,11 @@ it('strikes clip redactions even at the playhead, but never treats ordinary trac
   act(() =>
     useTimelineStore.setState({
       tracks: [
-        { ...track, muted: true, clips: track.clips.map((clip) => ({ ...clip, muted: false })) },
+        {
+          ...track,
+          muted: true,
+          clips: track.clips.map((clip) => ({ ...clip, muted: false, redactions: [] })),
+        },
       ],
     }),
   )

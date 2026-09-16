@@ -13,6 +13,10 @@
 - Use Zustand stores in [`src/renderer/src/stores/`](../src/renderer/src/stores/) for renderer application state; do not introduce React context as a parallel application-state system.
 - Treat [`ProjectFileSchema`](../src/shared/project.types.ts) as the source of truth for persisted project data and derive TypeScript types from its Zod schemas.
 - Keep editing non-destructive: store timeline decisions as project metadata and never modify source audio.
+- Persist source-relative redaction objects on their owning clip; never split a clip merely to redact text.
+- Retain overlay identities independently of their effective union; clamp effects to visible clip bounds while preserving hidden trim metadata.
+- Explicit splits partition overlay coverage into independent child objects; moving a clip preserves source coverage.
+- Timeline selection identifies either a clip or an overlay; pointer previews are transient and completed edits share track snapshot undo/redo.
 - Treat the managed package schema as the first published project format; do not add adapters for the retired unpublished path-identified shape.
 - Main owns the active temporary or saved `.redencut` workspace, and renderer state uses path-free workspace and cache descriptors.
 - Identify imported media with stable `AudioSourceId` values; never use filesystem paths as clip or transcript identities.
@@ -78,7 +82,8 @@
 
 - Export removes Redact intervals by default, independently of the interactive Preview toggle.
 - Share interval eligibility and retained-overlap protection through [`redactionTimeline.ts`](../src/shared/redactionTimeline.ts); do not maintain a second export-specific skip policy.
-- Contract retained clip positions and export progress by those intervals, preserving natural gaps and ordinary track-mute duration.
+- Contract retained clip positions and export progress by those intervals, preserving natural gaps and ordinary clip/track-mute duration.
+- Share overlay union/complement through `ClipRedactions.ts`; rendering subranges are ephemeral, never persisted clips.
 - Export remains non-destructive; source audio and project clip positions do not change.
 
 ## Transcription
@@ -96,7 +101,8 @@
 - Derive transcript occurrences from current clips and source acoustic boundaries; source, analysis revision, track, clip and text-unit identities must remain distinct.
 - Recompute output-time relationships from timeline state after moves, splits, mute changes and undo/redo; never persist display overlap as project truth.
 - Keep acoustic selection resolution independent of the Read/Align display mode and never infer source time from text pixel position.
-- Apply canonical text edits to an exact clip occurrence using `muteClipRanges`; ambiguous cross-occurrence selections must not silently select a track or duplicate clip.
+- Apply canonical text edits to exact clip occurrences using `redactTranscriptRange` or `redactClipRanges`; ambiguous selections must not silently select a track or duplicate clip.
+- Derive text redaction coverage from clip overlays: full coverage strikes text, partial coverage is disclosed, and ordinary mute only dims it.
 - Preserve coarse acoustic boundaries and disclose partial clipped units instead of inventing character timestamps.
 
 ## Speaker Presentation

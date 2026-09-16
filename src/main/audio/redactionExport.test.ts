@@ -39,7 +39,7 @@ execFileSync(getFfmpegPath(), [
 ])
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-function clip(start: number, end: number, outputStart = start, muted = false): Clip {
+function clip(start: number, end: number, outputStart = start, redacted = false): Clip {
   return {
     id: `${start}-${end}-${outputStart}`,
     trackId: 'a',
@@ -47,7 +47,8 @@ function clip(start: number, end: number, outputStart = start, muted = false): C
     sourceStart: start,
     sourceEnd: end,
     outputStart,
-    muted,
+    muted: false,
+    redactions: redacted ? [{ id: 'r', sourceStart: start, sourceEnd: end }] : [],
     gain: 1,
     effects: [],
   }
@@ -102,7 +103,9 @@ function at(audio: Float32Array, second: number) {
 }
 
 it('actually removes redacted samples and duration from the exported file', () => {
-  const audio = render([track([clip(0, 2), clip(2, 4, 2, true), clip(4, 6)])])
+  const audio = render([
+    track([{ ...clip(0, 6), redactions: [{ id: 'r', sourceStart: 2, sourceEnd: 4 }] }]),
+  ])
   expect(audio.length).toBe(4 * rate)
   expect(at(audio, 1)).toBeCloseTo(0.15, 3)
   expect(at(audio, 2)).toBeCloseTo(-0.25, 3)
@@ -124,6 +127,9 @@ it('preserves natural gaps and ordinary track mute duration', () => {
   const muted = render([track([clip(0, 6)], true)])
   expect(muted.length).toBe(6 * rate)
   expect(muted.every((value) => value === 0)).toBe(true)
+  const clipMuted = render([track([{ ...clip(0, 6), muted: true }])])
+  expect(clipMuted.length).toBe(6 * rate)
+  expect(clipMuted.every((value) => value === 0)).toBe(true)
 })
 it('removes trailing redaction while preserving a muted track tail', () => {
   const redacted = render([track([clip(0, 2), clip(2, 6, 2, true)])])

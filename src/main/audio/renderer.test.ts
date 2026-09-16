@@ -34,6 +34,7 @@ function makeProject(
     sourceEnd: number
     outputStart: number
     muted?: boolean
+    redacted?: boolean
   }[],
 ): ProjectFile {
   const project = createEmptyProject('2026-01-01T00:00:00.000Z')
@@ -51,6 +52,9 @@ function makeProject(
         outputStart: clip.outputStart,
         gain: 1,
         muted: clip.muted ?? false,
+        redactions: clip.redacted
+          ? [{ id: 'r', sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd }]
+          : [],
         effects: [],
       })),
       volume: 1,
@@ -86,7 +90,7 @@ describe('buildRenderArgs', () => {
   it('removes redacted clips and compacts retained output positions', () => {
     const project = makeProject([
       { source: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0 },
-      { source: 0, sourceStart: 5, sourceEnd: 10, outputStart: 5, muted: true },
+      { source: 0, sourceStart: 5, sourceEnd: 10, outputStart: 5, redacted: true },
       { source: 0, sourceStart: 10, sourceEnd: 15, outputStart: 10 },
     ])
     const args = buildRenderArgs(project, paths, '/tmp/out.mp3')
@@ -125,9 +129,9 @@ describe('buildRenderArgs', () => {
     expect(args[args.indexOf('-filter_complex') + 1]).not.toContain('amix=inputs=2')
   })
 
-  it('throws when all clips are muted', () => {
+  it('throws when the whole timeline is redacted', () => {
     const project = makeProject([
-      { source: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0, muted: true },
+      { source: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0, redacted: true },
     ])
     expect(() => buildRenderArgs(project, paths, '/tmp/out.mp3')).toThrow('No retained timeline')
   })

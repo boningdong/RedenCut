@@ -224,7 +224,7 @@ function LegacyTranscriptPanel({
     })
     if (selected.length === 0) return
 
-    // Group by trackId — muteRange is track-scoped so each track gets its own call.
+    // Group by trackId — redactRange is track-scoped so each track gets its own call.
     // This correctly handles mixed-track selections and prevents a mute on track 2
     // from landing on track 1 (which happened when routing by source identity, since
     // multiple tracks can share the same source file).
@@ -236,12 +236,11 @@ function LegacyTranscriptPanel({
       byTrack.set(w.trackId, arr)
     }
 
-    const { muteRange } = useTimelineStore.getState()
+    const { redactRange } = useTimelineStore.getState()
     for (const [trackId, tWords] of byTrack) {
       const tStart = Math.min(...tWords.map((w) => w.start))
       const tEnd = Math.max(...tWords.map((w) => w.end))
-      const tWordIds = tWords.map((w) => w.id)
-      muteRange(trackId, tStart, tEnd, tWordIds)
+      redactRange(trackId, tStart, tEnd)
     }
     sel.removeAllRanges()
     setSelection(null)
@@ -286,9 +285,8 @@ function LegacyTranscriptPanel({
         .filter((w) => !w.trackId || visibleSet.has(w.trackId))
         .filter((w) => {
           if (!showMutedWords) {
-            if (w.muted) return false
             const cs = clipStateMap.get(w.id)
-            if (cs === 'clip-muted' || cs === 'no-clip') return false
+            if (cs === 'clip-muted' || cs === 'no-clip' || cs === 'redacted') return false
           }
           return true
         })
@@ -541,7 +539,7 @@ function LegacyTranscriptPanel({
         >
           {visibleWords.map((word) => {
             const clipState = clipStateMap.get(word.id) ?? 'normal'
-            const isCurrent = !word.muted && clipState === 'normal' && word.id === currentWordId
+            const isCurrent = clipState === 'normal' && word.id === currentWordId
             // In merged view (multiple tracks visible), show a colored underline per track
             const trackColor =
               visibleSet.size > 1 ? (trackColorMap.get(word.trackId ?? '') ?? null) : null
@@ -556,11 +554,14 @@ function LegacyTranscriptPanel({
             if (isCurrent) {
               bg = 'var(--color-accent)'
               wordColor = 'var(--color-text-on-accent)'
-            } else if (word.muted || clipState === 'clip-muted') {
-              // Clip.muted is the persisted marker for redacted audio.
+            } else if (clipState === 'redacted') {
               decoration = 'line-through'
               opacity = 0.45
               wordColor = 'var(--color-danger-word)'
+            } else if (clipState === 'clip-muted') {
+              opacity = 0.45
+            } else if (clipState === 'partially-redacted') {
+              borderBot = '2px dashed var(--color-accent)'
             } else if (clipState === 'no-clip') {
               // Type c: clip was deleted — word produces no audio at all
               decoration = 'line-through'

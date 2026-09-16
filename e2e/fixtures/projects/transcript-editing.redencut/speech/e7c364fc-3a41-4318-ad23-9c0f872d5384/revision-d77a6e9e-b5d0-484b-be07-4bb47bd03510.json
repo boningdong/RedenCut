@@ -1,0 +1,4779 @@
+{
+  "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+  "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+  "sourceFingerprint": {
+    "byteLength": 11520114,
+    "modifiedTimeMs": 0,
+    "sha256": "9b62b7a9c1487246e6ef330dcbae3e78b68867e0843bb86996064881ec1439a0"
+  },
+  "transcript": {
+    "id": "6d1563c6-50ee-402e-9634-cc9202f11272",
+    "revision": 1,
+    "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+    "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+    "sourceFingerprint": {
+      "byteLength": 11520114,
+      "modifiedTimeMs": 0,
+      "sha256": "9b62b7a9c1487246e6ef330dcbae3e78b68867e0843bb86996064881ec1439a0"
+    },
+    "units": [
+      {
+        "id": "51e86591-23b9-4176-8cc1-e92fc41698d9",
+        "text": "周",
+        "kind": "speech"
+      },
+      {
+        "id": "fef79b80-8fdb-4e06-a4a3-59ad09974be3",
+        "text": "末",
+        "kind": "speech"
+      },
+      {
+        "id": "4d6e828e-de47-4656-908f-7641f10c316b",
+        "text": "天",
+        "kind": "speech"
+      },
+      {
+        "id": "8cb43d9f-fa52-40da-8df3-d1f70115f930",
+        "text": "气",
+        "kind": "speech"
+      },
+      {
+        "id": "260edf8e-3bbc-48fd-9604-bc8a4db529ac",
+        "text": "不",
+        "kind": "speech"
+      },
+      {
+        "id": "a4834494-bec4-4c9e-8bfd-2d9613bbe8c7",
+        "text": "错",
+        "kind": "speech"
+      },
+      {
+        "id": "b69d6bfa-ca6f-4263-a05e-af2cb9d11429",
+        "text": "要",
+        "kind": "speech"
+      },
+      {
+        "id": "3b949a39-e40d-4f9c-9599-179e36315780",
+        "text": "不",
+        "kind": "speech"
+      },
+      {
+        "id": "35368f69-fb0e-4d87-902b-eaffa1fc3e4f",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "8c19008e-c7b8-4129-bce7-8a727109223d",
+        "text": "们",
+        "kind": "speech"
+      },
+      {
+        "id": "4926c96a-40ad-4b2e-a12e-99a22fceaca4",
+        "text": "去",
+        "kind": "speech"
+      },
+      {
+        "id": "7270b5e7-32ce-4766-9871-14d450df79eb",
+        "text": "互",
+        "kind": "speech"
+      },
+      {
+        "id": "15563fe7-dbf2-47b3-b349-2bb923c63e52",
+        "text": "边",
+        "kind": "speech"
+      },
+      {
+        "id": "a9b15185-b51b-4ff7-885d-550dd732065f",
+        "text": "录",
+        "kind": "speech"
+      },
+      {
+        "id": "5d2ed6a8-4bd6-4968-8c47-ea5f4ebc2104",
+        "text": "影",
+        "kind": "speech"
+      },
+      {
+        "id": "a311c1b2-3550-4eb6-9bf3-f2384faad378",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "e473dc7e-c539-43d6-a19e-ae3291e528c2",
+        "text": "看",
+        "kind": "speech"
+      },
+      {
+        "id": "856367a0-590c-4e59-9a71-7983648b3dd8",
+        "text": "了",
+        "kind": "speech"
+      },
+      {
+        "id": "81a60d66-50f3-4382-8485-f8e4944c020c",
+        "text": "一",
+        "kind": "speech"
+      },
+      {
+        "id": "48f555bc-7f39-4381-8eeb-a7e1962ae650",
+        "text": "下",
+        "kind": "speech"
+      },
+      {
+        "id": "c8707877-0022-436f-83e2-2b9214289dae",
+        "text": "开",
+        "kind": "speech"
+      },
+      {
+        "id": "48970ebd-ef9f-47cc-b44b-27a38c6a2537",
+        "text": "车",
+        "kind": "speech"
+      },
+      {
+        "id": "88ecd995-abc3-430a-8e83-556f0f24fd79",
+        "text": "过",
+        "kind": "speech"
+      },
+      {
+        "id": "39b1b257-690e-443b-9d77-30ca6aed4f3c",
+        "text": "去",
+        "kind": "speech"
+      },
+      {
+        "id": "7840ed8f-dc6c-4514-886c-3ba8285d4bd1",
+        "text": "大",
+        "kind": "speech"
+      },
+      {
+        "id": "96b00432-065a-46fa-a4b7-e38b8caa3a16",
+        "text": "概",
+        "kind": "speech"
+      },
+      {
+        "id": "0fa1c1f7-0f3e-46aa-a71a-d356221ccf61",
+        "text": "一",
+        "kind": "speech"
+      },
+      {
+        "id": "8e0cfb0d-a8dd-4885-9f9d-5ede7f407428",
+        "text": "个",
+        "kind": "speech"
+      },
+      {
+        "id": "73b72020-ebda-4834-a138-3683618c106f",
+        "text": "小",
+        "kind": "speech"
+      },
+      {
+        "id": "a0ce6eea-f13f-417a-8ead-53bd28c09ef1",
+        "text": "时",
+        "kind": "speech"
+      },
+      {
+        "id": "b660ee8b-7d9e-4676-82bd-49735082b770",
+        "text": "可",
+        "kind": "speech"
+      },
+      {
+        "id": "d297a438-9b3d-4b34-913c-366fa5d545c2",
+        "text": "以",
+        "kind": "speech"
+      },
+      {
+        "id": "9ad34ff9-7efc-45d8-b4e7-eb0b31682c52",
+        "text": "啊",
+        "kind": "speech"
+      },
+      {
+        "id": "be42a4bc-f754-4f21-ac8a-b86b7aa862b9",
+        "text": "不",
+        "kind": "speech"
+      },
+      {
+        "id": "288cd457-d777-4be9-a4d1-da8a8fc33c4c",
+        "text": "过",
+        "kind": "speech"
+      },
+      {
+        "id": "649ce039-c26d-476c-85cc-0a76a7a4b215",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "b40f99b7-7332-490f-9e45-044e79c48c68",
+        "text": "先",
+        "kind": "speech"
+      },
+      {
+        "id": "6c6c29cd-e3f8-4903-b234-5459bf111280",
+        "text": "问",
+        "kind": "speech"
+      },
+      {
+        "id": "367b33f3-2366-4713-8626-49dd8231f3c8",
+        "text": "清",
+        "kind": "speech"
+      },
+      {
+        "id": "a2cc970b-a6fc-4088-ad59-78eb5812e4cf",
+        "text": "楚",
+        "kind": "speech"
+      },
+      {
+        "id": "e64a7c70-0468-4deb-9fe0-d4b9ce653a75",
+        "text": "是",
+        "kind": "speech"
+      },
+      {
+        "id": "f77e9928-3442-4171-b28d-d4f2cd59982a",
+        "text": "认",
+        "kind": "speech"
+      },
+      {
+        "id": "76b110f0-131a-4875-8edd-e1deede8b0e1",
+        "text": "真",
+        "kind": "speech"
+      },
+      {
+        "id": "c5b88593-8749-44f5-85c5-2755e553af39",
+        "text": "录",
+        "kind": "speech"
+      },
+      {
+        "id": "7ed2e6f3-94f6-413f-9881-adda70112e36",
+        "text": "影",
+        "kind": "speech"
+      },
+      {
+        "id": "7aeb837e-9afd-4ae2-a6c5-dd7a10aca3ad",
+        "text": "还",
+        "kind": "speech"
+      },
+      {
+        "id": "8b5ee454-64ac-4ce4-ab03-dd3c16ade101",
+        "text": "是",
+        "kind": "speech"
+      },
+      {
+        "id": "dc9ef8d2-e57b-4206-8ae1-82c57e043697",
+        "text": "换",
+        "kind": "speech"
+      },
+      {
+        "id": "782627e5-8161-4ec4-a208-9d8b55a4313e",
+        "text": "个",
+        "kind": "speech"
+      },
+      {
+        "id": "13cddaac-61fd-476a-ad5d-79e98232c943",
+        "text": "地",
+        "kind": "speech"
+      },
+      {
+        "id": "68355676-095e-45be-9ef2-4501fadaff62",
+        "text": "方",
+        "kind": "speech"
+      },
+      {
+        "id": "a9cfe84a-1e60-469d-b6f1-aa9990c35c44",
+        "text": "坐",
+        "kind": "speech"
+      },
+      {
+        "id": "cc9bb129-3e4d-40af-aa02-1d8f86786e9f",
+        "text": "着",
+        "kind": "speech"
+      },
+      {
+        "id": "1fdbb12e-0df4-4c21-93b2-bf459545926b",
+        "text": "吃",
+        "kind": "speech"
+      },
+      {
+        "id": "bc8020d9-cc5d-442f-92fd-a45ade13bba0",
+        "text": "零",
+        "kind": "speech"
+      },
+      {
+        "id": "ae96bcc7-ce46-480f-a467-e5fc024cead3",
+        "text": "食",
+        "kind": "speech"
+      },
+      {
+        "id": "5fe56d82-9a87-4bba-b8a9-81de00696839",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "18216017-51eb-452e-9cc8-ad37c3f62790",
+        "text": "觉",
+        "kind": "speech"
+      },
+      {
+        "id": "a0ea3dc1-b5eb-4bd4-a54c-8fbdc98e063c",
+        "text": "得",
+        "kind": "speech"
+      },
+      {
+        "id": "16d0cc3e-1f7e-4cbc-9035-15d999bdfb24",
+        "text": "都",
+        "kind": "speech"
+      },
+      {
+        "id": "00c182f3-85cd-453b-aa12-04323c99fc6f",
+        "text": "行",
+        "kind": "speech"
+      },
+      {
+        "id": "127f5a87-c399-4d2e-a0cd-a36cca516e7a",
+        "text": "只",
+        "kind": "speech"
+      },
+      {
+        "id": "6667b899-c8a9-4421-870e-28439a19f142",
+        "text": "要",
+        "kind": "speech"
+      },
+      {
+        "id": "fd84ecb4-02ba-420e-ad3d-3d080d85b29e",
+        "text": "别",
+        "kind": "speech"
+      },
+      {
+        "id": "c5f6843b-5941-46a8-817c-487acf4c090a",
+        "text": "让",
+        "kind": "speech"
+      },
+      {
+        "id": "64c93f72-3ed4-4f77-b134-bc92627b109c",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "b1f3c6ac-b47c-4ab8-8825-ac40ce2b7163",
+        "text": "六",
+        "kind": "speech"
+      },
+      {
+        "id": "1cf2943f-9789-43d6-88f1-34db7266cabf",
+        "text": "点",
+        "kind": "speech"
+      },
+      {
+        "id": "a1939023-7aad-4749-a3ff-3ecf7fb04674",
+        "text": "起",
+        "kind": "speech"
+      },
+      {
+        "id": "d752ecfd-7ef5-4d22-badf-68f378947975",
+        "text": "床",
+        "kind": "speech"
+      },
+      {
+        "id": "d626ae11-dbfe-4337-a6bb-ca7731ddaad5",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "cdb617af-f31b-4148-bfea-5d2c2e321601",
+        "text": "这",
+        "kind": "speech"
+      },
+      {
+        "id": "7363d3ff-f869-4a05-94ff-31107c929cc4",
+        "text": "周",
+        "kind": "speech"
+      },
+      {
+        "id": "4dead74f-6a26-4399-9312-8e20ab8871ed",
+        "text": "天",
+        "kind": "speech"
+      },
+      {
+        "id": "5dd4d5ec-1946-4db1-bb1b-13c6efa94492",
+        "text": "天",
+        "kind": "speech"
+      },
+      {
+        "id": "17b8b9d9-0fce-4c33-8d1e-630c4c0d1821",
+        "text": "开",
+        "kind": "speech"
+      },
+      {
+        "id": "ce36680f-beda-4f68-8a97-b2dc5008bdfb",
+        "text": "早",
+        "kind": "speech"
+      },
+      {
+        "id": "6939891f-32ff-47b5-9008-c93d96bc9d8e",
+        "text": "晦",
+        "kind": "speech"
+      },
+      {
+        "id": "e93fd3fe-a6b1-4a33-94f3-0323de78b23b",
+        "text": "周",
+        "kind": "speech"
+      },
+      {
+        "id": "d32cb8b5-58ed-4f72-b3e4-d073db8ff90a",
+        "text": "末",
+        "kind": "speech"
+      },
+      {
+        "id": "a15c8665-71f3-4c76-bcc4-5be6fde9c0f0",
+        "text": "实",
+        "kind": "speech"
+      },
+      {
+        "id": "fc39f7dc-b634-4fa5-b545-08adb8dd8d7c",
+        "text": "在",
+        "kind": "speech"
+      },
+      {
+        "id": "eb96bf7b-de6b-4bc3-bcc6-0bf5deb85244",
+        "text": "想",
+        "kind": "speech"
+      },
+      {
+        "id": "e0c6d3a1-7ff3-42bd-9e3a-af107edc53e8",
+        "text": "多",
+        "kind": "speech"
+      },
+      {
+        "id": "95521086-2934-4052-a4c3-ef276a3cb5f2",
+        "text": "睡",
+        "kind": "speech"
+      },
+      {
+        "id": "fb4427c4-2a48-408c-9775-ac75feaa3eae",
+        "text": "一",
+        "kind": "speech"
+      },
+      {
+        "id": "e512cccb-4f72-44c1-a2ce-45d0d38c2960",
+        "text": "会",
+        "kind": "speech"
+      },
+      {
+        "id": "b55cfb66-27a4-4241-82da-5b0e6109c931",
+        "text": "儿",
+        "kind": "speech"
+      },
+      {
+        "id": "c70285ae-d2a1-47d2-8cce-a038d714fc02",
+        "text": "不",
+        "kind": "speech"
+      },
+      {
+        "id": "42c93070-597b-4270-a642-676372522a21",
+        "text": "用",
+        "kind": "speech"
+      },
+      {
+        "id": "01323ad8-fc8a-45b6-82ff-a3d9fa5fa25a",
+        "text": "过",
+        "kind": "speech"
+      },
+      {
+        "id": "6089929d-70a6-4df5-b7b6-c5cc256ba436",
+        "text": "夜",
+        "kind": "speech"
+      },
+      {
+        "id": "0cf42cd9-c25d-4a6d-b0b8-a8d9725a53aa",
+        "text": "咱",
+        "kind": "speech"
+      },
+      {
+        "id": "cda6852c-89ed-4990-b0d4-5c88f05ae559",
+        "text": "们",
+        "kind": "speech"
+      },
+      {
+        "id": "8142c958-08ed-4eaf-ad85-9226ff484288",
+        "text": "当",
+        "kind": "speech"
+      },
+      {
+        "id": "3609a87e-4604-49db-af9d-eea51116df79",
+        "text": "天",
+        "kind": "speech"
+      },
+      {
+        "id": "3569cd85-b5e0-41f1-9ffa-65c610c23675",
+        "text": "回",
+        "kind": "speech"
+      },
+      {
+        "id": "f9425755-2895-4c73-8650-c14a33f778c2",
+        "text": "来",
+        "kind": "speech"
+      },
+      {
+        "id": "44c0d3e2-c921-4838-844e-839f1a8d5bbc",
+        "text": "早",
+        "kind": "speech"
+      },
+      {
+        "id": "82ab92fc-4e7d-44f4-a789-886f174dd6fe",
+        "text": "上",
+        "kind": "speech"
+      },
+      {
+        "id": "bde5f634-6911-4a4a-9b7c-15832004b77f",
+        "text": "就",
+        "kind": "speech"
+      },
+      {
+        "id": "55a13e8d-3e0b-4be6-ad7f-173cced8b2f3",
+        "text": "点",
+        "kind": "speech"
+      },
+      {
+        "id": "e99e5c86-1aea-44ac-b7c5-4574478b859a",
+        "text": "出",
+        "kind": "speech"
+      },
+      {
+        "id": "baf3c672-15a9-4475-8cc4-48cdb4f22e4b",
+        "text": "发",
+        "kind": "speech"
+      },
+      {
+        "id": "b3d028e7-a0e7-4701-b6bd-df41d299bfcd",
+        "text": "下",
+        "kind": "speech"
+      },
+      {
+        "id": "48e5e0ce-d29c-422f-a54e-f80e9b915b81",
+        "text": "午",
+        "kind": "speech"
+      },
+      {
+        "id": "4c62dbc0-3cf5-44b2-bf11-4ae89b145730",
+        "text": "四",
+        "kind": "speech"
+      },
+      {
+        "id": "91884926-3e45-434c-9bdd-d242e929fa0b",
+        "text": "点",
+        "kind": "speech"
+      },
+      {
+        "id": "d95f9c99-98be-4bfc-b853-581fa1aa3803",
+        "text": "收",
+        "kind": "speech"
+      },
+      {
+        "id": "a0c545c1-a183-4be1-8f06-f36ea4d96d28",
+        "text": "拾",
+        "kind": "speech"
+      },
+      {
+        "id": "d85c432c-c305-4e87-a3c0-47974eb7d3b7",
+        "text": "东",
+        "kind": "speech"
+      },
+      {
+        "id": "e319f9c4-bdfb-47c4-8f88-372be79e73e7",
+        "text": "西",
+        "kind": "speech"
+      },
+      {
+        "id": "efcf5eff-5a1e-4362-8f8c-2137712af3f4",
+        "text": "时",
+        "kind": "speech"
+      },
+      {
+        "id": "f5293817-d365-43c9-aaa7-d884b7eeba61",
+        "text": "间",
+        "kind": "speech"
+      },
+      {
+        "id": "0e214cc3-1281-4386-9245-33b1e3fdc7ff",
+        "text": "应",
+        "kind": "speech"
+      },
+      {
+        "id": "6c56d5aa-4516-4c26-b785-320ee9636ba0",
+        "text": "该",
+        "kind": "speech"
+      },
+      {
+        "id": "e7ec85ca-d786-4943-afa3-c32202d1b1eb",
+        "text": "够",
+        "kind": "speech"
+      },
+      {
+        "id": "27f3ea03-e8e1-4b08-999e-6701ebb77ba7",
+        "text": "了",
+        "kind": "speech"
+      },
+      {
+        "id": "a6824fa5-fc2e-46b8-946e-9418e364f70e",
+        "text": "那",
+        "kind": "speech"
+      },
+      {
+        "id": "49108ee7-a65b-44ed-bc71-70bc9aa9a8f1",
+        "text": "我",
+        "kind": "speech"
+      },
+      {
+        "id": "91c0f31a-a424-4ba6-bb13-34f59bf0e235",
+        "text": "负",
+        "kind": "speech"
+      },
+      {
+        "id": "28e6f4f9-973f-4b95-b7f2-dcd9204444c7",
+        "text": "责",
+        "kind": "speech"
+      },
+      {
+        "id": "afe33ae2-d8af-4955-86ac-de84136319ab",
+        "text": "吃",
+        "kind": "speech"
+      },
+      {
+        "id": "e07ef99d-a73a-45dc-8e87-81c7e680b531",
+        "text": "的",
+        "kind": "speech"
+      },
+      {
+        "id": "de632111-0528-4480-af6a-0c9fcfeec2d7",
+        "text": "三",
+        "kind": "speech"
+      },
+      {
+        "id": "4a6ee748-64f9-443b-92f5-eb5f50c3edc9",
+        "text": "明",
+        "kind": "speech"
+      },
+      {
+        "id": "a7914411-0e1b-4af0-a897-f959a2d73d35",
+        "text": "治",
+        "kind": "speech"
+      },
+      {
+        "id": "ef497717-eebd-4045-8a5d-227884e80a95",
+        "text": "水",
+        "kind": "speech"
+      },
+      {
+        "id": "bc7ca132-5e4c-4234-8070-6fc762418657",
+        "text": "果",
+        "kind": "speech"
+      },
+      {
+        "id": "f8eb30ea-3891-4919-8727-85cbb671f8ab",
+        "text": "再",
+        "kind": "speech"
+      },
+      {
+        "id": "f541071d-6c58-4f6c-b3bd-cf3c05cde2be",
+        "text": "买",
+        "kind": "speech"
+      },
+      {
+        "id": "6fce0ef4-f45b-48d3-8e20-a839508109fd",
+        "text": "点",
+        "kind": "speech"
+      },
+      {
+        "id": "454a1635-7604-4725-82c0-57380b50b1fa",
+        "text": "饮",
+        "kind": "speech"
+      },
+      {
+        "id": "f2b79607-72fa-4bcd-85d9-c68ea79f5927",
+        "text": "料",
+        "kind": "speech"
+      },
+      {
+        "id": "415c1624-60fd-4950-a961-ad27be5c19a9",
+        "text": "你",
+        "kind": "speech"
+      },
+      {
+        "id": "dec73d2c-e956-4c64-8a9c-72224c52cd13",
+        "text": "沒",
+        "kind": "speech"
+      },
+      {
+        "id": "20e74663-d96e-4747-9486-8b2856f35450",
+        "text": "想",
+        "kind": "speech"
+      },
+      {
+        "id": "ca237c1f-f230-4520-8764-77407e5c82a6",
+        "text": "到",
+        "kind": "speech"
+      },
+      {
+        "id": "812eaf97-ff5a-443a-8c11-2911cd6591c8",
+        "text": "?",
+        "kind": "punctuation"
+      }
+    ],
+    "mode": "best-effort-verbatim",
+    "provenance": {
+      "engineId": "whisper.cpp",
+      "engineVersion": "system",
+      "modelId": "ggml-base.bin",
+      "configHash": "84fca1805f6e12a1c1100e3d94d29867b6681ba953cfa08302c9afde7ebd351d",
+      "artifactSchemaVersion": 1,
+      "createdAt": "2026-09-15T06:41:56.800Z"
+    }
+  },
+  "alignment": {
+    "id": "3222f501-4f83-4833-aabe-6d1ef313be51",
+    "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+    "transcriptArtifactId": "6d1563c6-50ee-402e-9634-cc9202f11272",
+    "transcriptRevision": 1,
+    "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+    "sourceFingerprint": {
+      "byteLength": 11520114,
+      "modifiedTimeMs": 0,
+      "sha256": "9b62b7a9c1487246e6ef330dcbae3e78b68867e0843bb86996064881ec1439a0"
+    },
+    "acousticEditUnits": [
+      {
+        "id": "86894fa7-28fe-468b-8cd3-bdcf23be339d",
+        "transcriptUnitIds": [
+          "51e86591-23b9-4176-8cc1-e92fc41698d9"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 0.403,
+        "sourceEnd": 0.544,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "ba3e6c64-722c-448d-8012-4a9a049ef9f9",
+        "transcriptUnitIds": [
+          "fef79b80-8fdb-4e06-a4a3-59ad09974be3"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 0.544,
+        "sourceEnd": 0.705,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "70cc8985-eb8c-4f7c-9ecc-a9fe4341d317",
+        "transcriptUnitIds": [
+          "4d6e828e-de47-4656-908f-7641f10c316b"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 0.705,
+        "sourceEnd": 0.867,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "b9ec6d02-6883-479f-81c3-9bd9ca0460ca",
+        "transcriptUnitIds": [
+          "8cb43d9f-fa52-40da-8df3-d1f70115f930"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 0.867,
+        "sourceEnd": 0.9480000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.995
+      },
+      {
+        "id": "c387163e-eef2-4556-aa6e-b5398dcd51e7",
+        "transcriptUnitIds": [
+          "260edf8e-3bbc-48fd-9604-bc8a4db529ac"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 0.9480000000000001,
+        "sourceEnd": 1.089,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "fcade59c-c1f2-43d4-84a1-78391a78ab07",
+        "transcriptUnitIds": [
+          "a4834494-bec4-4c9e-8bfd-2d9613bbe8c7"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 1.089,
+        "sourceEnd": 1.109,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "aa5e53d3-8a67-400f-a4a6-8e9594925d69",
+        "transcriptUnitIds": [
+          "b69d6bfa-ca6f-4263-a05e-af2cb9d11429"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 1.861,
+        "sourceEnd": 2.002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.998
+      },
+      {
+        "id": "90e3a9c0-1e43-4de8-a2c4-d46db30fda6a",
+        "transcriptUnitIds": [
+          "3b949a39-e40d-4f9c-9599-179e36315780"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 2.002,
+        "sourceEnd": 2.526,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "67c0f4f4-aafb-4270-bfaa-c232f4695d52",
+        "transcriptUnitIds": [
+          "35368f69-fb0e-4d87-902b-eaffa1fc3e4f"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 2.526,
+        "sourceEnd": 2.627,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "53cb1766-fdfa-4670-94aa-623b69d26964",
+        "transcriptUnitIds": [
+          "8c19008e-c7b8-4129-bce7-8a727109223d"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 2.627,
+        "sourceEnd": 2.748,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "5e30e2e4-0634-42ce-b37d-24da0357ea2e",
+        "transcriptUnitIds": [
+          "4926c96a-40ad-4b2e-a12e-99a22fceaca4"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 2.748,
+        "sourceEnd": 2.909,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "ebf7be04-1a84-4f46-9981-95315a5ef3be",
+        "transcriptUnitIds": [
+          "7270b5e7-32ce-4766-9871-14d450df79eb"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 2.909,
+        "sourceEnd": 3.01,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.827
+      },
+      {
+        "id": "cde1f094-f100-4cee-89b3-8487b04af40b",
+        "transcriptUnitIds": [
+          "15563fe7-dbf2-47b3-b349-2bb923c63e52"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 3.01,
+        "sourceEnd": 3.151,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.97
+      },
+      {
+        "id": "41772241-1c3a-45b8-8d2d-bdaa17eb2df2",
+        "transcriptUnitIds": [
+          "a9b15185-b51b-4ff7-885d-550dd732065f"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 3.151,
+        "sourceEnd": 3.2720000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.973
+      },
+      {
+        "id": "9f905ddf-e279-457c-8884-36ad8dfda774",
+        "transcriptUnitIds": [
+          "5d2ed6a8-4bd6-4968-8c47-ea5f4ebc2104"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 3.2720000000000002,
+        "sourceEnd": 3.292,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.097
+      },
+      {
+        "id": "b2eb6e62-ad07-451f-bb23-2b1d02300ba2",
+        "transcriptUnitIds": [
+          "a311c1b2-3550-4eb6-9bf3-f2384faad378"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 4.043,
+        "sourceEnd": 4.185,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "610e29fe-e37d-4600-97da-cbef6793d3ed",
+        "transcriptUnitIds": [
+          "e473dc7e-c539-43d6-a19e-ae3291e528c2"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 4.185,
+        "sourceEnd": 4.3469999999999995,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "c51cc634-5781-4a2d-9fb5-626df25cd12e",
+        "transcriptUnitIds": [
+          "856367a0-590c-4e59-9a71-7983648b3dd8"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 4.3469999999999995,
+        "sourceEnd": 4.4079999999999995,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.669
+      },
+      {
+        "id": "73f9505d-71e9-4dc8-b3c6-f8ea183b68d6",
+        "transcriptUnitIds": [
+          "81a60d66-50f3-4382-8485-f8e4944c020c"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 4.4079999999999995,
+        "sourceEnd": 4.5089999999999995,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "e7bdc9d9-1518-4578-9b6f-f3000eb8999d",
+        "transcriptUnitIds": [
+          "48f555bc-7f39-4381-8eeb-a7e1962ae650"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 4.5089999999999995,
+        "sourceEnd": 4.529999999999999,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.049
+      },
+      {
+        "id": "10cf5430-6186-4d36-bc2a-3c539d9db581",
+        "transcriptUnitIds": [
+          "c8707877-0022-436f-83e2-2b9214289dae"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.042,
+        "sourceEnd": 5.244000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "d3974938-840a-4181-aa88-83ce2977ae85",
+        "transcriptUnitIds": [
+          "48970ebd-ef9f-47cc-b44b-27a38c6a2537"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.244000000000001,
+        "sourceEnd": 5.425000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "1e6b587f-0a28-4efb-9a2d-18315d274c7a",
+        "transcriptUnitIds": [
+          "88ecd995-abc3-430a-8e83-556f0f24fd79"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.425000000000001,
+        "sourceEnd": 5.587000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "519ac2e5-f140-4b42-a959-f09f6c1190b2",
+        "transcriptUnitIds": [
+          "39b1b257-690e-443b-9d77-30ca6aed4f3c"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.587000000000001,
+        "sourceEnd": 5.728,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "eeba93d1-af35-4590-9389-bc87368f29b3",
+        "transcriptUnitIds": [
+          "7840ed8f-dc6c-4514-886c-3ba8285d4bd1"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.728,
+        "sourceEnd": 5.849,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.995
+      },
+      {
+        "id": "9b675ca1-247b-4962-b9bc-34d144dc6e83",
+        "transcriptUnitIds": [
+          "96b00432-065a-46fa-a4b7-e38b8caa3a16"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.849,
+        "sourceEnd": 5.970000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.998
+      },
+      {
+        "id": "de2584b5-7dba-48bb-8c36-3c5935c71733",
+        "transcriptUnitIds": [
+          "0fa1c1f7-0f3e-46aa-a71a-d356221ccf61"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 5.970000000000001,
+        "sourceEnd": 6.050000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "e7206f72-d23d-4dcf-b2ed-4262928c65a3",
+        "transcriptUnitIds": [
+          "8e0cfb0d-a8dd-4885-9f9d-5ede7f407428"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 6.050000000000001,
+        "sourceEnd": 6.151,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "898966af-ebe7-4110-bd84-908156b0c1ba",
+        "transcriptUnitIds": [
+          "73b72020-ebda-4834-a138-3683618c106f"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 6.151,
+        "sourceEnd": 6.333,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "3e76d8b2-20ff-4981-af4f-7b500d80133f",
+        "transcriptUnitIds": [
+          "a0ce6eea-f13f-417a-8ead-53bd28c09ef1"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 6.333,
+        "sourceEnd": 6.353,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "1a8f3dcc-656b-4556-ad5d-74e110c3364b",
+        "transcriptUnitIds": [
+          "b660ee8b-7d9e-4676-82bd-49735082b770"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 6.982,
+        "sourceEnd": 7.143000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.998
+      },
+      {
+        "id": "fb7a2481-db66-4769-9e18-889e6336782b",
+        "transcriptUnitIds": [
+          "d297a438-9b3d-4b34-913c-366fa5d545c2"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 7.143000000000001,
+        "sourceEnd": 7.223,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.892
+      },
+      {
+        "id": "664d22ed-aa9f-4f41-8c75-9ce5471b4d3e",
+        "transcriptUnitIds": [
+          "9ad34ff9-7efc-45d8-b4e7-eb0b31682c52"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 7.223,
+        "sourceEnd": 7.626,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.953
+      },
+      {
+        "id": "3f3fb9a5-3fd8-40aa-81aa-5181dca01622",
+        "transcriptUnitIds": [
+          "be42a4bc-f754-4f21-ac8a-b86b7aa862b9"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 7.626,
+        "sourceEnd": 7.747,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "14db8db0-69cd-428b-bef9-e83ce98d147e",
+        "transcriptUnitIds": [
+          "288cd457-d777-4be9-a4d1-da8a8fc33c4c"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 7.747,
+        "sourceEnd": 7.868,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "3763ccd5-e9ff-4189-9540-0763082918aa",
+        "transcriptUnitIds": [
+          "649ce039-c26d-476c-85cc-0a76a7a4b215"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 7.868,
+        "sourceEnd": 7.949,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.75
+      },
+      {
+        "id": "e22c7e85-1d71-48f2-9c1e-6407d2562d3e",
+        "transcriptUnitIds": [
+          "b40f99b7-7332-490f-9e45-044e79c48c68"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 7.949,
+        "sourceEnd": 8.09,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.858
+      },
+      {
+        "id": "55375d8b-0fbd-401c-aa5f-556ff570ce40",
+        "transcriptUnitIds": [
+          "6c6c29cd-e3f8-4903-b234-5459bf111280"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 8.09,
+        "sourceEnd": 8.251,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.918
+      },
+      {
+        "id": "e8e99607-56ad-4294-8bb9-31a484a76e1a",
+        "transcriptUnitIds": [
+          "367b33f3-2366-4713-8626-49dd8231f3c8"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 8.251,
+        "sourceEnd": 8.513,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "e6b661c3-d800-4647-a2b3-1b16c7a632e1",
+        "transcriptUnitIds": [
+          "a2cc970b-a6fc-4088-ad59-78eb5812e4cf"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 8.513,
+        "sourceEnd": 8.533,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.997
+      },
+      {
+        "id": "7df8dec0-e198-4743-a8b0-740f757b536d",
+        "transcriptUnitIds": [
+          "e64a7c70-0468-4deb-9fe0-d4b9ce653a75"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 9.324,
+        "sourceEnd": 9.424999999999999,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.852
+      },
+      {
+        "id": "209ae2ca-390d-4406-8830-7a0e5eb7d0c4",
+        "transcriptUnitIds": [
+          "f77e9928-3442-4171-b28d-d4f2cd59982a"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 9.424999999999999,
+        "sourceEnd": 9.607,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.939
+      },
+      {
+        "id": "2d23d23a-2ce2-4c69-927a-b06d9371d85b",
+        "transcriptUnitIds": [
+          "76b110f0-131a-4875-8edd-e1deede8b0e1"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 9.607,
+        "sourceEnd": 9.769,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.998
+      },
+      {
+        "id": "7871622c-b0ff-4302-8af2-e7eed648795d",
+        "transcriptUnitIds": [
+          "c5b88593-8749-44f5-85c5-2755e553af39"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 9.769,
+        "sourceEnd": 9.951,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.955
+      },
+      {
+        "id": "e2fdd37b-8a2b-4a8b-9085-1fae589e7fcf",
+        "transcriptUnitIds": [
+          "7ed2e6f3-94f6-413f-9881-adda70112e36"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 9.951,
+        "sourceEnd": 9.972,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.002
+      },
+      {
+        "id": "08ebaf70-c154-4d87-8e8c-c48588a5b1e0",
+        "transcriptUnitIds": [
+          "7aeb837e-9afd-4ae2-a6c5-dd7a10aca3ad"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 10.402000000000001,
+        "sourceEnd": 10.543000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "bea5b8df-9d3f-4efb-b581-006570a66c71",
+        "transcriptUnitIds": [
+          "8b5ee454-64ac-4ce4-ab03-dd3c16ade101"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 10.543000000000001,
+        "sourceEnd": 10.684000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "23aab283-e111-4ae4-83e0-7913e33428de",
+        "transcriptUnitIds": [
+          "dc9ef8d2-e57b-4206-8ae1-82c57e043697"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 10.684000000000001,
+        "sourceEnd": 10.845,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.911
+      },
+      {
+        "id": "021e9cc7-6a22-4bd1-8996-174923968dba",
+        "transcriptUnitIds": [
+          "782627e5-8161-4ec4-a208-9d8b55a4313e"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 10.845,
+        "sourceEnd": 10.926,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "de07bb39-fed0-463f-92dc-bddd13e6b670",
+        "transcriptUnitIds": [
+          "13cddaac-61fd-476a-ad5d-79e98232c943"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 10.926,
+        "sourceEnd": 11.087,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "9a863aa1-e90f-499f-9c58-9a03e0879489",
+        "transcriptUnitIds": [
+          "68355676-095e-45be-9ef2-4501fadaff62"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 11.087,
+        "sourceEnd": 11.268,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "bcc40406-e881-4cab-b452-6f5a8d0dc61a",
+        "transcriptUnitIds": [
+          "a9cfe84a-1e60-469d-b6f1-aa9990c35c44"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 11.268,
+        "sourceEnd": 11.429,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.877
+      },
+      {
+        "id": "f9c2ec99-ad53-4f96-a6cc-641aafbe23b1",
+        "transcriptUnitIds": [
+          "cc9bb129-3e4d-40af-aa02-1d8f86786e9f"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 11.429,
+        "sourceEnd": 11.55,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.963
+      },
+      {
+        "id": "acc5d983-1b48-414a-ac58-e16f71ed952c",
+        "transcriptUnitIds": [
+          "1fdbb12e-0df4-4c21-93b2-bf459545926b"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 11.55,
+        "sourceEnd": 11.691,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.945
+      },
+      {
+        "id": "787823b4-f3b0-4859-89ae-9e57003971ce",
+        "transcriptUnitIds": [
+          "bc8020d9-cc5d-442f-92fd-a45ade13bba0"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 11.691,
+        "sourceEnd": 11.933,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.917
+      },
+      {
+        "id": "b89b56c7-6297-4b1d-b228-4ec9cb876771",
+        "transcriptUnitIds": [
+          "ae96bcc7-ce46-480f-a467-e5fc024cead3"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 11.933,
+        "sourceEnd": 11.953000000000001,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.001
+      },
+      {
+        "id": "38b2c1f1-e9ee-4d5e-a407-ad66cd607555",
+        "transcriptUnitIds": [
+          "5fe56d82-9a87-4bba-b8a9-81de00696839"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 12.642,
+        "sourceEnd": 12.803,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.983
+      },
+      {
+        "id": "46d76e8b-d5fe-4ec4-9762-c9e671dbceae",
+        "transcriptUnitIds": [
+          "18216017-51eb-452e-9cc8-ad37c3f62790"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 12.803,
+        "sourceEnd": 12.964,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "ed687f30-dc06-4f8f-9f70-a4f081a4b661",
+        "transcriptUnitIds": [
+          "a0ea3dc1-b5eb-4bd4-a54c-8fbdc98e063c"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 12.964,
+        "sourceEnd": 13.529,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "1026c2c7-3e0f-4e87-9446-fb6ae153c0d2",
+        "transcriptUnitIds": [
+          "16d0cc3e-1f7e-4cbc-9035-15d999bdfb24"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 13.529,
+        "sourceEnd": 13.71,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.995
+      },
+      {
+        "id": "63b6397f-21e7-4a51-859c-3fb98e9bba42",
+        "transcriptUnitIds": [
+          "00c182f3-85cd-453b-aa12-04323c99fc6f"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 13.71,
+        "sourceEnd": 13.73,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.006
+      },
+      {
+        "id": "7bd5d845-0a89-4f48-b7ac-d41e498e7711",
+        "transcriptUnitIds": [
+          "127f5a87-c399-4d2e-a0cd-a36cca516e7a"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 14.742,
+        "sourceEnd": 14.863,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "67d505ff-499d-4199-b241-a9d327860287",
+        "transcriptUnitIds": [
+          "6667b899-c8a9-4421-870e-28439a19f142"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 14.863,
+        "sourceEnd": 15.004,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.863
+      },
+      {
+        "id": "f02b049d-f23b-473a-b0c7-d48cfc29b6ce",
+        "transcriptUnitIds": [
+          "fd84ecb4-02ba-420e-ad3d-3d080d85b29e"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.004,
+        "sourceEnd": 15.125,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.991
+      },
+      {
+        "id": "e09011dc-a49e-457e-a8cc-1020dae55ba6",
+        "transcriptUnitIds": [
+          "c5f6843b-5941-46a8-817c-487acf4c090a"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.125,
+        "sourceEnd": 15.267,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "0e35c11d-aaa7-4435-849d-b6a598d9a8bd",
+        "transcriptUnitIds": [
+          "64c93f72-3ed4-4f77-b134-bc92627b109c"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.267,
+        "sourceEnd": 15.388,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "8799425e-b9b9-4585-bc1d-81647d0c01bd",
+        "transcriptUnitIds": [
+          "b1f3c6ac-b47c-4ab8-8825-ac40ce2b7163"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.388,
+        "sourceEnd": 15.509,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "660d73d8-1805-4747-a610-50430b26530a",
+        "transcriptUnitIds": [
+          "1cf2943f-9789-43d6-88f1-34db7266cabf"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.509,
+        "sourceEnd": 15.69,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "bf195df2-48e8-4582-bc12-269f06fa72f2",
+        "transcriptUnitIds": [
+          "a1939023-7aad-4749-a3ff-3ecf7fb04674"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.69,
+        "sourceEnd": 15.831,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.995
+      },
+      {
+        "id": "e55153f4-4ab9-4181-9aa1-96010488b837",
+        "transcriptUnitIds": [
+          "d752ecfd-7ef5-4d22-badf-68f378947975"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 15.831,
+        "sourceEnd": 15.852,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "f3b9830d-c580-4d61-9ecf-ea3e2120fc43",
+        "transcriptUnitIds": [
+          "d626ae11-dbfe-4337-a6bb-ca7731ddaad5"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 16.562,
+        "sourceEnd": 16.703,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "c0253869-3446-4c60-a1ef-30892f8ef0c6",
+        "transcriptUnitIds": [
+          "cdb617af-f31b-4148-bfea-5d2c2e321601"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 16.703,
+        "sourceEnd": 16.885,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.962
+      },
+      {
+        "id": "f5a775fd-c4c7-49b5-a999-6a8d01055735",
+        "transcriptUnitIds": [
+          "7363d3ff-f869-4a05-94ff-31107c929cc4"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 16.885,
+        "sourceEnd": 17.086,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "de443920-a654-418f-90c4-3635f6a60185",
+        "transcriptUnitIds": [
+          "4dead74f-6a26-4399-9312-8e20ab8871ed"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 17.086,
+        "sourceEnd": 17.208,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.98
+      },
+      {
+        "id": "03bdab2c-6209-4b67-9d06-3534c344c363",
+        "transcriptUnitIds": [
+          "5dd4d5ec-1946-4db1-bb1b-13c6efa94492"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 17.208,
+        "sourceEnd": 17.369,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.922
+      },
+      {
+        "id": "53409e7b-803a-4399-90de-304cb1ba982c",
+        "transcriptUnitIds": [
+          "17b8b9d9-0fce-4c33-8d1e-630c4c0d1821"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 17.369,
+        "sourceEnd": 17.509999999999998,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "fbb98e70-b2d2-4a71-9fda-e37cc7ed122e",
+        "transcriptUnitIds": [
+          "ce36680f-beda-4f68-8a97-b2dc5008bdfb"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 17.509999999999998,
+        "sourceEnd": 17.712,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.991
+      },
+      {
+        "id": "383e0c6e-0413-4e6d-8178-7c01f4ea670d",
+        "transcriptUnitIds": [
+          "6939891f-32ff-47b5-9008-c93d96bc9d8e"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 17.712,
+        "sourceEnd": 17.732,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.991
+      },
+      {
+        "id": "51f4bb18-9604-4395-8ee5-0969d4eaf44a",
+        "transcriptUnitIds": [
+          "e93fd3fe-a6b1-4a33-94f3-0323de78b23b"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 18.382,
+        "sourceEnd": 18.523,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "9b8a6a01-a192-44bf-8319-f466a95be922",
+        "transcriptUnitIds": [
+          "d32cb8b5-58ed-4f72-b3e4-d073db8ff90a"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 18.523,
+        "sourceEnd": 18.705000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.995
+      },
+      {
+        "id": "31411ff9-b642-407b-a1cf-63697c08c6d6",
+        "transcriptUnitIds": [
+          "a15c8665-71f3-4c76-bcc4-5be6fde9c0f0"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 18.705000000000002,
+        "sourceEnd": 18.846,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.857
+      },
+      {
+        "id": "671061cc-9ba7-4724-9b2c-7b7abc908ba0",
+        "transcriptUnitIds": [
+          "fc39f7dc-b634-4fa5-b545-08adb8dd8d7c"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 18.846,
+        "sourceEnd": 18.987000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "ca6be75d-1feb-4516-915f-2b34df95d540",
+        "transcriptUnitIds": [
+          "eb96bf7b-de6b-4bc3-bcc6-0bf5deb85244"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 18.987000000000002,
+        "sourceEnd": 19.189,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.997
+      },
+      {
+        "id": "e83df215-ff1a-4250-a8e3-192525d328f8",
+        "transcriptUnitIds": [
+          "e0c6d3a1-7ff3-42bd-9e3a-af107edc53e8"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 19.189,
+        "sourceEnd": 19.371000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "db717f58-6beb-4c77-a844-c729d8b1bfcb",
+        "transcriptUnitIds": [
+          "95521086-2934-4052-a4c3-ef276a3cb5f2"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 19.371000000000002,
+        "sourceEnd": 19.492,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.994
+      },
+      {
+        "id": "1fb95ca0-a323-4ceb-b7b6-7e3df3458eb4",
+        "transcriptUnitIds": [
+          "fb4427c4-2a48-408c-9775-ac75feaa3eae"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 19.492,
+        "sourceEnd": 19.633,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "2e31f3e2-8a78-43a7-96a6-c79ab7130a0e",
+        "transcriptUnitIds": [
+          "e512cccb-4f72-44c1-a2ce-45d0d38c2960"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 19.633,
+        "sourceEnd": 19.734,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "c062c348-f528-41cd-b2ed-dc9e43539f86",
+        "transcriptUnitIds": [
+          "b55cfb66-27a4-4241-82da-5b0e6109c931"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 19.734,
+        "sourceEnd": 19.754,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.186
+      },
+      {
+        "id": "445c99ae-98c7-4d30-837b-8e3dd77f9799",
+        "transcriptUnitIds": [
+          "c70285ae-d2a1-47d2-8cce-a038d714fc02"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.202,
+        "sourceEnd": 20.282,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "89928c99-d274-4a1c-a383-6b5ffc9a206e",
+        "transcriptUnitIds": [
+          "42c93070-597b-4270-a642-676372522a21"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.282,
+        "sourceEnd": 20.444,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "ed8602b9-99cd-47d6-97cf-dcba03865c69",
+        "transcriptUnitIds": [
+          "01323ad8-fc8a-45b6-82ff-a3d9fa5fa25a"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.444,
+        "sourceEnd": 20.605,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "fa1d607f-2131-441a-a78a-f53a718c097d",
+        "transcriptUnitIds": [
+          "6089929d-70a6-4df5-b7b6-c5cc256ba436"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.605,
+        "sourceEnd": 20.867,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.998
+      },
+      {
+        "id": "f520c132-d2c3-47ca-a7e7-d3046dd265e3",
+        "transcriptUnitIds": [
+          "0cf42cd9-c25d-4a6d-b0b8-a8d9725a53aa"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.867,
+        "sourceEnd": 20.968,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.815
+      },
+      {
+        "id": "c5a0e10b-1d7c-4e7f-804b-173801c1ec86",
+        "transcriptUnitIds": [
+          "cda6852c-89ed-4990-b0d4-5c88f05ae559"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.968,
+        "sourceEnd": 21.049,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.811
+      },
+      {
+        "id": "a56f0dec-9f92-4cd3-bb43-a1856492c7a3",
+        "transcriptUnitIds": [
+          "8142c958-08ed-4eaf-ad85-9226ff484288"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 21.049,
+        "sourceEnd": 21.21,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "2055badc-0067-462c-832a-31b60fb66a78",
+        "transcriptUnitIds": [
+          "3609a87e-4604-49db-af9d-eea51116df79"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 21.21,
+        "sourceEnd": 21.392,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "668b787c-fbaf-4d2b-9fee-69cfb4e2450f",
+        "transcriptUnitIds": [
+          "3569cd85-b5e0-41f1-9ffa-65c610c23675"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 21.392,
+        "sourceEnd": 21.513,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.959
+      },
+      {
+        "id": "bf1d98dc-2ed8-49d0-9aa7-0f3b543bbbea",
+        "transcriptUnitIds": [
+          "f9425755-2895-4c73-8650-c14a33f778c2"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 21.514,
+        "sourceEnd": 21.535,
+        "timingOrigin": "local-realigned",
+        "granularity": "character",
+        "confidence": 0.003
+      },
+      {
+        "id": "2c2ec1ec-c429-4c41-9f26-aded674f5571",
+        "transcriptUnitIds": [
+          "44c0d3e2-c921-4838-844e-839f1a8d5bbc"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.122999999999998,
+        "sourceEnd": 22.264999999999997,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "a7261c05-c978-4819-bcc4-5fcc8661b6e4",
+        "transcriptUnitIds": [
+          "82ab92fc-4e7d-44f4-a789-886f174dd6fe"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.264999999999997,
+        "sourceEnd": 22.406,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "75814f6d-f6e1-4093-bffb-dd9de3af3449",
+        "transcriptUnitIds": [
+          "bde5f634-6911-4a4a-9b7c-15832004b77f"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.406,
+        "sourceEnd": 22.508,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "7cba56c2-a359-4f4d-9c91-0d6f58780fc8",
+        "transcriptUnitIds": [
+          "55a13e8d-3e0b-4be6-ad7f-173cced8b2f3"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.508,
+        "sourceEnd": 22.669999999999998,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "68128224-3c4a-449e-9df3-d7c65676caf3",
+        "transcriptUnitIds": [
+          "e99e5c86-1aea-44ac-b7c5-4574478b859a"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.669999999999998,
+        "sourceEnd": 22.831999999999997,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "36881a57-0bb4-4171-8513-3c15735d75bf",
+        "transcriptUnitIds": [
+          "baf3c672-15a9-4475-8cc4-48cdb4f22e4b"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.831999999999997,
+        "sourceEnd": 22.851999999999997,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.997
+      },
+      {
+        "id": "399d0f3b-bdba-4b7d-a5b7-da80797ee72a",
+        "transcriptUnitIds": [
+          "b3d028e7-a0e7-4701-b6bd-df41d299bfcd"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 23.263,
+        "sourceEnd": 23.425,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.923
+      },
+      {
+        "id": "d54f0007-c0dd-4577-89b4-7496603b8940",
+        "transcriptUnitIds": [
+          "48e5e0ce-d29c-422f-a54e-f80e9b915b81"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 23.425,
+        "sourceEnd": 23.566,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.99
+      },
+      {
+        "id": "c34e70e8-00b5-44cb-8898-66cec6f54b12",
+        "transcriptUnitIds": [
+          "4c62dbc0-3cf5-44b2-bf11-4ae89b145730"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 23.566,
+        "sourceEnd": 23.687,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.974
+      },
+      {
+        "id": "d6d26379-ff02-4028-871c-91927bd050aa",
+        "transcriptUnitIds": [
+          "91884926-3e45-434c-9bdd-d242e929fa0b"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 23.687,
+        "sourceEnd": 23.849,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.983
+      },
+      {
+        "id": "a536afdd-5010-4a8f-8679-abdd8ba2328c",
+        "transcriptUnitIds": [
+          "d95f9c99-98be-4bfc-b853-581fa1aa3803"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 23.849,
+        "sourceEnd": 24.011,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.913
+      },
+      {
+        "id": "23406020-a3e1-42e5-b50a-d8916af9af29",
+        "transcriptUnitIds": [
+          "a0c545c1-a183-4be1-8f06-f36ea4d96d28"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 24.011,
+        "sourceEnd": 24.091,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.847
+      },
+      {
+        "id": "f5cbea01-d0fb-48cf-a3ac-cfc982329833",
+        "transcriptUnitIds": [
+          "d85c432c-c305-4e87-a3c0-47974eb7d3b7"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 24.091,
+        "sourceEnd": 24.294,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.993
+      },
+      {
+        "id": "63f68019-9dfa-4526-b184-97239af2d00a",
+        "transcriptUnitIds": [
+          "e319f9c4-bdfb-47c4-8f88-372be79e73e7"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 24.294,
+        "sourceEnd": 24.314,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.971
+      },
+      {
+        "id": "6b354852-f721-4e52-baf3-58e2be626b3e",
+        "transcriptUnitIds": [
+          "efcf5eff-5a1e-4362-8f8c-2137712af3f4"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 24.703000000000003,
+        "sourceEnd": 24.845000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.976
+      },
+      {
+        "id": "c950882a-bdce-454b-991a-f91bbf663f25",
+        "transcriptUnitIds": [
+          "f5293817-d365-43c9-aaa7-d884b7eeba61"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 24.845000000000002,
+        "sourceEnd": 24.966,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.944
+      },
+      {
+        "id": "6c83f352-5840-452a-b8ef-77538a2418e0",
+        "transcriptUnitIds": [
+          "0e214cc3-1281-4386-9245-33b1e3fdc7ff"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 24.966,
+        "sourceEnd": 25.047,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "1aaab532-f805-4903-8e01-d980f52e7583",
+        "transcriptUnitIds": [
+          "6c56d5aa-4516-4c26-b785-320ee9636ba0"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 25.047,
+        "sourceEnd": 25.189,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "3be35d30-667b-4df9-a15b-025bff0abcf2",
+        "transcriptUnitIds": [
+          "e7ec85ca-d786-4943-afa3-c32202d1b1eb"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 25.189,
+        "sourceEnd": 25.351000000000003,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.984
+      },
+      {
+        "id": "dbcffeda-c806-43dd-bdea-c05367ce264f",
+        "transcriptUnitIds": [
+          "27f3ea03-e8e1-4b08-999e-6701ebb77ba7"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 25.351000000000003,
+        "sourceEnd": 25.371000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "26073908-6e95-43d3-a51e-65d8d69d10ec",
+        "transcriptUnitIds": [
+          "a6824fa5-fc2e-46b8-946e-9418e364f70e"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 25.842000000000002,
+        "sourceEnd": 25.984,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.875
+      },
+      {
+        "id": "5ab0821f-be7e-4e8c-8f3a-e8f0205ea241",
+        "transcriptUnitIds": [
+          "49108ee7-a65b-44ed-bc71-70bc9aa9a8f1"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 25.984,
+        "sourceEnd": 26.166,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "fe5c7315-2e73-49a4-ae46-9d10c6e15cb5",
+        "transcriptUnitIds": [
+          "91c0f31a-a424-4ba6-bb13-34f59bf0e235"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 26.166,
+        "sourceEnd": 26.287000000000003,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.999
+      },
+      {
+        "id": "51385c82-be5d-48ea-b98c-312f4671eab3",
+        "transcriptUnitIds": [
+          "28e6f4f9-973f-4b95-b7f2-dcd9204444c7"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 26.287000000000003,
+        "sourceEnd": 26.489,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.998
+      },
+      {
+        "id": "c02cf251-464f-4101-bf07-559cc0d4c40d",
+        "transcriptUnitIds": [
+          "afe33ae2-d8af-4955-86ac-de84136319ab"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 26.489,
+        "sourceEnd": 26.671,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.994
+      },
+      {
+        "id": "19817aa2-9383-4e6f-90ba-30383b2f1aac",
+        "transcriptUnitIds": [
+          "e07ef99d-a73a-45dc-8e87-81c7e680b531"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 26.671,
+        "sourceEnd": 26.691000000000003,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.997
+      },
+      {
+        "id": "367c4d65-d62a-4aff-b631-ce7b05562191",
+        "transcriptUnitIds": [
+          "de632111-0528-4480-af6a-0c9fcfeec2d7"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 27.402,
+        "sourceEnd": 27.523,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.988
+      },
+      {
+        "id": "53eb3054-f7e7-4ab4-99f6-97f993720867",
+        "transcriptUnitIds": [
+          "4a6ee748-64f9-443b-92f5-eb5f50c3edc9"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 27.523,
+        "sourceEnd": 27.724,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.902
+      },
+      {
+        "id": "262dfd30-809b-4f9f-994b-e7a6e19be170",
+        "transcriptUnitIds": [
+          "a7914411-0e1b-4af0-a897-f959a2d73d35"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 27.724,
+        "sourceEnd": 27.906000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.89
+      },
+      {
+        "id": "891fb32c-43e5-4505-85f3-3163fa5296d6",
+        "transcriptUnitIds": [
+          "ef497717-eebd-4045-8a5d-227884e80a95"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 27.906000000000002,
+        "sourceEnd": 28.147000000000002,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "da44a59b-0bab-4945-ab5a-3986db6ecaee",
+        "transcriptUnitIds": [
+          "bc7ca132-5e4c-4234-8070-6fc762418657"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 28.147000000000002,
+        "sourceEnd": 28.57,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 1
+      },
+      {
+        "id": "0342069d-5a15-4eee-a111-2433b89abe0f",
+        "transcriptUnitIds": [
+          "f8eb30ea-3891-4919-8727-85cbb671f8ab"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 28.57,
+        "sourceEnd": 28.691000000000003,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.838
+      },
+      {
+        "id": "cb4dd4df-9a3c-48f6-ad4a-5afcc9c55880",
+        "transcriptUnitIds": [
+          "f541071d-6c58-4f6c-b3bd-cf3c05cde2be"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 28.691000000000003,
+        "sourceEnd": 28.832,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.996
+      },
+      {
+        "id": "cebe4c3f-d0ee-4a4d-b7bd-0de24ce69986",
+        "transcriptUnitIds": [
+          "6fce0ef4-f45b-48d3-8e20-a839508109fd"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 28.832,
+        "sourceEnd": 28.953000000000003,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.986
+      },
+      {
+        "id": "24f32c3f-bf41-4f09-b703-ca61c38f9d2e",
+        "transcriptUnitIds": [
+          "454a1635-7604-4725-82c0-57380b50b1fa"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 28.953000000000003,
+        "sourceEnd": 29.134,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.933
+      },
+      {
+        "id": "bdbaacb5-8721-45d2-9bfb-d2d65da79a1f",
+        "transcriptUnitIds": [
+          "f2b79607-72fa-4bcd-85d9-c68ea79f5927"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 29.134,
+        "sourceEnd": 29.154,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.398
+      },
+      {
+        "id": "9800094c-2d94-4283-81ab-a04d37e019f3",
+        "transcriptUnitIds": [
+          "415c1624-60fd-4950-a961-ad27be5c19a9"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 29.62,
+        "sourceEnd": 29.662000000000003,
+        "timingOrigin": "group-fallback",
+        "evidenceAnchorTextUnitIds": [
+          "dec73d2c-e956-4c64-8a9c-72224c52cd13"
+        ],
+        "granularity": "character"
+      },
+      {
+        "id": "f9385e8f-9fae-4137-80c9-37583a26997a",
+        "transcriptUnitIds": [
+          "dec73d2c-e956-4c64-8a9c-72224c52cd13"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 29.662000000000003,
+        "sourceEnd": 29.873,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.899
+      },
+      {
+        "id": "75229410-a056-4c62-b402-65367a1f0197",
+        "transcriptUnitIds": [
+          "20e74663-d96e-4747-9486-8b2856f35450"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 29.873,
+        "sourceEnd": 29.937,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.667
+      },
+      {
+        "id": "16ab580b-1e07-4001-b8d7-3dab87b2f1a6",
+        "transcriptUnitIds": [
+          "ca237c1f-f230-4520-8764-77407e5c82a6"
+        ],
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 29.937,
+        "sourceEnd": 29.979,
+        "timingOrigin": "aligned",
+        "granularity": "character",
+        "confidence": 0.5
+      }
+    ],
+    "validation": {
+      "version": 1,
+      "method": "audio-evidence"
+    },
+    "recoveryVersion": 1,
+    "observations": [
+      {
+        "transcriptUnitIds": [
+          "51e86591-23b9-4176-8cc1-e92fc41698d9"
+        ],
+        "candidateStart": 0.403,
+        "candidateEnd": 0.544,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "fef79b80-8fdb-4e06-a4a3-59ad09974be3"
+        ],
+        "candidateStart": 0.544,
+        "candidateEnd": 0.705,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "4d6e828e-de47-4656-908f-7641f10c316b"
+        ],
+        "candidateStart": 0.705,
+        "candidateEnd": 0.867,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "8cb43d9f-fa52-40da-8df3-d1f70115f930"
+        ],
+        "candidateStart": 0.867,
+        "candidateEnd": 0.9480000000000001,
+        "confidence": 0.995,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "260edf8e-3bbc-48fd-9604-bc8a4db529ac"
+        ],
+        "candidateStart": 0.9480000000000001,
+        "candidateEnd": 1.089,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a4834494-bec4-4c9e-8bfd-2d9613bbe8c7"
+        ],
+        "candidateStart": 1.089,
+        "candidateEnd": 1.109,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "b69d6bfa-ca6f-4263-a05e-af2cb9d11429"
+        ],
+        "candidateStart": 1.861,
+        "candidateEnd": 2.002,
+        "confidence": 0.998,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "3b949a39-e40d-4f9c-9599-179e36315780"
+        ],
+        "candidateStart": 2.002,
+        "candidateEnd": 2.526,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "35368f69-fb0e-4d87-902b-eaffa1fc3e4f"
+        ],
+        "candidateStart": 2.526,
+        "candidateEnd": 2.627,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "8c19008e-c7b8-4129-bce7-8a727109223d"
+        ],
+        "candidateStart": 2.627,
+        "candidateEnd": 2.748,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "4926c96a-40ad-4b2e-a12e-99a22fceaca4"
+        ],
+        "candidateStart": 2.748,
+        "candidateEnd": 2.909,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "7270b5e7-32ce-4766-9871-14d450df79eb"
+        ],
+        "candidateStart": 2.909,
+        "candidateEnd": 3.01,
+        "confidence": 0.827,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "15563fe7-dbf2-47b3-b349-2bb923c63e52"
+        ],
+        "candidateStart": 3.01,
+        "candidateEnd": 3.151,
+        "confidence": 0.97,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a9b15185-b51b-4ff7-885d-550dd732065f"
+        ],
+        "candidateStart": 3.151,
+        "candidateEnd": 3.2720000000000002,
+        "confidence": 0.973,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "5d2ed6a8-4bd6-4968-8c47-ea5f4ebc2104"
+        ],
+        "candidateStart": 3.2720000000000002,
+        "candidateEnd": 3.292,
+        "confidence": 0.097,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "a311c1b2-3550-4eb6-9bf3-f2384faad378"
+        ],
+        "candidateStart": 4.043,
+        "candidateEnd": 4.185,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e473dc7e-c539-43d6-a19e-ae3291e528c2"
+        ],
+        "candidateStart": 4.185,
+        "candidateEnd": 4.3469999999999995,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "856367a0-590c-4e59-9a71-7983648b3dd8"
+        ],
+        "candidateStart": 4.3469999999999995,
+        "candidateEnd": 4.4079999999999995,
+        "confidence": 0.669,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "81a60d66-50f3-4382-8485-f8e4944c020c"
+        ],
+        "candidateStart": 4.4079999999999995,
+        "candidateEnd": 4.5089999999999995,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "48f555bc-7f39-4381-8eeb-a7e1962ae650"
+        ],
+        "candidateStart": 4.5089999999999995,
+        "candidateEnd": 4.529999999999999,
+        "confidence": 0.049,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "c8707877-0022-436f-83e2-2b9214289dae"
+        ],
+        "candidateStart": 5.042,
+        "candidateEnd": 5.244000000000001,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "48970ebd-ef9f-47cc-b44b-27a38c6a2537"
+        ],
+        "candidateStart": 5.244000000000001,
+        "candidateEnd": 5.425000000000001,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "88ecd995-abc3-430a-8e83-556f0f24fd79"
+        ],
+        "candidateStart": 5.425000000000001,
+        "candidateEnd": 5.587000000000001,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "39b1b257-690e-443b-9d77-30ca6aed4f3c"
+        ],
+        "candidateStart": 5.587000000000001,
+        "candidateEnd": 5.728,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "7840ed8f-dc6c-4514-886c-3ba8285d4bd1"
+        ],
+        "candidateStart": 5.728,
+        "candidateEnd": 5.849,
+        "confidence": 0.995,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "96b00432-065a-46fa-a4b7-e38b8caa3a16"
+        ],
+        "candidateStart": 5.849,
+        "candidateEnd": 5.970000000000001,
+        "confidence": 0.998,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "0fa1c1f7-0f3e-46aa-a71a-d356221ccf61"
+        ],
+        "candidateStart": 5.970000000000001,
+        "candidateEnd": 6.050000000000001,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "8e0cfb0d-a8dd-4885-9f9d-5ede7f407428"
+        ],
+        "candidateStart": 6.050000000000001,
+        "candidateEnd": 6.151,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "73b72020-ebda-4834-a138-3683618c106f"
+        ],
+        "candidateStart": 6.151,
+        "candidateEnd": 6.333,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a0ce6eea-f13f-417a-8ead-53bd28c09ef1"
+        ],
+        "candidateStart": 6.333,
+        "candidateEnd": 6.353,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "b660ee8b-7d9e-4676-82bd-49735082b770"
+        ],
+        "candidateStart": 6.982,
+        "candidateEnd": 7.143000000000001,
+        "confidence": 0.998,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "d297a438-9b3d-4b34-913c-366fa5d545c2"
+        ],
+        "candidateStart": 7.143000000000001,
+        "candidateEnd": 7.223,
+        "confidence": 0.892,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "9ad34ff9-7efc-45d8-b4e7-eb0b31682c52"
+        ],
+        "candidateStart": 7.223,
+        "candidateEnd": 7.626,
+        "confidence": 0.953,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "be42a4bc-f754-4f21-ac8a-b86b7aa862b9"
+        ],
+        "candidateStart": 7.626,
+        "candidateEnd": 7.747,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "288cd457-d777-4be9-a4d1-da8a8fc33c4c"
+        ],
+        "candidateStart": 7.747,
+        "candidateEnd": 7.868,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "649ce039-c26d-476c-85cc-0a76a7a4b215"
+        ],
+        "candidateStart": 7.868,
+        "candidateEnd": 7.949,
+        "confidence": 0.75,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "b40f99b7-7332-490f-9e45-044e79c48c68"
+        ],
+        "candidateStart": 7.949,
+        "candidateEnd": 8.09,
+        "confidence": 0.858,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "6c6c29cd-e3f8-4903-b234-5459bf111280"
+        ],
+        "candidateStart": 8.09,
+        "candidateEnd": 8.251,
+        "confidence": 0.918,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "367b33f3-2366-4713-8626-49dd8231f3c8"
+        ],
+        "candidateStart": 8.251,
+        "candidateEnd": 8.513,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a2cc970b-a6fc-4088-ad59-78eb5812e4cf"
+        ],
+        "candidateStart": 8.513,
+        "candidateEnd": 8.533,
+        "confidence": 0.997,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e64a7c70-0468-4deb-9fe0-d4b9ce653a75"
+        ],
+        "candidateStart": 9.324,
+        "candidateEnd": 9.424999999999999,
+        "confidence": 0.852,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "f77e9928-3442-4171-b28d-d4f2cd59982a"
+        ],
+        "candidateStart": 9.424999999999999,
+        "candidateEnd": 9.607,
+        "confidence": 0.939,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "76b110f0-131a-4875-8edd-e1deede8b0e1"
+        ],
+        "candidateStart": 9.607,
+        "candidateEnd": 9.769,
+        "confidence": 0.998,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "c5b88593-8749-44f5-85c5-2755e553af39"
+        ],
+        "candidateStart": 9.769,
+        "candidateEnd": 9.951,
+        "confidence": 0.955,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "7ed2e6f3-94f6-413f-9881-adda70112e36"
+        ],
+        "candidateStart": 9.951,
+        "candidateEnd": 9.972,
+        "confidence": 0.002,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "7aeb837e-9afd-4ae2-a6c5-dd7a10aca3ad"
+        ],
+        "candidateStart": 10.402000000000001,
+        "candidateEnd": 10.543000000000001,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "8b5ee454-64ac-4ce4-ab03-dd3c16ade101"
+        ],
+        "candidateStart": 10.543000000000001,
+        "candidateEnd": 10.684000000000001,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "dc9ef8d2-e57b-4206-8ae1-82c57e043697"
+        ],
+        "candidateStart": 10.684000000000001,
+        "candidateEnd": 10.845,
+        "confidence": 0.911,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "782627e5-8161-4ec4-a208-9d8b55a4313e"
+        ],
+        "candidateStart": 10.845,
+        "candidateEnd": 10.926,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "13cddaac-61fd-476a-ad5d-79e98232c943"
+        ],
+        "candidateStart": 10.926,
+        "candidateEnd": 11.087,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "68355676-095e-45be-9ef2-4501fadaff62"
+        ],
+        "candidateStart": 11.087,
+        "candidateEnd": 11.268,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a9cfe84a-1e60-469d-b6f1-aa9990c35c44"
+        ],
+        "candidateStart": 11.268,
+        "candidateEnd": 11.429,
+        "confidence": 0.877,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "cc9bb129-3e4d-40af-aa02-1d8f86786e9f"
+        ],
+        "candidateStart": 11.429,
+        "candidateEnd": 11.55,
+        "confidence": 0.963,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "1fdbb12e-0df4-4c21-93b2-bf459545926b"
+        ],
+        "candidateStart": 11.55,
+        "candidateEnd": 11.691,
+        "confidence": 0.945,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "bc8020d9-cc5d-442f-92fd-a45ade13bba0"
+        ],
+        "candidateStart": 11.691,
+        "candidateEnd": 11.933,
+        "confidence": 0.917,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "ae96bcc7-ce46-480f-a467-e5fc024cead3"
+        ],
+        "candidateStart": 11.933,
+        "candidateEnd": 11.953000000000001,
+        "confidence": 0.001,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "5fe56d82-9a87-4bba-b8a9-81de00696839"
+        ],
+        "candidateStart": 12.642,
+        "candidateEnd": 12.803,
+        "confidence": 0.983,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "18216017-51eb-452e-9cc8-ad37c3f62790"
+        ],
+        "candidateStart": 12.803,
+        "candidateEnd": 12.964,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a0ea3dc1-b5eb-4bd4-a54c-8fbdc98e063c"
+        ],
+        "candidateStart": 12.964,
+        "candidateEnd": 13.529,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "16d0cc3e-1f7e-4cbc-9035-15d999bdfb24"
+        ],
+        "candidateStart": 13.529,
+        "candidateEnd": 13.71,
+        "confidence": 0.995,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "00c182f3-85cd-453b-aa12-04323c99fc6f"
+        ],
+        "candidateStart": 13.71,
+        "candidateEnd": 13.73,
+        "confidence": 0.006,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "127f5a87-c399-4d2e-a0cd-a36cca516e7a"
+        ],
+        "candidateStart": 14.742,
+        "candidateEnd": 14.863,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "6667b899-c8a9-4421-870e-28439a19f142"
+        ],
+        "candidateStart": 14.863,
+        "candidateEnd": 15.004,
+        "confidence": 0.863,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "fd84ecb4-02ba-420e-ad3d-3d080d85b29e"
+        ],
+        "candidateStart": 15.004,
+        "candidateEnd": 15.125,
+        "confidence": 0.991,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "c5f6843b-5941-46a8-817c-487acf4c090a"
+        ],
+        "candidateStart": 15.125,
+        "candidateEnd": 15.267,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "64c93f72-3ed4-4f77-b134-bc92627b109c"
+        ],
+        "candidateStart": 15.267,
+        "candidateEnd": 15.388,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "b1f3c6ac-b47c-4ab8-8825-ac40ce2b7163"
+        ],
+        "candidateStart": 15.388,
+        "candidateEnd": 15.509,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "1cf2943f-9789-43d6-88f1-34db7266cabf"
+        ],
+        "candidateStart": 15.509,
+        "candidateEnd": 15.69,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a1939023-7aad-4749-a3ff-3ecf7fb04674"
+        ],
+        "candidateStart": 15.69,
+        "candidateEnd": 15.831,
+        "confidence": 0.995,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "d752ecfd-7ef5-4d22-badf-68f378947975"
+        ],
+        "candidateStart": 15.831,
+        "candidateEnd": 15.852,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "d626ae11-dbfe-4337-a6bb-ca7731ddaad5"
+        ],
+        "candidateStart": 16.562,
+        "candidateEnd": 16.703,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "cdb617af-f31b-4148-bfea-5d2c2e321601"
+        ],
+        "candidateStart": 16.703,
+        "candidateEnd": 16.885,
+        "confidence": 0.962,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "7363d3ff-f869-4a05-94ff-31107c929cc4"
+        ],
+        "candidateStart": 16.885,
+        "candidateEnd": 17.086,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "4dead74f-6a26-4399-9312-8e20ab8871ed"
+        ],
+        "candidateStart": 17.086,
+        "candidateEnd": 17.208,
+        "confidence": 0.98,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "5dd4d5ec-1946-4db1-bb1b-13c6efa94492"
+        ],
+        "candidateStart": 17.208,
+        "candidateEnd": 17.369,
+        "confidence": 0.922,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "17b8b9d9-0fce-4c33-8d1e-630c4c0d1821"
+        ],
+        "candidateStart": 17.369,
+        "candidateEnd": 17.509999999999998,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "ce36680f-beda-4f68-8a97-b2dc5008bdfb"
+        ],
+        "candidateStart": 17.509999999999998,
+        "candidateEnd": 17.712,
+        "confidence": 0.991,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "6939891f-32ff-47b5-9008-c93d96bc9d8e"
+        ],
+        "candidateStart": 17.712,
+        "candidateEnd": 17.732,
+        "confidence": 0.991,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e93fd3fe-a6b1-4a33-94f3-0323de78b23b"
+        ],
+        "candidateStart": 18.382,
+        "candidateEnd": 18.523,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "d32cb8b5-58ed-4f72-b3e4-d073db8ff90a"
+        ],
+        "candidateStart": 18.523,
+        "candidateEnd": 18.705000000000002,
+        "confidence": 0.995,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a15c8665-71f3-4c76-bcc4-5be6fde9c0f0"
+        ],
+        "candidateStart": 18.705000000000002,
+        "candidateEnd": 18.846,
+        "confidence": 0.857,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "fc39f7dc-b634-4fa5-b545-08adb8dd8d7c"
+        ],
+        "candidateStart": 18.846,
+        "candidateEnd": 18.987000000000002,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "eb96bf7b-de6b-4bc3-bcc6-0bf5deb85244"
+        ],
+        "candidateStart": 18.987000000000002,
+        "candidateEnd": 19.189,
+        "confidence": 0.997,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e0c6d3a1-7ff3-42bd-9e3a-af107edc53e8"
+        ],
+        "candidateStart": 19.189,
+        "candidateEnd": 19.371000000000002,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "95521086-2934-4052-a4c3-ef276a3cb5f2"
+        ],
+        "candidateStart": 19.371000000000002,
+        "candidateEnd": 19.492,
+        "confidence": 0.994,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "fb4427c4-2a48-408c-9775-ac75feaa3eae"
+        ],
+        "candidateStart": 19.492,
+        "candidateEnd": 19.633,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e512cccb-4f72-44c1-a2ce-45d0d38c2960"
+        ],
+        "candidateStart": 19.633,
+        "candidateEnd": 19.734,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "b55cfb66-27a4-4241-82da-5b0e6109c931"
+        ],
+        "candidateStart": 19.734,
+        "candidateEnd": 19.754,
+        "confidence": 0.186,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "c70285ae-d2a1-47d2-8cce-a038d714fc02"
+        ],
+        "candidateStart": 20.202,
+        "candidateEnd": 20.282,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "42c93070-597b-4270-a642-676372522a21"
+        ],
+        "candidateStart": 20.282,
+        "candidateEnd": 20.444,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "01323ad8-fc8a-45b6-82ff-a3d9fa5fa25a"
+        ],
+        "candidateStart": 20.444,
+        "candidateEnd": 20.605,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "6089929d-70a6-4df5-b7b6-c5cc256ba436"
+        ],
+        "candidateStart": 20.605,
+        "candidateEnd": 20.867,
+        "confidence": 0.998,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "0cf42cd9-c25d-4a6d-b0b8-a8d9725a53aa"
+        ],
+        "candidateStart": 20.867,
+        "candidateEnd": 20.968,
+        "confidence": 0.815,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "cda6852c-89ed-4990-b0d4-5c88f05ae559"
+        ],
+        "candidateStart": 20.968,
+        "candidateEnd": 21.049,
+        "confidence": 0.811,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "8142c958-08ed-4eaf-ad85-9226ff484288"
+        ],
+        "candidateStart": 21.049,
+        "candidateEnd": 21.21,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "3609a87e-4604-49db-af9d-eea51116df79"
+        ],
+        "candidateStart": 21.21,
+        "candidateEnd": 21.392,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "3569cd85-b5e0-41f1-9ffa-65c610c23675"
+        ],
+        "candidateStart": 21.392,
+        "candidateEnd": 21.513,
+        "confidence": 0.959,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "f9425755-2895-4c73-8650-c14a33f778c2"
+        ],
+        "candidateStart": 21.513,
+        "candidateEnd": 21.533,
+        "confidence": 0,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "f9425755-2895-4c73-8650-c14a33f778c2"
+        ],
+        "candidateStart": 21.514,
+        "candidateEnd": 21.535,
+        "confidence": 0.003,
+        "audioEvidence": "non-silent",
+        "reason": "low-score",
+        "timingOrigin": "local-realigned"
+      },
+      {
+        "transcriptUnitIds": [
+          "44c0d3e2-c921-4838-844e-839f1a8d5bbc"
+        ],
+        "candidateStart": 22.122999999999998,
+        "candidateEnd": 22.264999999999997,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "82ab92fc-4e7d-44f4-a789-886f174dd6fe"
+        ],
+        "candidateStart": 22.264999999999997,
+        "candidateEnd": 22.406,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "bde5f634-6911-4a4a-9b7c-15832004b77f"
+        ],
+        "candidateStart": 22.406,
+        "candidateEnd": 22.508,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "55a13e8d-3e0b-4be6-ad7f-173cced8b2f3"
+        ],
+        "candidateStart": 22.508,
+        "candidateEnd": 22.669999999999998,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e99e5c86-1aea-44ac-b7c5-4574478b859a"
+        ],
+        "candidateStart": 22.669999999999998,
+        "candidateEnd": 22.831999999999997,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "baf3c672-15a9-4475-8cc4-48cdb4f22e4b"
+        ],
+        "candidateStart": 22.831999999999997,
+        "candidateEnd": 22.851999999999997,
+        "confidence": 0.997,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "b3d028e7-a0e7-4701-b6bd-df41d299bfcd"
+        ],
+        "candidateStart": 23.263,
+        "candidateEnd": 23.425,
+        "confidence": 0.923,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "48e5e0ce-d29c-422f-a54e-f80e9b915b81"
+        ],
+        "candidateStart": 23.425,
+        "candidateEnd": 23.566,
+        "confidence": 0.99,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "4c62dbc0-3cf5-44b2-bf11-4ae89b145730"
+        ],
+        "candidateStart": 23.566,
+        "candidateEnd": 23.687,
+        "confidence": 0.974,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "91884926-3e45-434c-9bdd-d242e929fa0b"
+        ],
+        "candidateStart": 23.687,
+        "candidateEnd": 23.849,
+        "confidence": 0.983,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "d95f9c99-98be-4bfc-b853-581fa1aa3803"
+        ],
+        "candidateStart": 23.849,
+        "candidateEnd": 24.011,
+        "confidence": 0.913,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a0c545c1-a183-4be1-8f06-f36ea4d96d28"
+        ],
+        "candidateStart": 24.011,
+        "candidateEnd": 24.091,
+        "confidence": 0.847,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "d85c432c-c305-4e87-a3c0-47974eb7d3b7"
+        ],
+        "candidateStart": 24.091,
+        "candidateEnd": 24.294,
+        "confidence": 0.993,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e319f9c4-bdfb-47c4-8f88-372be79e73e7"
+        ],
+        "candidateStart": 24.294,
+        "candidateEnd": 24.314,
+        "confidence": 0.971,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "efcf5eff-5a1e-4362-8f8c-2137712af3f4"
+        ],
+        "candidateStart": 24.703000000000003,
+        "candidateEnd": 24.845000000000002,
+        "confidence": 0.976,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "f5293817-d365-43c9-aaa7-d884b7eeba61"
+        ],
+        "candidateStart": 24.845000000000002,
+        "candidateEnd": 24.966,
+        "confidence": 0.944,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "0e214cc3-1281-4386-9245-33b1e3fdc7ff"
+        ],
+        "candidateStart": 24.966,
+        "candidateEnd": 25.047,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "6c56d5aa-4516-4c26-b785-320ee9636ba0"
+        ],
+        "candidateStart": 25.047,
+        "candidateEnd": 25.189,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e7ec85ca-d786-4943-afa3-c32202d1b1eb"
+        ],
+        "candidateStart": 25.189,
+        "candidateEnd": 25.351000000000003,
+        "confidence": 0.984,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "27f3ea03-e8e1-4b08-999e-6701ebb77ba7"
+        ],
+        "candidateStart": 25.351000000000003,
+        "candidateEnd": 25.371000000000002,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a6824fa5-fc2e-46b8-946e-9418e364f70e"
+        ],
+        "candidateStart": 25.842000000000002,
+        "candidateEnd": 25.984,
+        "confidence": 0.875,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "49108ee7-a65b-44ed-bc71-70bc9aa9a8f1"
+        ],
+        "candidateStart": 25.984,
+        "candidateEnd": 26.166,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "91c0f31a-a424-4ba6-bb13-34f59bf0e235"
+        ],
+        "candidateStart": 26.166,
+        "candidateEnd": 26.287000000000003,
+        "confidence": 0.999,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "28e6f4f9-973f-4b95-b7f2-dcd9204444c7"
+        ],
+        "candidateStart": 26.287000000000003,
+        "candidateEnd": 26.489,
+        "confidence": 0.998,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "afe33ae2-d8af-4955-86ac-de84136319ab"
+        ],
+        "candidateStart": 26.489,
+        "candidateEnd": 26.671,
+        "confidence": 0.994,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "e07ef99d-a73a-45dc-8e87-81c7e680b531"
+        ],
+        "candidateStart": 26.671,
+        "candidateEnd": 26.691000000000003,
+        "confidence": 0.997,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "de632111-0528-4480-af6a-0c9fcfeec2d7"
+        ],
+        "candidateStart": 27.402,
+        "candidateEnd": 27.523,
+        "confidence": 0.988,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "4a6ee748-64f9-443b-92f5-eb5f50c3edc9"
+        ],
+        "candidateStart": 27.523,
+        "candidateEnd": 27.724,
+        "confidence": 0.902,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "a7914411-0e1b-4af0-a897-f959a2d73d35"
+        ],
+        "candidateStart": 27.724,
+        "candidateEnd": 27.906000000000002,
+        "confidence": 0.89,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "ef497717-eebd-4045-8a5d-227884e80a95"
+        ],
+        "candidateStart": 27.906000000000002,
+        "candidateEnd": 28.147000000000002,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "bc7ca132-5e4c-4234-8070-6fc762418657"
+        ],
+        "candidateStart": 28.147000000000002,
+        "candidateEnd": 28.57,
+        "confidence": 1,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "f8eb30ea-3891-4919-8727-85cbb671f8ab"
+        ],
+        "candidateStart": 28.57,
+        "candidateEnd": 28.691000000000003,
+        "confidence": 0.838,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "f541071d-6c58-4f6c-b3bd-cf3c05cde2be"
+        ],
+        "candidateStart": 28.691000000000003,
+        "candidateEnd": 28.832,
+        "confidence": 0.996,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "6fce0ef4-f45b-48d3-8e20-a839508109fd"
+        ],
+        "candidateStart": 28.832,
+        "candidateEnd": 28.953000000000003,
+        "confidence": 0.986,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "454a1635-7604-4725-82c0-57380b50b1fa"
+        ],
+        "candidateStart": 28.953000000000003,
+        "candidateEnd": 29.134,
+        "confidence": 0.933,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "f2b79607-72fa-4bcd-85d9-c68ea79f5927"
+        ],
+        "candidateStart": 29.134,
+        "candidateEnd": 29.154,
+        "confidence": 0.398,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "415c1624-60fd-4950-a961-ad27be5c19a9"
+        ],
+        "candidateStart": 29.641000000000002,
+        "candidateEnd": 29.662000000000003,
+        "confidence": 0,
+        "audioEvidence": "non-silent",
+        "reason": "low-score"
+      },
+      {
+        "transcriptUnitIds": [
+          "dec73d2c-e956-4c64-8a9c-72224c52cd13"
+        ],
+        "candidateStart": 29.662000000000003,
+        "candidateEnd": 29.873,
+        "confidence": 0.899,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "20e74663-d96e-4747-9486-8b2856f35450"
+        ],
+        "candidateStart": 29.873,
+        "candidateEnd": 29.937,
+        "confidence": 0.667,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      },
+      {
+        "transcriptUnitIds": [
+          "ca237c1f-f230-4520-8764-77407e5c82a6"
+        ],
+        "candidateStart": 29.937,
+        "candidateEnd": 29.979,
+        "confidence": 0.5,
+        "audioEvidence": "non-silent",
+        "reason": "accepted"
+      }
+    ],
+    "recoveryProvenance": {
+      "algorithmId": "bounded-alignment-recovery",
+      "algorithmVersion": "1",
+      "configHash": "824618051d2d7b2fb07e4458c033f228a9c61e3ba9ca0cd6c39d4a4f5c6c3092",
+      "artifactSchemaVersion": 1,
+      "createdAt": "2026-09-15T06:42:03.510370Z"
+    },
+    "provenance": {
+      "engineId": "whisperx",
+      "engineVersion": "3.8.6",
+      "modelId": "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
+      "modelVersion": "99ccb2737be22b8bb50dcfcc39ad4d567fb90cfd",
+      "configHash": "824618051d2d7b2fb07e4458c033f228a9c61e3ba9ca0cd6c39d4a4f5c6c3092",
+      "artifactSchemaVersion": 1,
+      "createdAt": "2026-09-15T06:42:03.510370Z"
+    }
+  },
+  "schemaVersion": 2,
+  "diarizationStatus": "completed",
+  "diarization": {
+    "id": "a368f664-91e1-4f53-baf3-5ac5c77ea8b5",
+    "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+    "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+    "sourceFingerprint": {
+      "byteLength": 11520114,
+      "modifiedTimeMs": 0,
+      "sha256": "9b62b7a9c1487246e6ef330dcbae3e78b68867e0843bb86996064881ec1439a0"
+    },
+    "turns": [
+      {
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 0.38534375,
+        "sourceEnd": 1.27971875
+      },
+      {
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 1.8534687500000002,
+        "sourceEnd": 3.49034375
+      },
+      {
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 4.03034375,
+        "sourceEnd": 6.56159375
+      },
+      {
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 6.915968750000001,
+        "sourceEnd": 8.83971875
+      },
+      {
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 9.19409375,
+        "sourceEnd": 12.24846875
+      },
+      {
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 12.61971875,
+        "sourceEnd": 13.88534375
+      },
+      {
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 14.67846875,
+        "sourceEnd": 16.04534375
+      },
+      {
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 16.500968750000002,
+        "sourceEnd": 17.918468750000002
+      },
+      {
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 18.289718750000002,
+        "sourceEnd": 19.825343750000002
+      },
+      {
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 20.16284375,
+        "sourceEnd": 21.63096875
+      },
+      {
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 22.05284375,
+        "sourceEnd": 25.42784375
+      },
+      {
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 25.782218750000002,
+        "sourceEnd": 26.81159375
+      },
+      {
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 27.28409375,
+        "sourceEnd": 29.42721875
+      },
+      {
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+        "sourceStart": 29.76471875,
+        "sourceEnd": 29.96721875
+      }
+    ],
+    "provenance": {
+      "engineId": "pyannote.audio",
+      "engineVersion": "4.0.7",
+      "modelId": "pyannote/speaker-diarization-community-1",
+      "modelVersion": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+      "configHash": "824618051d2d7b2fb07e4458c033f228a9c61e3ba9ca0cd6c39d4a4f5c6c3092",
+      "artifactSchemaVersion": 1,
+      "createdAt": "2026-09-15T06:42:18.813223Z"
+    }
+  },
+  "speakerAttribution": {
+    "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+    "alignmentArtifactId": "3222f501-4f83-4833-aabe-6d1ef313be51",
+    "diarizationArtifactId": "a368f664-91e1-4f53-baf3-5ac5c77ea8b5",
+    "attributions": [
+      {
+        "acousticEditUnitId": "86894fa7-28fe-468b-8cd3-bdcf23be339d",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "ba3e6c64-722c-448d-8012-4a9a049ef9f9",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "70cc8985-eb8c-4f7c-9ecc-a9fe4341d317",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "b9ec6d02-6883-479f-81c3-9bd9ca0460ca",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c387163e-eef2-4556-aa6e-b5398dcd51e7",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "fcade59c-c1f2-43d4-84a1-78391a78ab07",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "aa5e53d3-8a67-400f-a4a6-8e9594925d69",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "90e3a9c0-1e43-4de8-a2c4-d46db30fda6a",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "67c0f4f4-aafb-4270-bfaa-c232f4695d52",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "53cb1766-fdfa-4670-94aa-623b69d26964",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "5e30e2e4-0634-42ce-b37d-24da0357ea2e",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "ebf7be04-1a84-4f46-9981-95315a5ef3be",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "cde1f094-f100-4cee-89b3-8487b04af40b",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "41772241-1c3a-45b8-8d2d-bdaa17eb2df2",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "9f905ddf-e279-457c-8884-36ad8dfda774",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "b2eb6e62-ad07-451f-bb23-2b1d02300ba2",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "610e29fe-e37d-4600-97da-cbef6793d3ed",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c51cc634-5781-4a2d-9fb5-626df25cd12e",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "73f9505d-71e9-4dc8-b3c6-f8ea183b68d6",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e7bdc9d9-1518-4578-9b6f-f3000eb8999d",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "10cf5430-6186-4d36-bc2a-3c539d9db581",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "d3974938-840a-4181-aa88-83ce2977ae85",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "1e6b587f-0a28-4efb-9a2d-18315d274c7a",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "519ac2e5-f140-4b42-a959-f09f6c1190b2",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "eeba93d1-af35-4590-9389-bc87368f29b3",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "9b675ca1-247b-4962-b9bc-34d144dc6e83",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "de2584b5-7dba-48bb-8c36-3c5935c71733",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e7206f72-d23d-4dcf-b2ed-4262928c65a3",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "898966af-ebe7-4110-bd84-908156b0c1ba",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "3e76d8b2-20ff-4981-af4f-7b500d80133f",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "1a8f3dcc-656b-4556-ad5d-74e110c3364b",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "fb7a2481-db66-4769-9e18-889e6336782b",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "664d22ed-aa9f-4f41-8c75-9ce5471b4d3e",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "3f3fb9a5-3fd8-40aa-81aa-5181dca01622",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "14db8db0-69cd-428b-bef9-e83ce98d147e",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "3763ccd5-e9ff-4189-9540-0763082918aa",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e22c7e85-1d71-48f2-9c1e-6407d2562d3e",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "55375d8b-0fbd-401c-aa5f-556ff570ce40",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e8e99607-56ad-4294-8bb9-31a484a76e1a",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e6b661c3-d800-4647-a2b3-1b16c7a632e1",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "7df8dec0-e198-4743-a8b0-740f757b536d",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "209ae2ca-390d-4406-8830-7a0e5eb7d0c4",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "2d23d23a-2ce2-4c69-927a-b06d9371d85b",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "7871622c-b0ff-4302-8af2-e7eed648795d",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e2fdd37b-8a2b-4a8b-9085-1fae589e7fcf",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "08ebaf70-c154-4d87-8e8c-c48588a5b1e0",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "bea5b8df-9d3f-4efb-b581-006570a66c71",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "23aab283-e111-4ae4-83e0-7913e33428de",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "021e9cc7-6a22-4bd1-8996-174923968dba",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "de07bb39-fed0-463f-92dc-bddd13e6b670",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "9a863aa1-e90f-499f-9c58-9a03e0879489",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "bcc40406-e881-4cab-b452-6f5a8d0dc61a",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f9c2ec99-ad53-4f96-a6cc-641aafbe23b1",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "acc5d983-1b48-414a-ac58-e16f71ed952c",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "787823b4-f3b0-4859-89ae-9e57003971ce",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "b89b56c7-6297-4b1d-b228-4ec9cb876771",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "38b2c1f1-e9ee-4d5e-a407-ad66cd607555",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "46d76e8b-d5fe-4ec4-9762-c9e671dbceae",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "ed687f30-dc06-4f8f-9f70-a4f081a4b661",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "1026c2c7-3e0f-4e87-9446-fb6ae153c0d2",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "63b6397f-21e7-4a51-859c-3fb98e9bba42",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "7bd5d845-0a89-4f48-b7ac-d41e498e7711",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "67d505ff-499d-4199-b241-a9d327860287",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f02b049d-f23b-473a-b0c7-d48cfc29b6ce",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e09011dc-a49e-457e-a8cc-1020dae55ba6",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "0e35c11d-aaa7-4435-849d-b6a598d9a8bd",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "8799425e-b9b9-4585-bc1d-81647d0c01bd",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "660d73d8-1805-4747-a610-50430b26530a",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "bf195df2-48e8-4582-bc12-269f06fa72f2",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e55153f4-4ab9-4181-9aa1-96010488b837",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f3b9830d-c580-4d61-9ecf-ea3e2120fc43",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c0253869-3446-4c60-a1ef-30892f8ef0c6",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f5a775fd-c4c7-49b5-a999-6a8d01055735",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "de443920-a654-418f-90c4-3635f6a60185",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "03bdab2c-6209-4b67-9d06-3534c344c363",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "53409e7b-803a-4399-90de-304cb1ba982c",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "fbb98e70-b2d2-4a71-9fda-e37cc7ed122e",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "383e0c6e-0413-4e6d-8178-7c01f4ea670d",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "51f4bb18-9604-4395-8ee5-0969d4eaf44a",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "9b8a6a01-a192-44bf-8319-f466a95be922",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "31411ff9-b642-407b-a1cf-63697c08c6d6",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "671061cc-9ba7-4724-9b2c-7b7abc908ba0",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "ca6be75d-1feb-4516-915f-2b34df95d540",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "e83df215-ff1a-4250-a8e3-192525d328f8",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "db717f58-6beb-4c77-a844-c729d8b1bfcb",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "1fb95ca0-a323-4ceb-b7b6-7e3df3458eb4",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "2e31f3e2-8a78-43a7-96a6-c79ab7130a0e",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c062c348-f528-41cd-b2ed-dc9e43539f86",
+        "speakerId": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "445c99ae-98c7-4d30-837b-8e3dd77f9799",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "89928c99-d274-4a1c-a383-6b5ffc9a206e",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "ed8602b9-99cd-47d6-97cf-dcba03865c69",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "fa1d607f-2131-441a-a78a-f53a718c097d",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f520c132-d2c3-47ca-a7e7-d3046dd265e3",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c5a0e10b-1d7c-4e7f-804b-173801c1ec86",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "a56f0dec-9f92-4cd3-bb43-a1856492c7a3",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "2055badc-0067-462c-832a-31b60fb66a78",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "668b787c-fbaf-4d2b-9fee-69cfb4e2450f",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "bf1d98dc-2ed8-49d0-9aa7-0f3b543bbbea",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "2c2ec1ec-c429-4c41-9f26-aded674f5571",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "a7261c05-c978-4819-bcc4-5fcc8661b6e4",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "75814f6d-f6e1-4093-bffb-dd9de3af3449",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "7cba56c2-a359-4f4d-9c91-0d6f58780fc8",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "68128224-3c4a-449e-9df3-d7c65676caf3",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "36881a57-0bb4-4171-8513-3c15735d75bf",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "399d0f3b-bdba-4b7d-a5b7-da80797ee72a",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "d54f0007-c0dd-4577-89b4-7496603b8940",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c34e70e8-00b5-44cb-8898-66cec6f54b12",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "d6d26379-ff02-4028-871c-91927bd050aa",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "a536afdd-5010-4a8f-8679-abdd8ba2328c",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "23406020-a3e1-42e5-b50a-d8916af9af29",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f5cbea01-d0fb-48cf-a3ac-cfc982329833",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "63f68019-9dfa-4526-b184-97239af2d00a",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "6b354852-f721-4e52-baf3-58e2be626b3e",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c950882a-bdce-454b-991a-f91bbf663f25",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "6c83f352-5840-452a-b8ef-77538a2418e0",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "1aaab532-f805-4903-8e01-d980f52e7583",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "3be35d30-667b-4df9-a15b-025bff0abcf2",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "dbcffeda-c806-43dd-bdea-c05367ce264f",
+        "speakerId": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "26073908-6e95-43d3-a51e-65d8d69d10ec",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "5ab0821f-be7e-4e8c-8f3a-e8f0205ea241",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "fe5c7315-2e73-49a4-ae46-9d10c6e15cb5",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "51385c82-be5d-48ea-b98c-312f4671eab3",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "c02cf251-464f-4101-bf07-559cc0d4c40d",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "19817aa2-9383-4e6f-90ba-30383b2f1aac",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "367c4d65-d62a-4aff-b631-ce7b05562191",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "53eb3054-f7e7-4ab4-99f6-97f993720867",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "262dfd30-809b-4f9f-994b-e7a6e19be170",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "891fb32c-43e5-4505-85f3-3163fa5296d6",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "da44a59b-0bab-4945-ab5a-3986db6ecaee",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "0342069d-5a15-4eee-a111-2433b89abe0f",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "cb4dd4df-9a3c-48f6-ad4a-5afcc9c55880",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "cebe4c3f-d0ee-4a4d-b7bd-0de24ce69986",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "24f32c3f-bf41-4f09-b703-ca61c38f9d2e",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "bdbaacb5-8721-45d2-9bfb-d2d65da79a1f",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "9800094c-2d94-4283-81ab-a04d37e019f3",
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "f9385e8f-9fae-4137-80c9-37583a26997a",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 0.5131812796208614,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "75229410-a056-4c62-b402-65367a1f0197",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 1,
+        "ambiguous": false
+      },
+      {
+        "acousticEditUnitId": "16ab580b-1e07-4001-b8d7-3dab87b2f1a6",
+        "speakerId": "15937176-6e73-4007-b5a8-623535edade9",
+        "confidence": 0.7194940476190698,
+        "ambiguous": false
+      }
+    ],
+    "provenance": {
+      "algorithmId": "overlap-duration",
+      "algorithmVersion": "1",
+      "configHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "artifactSchemaVersion": 1,
+      "createdAt": "2026-09-15T06:42:19.343Z"
+    }
+  },
+  "speakers": [
+    {
+      "id": "7d2fc3a9-aab7-45c7-8a62-41bd35d37d77",
+      "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+      "diarizationLabel": "SPEAKER_00",
+      "defaultDisplayName": "Speaker 1"
+    },
+    {
+      "id": "15937176-6e73-4007-b5a8-623535edade9",
+      "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+      "diarizationLabel": "SPEAKER_01",
+      "defaultDisplayName": "Speaker 2"
+    },
+    {
+      "id": "04ae4039-8606-44e4-9c5d-9d56988f936b",
+      "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+      "diarizationLabel": "SPEAKER_02",
+      "defaultDisplayName": "Speaker 3"
+    }
+  ]
+}

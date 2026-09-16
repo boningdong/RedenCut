@@ -147,7 +147,7 @@ export function CanonicalTranscriptPanel({
       if (
         !useTimelineStore
           .getState()
-          .muteTranscriptRange(track.id, selected.clips, selected.sourceRanges[0])
+          .redactTranscriptRange(track.id, selected.clips, selected.sourceRanges[0])
       ) {
         setPending(null)
         setScopeMessage('changedClip')
@@ -205,32 +205,35 @@ export function CanonicalTranscriptPanel({
         data-current={current}
         data-playing={current}
         data-partial={u.partial}
+        data-redaction={u.redaction ?? 'none'}
         data-output-start={u.outputStart ?? undefined}
         data-output-end={u.outputEnd ?? undefined}
         data-speaker-id={u.speakerId}
         title={
-          u.unit.kind === 'punctuation'
-            ? t('transcript.punctuationHint')
-            : !hasValidatedTiming(u.analysis)
-              ? t('transcript.unverifiedHint')
-              : !editable
-                ? t('transcript.unalignedHint')
-                : u.ambiguous
-                  ? t('transcript.uncertainHint')
-                  : t(
-                      u.partial
-                        ? 'transcript.partialUnitHint'
-                        : u.timingOrigin === 'anchor-inferred' ||
-                            u.timingOrigin === 'group-fallback'
-                          ? 'transcript.estimatedUnitHint'
-                          : (u.acousticUnitSize ?? 1) > 1
-                            ? 'transcript.groupedUnitHint'
-                            : 'transcript.unitHint',
-                      {
-                        name: u.track.name,
-                        seconds: u.outputStart!.toFixed(2),
-                      },
-                    )
+          u.redaction === 'partial'
+            ? t('transcript.partiallyRedactedHint')
+            : u.unit.kind === 'punctuation'
+              ? t('transcript.punctuationHint')
+              : !hasValidatedTiming(u.analysis)
+                ? t('transcript.unverifiedHint')
+                : !editable
+                  ? t('transcript.unalignedHint')
+                  : u.ambiguous
+                    ? t('transcript.uncertainHint')
+                    : t(
+                        u.partial
+                          ? 'transcript.partialUnitHint'
+                          : u.timingOrigin === 'anchor-inferred' ||
+                              u.timingOrigin === 'group-fallback'
+                            ? 'transcript.estimatedUnitHint'
+                            : (u.acousticUnitSize ?? 1) > 1
+                              ? 'transcript.groupedUnitHint'
+                              : 'transcript.unitHint',
+                        {
+                          name: u.track.name,
+                          seconds: u.outputStart!.toFixed(2),
+                        },
+                      )
         }
         onClick={() => {
           if (editable && window.getSelection()?.isCollapsed)
@@ -240,13 +243,15 @@ export function CanonicalTranscriptPanel({
         style={
           {
             textDecoration:
-              u.clip.muted && editable
+              u.redaction === 'full' && editable
                 ? 'line-through'
-                : !editable && u.unit.kind === 'speech'
-                  ? 'underline dotted'
-                  : current
-                    ? 'underline'
-                    : 'none',
+                : u.redaction === 'partial' && editable
+                  ? 'underline dashed'
+                  : !editable && u.unit.kind === 'speech'
+                    ? 'underline dotted'
+                    : current
+                      ? 'underline'
+                      : 'none',
             opacity: u.muted && editable ? 0.5 : u.unit.kind === 'punctuation' ? 0.65 : 1,
             background: highlighted
               ? 'var(--color-warning-muted)'

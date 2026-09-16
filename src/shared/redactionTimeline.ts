@@ -1,22 +1,28 @@
 import type { Track } from './project.types'
+import { clipRedactionRanges, clipRetainedRanges } from './ClipRedactions'
 
 export interface RedactionRange {
   start: number
   end: number
 }
 
-/** Clip.muted is the persisted redaction marker; track.muted is ordinary mix muting. */
+/** Only overlays contract time; ordinary mute never creates a deletion interval. */
 export function redactionSkipRanges(tracks: Track[]): RedactionRange[] {
   const solo = tracks.some((track) => track.solo)
   const events = tracks
     .filter((track) => !track.muted && (!solo || track.solo))
     .flatMap((track) =>
       track.clips.flatMap((clip) => {
-        const end = clip.outputStart + clip.sourceEnd - clip.sourceStart
-        if (end <= clip.outputStart) return []
+        const offset = clip.outputStart - clip.sourceStart
         return [
-          { time: clip.outputStart, redacted: clip.muted ? 1 : 0, retained: clip.muted ? 0 : 1 },
-          { time: end, redacted: clip.muted ? -1 : 0, retained: clip.muted ? 0 : -1 },
+          ...clipRedactionRanges(clip).flatMap((r) => [
+            { time: r.start + offset, redacted: 1, retained: 0 },
+            { time: r.end + offset, redacted: -1, retained: 0 },
+          ]),
+          ...clipRetainedRanges(clip).flatMap((r) => [
+            { time: r.start + offset, redacted: 0, retained: 1 },
+            { time: r.end + offset, redacted: 0, retained: -1 },
+          ]),
         ]
       }),
     )

@@ -109,6 +109,12 @@ The program-level design for transcript alignment, anonymous speaker attribution
 - Match duration, loudness, room character, and edit boundaries before publishing a reversible timeline edit.
 - Keep restricted model adapters outside the distributable core when their licenses require separate installation or authorization.
 
+## Engineering Follow-up — After Clip Redaction Overlay
+
+- [ ] Standardize existing project-owned TypeScript/JavaScript module filenames to PascalCase following [file organization standards](docs/file-organization-standards.md), including corresponding test basenames.
+- [ ] Update imports, dynamic loading/worklet references, build and test configuration, tooling references and documentation links; explicitly verify case-only renames on case-sensitive Linux as well as macOS.
+- [ ] Keep this as a mechanical refactor after overlay implementation and acceptance; verify formatting, lint, types, tests, build and relevant Docker harness flows without changing product behavior.
+
 ## Known Issue
 
 | Issue | Current behavior | Intended direction |

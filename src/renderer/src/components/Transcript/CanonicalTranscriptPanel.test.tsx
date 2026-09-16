@@ -186,6 +186,15 @@ describe('canonical transcript editability', () => {
   })
 
   it('visually distinguishes editable speech, punctuation, and unaligned speech consistently', () => {
+    useTimelineStore.setState({
+      tracks: useTimelineStore.getState().tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => ({
+          ...clip,
+          redactions: [{ id: 'r', sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd }],
+        })),
+      })),
+    })
     render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const speech = document.querySelector('[data-unit-id="speech"]') as HTMLElement
     const punctuation = document.querySelector('[data-unit-id="punctuation"]') as HTMLElement
@@ -212,7 +221,8 @@ describe('canonical transcript editability', () => {
     expect(speech.style.textDecoration).not.toBe('line-through')
     expect(speech.style.opacity).toBe('0.5')
     act(() => useTimelineStore.setState({ tracks: [{ ...mutedTrack, clips: original.clips }] }))
-    expect(speech.style.textDecoration).toBe('line-through')
+    expect(speech.style.textDecoration).not.toBe('line-through')
+    expect(speech.style.opacity).toBe('0.5')
   })
 
   it('assigns stable per-speaker colors without underlining inactive text', () => {
@@ -420,8 +430,9 @@ describe('canonical transcript editability', () => {
     expect(
       useTimelineStore
         .getState()
-        .tracks[0].clips.filter((c) => c.muted)
-        .map((c) => c.outputStart),
+        .tracks[0].clips.flatMap((c) =>
+          (c.redactions ?? []).map((r) => c.outputStart + r.sourceStart - c.sourceStart),
+        ),
     ).toEqual([8.5])
     act(() => useTimelineStore.getState().undo())
     expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
@@ -598,8 +609,9 @@ describe('canonical transcript editability', () => {
     expect(
       useTimelineStore
         .getState()
-        .tracks[0].clips.filter((clip) => clip.muted)
-        .map((clip) => [clip.sourceStart, clip.sourceEnd]),
+        .tracks[0].clips.flatMap((clip) =>
+          (clip.redactions ?? []).map((r) => [r.sourceStart, r.sourceEnd]),
+        ),
     ).toEqual([[0.75, 1]])
     expect(useTimelineStore.getState().undoStack).toHaveLength(1)
   })
@@ -651,8 +663,9 @@ describe('canonical transcript editability', () => {
     expect(
       useTimelineStore
         .getState()
-        .tracks[0].clips.filter((clip) => clip.muted)
-        .map((clip) => [clip.sourceStart, clip.sourceEnd]),
+        .tracks[0].clips.flatMap((clip) =>
+          (clip.redactions ?? []).map((r) => [r.sourceStart, r.sourceEnd]),
+        ),
     ).toEqual([[0.2, 1.5]])
     expect(screen.queryByRole('button', { name: 'Confirm redaction' })).toBeNull()
     expect(

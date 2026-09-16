@@ -82,3 +82,10 @@ Chinese font rendering is covered in the Linux container; system-owned native pi
 
 Run `sh harness/container/run.sh npm run test:harness -- ipcErrorBridge` to verify rejected IPC descriptors across the real Electron contextBridge.
 This isolated boundary regression uses the built application preload and checks that safe reason/code/message fields survive while diagnostic fields are excluded; it complements the UI workflow.
+
+## Existing transcript editing without models
+
+The [saved transcript fixture](fixtures/projects/README.md) packages real recognition/alignment/speaker results and their audio as a portable project.
+Run `sh harness/container/run.sh npm run test:e2e -- transcript-fixture` to verify opening, mouse text selection, redaction, undo/redo, save and full restart without generating speech.
+Each run receives a disposable copy; the repository fixture is never opened for editing.
+This complements the real-model speech-analysis tests and does not replace them.

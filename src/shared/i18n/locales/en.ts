@@ -178,6 +178,12 @@ export const englishResources = {
     darkTheme: 'Switch to dark theme',
   },
   waveform: {
+    redaction: 'Redaction {{start}}–{{end}} s',
+    redactionStart: 'Adjust redaction start',
+    redactionEnd: 'Adjust redaction end',
+    redactionSelected: 'Redaction selected',
+    redactionCycle: 'Select next overlapping redaction',
+    redactionHint: 'Drag to move · Edges to resize · Alt to select clip · Delete to restore',
     clipSelected: 'Clip selected',
     noClipSelected: 'No clip selected',
 
@@ -198,7 +204,7 @@ export const englishResources = {
     zoomIn: 'Zoom in',
     volume: 'Track / volume',
     addTrack: '+ Add Track',
-    editHint: 'Drag clips to move · S Split · M Redact',
+    editHint: 'Drag clips to move · S Split · M Mute clip / redact range',
     transcriptHint: 'Edit selected text in the transcript to preserve acoustic boundaries',
     details: 'Audio details',
     file: 'File',
@@ -218,6 +224,8 @@ export const englishResources = {
     channelCount: '{{count}} channels',
   },
   transcript: {
+    partiallyRedactedHint:
+      'Part of this speech is redacted. Adjust the overlay edges to refine it.',
     batchPosition: '{{phase}} · {{index}} of {{count}}',
     textReady: 'Text ready to edit',
     analysisDetails: 'Details',

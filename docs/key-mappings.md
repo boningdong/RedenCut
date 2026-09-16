@@ -9,10 +9,10 @@ Update the implementation and this document together whenever a mapping or its c
 | --- | --- | --- |
 | Space | Play or pause | Requires an active player. In preview mode, playback skips redacted sections. |
 | S | Split at playhead | Requires an active player and a selected clip; the playhead must be strictly inside that clip's output range. |
-| M | Redact selection | For a waveform selection, redacts its range on the selected track and clears it. In canonical transcript text, resolves the exact clip occurrence and asks for confirmation when acoustic boundaries expand the text selection. |
-| U | Restore redaction | Restores the selected redacted clip when one is selected; otherwise restores every redacted clip overlapping the waveform selection and clears that selection. |
-| Delete or Backspace | Remove selected clip or redact selection | Removes the selected clip when one is selected. Otherwise, a waveform selection redacts overlapping unredacted audio, associates selected transcript word IDs, and clears the selection. |
-| Escape | Clear selection | Clears the waveform selection and selected clip. |
+| M | Mute clip or redact selection | Toggles ordinary mute for a selected clip. Otherwise redacts a waveform range on the selected track. In canonical transcript text, creates overlays in the exact occurrence, asking for confirmation when acoustic boundaries expand the selection. |
+| U | Unmute clip | Unmutes the selected clip, or muted clips overlapping the waveform selection; overlays are unchanged. |
+| Delete or Backspace | Remove selected object or redact selection | Removes a selected overlay to restore its audio; a selected clip is removed instead. With a range or transcript selection, creates clip-owned overlays. |
+| Escape | Cancel drag or clear selection | Cancels an active overlay move or resize without an edit; otherwise clears waveform and timeline selection. |
 | Left Arrow | Nudge backward | Seeks one second backward, clamped to zero. |
 | Right Arrow | Nudge forward | Seeks one second forward, clamped to the player duration. |
 | Shift+Left Arrow | Nudge backward farther | Seeks five seconds backward, clamped to zero. |
@@ -24,13 +24,21 @@ Update the implementation and this document together whenever a mapping or its c
 ## Audio Toolbar
 
 Clicking a waveform clip selects its whole output-time range.
-The audio toolbar exposes the same split, redact-selection and delete-selection actions as the corresponding keyboard shortcuts.
+The audio toolbar exposes the same context-dependent split, mute/redact and delete actions as the corresponding keyboard shortcuts.
 Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.
 
-Track Mute and Solo control audibility only; they do not redact transcript text.
+Clip Mute, Track Mute and Solo control audibility only; muted speech dims and leaves simultaneous-speech presentation without a redaction strike-through.
 The Preview edits toggle skips redacted sections during playback.
 Export always removes those same intervals by default, even when Preview is off; retained overlapping audio, ordinary track mute, and natural gaps follow the same timeline rules.
-For compatibility, project files retain `clip.muted` as the redaction marker; `track.muted` remains the ordinary track mute control.
+`clip.redactions` stores independent source-relative overlays; `clip.muted` and `track.muted` are ordinary mute controls.
+Click an overlay to select it, then Delete to restore its coverage; hold Option/Alt to select or drag the underlying clip through an overlay.
+Drag the overlay body to move its range without changing duration, or either edge to preview its bounds, release to commit one undoable edit, or Escape to cancel.
+Completing a pointer edge resize clears overlay selection and handle focus; clicking the overlay body still selects it for removal.
+Focused overlay handles use Left/Right for 10 ms adjustments and Shift+Left/Right for 100 ms adjustments.
+Overlays fill the clip height; hover highlights the overlay independently from its parent clip.
+Overlapping overlays keep separate identities; the count button selects the next overlapping object and raises it above its peers.
+Option/Alt bypass is decided when the pointer gesture starts; pressing or releasing it during a drag does not change the target.
+Moving a trimmed overlay translates its full stored range, preserving hidden metadata while constraining its visible portion to the clip.
 
 ## Native Menu Routing
 

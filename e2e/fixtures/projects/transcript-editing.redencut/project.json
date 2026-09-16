@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "createdAt": "2026-09-15T00:00:00.000Z",
+  "audioSettings": {
+    "processingSampleRate": 48000
+  },
+  "audioSources": [
+    {
+      "id": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+      "displayName": "Conversation (30 seconds)",
+      "location": {
+        "mode": "copy",
+        "path": "media/e7c364fc-3a41-4318-ad23-9c0f872d5384/conversation-30s.wav"
+      },
+      "fingerprint": {
+        "byteLength": 11520114,
+        "modifiedTimeMs": 0,
+        "sha256": "9b62b7a9c1487246e6ef330dcbae3e78b68867e0843bb86996064881ec1439a0"
+      },
+      "metadata": {
+        "durationSeconds": 30,
+        "sampleRate": 48000,
+        "channels": 2,
+        "codec": "pcm_f32le",
+        "bitrateKbps": 3072
+      }
+    }
+  ],
+  "speechArtifacts": [
+    {
+      "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+      "analysisRevisionId": "d77a6e9e-b5d0-484b-be07-4bb47bd03510",
+      "sourceFingerprint": {
+        "byteLength": 11520114,
+        "modifiedTimeMs": 0,
+        "sha256": "9b62b7a9c1487246e6ef330dcbae3e78b68867e0843bb86996064881ec1439a0"
+      },
+      "artifactPath": "speech/e7c364fc-3a41-4318-ad23-9c0f872d5384/revision-d77a6e9e-b5d0-484b-be07-4bb47bd03510.json",
+      "artifactSha256": "3613c171197674569e409163ec8c93e0edb1ffc09bcebf6fab5e5f8918b9cc47",
+      "artifactByteLength": 143657,
+      "artifactSchemaVersion": 2,
+      "summary": {
+        "transcriptUnitCount": 139,
+        "acousticEditUnitCount": 138,
+        "speakerCount": 3
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "id": "fixture-track",
+      "name": "Track 1",
+      "color": "#ce7daa",
+      "clips": [
+        {
+          "id": "fixture-clip",
+          "trackId": "fixture-track",
+          "audioSourceId": "e7c364fc-3a41-4318-ad23-9c0f872d5384",
+          "sourceStart": 0,
+          "sourceEnd": 30,
+          "outputStart": 0
+        }
+      ]
+    }
+  ]
+}

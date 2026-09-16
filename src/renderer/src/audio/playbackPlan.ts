@@ -1,4 +1,5 @@
 import type { AudioSourceId, Track } from '@shared/project.types'
+import { retainedClipSegments } from '@shared/ClipRedactions'
 
 export type PlaybackSegment =
   | { kind: 'silence'; outputFrame: number; frameCount: number }
@@ -30,6 +31,7 @@ export function buildTrackPlaybackPlan(
   let cursor = startFrame
   const clips = [...track.clips]
     .filter((clip) => !clip.muted)
+    .flatMap(retainedClipSegments)
     .sort((a, b) => a.outputStart - b.outputStart)
 
   for (const clip of clips) {

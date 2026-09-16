@@ -119,6 +119,17 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
     await expect.poll(() => ui.page.locator('canvas:visible').count()).toBe(3)
     await select(1)
     await ui.call('browser_press_key', { key: 'm' })
+    const clipMuted = await exportWav('clip-muted')
+    expect(clipMuted.duration).toBeCloseTo(original.duration, 1)
+    expect(
+      clipMuted.pcm.slice(3.2 * 48000, 7.8 * 48000).every((sample) => Math.abs(sample) < 0.00001),
+    ).toBe(true)
+    await ui.call('browser_press_key', { key: 'Control+z' })
+    // A second click deselects the clip while retaining its waveform range.
+    await select(1)
+    await select(1)
+    await ui.call('browser_press_key', { key: 'm' })
+    await expect.poll(() => ui.page.locator('.clip-redaction').count()).toBe(1)
     expect(
       await ui.page
         .getByRole('button', { name: 'Preview', exact: true })
@@ -160,6 +171,7 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
     expect(gapPcm.every((sample) => Math.abs(sample) < 0.00001)).toBe(true)
     expect(correlation(gap.pcm, original.pcm, 11, 9)).toBeGreaterThan(0.98)
     await ui.call('browser_press_key', { key: 'Control+z' })
+    await select(1)
     await select(1)
     await ui.call('browser_press_key', { key: 'm' })
     await importTrack()

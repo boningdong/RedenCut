@@ -116,6 +116,16 @@ const EffectSchema = z.object({
   params: z.record(z.string(), z.number()).default({}),
 })
 
+export const ClipRedactionSchema = z
+  .object({
+    id: z.string().min(1),
+    sourceStart: z.number().finite().nonnegative(),
+    sourceEnd: z.number().finite().nonnegative(),
+  })
+  .strict()
+  .refine((range) => range.sourceEnd > range.sourceStart, 'Redaction must have positive duration')
+export type ClipRedaction = z.infer<typeof ClipRedactionSchema>
+
 const ClipSchema = z.object({
   id: z.string(),
   trackId: z.string(),
@@ -125,6 +135,7 @@ const ClipSchema = z.object({
   outputStart: z.number().nonnegative(),
   gain: z.number().default(1),
   muted: z.boolean().default(false),
+  redactions: z.array(ClipRedactionSchema).optional(),
   effects: z.array(EffectSchema).default([]),
 })
 export type Clip = z.infer<typeof ClipSchema>
@@ -239,6 +250,21 @@ export const ProjectFileSchema = z
             message: 'Clip trackId does not match its track',
           })
         }
+        const redactionIds = new Set<string>()
+        clip.redactions?.forEach((redaction, index) => {
+          if (
+            redactionIds.has(redaction.id) ||
+            (source && redaction.sourceEnd > source.metadata.durationSeconds)
+          ) {
+            context.addIssue({
+              code: 'custom',
+              path: [...path, 'redactions', index],
+              message:
+                'Redactions require unique clip-local IDs and bounds within the audio source',
+            })
+          }
+          redactionIds.add(redaction.id)
+        })
       })
     })
     const speechArtifactKeys = new Set<string>()

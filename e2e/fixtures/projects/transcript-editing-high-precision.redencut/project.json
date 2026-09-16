@@ -1,0 +1,143 @@
+{
+  "version": 2,
+  "createdAt": "2026-09-15T22:45:50.691Z",
+  "audioSettings": {
+    "processingSampleRate": 48000
+  },
+  "audioSources": [
+    {
+      "id": "f93b5e64-740c-4c99-872a-2bf15f8be0fb",
+      "displayName": "mandarin-conversation-mix.wav",
+      "location": {
+        "mode": "copy",
+        "path": "media/f93b5e64-740c-4c99-872a-2bf15f8be0fb/mandarin-conversation-mix.wav"
+      },
+      "fingerprint": {
+        "byteLength": 7822484,
+        "modifiedTimeMs": 1789512386476.369,
+        "sha256": "98d1f70972552a76f319a769f741c6c8e8b514097260e2c3d7c320a997cd4132"
+      },
+      "metadata": {
+        "durationSeconds": 81.48375,
+        "sampleRate": 48000,
+        "channels": 1,
+        "codec": "pcm_s16le",
+        "bitrateKbps": 768
+      }
+    },
+    {
+      "id": "c9f3d8ef-a911-46f4-a361-b1bceba4a070",
+      "displayName": "mandarin-conversation-A.wav",
+      "location": {
+        "mode": "copy",
+        "path": "media/c9f3d8ef-a911-46f4-a361-b1bceba4a070/mandarin-conversation-A.wav"
+      },
+      "fingerprint": {
+        "byteLength": 7822484,
+        "modifiedTimeMs": 1789512395396.0618,
+        "sha256": "c3731dfe0ebbed691df608dcd231da33e4ed8d1cad44d2efbd594f73fe029a67"
+      },
+      "metadata": {
+        "durationSeconds": 81.48375,
+        "sampleRate": 48000,
+        "channels": 1,
+        "codec": "pcm_s16le",
+        "bitrateKbps": 768
+      }
+    }
+  ],
+  "speechArtifacts": [
+    {
+      "audioSourceId": "f93b5e64-740c-4c99-872a-2bf15f8be0fb",
+      "analysisRevisionId": "b65fa1c7-ff41-434a-8ecb-599fe789a261",
+      "sourceFingerprint": {
+        "byteLength": 7822484,
+        "modifiedTimeMs": 1789512386476.369,
+        "sha256": "98d1f70972552a76f319a769f741c6c8e8b514097260e2c3d7c320a997cd4132"
+      },
+      "artifactPath": "speech/f93b5e64-740c-4c99-872a-2bf15f8be0fb/revision-b65fa1c7-ff41-434a-8ecb-599fe789a261-f58fe426a45bcffe50fa562c7308a7318e91d07e3fde02105f0f3f5b573f7fa7.json",
+      "artifactSha256": "f58fe426a45bcffe50fa562c7308a7318e91d07e3fde02105f0f3f5b573f7fa7",
+      "artifactByteLength": 360991,
+      "artifactSchemaVersion": 2,
+      "summary": {
+        "transcriptUnitCount": 355,
+        "acousticEditUnitCount": 354,
+        "speakerCount": 3
+      }
+    },
+    {
+      "audioSourceId": "c9f3d8ef-a911-46f4-a361-b1bceba4a070",
+      "analysisRevisionId": "a8153992-3053-45fe-a6d4-73a85f60c4a7",
+      "sourceFingerprint": {
+        "byteLength": 7822484,
+        "modifiedTimeMs": 1789512395396.0618,
+        "sha256": "c3731dfe0ebbed691df608dcd231da33e4ed8d1cad44d2efbd594f73fe029a67"
+      },
+      "artifactPath": "speech/c9f3d8ef-a911-46f4-a361-b1bceba4a070/revision-a8153992-3053-45fe-a6d4-73a85f60c4a7-e70d566a7a446c30f413ec2205d362accd17aca9d8053463e7877af3b08ecd02.json",
+      "artifactSha256": "e70d566a7a446c30f413ec2205d362accd17aca9d8053463e7877af3b08ecd02",
+      "artifactByteLength": 105173,
+      "artifactSchemaVersion": 2,
+      "summary": {
+        "transcriptUnitCount": 116,
+        "acousticEditUnitCount": 85,
+        "speakerCount": 2
+      }
+    }
+  ],
+  "speakerLabelOverrides": [],
+  "adjustments": [],
+  "markers": [],
+  "export": {
+    "targetLUFS": -16,
+    "truePeakDbTP": -1.5,
+    "format": "mp3",
+    "sampleRate": 48000
+  },
+  "pluginData": {},
+  "tracks": [
+    {
+      "id": "a28fd3dd-ec8d-418d-854c-96df473d1e91",
+      "name": "Track 1",
+      "clips": [
+        {
+          "id": "ce6fc726-658d-4dc8-9552-243f515e4ec0",
+          "trackId": "a28fd3dd-ec8d-418d-854c-96df473d1e91",
+          "audioSourceId": "f93b5e64-740c-4c99-872a-2bf15f8be0fb",
+          "sourceStart": 0,
+          "sourceEnd": 81.48375,
+          "outputStart": 0,
+          "gain": 1,
+          "muted": false,
+          "effects": []
+        }
+      ],
+      "volume": 1,
+      "muted": false,
+      "solo": false,
+      "color": "#cf7ba6",
+      "effects": []
+    },
+    {
+      "id": "507acd2d-4b90-4ba3-bffc-72c013049db4",
+      "name": "Track 2",
+      "clips": [
+        {
+          "id": "37bef8e0-ecee-4330-9573-8b24689fc982",
+          "trackId": "507acd2d-4b90-4ba3-bffc-72c013049db4",
+          "audioSourceId": "c9f3d8ef-a911-46f4-a361-b1bceba4a070",
+          "sourceStart": 0,
+          "sourceEnd": 81.48375,
+          "outputStart": 0,
+          "gain": 1,
+          "muted": false,
+          "effects": []
+        }
+      ],
+      "volume": 1,
+      "muted": false,
+      "solo": false,
+      "color": "#70b7b1",
+      "effects": []
+    }
+  ]
+}

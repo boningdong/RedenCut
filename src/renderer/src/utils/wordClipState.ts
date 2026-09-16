@@ -1,15 +1,16 @@
 import type { Word, Track } from '@shared/project.types'
+import { redactionCoverage } from '@shared/ClipRedactions'
 
 /**
  * Describes the relationship between a transcript word and its clip on the timeline.
  *
  *  normal     — the word falls within a retained clip (track audibility is separate).
  *  clip-muted — the word's covering clip has clip.muted=true (pressed 'M' on the
- *               waveform). This is a clip redaction even when word.muted is false.
+ *               waveform). Ordinary mute preserves duration.
  *  no-clip    — no clip on the word's track covers word.start. The clip was deleted
  *               (Delete key) or the track was removed. The word produces no audio.
  */
-export type WordClipState = 'normal' | 'clip-muted' | 'no-clip'
+export type WordClipState = 'normal' | 'clip-muted' | 'no-clip' | 'redacted' | 'partially-redacted'
 
 /**
  * Compute the clip relationship for a single word.
@@ -33,6 +34,9 @@ export function getWordClipState(word: Word, tracks: Track[]): WordClipState {
   )
 
   if (!coveringClip) return 'no-clip'
+  const coverage = redactionCoverage(coveringClip, word.start, word.end)
+  if (coverage === 'full') return 'redacted'
   if (coveringClip.muted) return 'clip-muted'
+  if (coverage === 'partial') return 'partially-redacted'
   return 'normal'
 }

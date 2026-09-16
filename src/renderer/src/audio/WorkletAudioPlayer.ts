@@ -589,7 +589,8 @@ function hasSamePlaybackStructure(previous: Track[], next: Track[]): boolean {
         clip.sourceEnd === other.sourceEnd &&
         clip.outputStart === other.outputStart &&
         clip.gain === other.gain &&
-        clip.muted === other.muted
+        clip.muted === other.muted &&
+        JSON.stringify(clip.redactions ?? []) === JSON.stringify(other.redactions ?? [])
       )
     })
   })

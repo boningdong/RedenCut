@@ -167,6 +167,12 @@ export const simplifiedChineseResources = {
     darkTheme: '切换到深色主题',
   },
   waveform: {
+    redaction: '删除区域 {{start}}–{{end}} 秒',
+    redactionStart: '调整删除区域起点',
+    redactionEnd: '调整删除区域终点',
+    redactionSelected: '已选择删除区域',
+    redactionCycle: '选择下一个重叠删除区域',
+    redactionHint: '拖动移动 · 边缘微调 · Option/Alt 选择剪辑 · Delete 恢复',
     clipSelected: '已选择片段',
     noClipSelected: '未选择片段',
 
@@ -187,7 +193,7 @@ export const simplifiedChineseResources = {
     zoomIn: '放大',
     volume: '轨道 / 音量',
     addTrack: '+ 添加轨道',
-    editHint: '拖动片段以移动 · S 拆分 · M 删减',
+    editHint: '拖动片段以移动 · S 拆分 · M 静音片段 / 删减选区',
     transcriptHint: '请在转写中编辑所选文字，以保留声学边界',
     details: '音频详情',
     file: '文件',
@@ -207,6 +213,7 @@ export const simplifiedChineseResources = {
     channelCount: '{{count}} 个声道',
   },
   transcript: {
+    partiallyRedactedHint: '这段发言已部分删除。可拖动覆盖层边界微调。',
     batchPosition: '{{phase}} · {{index}} / {{count}}',
     textReady: '文本已可编辑',
     analysisDetails: '详情',

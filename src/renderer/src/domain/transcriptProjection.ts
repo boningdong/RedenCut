@@ -1,4 +1,5 @@
 import { hasValidatedTiming } from './transcriptReliability'
+import { redactionCoverage } from '@shared/ClipRedactions'
 import type { Clip, Track } from '@shared/project.types'
 import type { RendererSpeechAnalysis, TranscriptUnit, SpeakerId } from '@shared/speech.types'
 
@@ -18,6 +19,7 @@ export interface TranscriptOccurrence {
   leadingSpace: boolean
   partial: boolean
   muted: boolean
+  redaction?: 'none' | 'partial' | 'full'
   speakerId?: SpeakerId
   contextSpeakerId?: SpeakerId
   ambiguous: boolean
@@ -98,6 +100,10 @@ export function projectTranscript(
             ? clip.outputStart + Math.max(anchor.sourceStart, clip.sourceStart) - clip.sourceStart
             : clip.outputStart)
         const speaker = acoustic ? attribution.get(acoustic.id) : undefined
+        const redaction =
+          sourceStart !== null && sourceEnd !== null
+            ? redactionCoverage(clip, sourceStart, sourceEnd)
+            : 'none'
         const scopeId = JSON.stringify([
           analysis.audioSourceId,
           analysis.analysisRevisionId,
@@ -126,7 +132,8 @@ export function projectTranscript(
           partial: Boolean(
             acoustic && (sourceStart !== acoustic.sourceStart || sourceEnd !== acoustic.sourceEnd),
           ),
-          muted: clip.muted || track.muted || (solo && !track.solo),
+          redaction,
+          muted: clip.muted || track.muted || (solo && !track.solo) || redaction === 'full',
           speakerId: speaker?.ambiguous ? undefined : speaker?.speakerId,
           contextSpeakerId:
             !acoustic && anchor && !attribution.get(anchor.id)?.ambiguous

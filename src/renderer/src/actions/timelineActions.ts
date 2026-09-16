@@ -1,7 +1,6 @@
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/timeline.store'
-import { useTranscriptStore } from '../stores/transcript.store'
 
 export function splitAtPlayhead(): void {
   const player = getAudioPlayerInstance()
@@ -10,18 +9,30 @@ export function splitAtPlayhead(): void {
 
 export function muteSelection(): void {
   const { selection, setSelection } = useEditorStore.getState()
-  if (!selection) return
   const timeline = useTimelineStore.getState()
+  if (timeline.selectedClipId) {
+    const clip = timeline.tracks
+      .flatMap((t) => t.clips)
+      .find((c) => c.id === timeline.selectedClipId)
+    if (clip) timeline.setClipMuted(clip.id, !clip.muted)
+    return
+  }
+  if (!selection) return
   const trackId = timeline.selectedTrackId ?? timeline.tracks[0]?.id
   if (!trackId) return
-  timeline.muteRange(trackId, selection.start, selection.end, [
-    ...useTranscriptStore.getState().selectedWordIds,
-  ])
+  timeline.redactRange(trackId, selection.start, selection.end)
   setSelection(null)
 }
 
 export function deleteSelection(): void {
   const timeline = useTimelineStore.getState()
+  if (timeline.timelineSelection?.kind === 'redaction') {
+    timeline.removeRedaction(
+      timeline.timelineSelection.clipId,
+      timeline.timelineSelection.redactionId,
+    )
+    return
+  }
   if (timeline.selectedClipId) {
     timeline.removeClip(timeline.selectedClipId)
     return
@@ -32,7 +43,6 @@ export function deleteSelection(): void {
   if (!trackId) return
   const hits = (timeline.tracks.find((track) => track.id === trackId)?.clips ?? []).some(
     (clip) =>
-      !clip.muted &&
       clip.outputStart < selection.end &&
       clip.outputStart + clip.sourceEnd - clip.sourceStart > selection.start,
   )

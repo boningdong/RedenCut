@@ -36,6 +36,7 @@ import { useTimelineStore } from '../../stores/timeline.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { CanvasWaveform } from './CanvasWaveform'
+import { ClipRedactionOverlay } from './ClipRedactionOverlay'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { TrackHeader } from './TrackHeader'
 import { calculateVisibleWaveformRange } from './waveformRange'
@@ -68,6 +69,7 @@ export function WaveformView({
   const removeTrack = useTimelineStore((s) => s.removeTrack)
   const moveClip = useTimelineStore((s) => s.moveClip)
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
+  const timelineSelection = useTimelineStore((s) => s.timelineSelection)
   const setSelectedClipId = useTimelineStore((s) => s.setSelectedClipId)
   const selectedTrackId = useTimelineStore((s) => s.selectedTrackId)
   const setSelectedTrackId = useTimelineStore((s) => s.setSelectedTrackId)
@@ -105,6 +107,24 @@ export function WaveformView({
     currentTime < selectedClip.outputStart + selectedClip.sourceEnd - selectedClip.sourceStart,
   )
   const setSelection = useEditorStore((s) => s.setSelection)
+
+  const [altPressed, setAltPressed] = useState(false)
+  const [pointerOwner, setPointerOwner] = useState<'clip' | 'redaction' | null>(null)
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => setAltPressed(event.altKey)
+    const blur = () => {
+      setAltPressed(false)
+      setPointerOwner(null)
+    }
+    window.addEventListener('keydown', key)
+    window.addEventListener('keyup', key)
+    window.addEventListener('blur', blur)
+    return () => {
+      window.removeEventListener('keydown', key)
+      window.removeEventListener('keyup', key)
+      window.removeEventListener('blur', blur)
+    }
+  }, [])
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(1.0)
@@ -213,6 +233,7 @@ export function WaveformView({
 
   const handleClipPointerDown = useCallback(
     (e: React.PointerEvent, clip: Clip) => {
+      if (e.button !== 0) return
       e.preventDefault()
       focusTimeline()
       e.currentTarget.setPointerCapture(e.pointerId)
@@ -290,7 +311,21 @@ export function WaveformView({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="audio-panel-view" ref={audioPanel} tabIndex={-1}>
+    <div
+      className="audio-panel-view"
+      ref={audioPanel}
+      tabIndex={-1}
+      data-redaction-bypass={pointerOwner ? pointerOwner === 'clip' : altPressed}
+      onPointerDownCapture={(e) => {
+        if (e.button !== 0) return
+        const target = e.target as HTMLElement
+        if (target.closest('.waveform-clip'))
+          setPointerOwner(!e.altKey && target.closest('.clip-redaction') ? 'redaction' : 'clip')
+      }}
+      onPointerUpCapture={() => setPointerOwner(null)}
+      onPointerCancelCapture={() => setPointerOwner(null)}
+      onLostPointerCapture={() => setPointerOwner(null)}
+    >
       <div className="feature-toolbar">
         {workspaceControls}
         <span className="feature-title">{t('waveform.audio')}</span>
@@ -305,9 +340,13 @@ export function WaveformView({
           <Icon name="split" />
         </button>
         <button
-          aria-label={t('waveform.redact')}
-          title={hasTranscriptSelection ? transcriptEditHint : t('waveform.redactHint')}
-          disabled={hasTranscriptSelection || !selection}
+          aria-label={t(selectedClipId ? 'waveform.mute' : 'waveform.redact')}
+          title={
+            hasTranscriptSelection
+              ? transcriptEditHint
+              : t(selectedClipId ? 'waveform.mute' : 'waveform.redactHint')
+          }
+          disabled={hasTranscriptSelection || (!selection && !selectedClipId)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={muteSelection}
         >
@@ -316,7 +355,7 @@ export function WaveformView({
         <button
           aria-label={t('waveform.delete')}
           title={hasTranscriptSelection ? transcriptEditHint : t('waveform.deleteHint')}
-          disabled={hasTranscriptSelection || (!selectedClipId && !selection)}
+          disabled={hasTranscriptSelection || (!timelineSelection && !selectedClipId && !selection)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={deleteSelection}
         >
@@ -491,6 +530,15 @@ export function WaveformView({
                               muted={clip.muted}
                             />
                           )}
+                          {(clip.redactions ?? []).map((redaction) => (
+                            <ClipRedactionOverlay
+                              key={redaction.id}
+                              clip={clip}
+                              redaction={redaction}
+                              pxPerSec={pxPerSec}
+                              onFocusTimeline={focusTimeline}
+                            />
+                          ))}
                         </div>
                       )
                     })}
@@ -587,8 +635,20 @@ export function WaveformView({
         </button>
       </div>
       <div className="audio-footer">
-        <span>{selectedClipId ? t('waveform.clipSelected') : t('waveform.noClipSelected')}</span>
-        <span className="audio-footer-hint">{t('waveform.editHint')}</span>
+        <span>
+          {timelineSelection?.kind === 'redaction'
+            ? t('waveform.redactionSelected')
+            : selectedClipId
+              ? t('waveform.clipSelected')
+              : t('waveform.noClipSelected')}
+        </span>
+        <span className="audio-footer-hint">
+          {t(
+            timelineSelection?.kind === 'redaction'
+              ? 'waveform.redactionHint'
+              : 'waveform.editHint',
+          )}
+        </span>
         {audioDetails}
       </div>
     </div>
