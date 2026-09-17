@@ -52,6 +52,7 @@ export const simplifiedChineseResources = {
     person: '人物',
   },
   settings: {
+    whisperRuntimeRequired: '请先在上方配置 Whisper 与 FFmpeg，并点击“验证”以启用下载。',
     changeWhisper: '更换 Whisper 模型',
     changeModel: '更换',
     whisperModel: 'Whisper 模型',
@@ -99,7 +100,7 @@ export const simplifiedChineseResources = {
     devRunAtRoot: '在当前 RedenCut 项目根目录打开终端，运行：',
     devSetupHelp: '准备 Python 3.11，在 speech-worker/.venv 中安装锁定版本的语音依赖。',
     devReturn: '完成后点击“验证”。模型在下方单独下载。',
-    devModelsBlocked: '先完成上方开发环境配置并点击“验证”，再下载模型。',
+    devModelsBlocked: '先配置各模型所需的工具，再点击上方“验证”。',
     devRuntimeError:
       '语音运行环境不可用。请先完成上方“开发环境”中的配置并重新验证，再重试模型下载。',
 

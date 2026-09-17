@@ -1364,3 +1364,34 @@ html[data-theme='light'] .preferences-dialog {
   color: var(--muted);
   font-size: 12px;
 }
+
+.preferences-dialog .whisper-size-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.preferences-dialog .whisper-recommended {
+  white-space: nowrap;
+  font-weight: 400;
+  line-height: 16px;
+}
+.preferences-dialog .model-runtime-hint {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.whisper-heading > div:first-child {
+  min-width: 0;
+}
+.whisper-selector {
+  flex-shrink: 0;
+}

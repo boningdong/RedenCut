@@ -76,8 +76,10 @@ export function WhisperModelSelector({ disabled }: { disabled: boolean }) {
         }
       }}
     >
-      <span>{t(`settings.whisperModels.${selected.variant}`)}</span>
-      {selected.recommended && <span className="badge">{t('settings.recommended')}</span>}
+      <span className="whisper-size-tag">{t(`settings.whisperModels.${selected.variant}`)}</span>
+      {selected.recommended && (
+        <span className="pill whisper-recommended">{t('settings.recommended')}</span>
+      )}
       <button
         ref={trigger}
         className="whisper-change"

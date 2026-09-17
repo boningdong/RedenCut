@@ -126,3 +126,4 @@
 - Base preparation and readiness depend only on the selected Whisper and the fixed Chinese/English alignment models, never on every downloadable Whisper alternative.
 - Selection does not download. Model-specific preparation accepts only manifest-listed transcription IDs; alignment and diarization retain their fixed models.
 - Started analysis jobs retain their snapshotted model path. Subsequent jobs resolve the selected model; an uninstalled selected model does not silently use a different installed model.
+- Whisper preparation checks its native CLI and FFmpeg independently of Python-based alignment/diarization; missing unrelated Python dependencies must not block a selected Whisper download. Runtime-blocked requests publish an actionable failure rather than silently returning unchanged state.

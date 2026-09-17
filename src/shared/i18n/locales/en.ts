@@ -53,6 +53,8 @@ export const englishResources = {
     person: 'Person',
   },
   settings: {
+    whisperRuntimeRequired:
+      'Set up Whisper and FFmpeg above, then click Validate to enable download.',
     changeWhisper: 'Change Whisper model',
     changeModel: 'Change',
     whisperModel: 'Whisper model',
@@ -108,8 +110,7 @@ export const englishResources = {
     devSetupHelp:
       'Prepares Python 3.11 and installs locked speech dependencies in speech-worker/.venv.',
     devReturn: 'Then click Validate. Models are downloaded separately below.',
-    devModelsBlocked:
-      'Complete the development environment setup above and click Validate before downloading models.',
+    devModelsBlocked: 'Prepare the tools needed by each model above, then click Validate.',
     devRuntimeError:
       'The speech runtime is unavailable. Complete the Development environment setup above and validate it before retrying the model download.',
 

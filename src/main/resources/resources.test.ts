@@ -335,7 +335,7 @@ it('blocks downloads before environment setup and allows preparation after valid
   const { fetcher } = remote()
   const registry = new ModelRegistry(dir)
   const manager = new ResourceManager(
-    [model],
+    [model, { ...model, id: 'alignment', capability: 'alignment' }],
     registry,
     new ModelDownloader(fetcher),
     undefined,
@@ -468,4 +468,39 @@ it('rejects selection while a download is active and keeps its target fixed', as
   finish()
   await manager.cancel()
   expect((await manager.read()).selectedWhisperModelId).toBe('transcription-default')
+})
+
+it('downloads a standalone Whisper model without the unrelated Python runtime', async () => {
+  const registry = new ModelRegistry(await root())
+  const { fetcher } = remote()
+  const manager = new ResourceManager(
+    [model],
+    registry,
+    new ModelDownloader(fetcher),
+    undefined,
+    async () => {},
+    {
+      check: async () => ({
+        platform: 'darwin',
+        ffmpeg: true,
+        ffprobe: true,
+        whisper: true,
+        uv: false,
+        python: false,
+        libraries: false,
+        ready: false,
+      }),
+    },
+  )
+  const completed = new Promise<void>((resolve) => {
+    const stop = manager.subscribe((snapshot) => {
+      if (snapshot.baseReady) {
+        stop()
+        resolve()
+      }
+    })
+  })
+  await manager.prepare({ kind: 'model', modelId: model.id })
+  await completed
+  expect(await registry.resolve(model)).toBeTruthy()
 })

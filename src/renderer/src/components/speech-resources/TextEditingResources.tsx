@@ -1,3 +1,4 @@
+import { modelRuntimeReady } from '@shared/ModelRuntimeRequirements'
 import { WhisperModelSelector } from './WhisperModelSelector'
 import { useLocaleStore } from '../../stores/locale.store'
 import { useResourcesStore } from '../../stores/resources.store'
@@ -10,6 +11,7 @@ export function TextEditingResources() {
   const enabled = useLocaleStore((s) => s.textEditingEnabled)
   const snapshot = useResourcesStore((s) => s.snapshot)
   const environmentMissing = !!snapshot?.development && !snapshot.development.ready
+  const whisperRuntimeMissing = !modelRuntimeReady(snapshot?.development, 'transcription')
   const transcription = aggregateResource(snapshot, 'transcription')
   const selected = snapshot?.whisperModels?.find((m) => m.id === snapshot.selectedWhisperModelId)
   const modelName = selected ? t(`settings.whisperModels.${selected.variant}`) : 'Small'
@@ -32,6 +34,11 @@ export function TextEditingResources() {
           engine="Whisper"
           selection={<WhisperModelSelector disabled={!enabled || resourcesBusy(snapshot)} />}
           description={selected ? t(`settings.whisperHelp.${selected.variant}`) : undefined}
+          hint={
+            enabled && whisperRuntimeMissing && transcription.status !== 'ready'
+              ? t('settings.whisperRuntimeRequired')
+              : undefined
+          }
           action={
             <ResourceDownloadAction
               target={{
@@ -42,7 +49,7 @@ export function TextEditingResources() {
                   transcription.id,
               }}
               resources={[transcription]}
-              disabled={!enabled || environmentMissing || resourcesBusy(snapshot)}
+              disabled={!enabled || whisperRuntimeMissing || resourcesBusy(snapshot)}
               label={t('settings.downloadWhisper', { model: modelName })}
             />
           }

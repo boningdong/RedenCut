@@ -1,3 +1,4 @@
+import { modelRuntimeReady } from '../../shared/ModelRuntimeRequirements'
 import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
 import { selectWhisperDefinition } from './WhisperModelSelection'
 import type { DevelopmentEnvironmentChecker } from '../runtime/DevelopmentEnvironmentChecker'
@@ -163,7 +164,6 @@ export class ResourceManager {
   private async start(target: ResourcePreparation): Promise<ResourceSnapshot> {
     await this.read()
     if (this.active) return this.snapshot()
-    if (this.development && !this.development.ready) return this.snapshot()
     if (target === 'diarization' && !this.snapshot().baseReady)
       throw new Error('base-resources-required')
     if (
@@ -181,6 +181,19 @@ export class ResourceManager {
         this.resources.find((r) => r.id === m.id)?.status !== 'ready',
     )
     if (!selected.length) return this.snapshot()
+    if (
+      selected.some(
+        (model) => !modelRuntimeReady(this.development, model.capability as ResourceCapability),
+      )
+    ) {
+      for (const model of selected) {
+        const state = this.resources.find((resource) => resource.id === model.id)!
+        state.status = 'failed'
+        state.error = 'runtime-unavailable'
+      }
+      this.emit()
+      return this.snapshot()
+    }
     const token = target === 'diarization' ? await this.access?.downloadToken() : undefined
     if (target === 'diarization' && !token) throw new Error('access-denied')
     const controller = new AbortController()

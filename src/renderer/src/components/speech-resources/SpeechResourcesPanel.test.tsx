@@ -158,7 +158,7 @@ it('shows development instructions, blocks model downloads, and unlocks after va
   expect((screen.getByRole('button', { name: 'Download' }) as HTMLButtonElement).disabled).toBe(
     true,
   )
-  expect(screen.getByText(/Complete the development environment setup above/)).toBeTruthy()
+  expect(screen.getByText(/Prepare the tools needed by each model above/)).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: 'Install guide' })[1])
   expect(screen.getByText('npm run setup:speech')).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: 'Validate' })[1])
@@ -403,4 +403,38 @@ it('allows choosing a model before preparing the development runtime', () => {
   expect(
     (screen.getByRole('button', { name: 'Download Whisper Small' }) as HTMLButtonElement).disabled,
   ).toBe(true)
+})
+
+it('allows Whisper download with its runtime ready while alignment still needs Python', () => {
+  const snapshot = useResourcesStore.getState().snapshot!
+  useResourcesStore.setState({
+    snapshot: {
+      ...snapshot,
+      selectedWhisperModelId: 'whisper',
+      whisperModels: [{ id: 'whisper', variant: 'small', recommended: true }],
+      development: {
+        platform: 'darwin',
+        ffmpeg: true,
+        ffprobe: true,
+        whisper: true,
+        uv: false,
+        python: false,
+        libraries: false,
+        ready: false,
+      },
+    },
+  })
+  render(<SpeechResourcesPanel />)
+  const download = screen.getByRole('button', {
+    name: 'Download Whisper Small',
+  }) as HTMLButtonElement
+  expect(download.disabled).toBe(false)
+  fireEvent.click(download)
+  expect(useResourcesStore.getState().prepare).toHaveBeenCalledWith({
+    kind: 'model',
+    modelId: 'whisper',
+  })
+  expect((screen.getByRole('button', { name: 'Download' }) as HTMLButtonElement).disabled).toBe(
+    true,
+  )
 })

@@ -11,6 +11,7 @@ export function ModelResourceRow({
   locked,
   selection,
   description,
+  hint,
 }: {
   title: string
   engine: ReactNode
@@ -19,6 +20,7 @@ export function ModelResourceRow({
   locked?: string
   selection?: ReactNode
   description?: string
+  hint?: string
 }) {
   const { t } = useTranslation()
   const development = useResourcesStore((s) => s.snapshot?.development)
@@ -86,6 +88,7 @@ export function ModelResourceRow({
         ) : null}
         {(moving || status === 'failed') && action}
       </div>
+      {hint && <p className="model-runtime-hint">{hint}</p>}
       {failureKey && (
         <p className="error-message" role="alert">
           {t(
