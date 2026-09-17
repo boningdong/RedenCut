@@ -17,7 +17,7 @@
   <a href="ROADMAP.md">Roadmap</a>
 </p>
 
-<p align="center">English · Chinese README coming later</p>
+<p align="center">English</p>
 
 > **Development preview:** RedenCut currently targets macOS and runs from source.
 > Standalone packaging, runtime bundling, and signing are still in progress.
@@ -211,9 +211,6 @@ If an audio sample is needed, use a short recording you have permission to share
 We are not accepting large pull requests at this time.
 If you would like to contribute, please contact the author by email before starting work so we can discuss the scope and direction.
 We are still exploring how community contributions should work, and the contribution process will evolve as the project grows.
-
-**Contribution contact:** Email address to be added.
-<!-- TODO before public launch: Add the author's contribution contact email and a mailto link. -->
 
 ## Acknowledgments
 
