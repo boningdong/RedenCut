@@ -1,5 +1,5 @@
 import { AppPreferencesStore } from '../preferences/AppPreferencesStore'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -503,4 +503,33 @@ it('downloads a standalone Whisper model without the unrelated Python runtime', 
   await manager.prepare({ kind: 'model', modelId: model.id })
   await completed
   expect(await registry.resolve(model)).toBeTruthy()
+})
+
+it('reuses environment validation for model actions and refreshes only on explicit read', async () => {
+  const check = vi.fn(async () => ({
+    platform: 'darwin',
+    ffmpeg: true,
+    ffprobe: true,
+    whisper: true,
+    uv: false,
+    python: false,
+    libraries: false,
+    ready: false,
+  }))
+  const manager = new ResourceManager(
+    [model],
+    new ModelRegistry(await root()),
+    new ModelDownloader(remote().fetcher),
+    undefined,
+    async () => {},
+    { check },
+  )
+  await manager.read()
+  await manager.selectWhisperModel(model.id)
+  expect(check).toHaveBeenCalledTimes(1)
+  await manager.prepare({ kind: 'model', modelId: model.id })
+  await manager.cancel()
+  expect(check).toHaveBeenCalledTimes(1)
+  await manager.read()
+  expect(check).toHaveBeenCalledTimes(2)
 })

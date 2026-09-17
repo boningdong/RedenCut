@@ -79,10 +79,10 @@ export class ResourceManager {
     const snapshot = this.snapshot()
     for (const listener of this.listeners) listener(snapshot)
   }
-  async read(): Promise<ResourceSnapshot> {
+  async read({ refreshEnvironment = true } = {}): Promise<ResourceSnapshot> {
     this.hydrated ??= this.hydrate()
     await this.hydrated
-    if (this.environment && !this.active) {
+    if (this.environment && !this.active && (refreshEnvironment || !this.development)) {
       this.development = await this.environment.check((state) => {
         this.development = state
         this.emit()
@@ -134,7 +134,7 @@ export class ResourceManager {
       throw new Error('unknown-whisper-model')
     this.selecting = true
     try {
-      await this.read()
+      await this.read({ refreshEnvironment: false })
       await this.preferences?.setWhisperModel(id)
       this.selectedWhisperModelId = id
       this.emit()
@@ -162,7 +162,7 @@ export class ResourceManager {
     return this.preparing
   }
   private async start(target: ResourcePreparation): Promise<ResourceSnapshot> {
-    await this.read()
+    await this.read({ refreshEnvironment: false })
     if (this.active) return this.snapshot()
     if (target === 'diarization' && !this.snapshot().baseReady)
       throw new Error('base-resources-required')
@@ -285,7 +285,7 @@ export class ResourceManager {
     await this.preparing?.catch(() => {})
     this.active?.controller.abort()
     await this.active?.done
-    return this.read()
+    return this.read({ refreshEnvironment: false })
   }
   async getModelPaths(): Promise<Record<string, string>> {
     const paths: Record<string, string> = {}

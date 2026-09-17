@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ModelAccessDialog } from './ModelAccessDialog'
 import { SpeechResourcesPanel } from './SpeechResourcesPanel'
 import { useResourcesStore } from '../../stores/resources.store'
@@ -438,3 +438,30 @@ it('allows Whisper download with its runtime ready while alignment still needs P
     true,
   )
 })
+
+it.each([true, false])(
+  'shows validation progress only for active checks (Python checking: %s)',
+  (checking) => {
+    const snapshot = useResourcesStore.getState().snapshot!
+    const development = {
+      platform: 'darwin',
+      ffmpeg: true,
+      ffprobe: true,
+      whisper: true,
+      uv: true,
+      python: true,
+      libraries: false,
+      ready: false,
+      checking: checking ? ['libraries' as const] : [],
+    }
+    useResourcesStore.setState({ pending: true, snapshot: { ...snapshot, development } })
+    render(<SpeechResourcesPanel />)
+    const tools = screen.getByRole('heading', { name: 'Local tools' }).closest('section')!
+    const python = screen.getByRole('heading', { name: 'Python runtime' }).closest('section')!
+    expect(within(tools).queryByRole('button', { name: 'Validating…' })).toBeNull()
+    expect(within(tools).getByRole('button', { name: 'Validate' })).toBeTruthy()
+    expect(
+      within(python).getByRole('button', { name: checking ? 'Validating…' : 'Validate' }),
+    ).toBeTruthy()
+  },
+)

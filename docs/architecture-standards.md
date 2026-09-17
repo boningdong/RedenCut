@@ -54,6 +54,7 @@
 - No token is returned through preload, written into project artifacts or passed to ordinary inference workers.
 - AppRuntimeLocator is the single executable-location boundary; development runtime availability does not certify packaged distribution.
 - Non-bundled builds use DevelopmentEnvironmentChecker for read-only executable and Python import checks, exposed in ResourceManager snapshots.
+- Model selection, preparation and cancellation reuse the latest environment result; first access and explicit resource refresh validate the environment. Per-group progress reflects active check keys, not unrelated resource operations.
 - Developer installation is explicit through `npm run setup:speech`; the app validates the result and blocks model preparation while required runtime checks fail.
 - uv is only an environment-setup tool; an already usable runtime does not require uv for inference or model preparation.
 - Bundled snapshots omit development setup; installation guide IPC accepts fixed guide IDs rather than renderer-supplied URLs.

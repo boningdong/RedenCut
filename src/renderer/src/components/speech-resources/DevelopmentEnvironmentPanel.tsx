@@ -33,17 +33,22 @@ export function DevelopmentEnvironmentPanel() {
       </span>
     </div>
   )
-  const actions = (group: 'tools' | 'python') => (
-    <div className="dev-block-footer">
-      <button className="outline" onClick={() => setGuide(guide === group ? null : group)}>
-        {t('settings.devGuide')}
-      </button>
-      <button className="recheck-action" disabled={pending} onClick={() => void refresh()}>
-        {pending ? <i className="loading-spinner" /> : <Icon name="refresh" />}
-        {t(pending ? 'settings.devChecking' : 'settings.devValidate')}
-      </button>
-    </div>
-  )
+  const actions = (group: 'tools' | 'python') => {
+    const checks: DevelopmentCheck[] =
+      group === 'tools' ? ['ffmpeg', 'ffprobe', 'whisper'] : ['uv', 'python', 'libraries']
+    const checking = dev.checking?.some((key) => checks.includes(key)) ?? false
+    return (
+      <div className="dev-block-footer">
+        <button className="outline" onClick={() => setGuide(guide === group ? null : group)}>
+          {t('settings.devGuide')}
+        </button>
+        <button className="recheck-action" disabled={pending} onClick={() => void refresh()}>
+          {checking ? <i className="loading-spinner" /> : <Icon name="refresh" />}
+          {t(checking ? 'settings.devChecking' : 'settings.devValidate')}
+        </button>
+      </div>
+    )
+  }
   return (
     <section className="dev-env">
       <button className="dev-summary" aria-expanded={open} onClick={() => setExpanded(!open)}>
