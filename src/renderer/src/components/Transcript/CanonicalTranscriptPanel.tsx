@@ -218,16 +218,20 @@ export function CanonicalTranscriptPanel({
         <span className="feature-title">{t('transcript.title')}</span>
         <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
         <span className="transport-separator" aria-hidden="true" />
-        {displayMode === 'speakers' && (
+        {displayMode === 'speakers' ? (
           <SpeakerLabels
+            toolbarActions={<TranscriptDisplaySwitch />}
             onSave={onSaveSpeakerIdentities}
             analyses={analyses}
             isGenerating={isGenerating}
             unassignedSourceIds={unassignedSourceIds}
           />
+        ) : (
+          <>
+            <div className="toolbar-spacer" />
+            <TranscriptDisplaySwitch />
+          </>
         )}
-        <div className="toolbar-spacer" />
-        <TranscriptDisplaySwitch />
         <SpeechTaskPopover
           tracks={tracks}
           analyses={analyses}
