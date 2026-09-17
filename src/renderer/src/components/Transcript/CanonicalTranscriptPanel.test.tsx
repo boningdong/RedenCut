@@ -93,6 +93,25 @@ describe('canonical transcript editability', () => {
     ])
   })
 
+  it('keeps toolbar controls mounted and puts unassigned speech in the speaker tag row', () => {
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const manage = screen.getByRole('button', { name: 'Manage people' }) as HTMLButtonElement
+    const modes = screen.getByRole('group', { name: 'Transcript display' })
+    const unassigned = screen.getByRole('button', { name: 'Show Unassigned speaker' })
+    expect(unassigned.closest('.identity-tags')).not.toBeNull()
+    fireEvent.click(manage)
+    expect(screen.getByRole('complementary', { name: 'Manage people' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Continuous text' }))
+    expect(screen.getByRole('button', { name: 'Manage people' })).toBe(manage)
+    expect(manage.disabled).toBe(true)
+    expect(screen.queryByRole('complementary', { name: 'Manage people' })).toBeNull()
+    expect(screen.getByRole('group', { name: 'Transcript display' })).toBe(modes)
+    expect(screen.queryByRole('button', { name: 'Show Unassigned speaker' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'By speaker' }))
+    expect(manage.disabled).toBe(false)
+    expect(screen.queryByRole('complementary', { name: 'Manage people' })).toBeNull()
+  })
+
   it('shows hidden text in continuous mode and restores speaker filters on switching back', () => {
     render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     fireEvent.click(screen.getByRole('button', { name: 'Show Unassigned speaker' }))

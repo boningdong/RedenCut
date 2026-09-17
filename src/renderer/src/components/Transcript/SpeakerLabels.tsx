@@ -29,9 +29,9 @@ function UnassignedTag({
       ? t('transcript.unassignedSource', { name: sourceName })
       : t('transcript.unassignedSpeaker')
   return (
-    <div className={`speaker-tag${hidden ? ' is-hidden' : ''}`}>
+    <div className={`identity-tag${hidden ? ' is-hidden' : ''}`}>
       <button
-        className="speaker-name-button"
+        className="identity-tag-label"
         aria-label={t('transcript.show', { name: label })}
         aria-pressed={!hidden}
         onClick={() => {
@@ -40,6 +40,7 @@ function UnassignedTag({
           useTranscriptStore.getState().toggleSpeakerVisibility(key)
         }}
       >
+        <span className="identity-dot" style={{ background: 'var(--color-text-muted)' }} />
         {label}
       </button>
     </div>
@@ -51,7 +52,9 @@ export function SpeakerLabels({
   unassignedSourceIds = [],
   onSave,
   toolbarActions,
+  showTags = true,
 }: {
+  showTags?: boolean
   toolbarActions?: ReactNode
   analyses: RendererSpeechAnalysis[]
   isGenerating: boolean
@@ -69,16 +72,18 @@ export function SpeakerLabels({
   )
   return (
     <div className="transcript-speaker-labels">
-      {analyses
-        .filter((a) => unassignedSourceIds.includes(a.audioSourceId))
-        .map((a) => (
-          <UnassignedTag
-            key={unassignedSpeakerKey(a)}
-            analysis={a}
-            showSource={unassignedSourceIds.length > 1}
-          />
-        ))}
       <SpeakerIdentityControls
+        showTags={showTags}
+        managementDisabled={!showTags}
+        extraTags={analyses
+          .filter((a) => unassignedSourceIds.includes(a.audioSourceId))
+          .map((a) => (
+            <UnassignedTag
+              key={unassignedSpeakerKey(a)}
+              analysis={a}
+              showSource={unassignedSourceIds.length > 1}
+            />
+          ))}
         toolbarActions={toolbarActions}
         catalog={catalog}
         analyses={analyses}

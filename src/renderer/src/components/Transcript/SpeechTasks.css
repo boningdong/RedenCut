@@ -147,7 +147,7 @@ html[data-theme='light'] .speech-task-complete {
   padding: 2px;
   gap: 2px;
 }
-.transcript-display-switch button {
+.transcript-display-switch.transcript-display-switch button {
   border: 0;
   border-radius: 3px;
   padding: 4px 7px;
@@ -156,7 +156,7 @@ html[data-theme='light'] .speech-task-complete {
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.transcript-display-switch button[aria-pressed='true'] {
+.transcript-display-switch.transcript-display-switch button[aria-pressed='true'] {
   background: var(--color-bg-elevated);
   color: var(--color-text-primary);
 }

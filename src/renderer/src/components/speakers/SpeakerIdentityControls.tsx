@@ -19,6 +19,9 @@ import './SpeakerIdentities.css'
 
 export function SpeakerIdentityControls({
   toolbarActions,
+  extraTags,
+  showTags = true,
+  managementDisabled = false,
   catalog,
   analyses,
   tracks,
@@ -26,6 +29,9 @@ export function SpeakerIdentityControls({
   onTogglePeople,
   onSave,
 }: {
+  extraTags?: ReactNode
+  showTags?: boolean
+  managementDisabled?: boolean
   toolbarActions?: ReactNode
   catalog: SpeakerIdentityCatalog
   analyses: RendererSpeechAnalysis[]
@@ -36,6 +42,9 @@ export function SpeakerIdentityControls({
 }) {
   const { t } = useTranslation()
   const [manage, setManage] = useState(false)
+  useEffect(() => {
+    if (managementDisabled) setManage(false)
+  }, [managementDisabled])
   const [expanded, setExpanded] = useState<string[]>([])
   const [editor, setEditor] = useState<{ target: IdentityTarget; anchor: HTMLElement } | null>(null)
   const [drag, setDrag] = useState<IdentityTarget | null>(null)
@@ -94,100 +103,103 @@ export function SpeakerIdentityControls({
   return (
     <div className="identity-controls">
       <div className="identity-tags">
-        {targets
-          .filter((target) => presentMembers(target).some((p) => isPersonEditable(p, analyses)))
-          .map((target) => {
-            const people = presentMembers(target)
-            const hidden = people.every((p) =>
-              hiddenSpeakerKeys.includes(
-                `${p.binding.audioSourceId}:${p.binding.analysisRevisionId}:${p.binding.speakerId}`,
-              ),
-            )
-            return (
-              <div
-                key={target.kind + target.id}
-                className={`identity-tag ${hidden ? 'is-hidden' : ''} ${dropTarget === target.id ? 'is-drop-target' : ''} ${drag?.id === target.id ? 'is-dragging' : ''}`}
-                draggable={editable(target) && !saving}
-                onDragStart={(e) => {
-                  setDropTarget(null)
-                  setDrag(target)
-                  e.dataTransfer.setData('application/x-redencut-speaker', target.id)
-                  e.dataTransfer.effectAllowed = 'link'
-                }}
-                onDragEnd={() => {
-                  setDrag(null)
-                  setDropTarget(null)
-                }}
-                onDragOver={(e) => {
-                  if (
-                    drag &&
-                    drag.id !== target.id &&
-                    editable(drag) &&
-                    editable(target) &&
-                    !saving
-                  ) {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'link'
-                    setDropTarget(target.id)
-                  }
-                }}
-                onDragLeave={(e) => {
-                  if (
-                    !(e.relatedTarget instanceof Node) ||
-                    !e.currentTarget.contains(e.relatedTarget)
-                  )
+        {showTags && extraTags}
+        {showTags &&
+          targets
+            .filter((target) => presentMembers(target).some((p) => isPersonEditable(p, analyses)))
+            .map((target) => {
+              const people = presentMembers(target)
+              const hidden = people.every((p) =>
+                hiddenSpeakerKeys.includes(
+                  `${p.binding.audioSourceId}:${p.binding.analysisRevisionId}:${p.binding.speakerId}`,
+                ),
+              )
+              return (
+                <div
+                  key={target.kind + target.id}
+                  className={`identity-tag ${hidden ? 'is-hidden' : ''} ${dropTarget === target.id ? 'is-drop-target' : ''} ${drag?.id === target.id ? 'is-dragging' : ''}`}
+                  draggable={editable(target) && !saving}
+                  onDragStart={(e) => {
                     setDropTarget(null)
-                }}
-                onDrop={(e) => {
-                  setDropTarget(null)
-                  void (async () => {
-                    e.preventDefault()
+                    setDrag(target)
+                    e.dataTransfer.setData('application/x-redencut-speaker', target.id)
+                    e.dataTransfer.effectAllowed = 'link'
+                  }}
+                  onDragEnd={() => {
+                    setDrag(null)
+                    setDropTarget(null)
+                  }}
+                  onDragOver={(e) => {
                     if (
-                      !drag ||
-                      !editable(target) ||
-                      !editable(drag) ||
-                      saving ||
-                      drag.id === target.id
-                    )
-                      return
-                    setSaving(true)
-                    try {
-                      await onSave(associateSpeakers(catalog, target, drag, crypto.randomUUID()))
-                      setError(false)
-                    } catch {
-                      setError(true)
-                    } finally {
-                      setSaving(false)
-                      setDrag(null)
+                      drag &&
+                      drag.id !== target.id &&
+                      editable(drag) &&
+                      editable(target) &&
+                      !saving
+                    ) {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'link'
+                      setDropTarget(target.id)
                     }
-                  })()
-                }}
-              >
-                <button
-                  type="button"
-                  className="identity-tag-label"
-                  aria-label={t('transcript.show', { name: label(target) })}
-                  aria-pressed={!hidden}
-                  onClick={() => onTogglePeople(people.map((p) => p.id))}
+                  }}
+                  onDragLeave={(e) => {
+                    if (
+                      !(e.relatedTarget instanceof Node) ||
+                      !e.currentTarget.contains(e.relatedTarget)
+                    )
+                      setDropTarget(null)
+                  }}
+                  onDrop={(e) => {
+                    setDropTarget(null)
+                    void (async () => {
+                      e.preventDefault()
+                      if (
+                        !drag ||
+                        !editable(target) ||
+                        !editable(drag) ||
+                        saving ||
+                        drag.id === target.id
+                      )
+                        return
+                      setSaving(true)
+                      try {
+                        await onSave(associateSpeakers(catalog, target, drag, crypto.randomUUID()))
+                        setError(false)
+                      } catch {
+                        setError(true)
+                      } finally {
+                        setSaving(false)
+                        setDrag(null)
+                      }
+                    })()
+                  }}
                 >
-                  <SourceBadges people={people} tracks={tracks} collapsible />
-                  <span
-                    className={`identity-dot ${target.kind === 'association' ? 'identity-associated' : ''}`}
-                    style={{ background: identityColor(catalog, target) }}
-                  />
-                  {label(target)}
-                </button>
-                {editButton(target)}
-              </div>
-            )
-          })}
+                  <button
+                    type="button"
+                    className="identity-tag-label"
+                    aria-label={t('transcript.show', { name: label(target) })}
+                    aria-pressed={!hidden}
+                    onClick={() => onTogglePeople(people.map((p) => p.id))}
+                  >
+                    <SourceBadges people={people} tracks={tracks} collapsible />
+                    <span
+                      className={`identity-dot ${target.kind === 'association' ? 'identity-associated' : ''}`}
+                      style={{ background: identityColor(catalog, target) }}
+                    />
+                    {label(target)}
+                  </button>
+                  {editButton(target)}
+                </div>
+              )
+            })}
       </div>
       <div className="identity-toolbar-actions">
         {toolbarActions}
         <button
           type="button"
           className="identity-manage"
-          aria-expanded={manage}
+          disabled={managementDisabled}
+          aria-expanded={manage && !managementDisabled}
           onClick={() => setManage(!manage)}
         >
           <Icon name="person" size={14} />
@@ -195,7 +207,7 @@ export function SpeakerIdentityControls({
         </button>
       </div>
       {error && <p role="alert">{t('speakerIdentity.failed')}</p>}
-      {manage && (
+      {manage && !managementDisabled && (
         <aside
           onKeyDown={(event) => {
             event.stopPropagation()
