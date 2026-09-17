@@ -16,6 +16,16 @@ Use real UI actions and disposable fixtures to reach states; follow the harness 
 Inspect screenshots as well as semantic snapshots: a valid accessibility tree does not prove correct rendering, and an attractive screenshot does not prove correct behavior.
 Judge consistency against the app's established controls and approved design, not a new aesthetic invented during verification.
 
+## Design Changes and Routine Repairs
+
+Discuss changes to the overall design with the user before implementing them: a new visual direction, reorganized information hierarchy, a different main layout or a changed user workflow requires agreement.
+When the design or intended behavior has already been agreed, directly fix implementation defects within that scope without asking for approval again.
+Examples include unintended wrapping, clipping, overlap, inconsistent button/icon styles, incorrect spacing or alignment, and interaction states that deviate from the agreed behavior.
+Use the approved design and established app patterns to resolve routine details; do not treat every CSS or component adjustment as a new design decision.
+If a repair requires choosing between materially different designs or changing the agreed behavior, discuss that decision while continuing independent repairs that remain within scope.
+When acceptance finds an authorized defect, return to implementation, fix it, then verify the affected checks against a fresh product snapshot; report what changed and the evidence.
+This authorization covers repairs to the approved task, not an unsolicited redesign of unrelated screens.
+
 ## Mandatory Checkpoints
 
 | ID | Required observable outcome | Evidence |
