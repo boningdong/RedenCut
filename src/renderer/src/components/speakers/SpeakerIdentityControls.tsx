@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import type { Track } from '@shared/project.types'
@@ -10,6 +10,7 @@ import {
   EditIcon,
   identityColor,
   membersFor,
+  personIsOnTimeline,
   SourceBadges,
   type IdentityTarget,
 } from './SpeakerIdentityPresentation'
@@ -17,6 +18,7 @@ import { SpeakerIdentityEditor } from './SpeakerIdentityEditor'
 import './SpeakerIdentities.css'
 
 export function SpeakerIdentityControls({
+  toolbarActions,
   catalog,
   analyses,
   tracks,
@@ -24,6 +26,7 @@ export function SpeakerIdentityControls({
   onTogglePeople,
   onSave,
 }: {
+  toolbarActions?: ReactNode
   catalog: SpeakerIdentityCatalog
   analyses: RendererSpeechAnalysis[]
   tracks: Track[]
@@ -36,14 +39,23 @@ export function SpeakerIdentityControls({
   const [expanded, setExpanded] = useState<string[]>([])
   const [editor, setEditor] = useState<{ target: IdentityTarget; anchor: HTMLElement } | null>(null)
   const [drag, setDrag] = useState<IdentityTarget | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const [saving, setSaving] = useState(false)
-  const targets: IdentityTarget[] = [
-    ...catalog.associations.map((a) => ({ kind: 'association' as const, id: a.id })),
-    ...catalog.people
-      .filter((p) => !catalog.associations.some((a) => a.memberPersonIds.includes(p.id)))
-      .map((p) => ({ kind: 'person' as const, id: p.id })),
-  ]
+  const presentMembers = (target: IdentityTarget) =>
+    membersFor(catalog, target).filter((person) => personIsOnTimeline(person, tracks))
+  const editorPresent = !!editor && presentMembers(editor.target).length > 0
+  useEffect(() => {
+    if (!editorPresent) setEditor(null)
+  }, [editorPresent])
+  const targets: IdentityTarget[] = (
+    [
+      ...catalog.associations.map((a) => ({ kind: 'association' as const, id: a.id })),
+      ...catalog.people
+        .filter((p) => !catalog.associations.some((a) => a.memberPersonIds.includes(p.id)))
+        .map((p) => ({ kind: 'person' as const, id: p.id })),
+    ] as IdentityTarget[]
+  ).filter((target) => presentMembers(target).length > 0)
   const label = (target: IdentityTarget) =>
     (target.kind === 'person' ? catalog.people : catalog.associations).find(
       (p) => p.id === target.id,
@@ -83,41 +95,51 @@ export function SpeakerIdentityControls({
     <div className="identity-controls">
       <div className="identity-tags">
         {targets
-          .filter((target) =>
-            membersFor(catalog, target).some((p) => isPersonEditable(p, analyses)),
-          )
+          .filter((target) => presentMembers(target).some((p) => isPersonEditable(p, analyses)))
           .map((target) => {
-            const people = membersFor(catalog, target)
+            const people = presentMembers(target)
             const hidden = people.every((p) =>
               hiddenSpeakerKeys.includes(
                 `${p.binding.audioSourceId}:${p.binding.analysisRevisionId}:${p.binding.speakerId}`,
               ),
             )
-            const colors = tracks
-              .filter((track) =>
-                people.some((p) =>
-                  track.clips.some((c) => c.audioSourceId === p.binding.audioSourceId),
-                ),
-              )
-              .map((track) => track.color)
             return (
               <div
                 key={target.kind + target.id}
-                className={`identity-tag ${hidden ? 'is-hidden' : ''}`}
+                className={`identity-tag ${hidden ? 'is-hidden' : ''} ${dropTarget === target.id ? 'is-drop-target' : ''} ${drag?.id === target.id ? 'is-dragging' : ''}`}
                 draggable={editable(target) && !saving}
                 onDragStart={(e) => {
+                  setDropTarget(null)
                   setDrag(target)
                   e.dataTransfer.setData('application/x-redencut-speaker', target.id)
                   e.dataTransfer.effectAllowed = 'link'
                 }}
-                onDragEnd={() => setDrag(null)}
+                onDragEnd={() => {
+                  setDrag(null)
+                  setDropTarget(null)
+                }}
                 onDragOver={(e) => {
-                  if (drag && editable(target) && !saving) {
+                  if (
+                    drag &&
+                    drag.id !== target.id &&
+                    editable(drag) &&
+                    editable(target) &&
+                    !saving
+                  ) {
                     e.preventDefault()
                     e.dataTransfer.dropEffect = 'link'
+                    setDropTarget(target.id)
                   }
                 }}
+                onDragLeave={(e) => {
+                  if (
+                    !(e.relatedTarget instanceof Node) ||
+                    !e.currentTarget.contains(e.relatedTarget)
+                  )
+                    setDropTarget(null)
+                }}
                 onDrop={(e) => {
+                  setDropTarget(null)
                   void (async () => {
                     e.preventDefault()
                     if (
@@ -141,15 +163,6 @@ export function SpeakerIdentityControls({
                   })()
                 }}
               >
-                <span
-                  className="identity-track-rail"
-                  style={{
-                    background:
-                      colors.length > 1
-                        ? `linear-gradient(${colors.join(',')})`
-                        : (colors[0] ?? 'transparent'),
-                  }}
-                />
                 <button
                   type="button"
                   className="identity-tag-label"
@@ -157,23 +170,27 @@ export function SpeakerIdentityControls({
                   aria-pressed={!hidden}
                   onClick={() => onTogglePeople(people.map((p) => p.id))}
                 >
+                  <SourceBadges people={people} tracks={tracks} collapsible />
                   <span
                     className={`identity-dot ${target.kind === 'association' ? 'identity-associated' : ''}`}
                     style={{ background: identityColor(catalog, target) }}
                   />
                   {label(target)}
-                  <SourceBadges people={people} tracks={tracks} />
                 </button>
                 {editButton(target)}
               </div>
             )
           })}
+      </div>
+      <div className="identity-toolbar-actions">
+        {toolbarActions}
         <button
           type="button"
           className="identity-manage"
           aria-expanded={manage}
           onClick={() => setManage(!manage)}
         >
+          <Icon name="person" size={14} />
           {t('speakerIdentity.manage')}
         </button>
       </div>
@@ -235,7 +252,7 @@ export function SpeakerIdentityControls({
                     </div>
                     {expanded.includes(target.id) && (
                       <ul role="group">
-                        {membersFor(catalog, target).map((p) => (
+                        {presentMembers(target).map((p) => (
                           <li role="treeitem" key={p.id}>
                             {treeRow({ kind: 'person', id: p.id })}
                           </li>
@@ -251,7 +268,7 @@ export function SpeakerIdentityControls({
           </ul>
         </aside>
       )}
-      {editor && (
+      {editor && editorPresent && (
         <SpeakerIdentityEditor
           key={editor.target.kind + editor.target.id}
           {...editor}

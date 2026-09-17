@@ -28,19 +28,10 @@
 .canonical-transcript-panel > .transcript-controls > .panel-count {
   flex-shrink: 0;
 }
-.canonical-transcript-panel > .transcript-controls > .toolbar-spacer {
-  display: none;
-}
 .canonical-transcript-panel > .transcript-controls > .transcript-speaker-labels {
   flex: 1 1 280px;
   min-width: 0;
   max-width: 100%;
-}
-.canonical-transcript-panel > .transcript-controls > .transcript-generation {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  margin-left: auto;
 }
 .transcript-generation button {
   overflow-wrap: anywhere;

@@ -25,6 +25,12 @@ const analyses = catalog.people.map((p) => ({
   diarizationStatus: 'completed',
   speakers: [{ id: p.binding.speakerId }],
 })) as unknown as RendererSpeechAnalysis[]
+const presentTracks = catalog.people.map((person, i) => ({
+  id: `track-${i}`,
+  name: `Track ${i + 1}`,
+  color: person.color,
+  clips: [{ audioSourceId: person.binding.audioSourceId }],
+})) as unknown as Track[]
 beforeEach(() => useLocaleStore.setState({ resolvedLocale: 'en' }))
 afterEach(cleanup)
 function setup(value = catalog) {
@@ -35,7 +41,7 @@ function setup(value = catalog) {
     <SpeakerIdentityControls
       catalog={value}
       analyses={analyses}
-      tracks={[]}
+      tracks={presentTracks}
       hiddenSpeakerKeys={[]}
       onTogglePeople={vi.fn()}
       onSave={onSave}
@@ -132,7 +138,7 @@ it('routes tag visibility to all members and drop keeps the receiving name', asy
     <SpeakerIdentityControls
       catalog={catalog}
       analyses={analyses}
-      tracks={[]}
+      tracks={presentTracks}
       hiddenSpeakerKeys={[]}
       onSave={save}
       onTogglePeople={toggle}
@@ -160,7 +166,7 @@ it('keeps one portal clamped and preserves drafts when unrelated people arrive',
   const props = {
     catalog,
     analyses,
-    tracks: [],
+    tracks: presentTracks,
     hiddenSpeakerKeys: [],
     onTogglePeople: vi.fn(),
     onSave: save,
@@ -321,7 +327,7 @@ it('does not discard a pending save or close a subsequently opened editor', asyn
     <SpeakerIdentityControls
       catalog={catalog}
       analyses={analyses}
-      tracks={[]}
+      tracks={presentTracks}
       hiddenSpeakerKeys={[]}
       onTogglePeople={vi.fn()}
       onSave={save}
@@ -382,4 +388,104 @@ it('keeps inline rename geometry stable through blur before the save click', asy
   fireEvent.click(button)
   await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
   expect(save.mock.calls[0][0].people.find((p) => p.id === 'Bob')!.displayName).toBe('Robert')
+})
+
+it('removes absent-source people from every surface and restores them with timeline state', () => {
+  const props = {
+    catalog,
+    analyses,
+    tracks: presentTracks,
+    hiddenSpeakerKeys: [],
+    onTogglePeople: vi.fn(),
+    onSave: vi.fn(),
+  }
+  const view = render(<SpeakerIdentityControls {...props} />)
+  expect(screen.getByRole('button', { name: 'Show Alice' })).toBeTruthy()
+  view.rerender(<SpeakerIdentityControls {...props} tracks={presentTracks.slice(1)} />)
+  expect(screen.queryByRole('button', { name: 'Show Alice' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Manage people' }))
+  expect(within(screen.getByRole('tree')).queryByText('Alice')).toBeNull()
+  fireEvent.click(within(screen.getByRole('tree')).getByRole('button', { name: 'Edit Bob' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add person' }))
+  expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Add Alice' })).toBeNull()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  view.rerender(<SpeakerIdentityControls {...props} />)
+  expect(screen.getByRole('button', { name: 'Show Alice' })).toBeTruthy()
+})
+it('highlights only a valid drag destination and clears feedback when leaving or cancelling', () => {
+  setup()
+  const alice = screen.getByRole('button', { name: 'Show Alice' }).parentElement!
+  const bob = screen.getByRole('button', { name: 'Show Bob' }).parentElement!
+  const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+  fireEvent.dragStart(bob, { dataTransfer })
+  fireEvent.dragOver(bob, { dataTransfer })
+  expect(bob.classList.contains('is-drop-target')).toBe(false)
+  fireEvent.dragOver(alice, { dataTransfer })
+  expect(alice.classList.contains('is-drop-target')).toBe(true)
+  fireEvent.dragLeave(alice, { relatedTarget: document.body })
+  expect(alice.classList.contains('is-drop-target')).toBe(false)
+  fireEvent.dragOver(alice, { dataTransfer })
+  fireEvent.dragEnd(bob)
+  expect(alice.classList.contains('is-drop-target')).toBe(false)
+})
+
+it('filters associated children and selected members when their source leaves all tracks', () => {
+  const props = {
+    catalog: {
+      ...catalog,
+      associations: [
+        {
+          id: 'g',
+          displayName: 'Guests',
+          color: { mode: 'automatic' as const },
+          memberPersonIds: ['Alice', 'Bob'],
+        },
+      ],
+    },
+    analyses,
+    tracks: presentTracks,
+    hiddenSpeakerKeys: [],
+    onTogglePeople: vi.fn(),
+    onSave: vi.fn(),
+  }
+  const view = render(<SpeakerIdentityControls {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Guests' }))
+  expect(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Rename Bob' }),
+  ).toBeTruthy()
+  view.rerender(
+    <SpeakerIdentityControls {...props} tracks={[presentTracks[0], presentTracks[2]]} />,
+  )
+  expect(
+    within(screen.getByRole('dialog')).queryByRole('button', { name: 'Rename Bob' }),
+  ).toBeNull()
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add person' }))
+  expect(within(screen.getByRole('dialog')).queryByRole('button', { name: 'Add Bob' })).toBeNull()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  fireEvent.click(screen.getByRole('button', { name: 'Manage people' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Guests' }))
+  expect(within(screen.getByRole('tree')).queryByText('Bob')).toBeNull()
+  expect(within(screen.getByRole('tree')).getByText('Alice')).toBeTruthy()
+  view.rerender(<SpeakerIdentityControls {...props} tracks={[presentTracks[2]]} />)
+  expect(screen.queryByRole('button', { name: 'Show Guests' })).toBeNull()
+  expect(within(screen.getByRole('tree')).queryByText('Guests')).toBeNull()
+})
+it('retains a person while another track uses the same source and closes an absent person editor', () => {
+  const duplicate = { ...presentTracks[0], id: 'duplicate' }
+  const props = {
+    catalog,
+    analyses,
+    tracks: [presentTracks[0], duplicate],
+    hiddenSpeakerKeys: [],
+    onTogglePeople: vi.fn(),
+    onSave: vi.fn(),
+  }
+  const view = render(<SpeakerIdentityControls {...props} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Alice' }))
+  view.rerender(<SpeakerIdentityControls {...props} tracks={[duplicate]} />)
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Show Alice' })).toBeTruthy()
+  view.rerender(<SpeakerIdentityControls {...props} tracks={[]} />)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Show Alice' })).toBeNull()
 })

@@ -1,7 +1,13 @@
+import type { CSSProperties } from 'react'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { Track } from '@shared/project.types'
 export type IdentityTarget = { kind: 'person' | 'association'; id: string }
 export type Person = SpeakerIdentityCatalog['people'][number]
+export function personIsOnTimeline(person: Person, tracks: Track[]): boolean {
+  return tracks.some((track) =>
+    track.clips.some((clip) => clip.audioSourceId === person.binding.audioSourceId),
+  )
+}
 export function membersFor(catalog: SpeakerIdentityCatalog, target: IdentityTarget): Person[] {
   const ids =
     target.kind === 'person'
@@ -17,17 +23,30 @@ export function identityColor(catalog: SpeakerIdentityCatalog, target: IdentityT
   const colors = membersFor(catalog, target).map((p) => p.color)
   return colors.length > 1 ? `linear-gradient(135deg, ${colors.join(', ')})` : (colors[0] ?? '#aaa')
 }
-export function SourceBadges({ people, tracks }: { people: Person[]; tracks: Track[] }) {
+export function SourceBadges({
+  people,
+  tracks,
+  collapsible = false,
+}: {
+  people: Person[]
+  tracks: Track[]
+  collapsible?: boolean
+}) {
   return (
-    <span className="identity-source-badges">
+    <span className={collapsible ? 'identity-track-strips' : 'identity-source-badges'}>
       {tracks.map((track, index) =>
         people.some((p) => track.clips.some((c) => c.audioSourceId === p.binding.audioSourceId)) ? (
           <span
             key={track.id}
-            style={{
-              color: track.color,
-              background: `color-mix(in srgb, ${track.color} 10%, transparent)`,
-            }}
+            title={track.name}
+            style={
+              collapsible
+                ? ({ '--identity-track-color': track.color } as CSSProperties)
+                : {
+                    color: track.color,
+                    background: `color-mix(in srgb, ${track.color} 10%, transparent)`,
+                  }
+            }
           >
             T{index + 1}
           </span>

@@ -11,6 +11,7 @@ import { Icon } from '../ui/Icon'
 import { SpeakerColorChoices } from './SpeakerColorChoices'
 import {
   identityColor,
+  personIsOnTimeline,
   SourceBadges,
   type IdentityTarget,
   type Person,
@@ -205,6 +206,7 @@ export function SpeakerIdentityEditor({
   }
   const candidates = draft.people.filter(
     (p) =>
+      personIsOnTimeline(p, tracks) &&
       p.id !== target.id &&
       !selected.includes(p.id) &&
       isPersonEditable(p, analyses) &&
@@ -217,6 +219,10 @@ export function SpeakerIdentityEditor({
           }),
       ),
   )
+  const visibleSelected = selected.filter((id) => {
+    const person = draft.people.find((p) => p.id === id)
+    return person && personIsOnTimeline(person, tracks)
+  })
   return createPortal(
     <div
       className="identity-editor"
@@ -277,8 +283,10 @@ export function SpeakerIdentityEditor({
         </section>
         <section>
           <h4>{t('speakerIdentity.members')}</h4>
-          {selected.length === 0 && <p className="identity-notice">{t('speakerIdentity.empty')}</p>}
-          {selected.map((id) => {
+          {visibleSelected.length === 0 && (
+            <p className="identity-notice">{t('speakerIdentity.empty')}</p>
+          )}
+          {visibleSelected.map((id) => {
             const person = draft.people.find((p) => p.id === id)
             if (!person) return null
             return (

@@ -91,7 +91,7 @@ describe('canonical transcript editability', () => {
     ])
   })
 
-  it('keeps recognized people editable after their last timeline clip is removed', () => {
+  it('hides recognized people without timeline clips from management', () => {
     const analysis = useTranscriptStore.getState().analyses[0]
     const detached = {
       ...analysis,
@@ -108,8 +108,7 @@ describe('canonical transcript editability', () => {
     useTranscriptStore.getState().loadAnalyses([analysis, detached])
     render(<TranscriptPanel onGenerate={() => {}} isGenerating={false} generatingStatus={null} />)
     fireEvent.click(screen.getByRole('button', { name: 'Manage people' }))
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit Detached guest' }).slice(-1)[0])
-    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByRole('button', { name: 'Edit Detached guest' })).toBeNull()
   })
   afterEach(() => {
     cleanup()

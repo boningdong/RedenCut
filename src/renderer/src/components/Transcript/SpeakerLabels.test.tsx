@@ -6,6 +6,7 @@ import { SpeakerLabels } from './SpeakerLabels'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { useEditorStore } from '../../stores/editor.store'
+import type { Track } from '@shared/project.types'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 
 const analysis = {
@@ -19,6 +20,11 @@ beforeEach(() => {
   useLocaleStore.setState({ resolvedLocale: 'en' })
   useTranscriptStore.getState().reset()
   useTimelineStore.getState().reset()
+  useTimelineStore.setState({
+    tracks: [
+      { id: 'track', name: 'Track', color: '#abcdef', clips: [{ audioSourceId: 'source' }] },
+    ] as unknown as Track[],
+  })
   useEditorStore.getState().reset()
   useTranscriptStore.getState().loadAnalyses([analysis])
 })
@@ -53,7 +59,7 @@ it('keeps unassigned visibility source scoped across refreshed speaker results',
       unassignedSourceIds={['source', 'other']}
     />,
   )
-  const toggles = screen.getAllByRole('button', { name: 'Show Unassigned speaker' })
+  const toggles = screen.getAllByRole('button', { name: /^Show Unassigned/ })
   fireEvent.click(toggles[0])
   expect(toggles[0].getAttribute('aria-pressed')).toBe('false')
   expect(toggles[1].getAttribute('aria-pressed')).toBe('true')
@@ -65,9 +71,7 @@ it('keeps unassigned visibility source scoped across refreshed speaker results',
     />,
   )
   expect(
-    screen
-      .getAllByRole('button', { name: 'Show Unassigned speaker' })[0]
-      .getAttribute('aria-pressed'),
+    screen.getAllByRole('button', { name: /^Show Unassigned/ })[0].getAttribute('aria-pressed'),
   ).toBe('false')
   expect(useTranscriptStore.getState().hiddenSpeakerKeys).toEqual(['source:unassigned'])
 })

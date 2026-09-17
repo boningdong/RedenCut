@@ -293,28 +293,30 @@ export function CanonicalTranscriptPanel({
         {workspaceControls}
         <span className="feature-title">{t('transcript.title')}</span>
         <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
-        <div className="toolbar-spacer" />
+        <span className="transport-separator" aria-hidden="true" />
         <SpeakerLabels
+          toolbarActions={
+            <div className="transcript-generation">
+              {missing.map((track) => (
+                <button key={track.id} disabled={isGenerating} onClick={() => onGenerate(track.id)}>
+                  {t('transcript.generateTrack', { name: track.name })}
+                </button>
+              ))}
+              <button disabled={isGenerating} onClick={() => onGenerate()}>
+                {t('transcript.generate')}
+              </button>
+              {onRegenerate && (
+                <button disabled={isGenerating} onClick={onRegenerate}>
+                  {t('transcript.reanalyze')}
+                </button>
+              )}
+            </div>
+          }
           onSave={onSaveSpeakerIdentities}
           analyses={analyses}
           isGenerating={isGenerating}
           unassignedSourceIds={unassignedSourceIds}
         />
-        <div className="transcript-generation">
-          {missing.map((track) => (
-            <button key={track.id} disabled={isGenerating} onClick={() => onGenerate(track.id)}>
-              {t('transcript.generateTrack', { name: track.name })}
-            </button>
-          ))}
-          <button disabled={isGenerating} onClick={() => onGenerate()}>
-            {t('transcript.generate')}
-          </button>
-          {onRegenerate && (
-            <button disabled={isGenerating} onClick={onRegenerate}>
-              {t('transcript.reanalyze')}
-            </button>
-          )}
-        </div>
       </div>
       <div
         ref={container}

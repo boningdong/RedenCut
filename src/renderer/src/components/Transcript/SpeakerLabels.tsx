@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { reconcileSpeakerIdentities } from '@shared/SpeakerIdentityReconciler'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
@@ -50,7 +50,9 @@ export function SpeakerLabels({
   analyses,
   unassignedSourceIds = [],
   onSave,
+  toolbarActions,
 }: {
+  toolbarActions?: ReactNode
   analyses: RendererSpeechAnalysis[]
   isGenerating: boolean
   unassignedSourceIds?: string[]
@@ -77,6 +79,7 @@ export function SpeakerLabels({
           />
         ))}
       <SpeakerIdentityControls
+        toolbarActions={toolbarActions}
         catalog={catalog}
         analyses={analyses}
         tracks={tracks}
