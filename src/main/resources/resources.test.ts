@@ -533,3 +533,35 @@ it('reuses environment validation for model actions and refreshes only on explic
   await manager.read()
   expect(check).toHaveBeenCalledTimes(2)
 })
+
+it('switches hydrated models without hashing installed files and still verifies on refresh', async () => {
+  const dir = await root()
+  const installedModel = { ...model, id: 'transcription-default' }
+  const alternative = { ...model, id: 'medium' }
+  const registry = new ModelRegistry(dir)
+  const { staging } = resourcePaths(dir, installedModel)
+  await mkdir(staging, { recursive: true })
+  await writeFile(join(staging, 'model.bin'), bytes)
+  const installed = await registry.publish(installedModel)
+  const preferences = new AppPreferencesStore(join(dir, 'preferences.json'), () => ['en'])
+  const manager = new ResourceManager(
+    [installedModel, alternative],
+    registry,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    preferences,
+  )
+  await manager.read()
+  const resolve = vi.spyOn(registry, 'resolve')
+  expect((await manager.selectWhisperModel(alternative.id)).selectedWhisperModelId).toBe(
+    alternative.id,
+  )
+  expect((await preferences.read()).whisperModelId).toBe(alternative.id)
+  expect((await manager.selectWhisperModel(installedModel.id)).baseReady).toBe(true)
+  expect(resolve).not.toHaveBeenCalled()
+  await writeFile(join(installed, 'model.bin'), Buffer.alloc(bytes.length))
+  expect((await manager.read()).baseReady).toBe(false)
+  expect(resolve).toHaveBeenCalledWith(installedModel)
+})

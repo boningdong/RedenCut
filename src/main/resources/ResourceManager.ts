@@ -80,8 +80,7 @@ export class ResourceManager {
     for (const listener of this.listeners) listener(snapshot)
   }
   async read({ refreshEnvironment = true } = {}): Promise<ResourceSnapshot> {
-    this.hydrated ??= this.hydrate()
-    await this.hydrated
+    await this.ensureHydrated()
     if (this.environment && !this.active && (refreshEnvironment || !this.development)) {
       this.development = await this.environment.check((state) => {
         this.development = state
@@ -102,6 +101,9 @@ export class ResourceManager {
       if (changed) this.emit()
     }
     return this.snapshot()
+  }
+  private ensureHydrated(): Promise<void> {
+    return (this.hydrated ??= this.hydrate())
   }
   private async hydrate(): Promise<void> {
     const preferences = await this.preferences?.read()
@@ -134,7 +136,7 @@ export class ResourceManager {
       throw new Error('unknown-whisper-model')
     this.selecting = true
     try {
-      await this.read({ refreshEnvironment: false })
+      await this.ensureHydrated()
       await this.preferences?.setWhisperModel(id)
       this.selectedWhisperModelId = id
       this.emit()
