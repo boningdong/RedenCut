@@ -1,3 +1,4 @@
+import { ResourcePreparationSchema } from '../../shared/resources.types'
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { z } from 'zod'
 import type { ResourceManager } from '../resources/ResourceManager'
@@ -13,9 +14,12 @@ export function registerResourcesIpc(manager: ResourceManager): void {
       )
     }),
   )
+  ipcMain.handle('resources:select-whisper', (_event, input: unknown) =>
+    toIpcResult(() => manager.selectWhisperModel(z.string().min(1).parse(input))),
+  )
   ipcMain.handle('resources:get', () => toIpcResult(() => manager.read()))
   ipcMain.handle('resources:prepare', (_event, input: unknown) =>
-    toIpcResult(() => manager.prepare(z.enum(['base', 'diarization']).parse(input))),
+    toIpcResult(() => manager.prepare(ResourcePreparationSchema.parse(input))),
   )
   ipcMain.handle('resources:cancel', () => toIpcResult(() => manager.cancel()))
   manager.subscribe((snapshot) => {

@@ -3,7 +3,14 @@ export function aggregateResource(
   snapshot: ResourceSnapshot | null,
   capability: ResourceCapability,
 ): ResourceState {
-  const rows = snapshot?.resources.filter((row) => row.capability === capability) ?? []
+  const rows =
+    snapshot?.resources.filter(
+      (row) =>
+        row.capability === capability &&
+        (capability !== 'transcription' ||
+          !snapshot.selectedWhisperModelId ||
+          row.id === snapshot.selectedWhisperModelId),
+    ) ?? []
   const status = rows.length
     ? ((['downloading', 'verifying', 'failed', 'paused', 'missing'] as const).find((value) =>
         rows.some((row) => row.status === value),

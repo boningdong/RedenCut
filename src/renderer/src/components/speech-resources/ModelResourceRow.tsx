@@ -9,12 +9,16 @@ export function ModelResourceRow({
   resource,
   action,
   locked,
+  selection,
+  description,
 }: {
   title: string
-  engine: string
+  engine: ReactNode
   resource?: ResourceState
   action?: ReactNode
   locked?: string
+  selection?: ReactNode
+  description?: string
 }) {
   const { t } = useTranslation()
   const development = useResourcesStore((s) => s.snapshot?.development)
@@ -35,16 +39,33 @@ export function ModelResourceRow({
   const moving = status === 'downloading' || status === 'verifying'
   return (
     <div className="model-row">
+      {selection && (
+        <div className="row whisper-heading">
+          <div>
+            <span>{title}</span>
+            <div className="model-engine">{engine}</div>
+          </div>
+          <div className="spacer" />
+          {selection}
+        </div>
+      )}
       <div className="row">
-        <span>{title}</span>
-        <span className="model-engine">{engine}</span>
+        {selection ? (
+          <span className="whisper-description">{description}</span>
+        ) : (
+          <>
+            <span>{title}</span>
+            <span className="model-engine">{engine}</span>
+          </>
+        )}
         <div className="spacer" />
-        {action}
         {locked ? (
           <span className="status pending">
             <i className="status-dot" />
             {locked}
           </span>
+        ) : action && status !== 'ready' && !moving && status !== 'failed' ? (
+          action
         ) : resource || !action ? (
           <span
             className={
@@ -63,6 +84,7 @@ export function ModelResourceRow({
             </span>
           </span>
         ) : null}
+        {(moving || status === 'failed') && action}
       </div>
       {failureKey && (
         <p className="error-message" role="alert">

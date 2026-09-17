@@ -9,6 +9,7 @@ interface ResourcesState {
   pending: boolean
   hydrate: () => Promise<void>
   refresh: () => Promise<void>
+  selectWhisper: (modelId: string) => Promise<void>
   prepare: (target: ResourcePreparation) => Promise<void>
   cancel: () => Promise<void>
   verifyLocal: () => Promise<void>
@@ -82,6 +83,12 @@ export function createResourcesStore(getApi: () => IElectronAPI) {
         return hydration
       },
       refresh,
+      selectWhisper: (modelId) =>
+        run(async () => {
+          const generation = lifecycle
+          const snapshot = await getApi().resourcesSelectWhisper(modelId)
+          if (generation === lifecycle) apply(snapshot)
+        }),
       prepare: (target) =>
         run(async () => {
           const generation = lifecycle

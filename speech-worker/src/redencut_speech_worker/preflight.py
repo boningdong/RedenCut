@@ -21,6 +21,8 @@ def inspect_runtime(
     missing_model_ids: List[str] = []
     invalid_model_ids: List[str] = []
     for model in manifest["models"]:
+        if model_ids is None and model.get("selection", {}).get("recommended") is False:
+            continue
         if model_ids is not None and model["id"] not in model_ids:
             continue
         if not speaker_recognition_enabled and model["capability"] == "diarization":

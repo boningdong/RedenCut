@@ -26,6 +26,13 @@ const ModelFileSchema = z
 export const ModelDefinitionSchema = z
   .object({
     id: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+    selection: z
+      .object({
+        family: z.literal('whisper'),
+        variant: z.enum(['small', 'medium', 'large-v3']),
+        recommended: z.boolean(),
+      })
+      .optional(),
     capability: z.enum(['transcription', 'transcription-smoke', 'alignment', 'diarization']),
     repository: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
     revision: z.string().regex(/^[a-f0-9]{40}$/),

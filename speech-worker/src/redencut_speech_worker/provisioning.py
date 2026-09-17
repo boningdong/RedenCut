@@ -23,6 +23,8 @@ def provision_models(
     staging_root = cache_root / ".staging"
     try:
         for model in manifest["models"]:
+            if model.get("selection", {}).get("recommended") is False:
+                continue
             final_path = cache_root / model["id"] / model["revision"]
             if final_path.exists():
                 _verify_expected_files(final_path, model["expectedFiles"])

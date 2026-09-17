@@ -119,6 +119,7 @@ startApplicationLifecycle({
       access,
       createModelLoadValidator(runtime, manifestPath),
       app.isPackaged ? undefined : new DevelopmentEnvironmentChecker(runtime),
+      appPreferences,
     )
     registerResourcesIpc(resources)
     registerModelAccessIpc(access)

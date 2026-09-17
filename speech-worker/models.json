@@ -49,7 +49,12 @@
           "size": 487601967,
           "sha256": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b"
         }
-      ]
+      ],
+      "selection": {
+        "family": "whisper",
+        "variant": "small",
+        "recommended": true
+      }
     },
     {
       "id": "alignment-zh",
@@ -205,6 +210,66 @@
         "zh",
         "en"
       ]
+    },
+    {
+      "id": "transcription-whisper-medium",
+      "capability": "transcription",
+      "repository": "ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "expectedFiles": [
+        "ggml-medium.bin"
+      ],
+      "license": "MIT",
+      "access": "public",
+      "profiles": [
+        "native-macos"
+      ],
+      "supportedLanguages": [
+        "zh",
+        "en"
+      ],
+      "files": [
+        {
+          "path": "ggml-medium.bin",
+          "size": 1533763059,
+          "sha256": "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208"
+        }
+      ],
+      "selection": {
+        "family": "whisper",
+        "variant": "medium",
+        "recommended": false
+      }
+    },
+    {
+      "id": "transcription-whisper-large-v3",
+      "capability": "transcription",
+      "repository": "ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "expectedFiles": [
+        "ggml-large-v3.bin"
+      ],
+      "license": "MIT",
+      "access": "public",
+      "profiles": [
+        "native-macos"
+      ],
+      "supportedLanguages": [
+        "zh",
+        "en"
+      ],
+      "files": [
+        {
+          "path": "ggml-large-v3.bin",
+          "size": 3095033483,
+          "sha256": "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2"
+        }
+      ],
+      "selection": {
+        "family": "whisper",
+        "variant": "large-v3",
+        "recommended": false
+      }
     }
   ]
 }

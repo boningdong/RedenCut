@@ -55,6 +55,7 @@ test('gets preferences and broadcasts ordered snapshots exactly matching success
     value: {
       themeId: 'dark',
       themePreferenceSet: false,
+      whisperModelId: 'transcription-default',
       textEditingEnabled: true,
       speakerRecognitionEnabled: true,
       onboardingDisposition: 'pending',
@@ -71,6 +72,7 @@ test('gets preferences and broadcasts ordered snapshots exactly matching success
       value: {
         themeId: 'dark',
         themePreferenceSet: false,
+        whisperModelId: 'transcription-default',
         textEditingEnabled: true,
         speakerRecognitionEnabled: true,
         onboardingDisposition: 'pending',
@@ -85,6 +87,7 @@ test('gets preferences and broadcasts ordered snapshots exactly matching success
       value: {
         themeId: 'dark',
         themePreferenceSet: false,
+        whisperModelId: 'transcription-default',
         textEditingEnabled: true,
         speakerRecognitionEnabled: true,
         onboardingDisposition: 'pending',
@@ -130,6 +133,7 @@ test('failed writes publish no event, preserve state and redact filesystem diagn
     value: {
       themeId: 'dark',
       themePreferenceSet: false,
+      whisperModelId: 'transcription-default',
       textEditingEnabled: true,
       speakerRecognitionEnabled: true,
       onboardingDisposition: 'pending',
@@ -150,6 +154,7 @@ test('a closing window does not reject a committed preference or block other sub
     value: {
       themeId: 'dark',
       themePreferenceSet: false,
+      whisperModelId: 'transcription-default',
       textEditingEnabled: true,
       speakerRecognitionEnabled: true,
       onboardingDisposition: 'pending',

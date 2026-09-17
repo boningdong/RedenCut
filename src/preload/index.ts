@@ -63,6 +63,8 @@ ipcRenderer.on('project:pending-open', (_event, value: PendingProjectOpenEvent) 
 })
 
 const api = {
+  resourcesSelectWhisper: (modelId: string) =>
+    invokeSafe<ResourceSnapshot>(invoke, 'resources:select-whisper', modelId),
   resourcesGet: () => invokeSafe<ResourceSnapshot>(invoke, 'resources:get'),
   resourcesPrepare: (target: ResourcePreparation) =>
     invokeSafe<ResourceSnapshot>(invoke, 'resources:prepare', target),

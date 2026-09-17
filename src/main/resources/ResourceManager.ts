@@ -1,3 +1,5 @@
+import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
+import { selectWhisperDefinition } from './WhisperModelSelection'
 import type { DevelopmentEnvironmentChecker } from '../runtime/DevelopmentEnvironmentChecker'
 import type { DevelopmentEnvironment } from '../../shared/developmentEnvironment.types'
 import { stat } from 'node:fs/promises'
@@ -17,6 +19,8 @@ export class ResourceManager {
   private resources: ResourceState[]
   private development?: DevelopmentEnvironment
   private revision = 0
+  private selectedWhisperModelId?: string
+  private selecting = false
   private preparing: Promise<ResourceSnapshot> | null = null
   private hydrated: Promise<void> | null = null
   private active: { controller: AbortController; done: Promise<void> } | null = null
@@ -35,8 +39,10 @@ export class ResourceManager {
       preflight?: (models: ModelDefinition[], signal: AbortSignal) => Promise<void>
     } = async () => {},
     private readonly environment?: Pick<DevelopmentEnvironmentChecker, 'check'>,
+    private readonly preferences?: Pick<AppPreferencesStore, 'read' | 'setWhisperModel'>,
   ) {
     this.models = models.filter((m) => m.capability !== 'transcription-smoke')
+    this.selectedWhisperModelId = selectWhisperDefinition(this.models)?.id
     this.resources = this.models.map((m) => ({
       id: m.id,
       capability: m.capability as ResourceCapability,
@@ -55,9 +61,15 @@ export class ResourceManager {
     return {
       revision: this.revision,
       ...(this.development ? { development: this.development } : {}),
+      selectedWhisperModelId: this.selectedWhisperModelId,
+      whisperModels: this.models.flatMap((m) =>
+        m.capability === 'transcription' && m.selection
+          ? [{ id: m.id, variant: m.selection.variant, recommended: m.selection.recommended }]
+          : [],
+      ),
       resources: this.resources.map((r) => ({ ...r })),
       baseReady: this.resources
-        .filter((r) => r.capability !== 'diarization')
+        .filter((r) => r.capability === 'alignment' || r.id === this.selectedWhisperModelId)
         .every((r) => r.status === 'ready'),
     }
   }
@@ -91,6 +103,11 @@ export class ResourceManager {
     return this.snapshot()
   }
   private async hydrate(): Promise<void> {
+    const preferences = await this.preferences?.read()
+    this.selectedWhisperModelId = selectWhisperDefinition(
+      this.models,
+      preferences?.whisperModelId,
+    )?.id
     for (const model of this.models) {
       const state = this.resources.find((r) => r.id === model.id)!
       if (await this.registry.resolve(model)) {
@@ -110,7 +127,33 @@ export class ResourceManager {
     }
     this.emit()
   }
+  async selectWhisperModel(id: string): Promise<ResourceSnapshot> {
+    if (this.selecting || this.preparing || this.active) throw new Error('resources-busy')
+    if (!this.models.some((m) => m.id === id && m.capability === 'transcription'))
+      throw new Error('unknown-whisper-model')
+    this.selecting = true
+    try {
+      await this.read()
+      await this.preferences?.setWhisperModel(id)
+      this.selectedWhisperModelId = id
+      this.emit()
+      return this.snapshot()
+    } finally {
+      this.selecting = false
+    }
+  }
+
+  async resolveWhisperModel(
+    id = this.selectedWhisperModelId,
+  ): Promise<{ model: ModelDefinition; path: string } | null> {
+    const model = this.models.find((m) => m.id === id && m.capability === 'transcription')
+    if (!model) return null
+    const directory = await this.registry.resolve(model)
+    return directory ? { model, path: join(directory, model.files[0].path) } : null
+  }
+
   prepare(target: ResourcePreparation): Promise<ResourceSnapshot> {
+    if (this.selecting) return Promise.reject(new Error('resources-busy'))
     if (this.preparing) return this.preparing
     this.preparing = this.start(target).finally(() => {
       this.preparing = null
@@ -123,9 +166,18 @@ export class ResourceManager {
     if (this.development && !this.development.ready) return this.snapshot()
     if (target === 'diarization' && !this.snapshot().baseReady)
       throw new Error('base-resources-required')
+    if (
+      typeof target === 'object' &&
+      !this.models.some((m) => m.id === target.modelId && m.capability === 'transcription')
+    )
+      throw new Error('unknown-whisper-model')
     const selected = this.models.filter(
       (m) =>
-        (target === 'base' ? m.capability !== 'diarization' : m.capability === 'diarization') &&
+        (typeof target === 'object'
+          ? m.id === target.modelId
+          : target === 'base'
+            ? m.capability === 'alignment' || m.id === this.selectedWhisperModelId
+            : m.capability === target) &&
         this.resources.find((r) => r.id === m.id)?.status !== 'ready',
     )
     if (!selected.length) return this.snapshot()

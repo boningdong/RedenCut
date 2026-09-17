@@ -20,6 +20,11 @@ export const StoredAppPreferencesSchema = z.object({
   textEditingEnabled: z.boolean().default(true),
   speakerRecognitionEnabled: z.boolean().default(true),
   onboardingDisposition: OnboardingDispositionSchema.default('pending'),
+  whisperModelId: z
+    .string()
+    .regex(/^[a-zA-Z0-9_-]+$/)
+    .catch('transcription-default')
+    .default('transcription-default'),
 })
 
 export interface AppPreferencesSnapshot {
@@ -32,4 +37,5 @@ export interface AppPreferencesSnapshot {
   textEditingEnabled: boolean
   speakerRecognitionEnabled: boolean
   onboardingDisposition: OnboardingDisposition
+  whisperModelId: string
 }

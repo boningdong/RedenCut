@@ -118,3 +118,11 @@
 
 - Track future audio processing, intelligence, and plugin work in [`ROADMAP.md`](../ROADMAP.md), not as speculative interfaces in current architecture standards.
 - Introduce new extension points only through a separately approved design that preserves the process, data, and playback boundaries above.
+
+## Whisper Model Selection
+
+- Onboarding and Settings share the Whisper selector and revisioned resource snapshots; selected model IDs are persisted in `app-preferences.json` independently of projects.
+- Small retains the `transcription-default` installation ID. Older or unsupported selections resolve to Small; installed alternatives remain available and are not removed on switching.
+- Base preparation and readiness depend only on the selected Whisper and the fixed Chinese/English alignment models, never on every downloadable Whisper alternative.
+- Selection does not download. Model-specific preparation accepts only manifest-listed transcription IDs; alignment and diarization retain their fixed models.
+- Started analysis jobs retain their snapshotted model path. Subsequent jobs resolve the selected model; an uninstalled selected model does not silently use a different installed model.

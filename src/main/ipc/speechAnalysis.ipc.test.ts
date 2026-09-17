@@ -361,3 +361,40 @@ it('does not require speaker resources when generating only text', async () => {
   preferences.resolve(true)
   expect(await result).toEqual({ ok: true, value: null })
 })
+
+it('uses the selected Whisper file for new jobs and does not fall back to an installed alternative', async () => {
+  const preferences = deferredPreferences()
+  const read = vi.mocked(preferences.services.preferences.read)
+  read.mockResolvedValue({
+    textEditingEnabled: true,
+    speakerRecognitionEnabled: false,
+    whisperModelId: 'medium',
+  } as Awaited<ReturnType<typeof read>>)
+  preferences.services.resources.models.push({
+    id: 'medium',
+    capability: 'transcription',
+    files: [{ path: 'ggml-medium.bin' }],
+  } as (typeof preferences.services.resources.models)[number])
+  const paths = vi.mocked(preferences.services.resources.getModelPaths)
+  paths.mockResolvedValue({
+    whisper: '/models/whisper',
+    medium: '/models/medium',
+    'alignment-zh': '/models/zh',
+    'alignment-en': '/models/en',
+  })
+  const { start } = setup(preferences.services)
+  expect(await start()).toMatchObject({ ok: true })
+  expect(mocks.run).toHaveBeenCalledWith(
+    expect.objectContaining({ transcriptionModel: '/models/medium/ggml-medium.bin' }),
+    expect.any(AbortSignal),
+    expect.any(Function),
+  )
+  paths.mockResolvedValue({
+    whisper: '/models/whisper',
+    'alignment-zh': '/models/zh',
+    'alignment-en': '/models/en',
+  })
+  mocks.run.mockClear()
+  expect(await start('first')).toMatchObject({ ok: false })
+  expect(mocks.run).not.toHaveBeenCalled()
+})

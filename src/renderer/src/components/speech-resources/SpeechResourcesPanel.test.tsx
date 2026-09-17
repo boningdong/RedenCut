@@ -67,11 +67,11 @@ afterEach(() => {
   useResourcesStore.setState(originalResources)
   useLocaleStore.setState(originalPreferences)
 })
-it('downloads all base models together and keeps optional authorization locked first', () => {
+it('downloads alignment independently and keeps optional authorization locked first', () => {
   render(<SpeechResourcesPanel />)
   expect(screen.queryByRole('button', { name: /Authorize access/ })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Download' }))
-  expect(useResourcesStore.getState().prepare).toHaveBeenCalledWith('base')
+  expect(useResourcesStore.getState().prepare).toHaveBeenCalledWith('alignment')
 })
 it('keeps cancellation in the download action position and offers explicit resume', () => {
   const snapshot = useResourcesStore.getState().snapshot!
@@ -93,7 +93,10 @@ it('keeps cancellation in the download action position and offers explicit resum
   snapshot.resources[0].status = 'paused'
   render(<SpeechResourcesPanel />)
   fireEvent.click(screen.getByRole('button', { name: 'Continue download' }))
-  expect(useResourcesStore.getState().prepare).toHaveBeenCalledWith('base')
+  expect(useResourcesStore.getState().prepare).toHaveBeenCalledWith({
+    kind: 'model',
+    modelId: 'whisper',
+  })
 })
 it('submits a token only on explicit verification and does not start a download', async () => {
   const snapshot = useResourcesStore.getState().snapshot!
@@ -330,3 +333,74 @@ it.each([true, false])(
     }
   },
 )
+
+it('offers Whisper alternatives in a floating menu and downloads only the selected model', async () => {
+  const snapshot = useResourcesStore.getState().snapshot!
+  snapshot.selectedWhisperModelId = 'whisper'
+  snapshot.whisperModels = [
+    { id: 'whisper', variant: 'small', recommended: true },
+    { id: 'medium', variant: 'medium', recommended: false },
+  ]
+  snapshot.resources.push({
+    id: 'medium',
+    capability: 'transcription',
+    status: 'ready',
+    downloadedBytes: 1,
+    totalBytes: 1,
+  })
+  useResourcesStore.setState({
+    selectWhisper: async (id) =>
+      useResourcesStore.setState({
+        snapshot: { ...snapshot, selectedWhisperModelId: id, revision: 2 },
+      }),
+  })
+  render(<SpeechResourcesPanel />)
+  fireEvent.click(screen.getByRole('button', { name: 'Change Whisper model' }))
+  const menu = screen.getByRole('menu', { name: 'Whisper model' })
+  expect(menu.textContent).toContain('Downloaded')
+  expect(menu.textContent).toContain('Not downloaded')
+  expect(fireEvent.keyDown(menu, { key: 'Escape' })).toBe(false)
+  expect(screen.queryByRole('menu')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Change Whisper model' }))
+  fireEvent.click(screen.getByRole('menuitemradio', { name: /Medium/ }))
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  expect(screen.getByRole('status', { name: 'Transcription model: Ready' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Change Whisper model' }))
+  fireEvent.click(screen.getByRole('menuitemradio', { name: /Small/ }))
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  fireEvent.click(screen.getByRole('button', { name: 'Download Whisper Small' }))
+  expect(useResourcesStore.getState().prepare).toHaveBeenCalledWith({
+    kind: 'model',
+    modelId: 'whisper',
+  })
+})
+
+it('allows choosing a model before preparing the development runtime', () => {
+  const snapshot = useResourcesStore.getState().snapshot!
+  useResourcesStore.setState({
+    snapshot: {
+      ...snapshot,
+      selectedWhisperModelId: 'whisper',
+      whisperModels: [{ id: 'whisper', variant: 'small', recommended: true }],
+      development: {
+        platform: 'darwin',
+        ffmpeg: false,
+        ffprobe: false,
+        whisper: false,
+        uv: false,
+        python: false,
+        libraries: false,
+        ready: false,
+      },
+    },
+  })
+  render(<SpeechResourcesPanel />)
+  expect(
+    (screen.getByRole('button', { name: 'Change Whisper model' }) as HTMLButtonElement).disabled,
+  ).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Change Whisper model' }))
+  expect(screen.getByRole('menuitemradio', { name: /Small/ })).toBeTruthy()
+  expect(
+    (screen.getByRole('button', { name: 'Download Whisper Small' }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+})

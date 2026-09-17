@@ -233,6 +233,7 @@ function installApi(initial: RendererSession) {
   const saveProjectAs = vi.fn<IElectronAPI['project']['saveAs']>(async () => null)
   const api = {
     resourcesOpenGuide: vi.fn(async () => {}),
+    resourcesSelectWhisper: vi.fn(async () => ({ revision: 1, resources: [], baseReady: false })),
     resourcesGet: vi.fn(async () => ({ revision: 0, resources: [], baseReady: false })),
     resourcesPrepare: vi.fn<IElectronAPI['resourcesPrepare']>(),
     resourcesCancel: vi.fn<IElectronAPI['resourcesCancel']>(),
@@ -250,6 +251,7 @@ function installApi(initial: RendererSession) {
     appPreferences: {
       get: vi.fn<IElectronAPI['appPreferences']['get']>(async () => ({
         themeId: 'dark',
+        whisperModelId: 'transcription-default',
         themePreferenceSet: true,
         textEditingEnabled: true,
         speakerRecognitionEnabled: true,

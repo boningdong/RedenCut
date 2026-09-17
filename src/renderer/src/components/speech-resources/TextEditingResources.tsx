@@ -1,3 +1,4 @@
+import { WhisperModelSelector } from './WhisperModelSelector'
 import { useLocaleStore } from '../../stores/locale.store'
 import { useResourcesStore } from '../../stores/resources.store'
 import { useTranslation } from '../../i18n/useTranslation'
@@ -10,6 +11,8 @@ export function TextEditingResources() {
   const snapshot = useResourcesStore((s) => s.snapshot)
   const environmentMissing = !!snapshot?.development && !snapshot.development.ready
   const transcription = aggregateResource(snapshot, 'transcription')
+  const selected = snapshot?.whisperModels?.find((m) => m.id === snapshot.selectedWhisperModelId)
+  const modelName = selected ? t(`settings.whisperModels.${selected.variant}`) : 'Small'
   const alignment = aggregateResource(snapshot, 'alignment')
   return (
     <section
@@ -18,11 +21,6 @@ export function TextEditingResources() {
       <div className="flow-heading">
         <span className="stage-marker">1</span>
         <h3>{t('settings.core')}</h3>
-        <ResourceDownloadAction
-          target="base"
-          resources={[transcription, alignment]}
-          disabled={!enabled || environmentMissing || resourcesBusy(snapshot)}
-        />
         {snapshot?.baseReady && <span className="status ready">{t('settings.ready')}</span>}
       </div>
       <p className="stage-description">
@@ -32,11 +30,34 @@ export function TextEditingResources() {
         <ModelResourceRow
           title={t('settings.transcription')}
           engine="Whisper"
+          selection={<WhisperModelSelector disabled={!enabled || resourcesBusy(snapshot)} />}
+          description={selected ? t(`settings.whisperHelp.${selected.variant}`) : undefined}
+          action={
+            <ResourceDownloadAction
+              target={{
+                kind: 'model',
+                modelId:
+                  snapshot?.selectedWhisperModelId ??
+                  snapshot?.resources.find((r) => r.capability === 'transcription')?.id ??
+                  transcription.id,
+              }}
+              resources={[transcription]}
+              disabled={!enabled || environmentMissing || resourcesBusy(snapshot)}
+              label={t('settings.downloadWhisper', { model: modelName })}
+            />
+          }
           resource={transcription}
         />
         <ModelResourceRow
           title={t('settings.alignment')}
           engine="Alignment · 中文 / English"
+          action={
+            <ResourceDownloadAction
+              target="alignment"
+              resources={[alignment]}
+              disabled={!enabled || environmentMissing || resourcesBusy(snapshot)}
+            />
+          }
           resource={alignment}
         />
       </div>

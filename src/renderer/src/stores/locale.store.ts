@@ -56,6 +56,7 @@ export function createLocaleStore(getApi: () => IElectronAPI['appPreferences']) 
     }
     return {
       themeId: 'dark',
+      whisperModelId: 'transcription-default',
       themePreferenceSet: false,
       textEditingEnabled: true,
       speakerRecognitionEnabled: true,

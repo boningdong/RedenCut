@@ -52,6 +52,16 @@ export const simplifiedChineseResources = {
     person: '人物',
   },
   settings: {
+    changeWhisper: '更换 Whisper 模型',
+    changeModel: '更换',
+    whisperModel: 'Whisper 模型',
+    recommended: '推荐',
+    downloaded: '已下载',
+    notDownloaded: '未下载',
+    downloadWhisper: '下载 Whisper {{model}}',
+    whisperModels: { small: 'Small', medium: 'Medium', 'large-v3': 'Large v3' },
+    whisperHelp: { small: '轻量 · 推荐', medium: '更大容量', 'large-v3': '更高内存占用' },
+
     localLogin: '本机 Hugging Face 登录',
     localLoginHelp:
       '使用本机已有的凭据验证模型访问权限。验证通过后加密保存到此 App，不修改命令行登录。',

@@ -1,4 +1,5 @@
 import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
+import { selectWhisperDefinition } from '../resources/WhisperModelSelection'
 import { createSpeechBatchHandler } from './speechBatch.ipc'
 import { ProjectFileSchema } from '../../shared/project.types'
 import type { ResourceManager } from '../resources/ResourceManager'
@@ -88,8 +89,9 @@ export function registerSpeechAnalysisIpc(
         const preferences = await services.preferences.read()
         if (!preferences.textEditingEnabled) return { reason: 'speech-models-missing' as const }
         const paths = await services.resources.getModelPaths()
-        const transcription = services.resources.models.find(
-          (model) => model.capability === 'transcription',
+        const transcription = selectWhisperDefinition(
+          services.resources.models,
+          preferences?.whisperModelId,
         )!
         managedWhisper = paths[transcription.id]
           ? join(paths[transcription.id], transcription.files[0].path)
@@ -126,8 +128,9 @@ export function registerSpeechAnalysisIpc(
         : (preferences?.speakerRecognitionEnabled ?? true)
       let transcriptionModel: string | undefined
       if (services && modelPaths) {
-        const model = services.resources.models.find(
-          (model) => model.capability === 'transcription',
+        const model = selectWhisperDefinition(
+          services.resources.models,
+          preferences?.whisperModelId,
         )!
         if (
           !preferences?.textEditingEnabled ||
@@ -220,8 +223,9 @@ export function registerSpeechAnalysisIpc(
               abortController.signal.throwIfAborted()
               let transcriptionModel: string | undefined
               if (services && modelPaths) {
-                const model = services.resources.models.find(
-                  (model) => model.capability === 'transcription',
+                const model = selectWhisperDefinition(
+                  services.resources.models,
+                  preferences?.whisperModelId,
                 )!
                 if (
                   !preferences?.textEditingEnabled ||

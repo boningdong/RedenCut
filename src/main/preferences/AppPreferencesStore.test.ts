@@ -9,6 +9,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 import { AppPreferencesStore } from './AppPreferencesStore'
 
 const defaults = {
+  whisperModelId: 'transcription-default',
   themeId: 'dark',
   themePreferenceSet: false,
   textEditingEnabled: true,
@@ -75,6 +76,7 @@ test('persists only version and preference; restart resolves system afresh and r
   })
   expect(JSON.parse(await fs.readFile(path, 'utf8'))).toEqual({
     version: 1,
+    whisperModelId: 'transcription-default',
     textEditingEnabled: true,
     speakerRecognitionEnabled: true,
     onboardingDisposition: 'pending',
@@ -122,6 +124,7 @@ test('a failed atomic rename preserves the committed snapshot and file, cleans u
   expect(await store.read()).toEqual(committed)
   expect(JSON.parse(await fs.readFile(path, 'utf8'))).toEqual({
     version: 1,
+    whisperModelId: 'transcription-default',
     textEditingEnabled: true,
     speakerRecognitionEnabled: true,
     onboardingDisposition: 'pending',
@@ -190,4 +193,14 @@ test('concurrent changes preserve other fields and onboarding is independent of 
     onboardingDisposition: 'skipped',
     preference: 'zh-CN',
   })
+})
+
+test('persists Whisper selection independently and defaults old preferences to Small', async () => {
+  await fs.writeFile(path, JSON.stringify({ version: 1, localePreference: 'zh-CN' }))
+  const store = new AppPreferencesStore(path, () => ['en'])
+  expect((await store.read()).whisperModelId).toBe('transcription-default')
+  await store.setWhisperModel('transcription-whisper-medium')
+  const restarted = await new AppPreferencesStore(path, () => ['en']).read()
+  expect(restarted.whisperModelId).toBe('transcription-whisper-medium')
+  expect(restarted.preference).toBe('zh-CN')
 })

@@ -19,6 +19,7 @@ export class AppPreferencesStore {
   private writes: Promise<void> = Promise.resolve()
   private hydration: Promise<void> | null = null
   private snapshot: AppPreferencesSnapshot = {
+    whisperModelId: 'transcription-default',
     themeId: 'dark',
     themePreferenceSet: false,
     textEditingEnabled: true,
@@ -52,6 +53,10 @@ export class AppPreferencesStore {
     return this.update({ preference: parsed.data })
   }
 
+  setWhisperModel(whisperModelId: string): Promise<AppPreferencesSnapshot> {
+    return this.update({ whisperModelId })
+  }
+
   setTheme(input: ThemeId): Promise<AppPreferencesSnapshot> {
     return this.update({ themeId: ThemeIdSchema.parse(input), themePreferenceSet: true })
   }
@@ -72,6 +77,7 @@ export class AppPreferencesStore {
     patch: Partial<
       Pick<
         AppPreferencesSnapshot,
+        | 'whisperModelId'
         | 'preference'
         | 'themeId'
         | 'themePreferenceSet'
@@ -139,6 +145,7 @@ export class AppPreferencesStore {
       } else warning = 'invalid-preferences'
     }
     this.snapshot = {
+      whisperModelId: stored?.whisperModelId ?? 'transcription-default',
       themeId: stored?.themeId ?? 'dark',
       themePreferenceSet: stored?.themeId !== undefined,
       textEditingEnabled: stored?.textEditingEnabled ?? true,
@@ -166,6 +173,7 @@ export class AppPreferencesStore {
           JSON.stringify(
             {
               version: 1,
+              whisperModelId: snapshot.whisperModelId,
               localePreference: snapshot.preference,
               ...(snapshot.themePreferenceSet ? { themeId: snapshot.themeId } : {}),
               textEditingEnabled: snapshot.textEditingEnabled,

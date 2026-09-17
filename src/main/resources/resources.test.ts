@@ -1,3 +1,4 @@
+import { AppPreferencesStore } from '../preferences/AppPreferencesStore'
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -366,4 +367,105 @@ it('blocks downloads before environment setup and allows preparation after valid
     })
   })
   expect(await registry.resolve(model)).toBeTruthy()
+})
+
+it('prepares only the chosen Whisper and ignores missing alternatives for readiness', async () => {
+  const dir = await root()
+  const models = [
+    {
+      ...model,
+      id: 'transcription-default',
+      selection: { family: 'whisper' as const, variant: 'small' as const, recommended: true },
+    },
+    {
+      ...model,
+      id: 'transcription-whisper-medium',
+      selection: { family: 'whisper' as const, variant: 'medium' as const, recommended: false },
+    },
+  ]
+  const manager = new ResourceManager(
+    models,
+    new ModelRegistry(dir),
+    new ModelDownloader(remote().fetcher),
+  )
+  await manager.selectWhisperModel(models[1].id)
+  const completed = new Promise<void>((resolve) =>
+    manager.subscribe((s) => {
+      if (s.baseReady) resolve()
+    }),
+  )
+  await manager.prepare('base')
+  await completed
+  const snapshot = await manager.read()
+  expect(snapshot.selectedWhisperModelId).toBe(models[1].id)
+  expect(snapshot.resources.map((r) => r.status)).toEqual(['missing', 'ready'])
+  expect((await manager.resolveWhisperModel())?.model.id).toBe(models[1].id)
+  await manager.selectWhisperModel(models[0].id)
+  expect((await manager.read()).baseReady).toBe(false)
+  expect(await manager.resolveWhisperModel()).toBeNull()
+  await expect(manager.selectWhisperModel('alignment-zh')).rejects.toThrow()
+})
+
+it('hydrates a saved selection, rejects non-Whisper downloads and preserves selection on failed writes', async () => {
+  const dir = await root()
+  const models = [
+    { ...model, id: 'transcription-default' },
+    { ...model, id: 'medium' },
+    { ...model, id: 'zh', capability: 'alignment' as const },
+  ]
+  const preferences = new AppPreferencesStore(join(dir, 'app-preferences.json'), () => ['en'])
+  await preferences.setWhisperModel('medium')
+  const manager = new ResourceManager(
+    models,
+    new ModelRegistry(dir),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    preferences,
+  )
+  expect((await manager.read()).selectedWhisperModelId).toBe('medium')
+  await expect(manager.prepare({ kind: 'model', modelId: 'zh' })).rejects.toThrow(
+    'unknown-whisper-model',
+  )
+  const failed = new ResourceManager(
+    models,
+    new ModelRegistry(dir),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    {
+      read: () => preferences.read(),
+      setWhisperModel: async () => {
+        throw new Error('disk-full')
+      },
+    },
+  )
+  await expect(failed.selectWhisperModel('transcription-default')).rejects.toThrow('disk-full')
+  expect((await failed.read()).selectedWhisperModelId).toBe('medium')
+})
+
+it('rejects selection while a download is active and keeps its target fixed', async () => {
+  const dir = await root()
+  let finish!: () => void
+  const waiting = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  const models = [
+    { ...model, id: 'transcription-default' },
+    { ...model, id: 'medium' },
+  ]
+  const manager = new ResourceManager(
+    models,
+    new ModelRegistry(dir),
+    new ModelDownloader(remote().fetcher),
+    undefined,
+    async () => waiting,
+  )
+  await manager.prepare({ kind: 'model', modelId: 'medium' })
+  await expect(manager.selectWhisperModel('medium')).rejects.toThrow('resources-busy')
+  finish()
+  await manager.cancel()
+  expect((await manager.read()).selectedWhisperModelId).toBe('transcription-default')
 })

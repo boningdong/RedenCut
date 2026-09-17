@@ -116,6 +116,7 @@ export interface RenderProgress {
 export interface RenderProgressEvent extends SessionJobRequest<ExportJobId>, RenderProgress {}
 
 export interface IElectronAPI {
+  resourcesSelectWhisper(modelId: string): Promise<ResourceSnapshot>
   resourcesGet(): Promise<ResourceSnapshot>
   resourcesPrepare(target: ResourcePreparation): Promise<ResourceSnapshot>
   resourcesOpenGuide(guide: 'tools' | 'python'): Promise<void>

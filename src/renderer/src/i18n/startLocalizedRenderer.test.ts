@@ -44,6 +44,7 @@ const chinese: AppPreferencesSnapshot = {
   revision: 0,
   warning: null,
   themeId: 'dark',
+  whisperModelId: 'transcription-default',
   themePreferenceSet: true,
   textEditingEnabled: true,
   speakerRecognitionEnabled: true,

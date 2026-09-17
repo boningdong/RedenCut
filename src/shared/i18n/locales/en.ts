@@ -53,6 +53,20 @@ export const englishResources = {
     person: 'Person',
   },
   settings: {
+    changeWhisper: 'Change Whisper model',
+    changeModel: 'Change',
+    whisperModel: 'Whisper model',
+    recommended: 'Recommended',
+    downloaded: 'Downloaded',
+    notDownloaded: 'Not downloaded',
+    downloadWhisper: 'Download Whisper {{model}}',
+    whisperModels: { small: 'Small', medium: 'Medium', 'large-v3': 'Large v3' },
+    whisperHelp: {
+      small: 'Lightweight · Recommended',
+      medium: 'More capacity',
+      'large-v3': 'Highest memory use',
+    },
+
     localLogin: 'Local Hugging Face login',
     localLoginHelp:
       'Use existing local credentials to verify model access. After verification, an encrypted copy is saved in this app; your CLI login is unchanged.',

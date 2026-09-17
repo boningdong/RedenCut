@@ -19,6 +19,7 @@ const english: AppPreferencesSnapshot = {
   revision: 0,
   warning: null,
   themeId: 'dark',
+  whisperModelId: 'transcription-default',
   themePreferenceSet: true,
   textEditingEnabled: true,
   speakerRecognitionEnabled: true,
@@ -30,6 +31,7 @@ const chinese: AppPreferencesSnapshot = {
   revision: 1,
   warning: null,
   themeId: 'dark',
+  whisperModelId: 'transcription-default',
   themePreferenceSet: true,
   textEditingEnabled: true,
   speakerRecognitionEnabled: true,
@@ -151,6 +153,7 @@ it('migrates only a valid legacy theme when main has not saved one', async () =>
   vi.mocked(f.api.migrateTheme).mockResolvedValue({
     ...english,
     themeId: 'light',
+    whisperModelId: 'transcription-default',
     themePreferenceSet: true,
     revision: 1,
   })

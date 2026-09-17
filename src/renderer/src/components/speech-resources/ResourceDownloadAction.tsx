@@ -6,10 +6,12 @@ export function ResourceDownloadAction({
   target,
   resources,
   disabled = false,
+  label,
 }: {
   target: ResourcePreparation
   resources: ResourceState[]
   disabled?: boolean
+  label?: string
 }) {
   const { t } = useTranslation()
   const store = useResourcesStore()
@@ -19,6 +21,7 @@ export function ResourceDownloadAction({
   return (
     <button
       className="download-action"
+      aria-label={!busy && !resumable ? label : undefined}
       disabled={!busy && (store.pending || disabled)}
       onClick={() => void (busy ? store.cancel() : store.prepare(target))}
     >
