@@ -96,14 +96,14 @@ vi.mock('./components/Transcript/TranscriptPanel', () => ({
   TranscriptPanel: ({
     workspaceControls,
     onGenerate,
-    onRegenerate,
+    onRun,
     isGenerating,
     generatingStatus,
     onCancel,
   }: {
     workspaceControls?: React.ReactNode
     onGenerate: (trackId?: string) => void
-    onRegenerate?: () => void
+    onRun: (scope: { kind: 'all' }, tasks: { text: 'replace'; speakers: 'replace' }) => void
     isGenerating: boolean
     onCancel?: () => void
     generatingStatus: { stage: string } | null
@@ -112,7 +112,9 @@ vi.mock('./components/Transcript/TranscriptPanel', () => ({
       {workspaceControls}
       <button onClick={() => onGenerate('track-1')}>Generate transcript</button>
       <button onClick={onCancel}>Cancel speech</button>
-      <button onClick={onRegenerate}>Regenerate transcript</button>
+      <button onClick={() => onRun({ kind: 'all' }, { text: 'replace', speakers: 'replace' })}>
+        Regenerate transcript
+      </button>
       <button onClick={() => onGenerate()}>Generate all</button>
       <span data-testid="generation-state">
         {String(isGenerating)}:{generatingStatus?.stage}
@@ -1041,7 +1043,10 @@ describe('App transcription job identity', () => {
     const { requests } = await renderInitialized(initial)
     fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
     await waitFor(() => expect(requests).toHaveLength(1))
-    expect(requests[0].request).toMatchObject({ scope: { kind: 'all' }, mode: 'missing' })
+    expect(requests[0].request).toMatchObject({
+      scope: { kind: 'all' },
+      tasks: { text: 'missing', speakers: 'missing' },
+    })
     expect(requests[0].request.draft.tracks).toHaveLength(3)
   })
 

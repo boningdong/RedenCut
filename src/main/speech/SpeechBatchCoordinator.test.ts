@@ -35,7 +35,11 @@ function setup(options: { fail?: string; cancelAfterText?: boolean } = {}) {
 }
 it('publishes every text before any speaker recognition and finishes every source', async () => {
   const { coordinator, calls, abort, saved } = setup()
-  const result = await coordinator.run(sources(), true, abort.signal)
+  const result = await coordinator.run(
+    sources(),
+    { text: 'missing', speakers: 'missing' },
+    abort.signal,
+  )
   expect(calls).toEqual([
     'text:A',
     'save:A',
@@ -52,14 +56,22 @@ it('publishes every text before any speaker recognition and finishes every sourc
 })
 it('retains completed text on cancellation and starts no remaining work', async () => {
   const { coordinator, calls, abort, saved } = setup({ cancelAfterText: true })
-  const result = await coordinator.run(sources(), true, abort.signal)
+  const result = await coordinator.run(
+    sources(),
+    { text: 'missing', speakers: 'missing' },
+    abort.signal,
+  )
   expect(calls).toEqual(['text:A', 'save:A'])
   expect(saved.get('A')).toMatchObject({ diarizationStatus: 'pending' })
   expect(result.cancelled).toBe(true)
 })
 it('continues unrelated sources after one fails', async () => {
   const { coordinator, calls, abort } = setup({ fail: 'A' })
-  const result = await coordinator.run(sources(), true, abort.signal)
+  const result = await coordinator.run(
+    sources(),
+    { text: 'missing', speakers: 'missing' },
+    abort.signal,
+  )
   expect(calls).toEqual(['text:A', 'text:B', 'save:B', 'speakers:B', 'save:B'])
   expect(result.failures).toEqual([expect.objectContaining({ audioSourceId: 'A', phase: 'text' })])
   expect(result.completedCount).toBe(1)
@@ -70,7 +82,11 @@ it('reuses completed analysis and runs only speakers for pending text', async ()
     ...item,
     artifact: artifact(item.audioSourceId, index === 0),
   }))
-  const result = await coordinator.run(items, true, abort.signal)
+  const result = await coordinator.run(
+    items,
+    { text: 'missing', speakers: 'missing' },
+    abort.signal,
+  )
   expect(calls).toEqual(['speakers:B', 'save:B'])
   expect(result.completedCount).toBe(2)
   expect(result.reusedCount).toBe(1)
@@ -78,11 +94,48 @@ it('reuses completed analysis and runs only speakers for pending text', async ()
 it('does not start engines for pre-cancelled batches', async () => {
   const { coordinator, calls, abort } = setup()
   abort.abort()
-  expect((await coordinator.run(sources(), true, abort.signal)).cancelled).toBe(true)
+  expect(
+    (await coordinator.run(sources(), { text: 'missing', speakers: 'missing' }, abort.signal))
+      .cancelled,
+  ).toBe(true)
   expect(calls).toEqual([])
 })
 it('does not request speakers when recognition is disabled', async () => {
   const { coordinator, calls, abort } = setup()
-  expect((await coordinator.run(sources(), false, abort.signal)).completedCount).toBe(2)
+  expect(
+    (await coordinator.run(sources(), { text: 'missing', speakers: 'skip' }, abort.signal))
+      .completedCount,
+  ).toBe(2)
   expect(calls).toEqual(['text:A', 'save:A', 'text:B', 'save:B'])
+})
+it('runs only the selected speaker step without invoking transcription', async () => {
+  const { coordinator, calls, abort } = setup()
+  const items = sources().map((source) => ({ ...source, artifact: artifact(source.audioSourceId) }))
+  await coordinator.run(items, { text: 'skip', speakers: 'missing' }, abort.signal)
+  expect(calls).toEqual(['speakers:A', 'save:A', 'speakers:B', 'save:B'])
+})
+it('replaces text without implicitly running speakers', async () => {
+  const { coordinator, calls, abort } = setup()
+  const items = sources().map((source) => ({
+    ...source,
+    artifact: artifact(source.audioSourceId, true),
+  }))
+  await coordinator.run(items, { text: 'replace', speakers: 'skip' }, abort.signal)
+  expect(calls).toEqual(['text:A', 'save:A', 'text:B', 'save:B'])
+})
+it('replaces completed speakers without retranscribing', async () => {
+  const { coordinator, calls, abort } = setup()
+  const items = sources().map((source) => ({
+    ...source,
+    artifact: artifact(source.audioSourceId, true),
+  }))
+  await coordinator.run(items, { text: 'skip', speakers: 'replace' }, abort.signal)
+  expect(calls).toEqual(['speakers:A', 'save:A', 'speakers:B', 'save:B'])
+})
+it('rejects missing text dependencies before starting any engine', async () => {
+  const { coordinator, calls, abort } = setup()
+  await expect(
+    coordinator.run(sources(), { text: 'skip', speakers: 'missing' }, abort.signal),
+  ).rejects.toThrow()
+  expect(calls).toEqual([])
 })

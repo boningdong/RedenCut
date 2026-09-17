@@ -1,3 +1,4 @@
+import type { SpeechTaskSelection } from './SpeechTaskPlanner'
 import type { SaveSpeakerIdentitiesRequest } from './SpeakerIdentityTypes'
 import type { SpeechBatchScope, SpeechBatchProgress, SpeechBatchSummary } from './speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from './resources.types'
@@ -70,6 +71,7 @@ export interface TranscriptionJobRequest extends SessionJobRequest<Transcription
 export type SpeechAnalysisJobRequest = SessionJobRequest<SpeechAnalysisJobId> & {
   language: string
   draft: ProjectDraft
+  tasks?: SpeechTaskSelection
   mode?: 'missing' | 'regenerate'
   confirmSpeakerLabelReset?: boolean
 } & (
@@ -163,7 +165,7 @@ export interface IElectronAPI {
     ): Promise<TranscriptionCancellationResult>
   }
   speechAnalysis: {
-    checkAvailability(): Promise<PublicMessage | null>
+    checkAvailability(tasks?: SpeechTaskSelection): Promise<PublicMessage | null>
     start(
       request: SpeechAnalysisJobRequest,
     ): Promise<

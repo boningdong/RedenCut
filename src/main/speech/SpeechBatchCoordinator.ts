@@ -1,3 +1,4 @@
+import { planSpeechTasks, type SpeechTaskSelection } from '../../shared/SpeechTaskPlanner'
 import type { AudioSourceId } from '../../shared/source.types'
 import type { SpeechArtifact } from '../../shared/speechArtifact.schema'
 import type { PublicMessage, SpeechProgress } from '../../shared/publicMessages'
@@ -34,11 +35,21 @@ export class SpeechBatchCoordinator {
 
   async run(
     input: readonly SpeechBatchSource[],
-    speakersEnabled: boolean,
+    selection: SpeechTaskSelection,
     signal: AbortSignal,
     onProgress: (event: SpeechProgress, batch: SpeechBatchProgress) => void = () => {},
   ): Promise<SpeechBatchSummary> {
     const sources = input.map((source) => ({ ...source }))
+    const plan = planSpeechTasks(
+      sources.map((source) => ({
+        audioSourceId: source.audioSourceId,
+        text: !!source.artifact,
+        speakers: !!source.artifact?.diarization,
+      })),
+      selection,
+    )
+    if (plan.missingText.length)
+      throw new Error('Speaker recognition requires an aligned transcript')
     const summary: SpeechBatchSummary = {
       sourceCount: sources.length,
       completedCount: 0,
@@ -49,21 +60,23 @@ export class SpeechBatchCoordinator {
     const failed = new Set<AudioSourceId>()
     const completed = new Set<AudioSourceId>()
     for (const source of sources) {
-      if (source.artifact && (!speakersEnabled || source.artifact.diarization)) {
+      if (
+        !plan.text.includes(source.audioSourceId) &&
+        !plan.speakers.includes(source.audioSourceId)
+      ) {
         completed.add(source.audioSourceId)
         summary.reusedCount++
       }
     }
     for (const phase of ['text', 'speakers'] as const) {
-      if (phase === 'speakers' && !speakersEnabled) break
-      for (const [index, source] of sources.entries()) {
+      const targets = sources.filter((source) => plan[phase].includes(source.audioSourceId))
+      for (const [index, source] of targets.entries()) {
         if (signal.aborted) break
         if (failed.has(source.audioSourceId) || completed.has(source.audioSourceId)) continue
-        if (phase === 'text' && source.artifact) continue
         const batch: SpeechBatchProgress = {
           phase,
           sourceIndex: index + 1,
-          sourceCount: sources.length,
+          sourceCount: targets.length,
           audioSourceId: source.audioSourceId,
           displayName: source.displayName,
         }
@@ -80,7 +93,8 @@ export class SpeechBatchCoordinator {
           progress({ stage: 'publishing' })
           await this.operations.publish(source, artifact, signal)
           source.artifact = artifact
-          if (!speakersEnabled || phase === 'speakers') completed.add(source.audioSourceId)
+          if (!plan.speakers.includes(source.audioSourceId) || phase === 'speakers')
+            completed.add(source.audioSourceId)
         } catch (error) {
           if (signal.aborted) break
           failed.add(source.audioSourceId)

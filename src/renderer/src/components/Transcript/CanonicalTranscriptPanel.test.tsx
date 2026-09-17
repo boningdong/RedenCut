@@ -93,6 +93,19 @@ describe('canonical transcript editability', () => {
     ])
   })
 
+  it('shows hidden text in continuous mode and restores speaker filters on switching back', () => {
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show Unassigned speaker' }))
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeNull()
+    const tracks = useTimelineStore.getState().tracks
+    fireEvent.click(screen.getByRole('button', { name: 'Continuous text' }))
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeTruthy()
+    expect(document.querySelector('.transcript-speaker')).toBeNull()
+    expect(useTimelineStore.getState().tracks).toBe(tracks)
+    fireEvent.click(screen.getByRole('button', { name: 'By speaker' }))
+    expect(document.querySelector('[data-unit-id="speech"]')).toBeNull()
+  })
+
   it('updates playback highlighting without rerendering a long transcript or disturbing selection', () => {
     const analysis = useTranscriptStore.getState().analyses[0]
     let textReads = 0
@@ -257,10 +270,13 @@ describe('canonical transcript editability', () => {
     })
     const generate = vi.fn()
     render(<TranscriptPanel onGenerate={generate} isGenerating={false} generatingStatus={null} />)
-    const button = screen.getByRole('button', { name: 'Generate <My guest>' })
+    const button = screen.getByRole('button', { name: 'AI processing' })
     act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
-    expect(screen.getByRole('button', { name: '生成 <My guest> 的转写' })).toBe(button)
+    expect(screen.getByRole('button', { name: 'AI 处理' })).toBe(button)
     fireEvent.click(button)
+    fireEvent.change(screen.getByLabelText('处理范围'), { target: { value: track.id } })
+    expect(screen.getByRole('option', { name: 'T1 · <My guest>' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '开始处理' }))
     expect(generate).toHaveBeenCalledWith(track.id)
     expect(useTimelineStore.getState().tracks[0].name).toBe('<My guest>')
   })
@@ -422,7 +438,9 @@ describe('canonical transcript editability', () => {
     const generate = vi.fn()
     render(<TranscriptPanel onGenerate={generate} isGenerating={false} generatingStatus={null} />)
     expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(2)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate Guest' }))
+    fireEvent.click(screen.getByRole('button', { name: 'AI processing' }))
+    fireEvent.change(screen.getByLabelText('Tracks to process'), { target: { value: 'missing' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start processing' }))
     expect(generate).toHaveBeenCalledWith('missing')
     act(() => useTimelineStore.getState().removeClip('duplicate'))
     expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(1)

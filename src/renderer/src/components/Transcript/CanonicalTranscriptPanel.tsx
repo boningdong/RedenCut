@@ -1,3 +1,6 @@
+import { SpeechTaskPopover } from './SpeechTaskPopover'
+import { TranscriptDisplaySwitch } from './TranscriptDisplaySwitch'
+import { ContinuousTranscript } from './ContinuousTranscript'
 import { hasValidatedTiming } from '../../domain/transcriptReliability'
 import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 import { useTranslation } from '../../i18n/useTranslation'
@@ -25,7 +28,7 @@ export function CanonicalTranscriptPanel({
   onSaveSpeakerIdentities,
   workspaceControls,
   onGenerate,
-  onRegenerate,
+  onRun,
   isGenerating,
   generatingStatus,
   onCancel,
@@ -35,6 +38,7 @@ export function CanonicalTranscriptPanel({
   const tracks = useTimelineStore((s) => s.tracks)
   const setSelection = useEditorStore((s) => s.setSelection)
   const colors = useSpeakerColors()
+  const displayMode = useTranscriptStore((s) => s.displayMode)
   const hidden = useTranscriptStore((s) => s.hiddenSpeakerKeys)
   const allUnits = useMemo(() => projectTranscript(analyses, tracks), [analyses, tracks])
   const unassignedSourceIds = useMemo(
@@ -49,17 +53,22 @@ export function CanonicalTranscriptPanel({
   )
   const units = useMemo(
     () =>
-      allUnits.filter((u) => {
-        const speaker = u.speakerId ?? u.contextSpeakerId
-        return !hidden.includes(
-          speaker ? speakerKey(u.analysis, speaker) : unassignedSpeakerKey(u.analysis),
-        )
-      }),
-    [allUnits, hidden],
+      displayMode === 'continuous'
+        ? allUnits
+        : allUnits.filter((u) => {
+            const speaker = u.speakerId ?? u.contextSpeakerId
+            return !hidden.includes(
+              speaker ? speakerKey(u.analysis, speaker) : unassignedSpeakerKey(u.analysis),
+            )
+          }),
+    [allUnits, hidden, displayMode],
   )
   const container = useRef<HTMLDivElement>(null)
   const elements = useRef(new Map<string, HTMLSpanElement>())
   const [pending, setPending] = useState<SessionSelection | null>(null)
+  useEffect(() => {
+    setPending(null)
+  }, [displayMode])
   const [scopeMessage, setScopeMessage] = useState<'hiddenSpeaker' | 'changedClip' | null>(null)
   const resolveNative = useCallback(() => {
     const selection = window.getSelection()
@@ -110,6 +119,7 @@ export function CanonicalTranscriptPanel({
       if (!selected.editable) return
       const { track, clip, analysis } = selected.occurrence
       if (
+        useTranscriptStore.getState().displayMode === 'speakers' &&
         selected.occurrences.some((u) => {
           const speaker = u.speakerId ?? u.contextSpeakerId
           return useTranscriptStore
@@ -183,7 +193,11 @@ export function CanonicalTranscriptPanel({
         key={u.id}
         unit={u}
         elements={elements}
-        color={speaker ? colors.get(speakerKey(u.analysis, speaker)) : undefined}
+        color={
+          displayMode === 'speakers' && speaker
+            ? colors.get(speakerKey(u.analysis, speaker))
+            : undefined
+        }
         highlighted={Boolean(
           pending?.occurrence.track.id === u.track.id &&
           pending.clips.some((c) => c.id === u.clip.id) &&
@@ -192,9 +206,6 @@ export function CanonicalTranscriptPanel({
       />
     )
   }
-  const missing = tracks.filter((t) =>
-    t.clips.some((c) => !analyses.some((a) => a.audioSourceId === c.audioSourceId)),
-  )
   const pendingText = (ids: string[]) =>
     pending?.occurrence.analysis.transcript.units
       .filter((u) => ids.includes(u.id))
@@ -207,28 +218,23 @@ export function CanonicalTranscriptPanel({
         <span className="feature-title">{t('transcript.title')}</span>
         <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
         <span className="transport-separator" aria-hidden="true" />
-        <SpeakerLabels
-          toolbarActions={
-            <div className="transcript-generation">
-              {missing.map((track) => (
-                <button key={track.id} disabled={isGenerating} onClick={() => onGenerate(track.id)}>
-                  {t('transcript.generateTrack', { name: track.name })}
-                </button>
-              ))}
-              <button disabled={isGenerating} onClick={() => onGenerate()}>
-                {t('transcript.generate')}
-              </button>
-              {onRegenerate && (
-                <button disabled={isGenerating} onClick={onRegenerate}>
-                  {t('transcript.reanalyze')}
-                </button>
-              )}
-            </div>
-          }
-          onSave={onSaveSpeakerIdentities}
+        {displayMode === 'speakers' && (
+          <SpeakerLabels
+            onSave={onSaveSpeakerIdentities}
+            analyses={analyses}
+            isGenerating={isGenerating}
+            unassignedSourceIds={unassignedSourceIds}
+          />
+        )}
+        <div className="toolbar-spacer" />
+        <TranscriptDisplaySwitch />
+        <SpeechTaskPopover
+          tracks={tracks}
           analyses={analyses}
           isGenerating={isGenerating}
-          unassignedSourceIds={unassignedSourceIds}
+          onRun={
+            onRun ?? ((scope) => onGenerate(scope.kind === 'track' ? scope.trackId : undefined))
+          }
         />
       </div>
       <div
@@ -244,7 +250,11 @@ export function CanonicalTranscriptPanel({
         onKeyDown={keyDown}
         className="transcript-document"
       >
-        <TranscriptDialogue units={units} tracks={tracks} renderUnit={renderUnit} />
+        {displayMode === 'continuous' ? (
+          <ContinuousTranscript units={units} tracks={tracks} renderUnit={renderUnit} />
+        ) : (
+          <TranscriptDialogue units={units} tracks={tracks} renderUnit={renderUnit} />
+        )}
         {!units.length && (
           <p>{t(allUnits.length ? 'transcript.allSpeakersHidden' : 'transcript.emptyTimeline')}</p>
         )}

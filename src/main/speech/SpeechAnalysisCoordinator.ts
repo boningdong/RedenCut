@@ -23,6 +23,7 @@ interface AnalysisInput {
   language: string
   alignmentModel: string
   diarizationModel?: string
+  replaceSpeakers?: boolean
   speakerRecognitionEnabled?: boolean
   transcriptionModel?: string
   modelPaths?: Record<string, string>
@@ -63,7 +64,11 @@ export class SpeechAnalysisCoordinator {
       artifact.sourceFingerprint.modifiedTimeMs !== input.audioSource.fingerprint.modifiedTimeMs
     )
       throw new Error('Speech artifact source does not match analysis input')
-    if (artifact.schemaVersion === 1 || artifact.diarizationStatus === 'completed') return artifact
+    if (
+      !input.replaceSpeakers &&
+      (artifact.schemaVersion === 1 || artifact.diarizationStatus === 'completed')
+    )
+      return artifact
     if (input.speakerRecognitionEnabled === false) return artifact
     const result = await this.worker.run(
       {

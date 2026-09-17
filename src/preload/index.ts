@@ -144,8 +144,8 @@ const api = {
       invokeSafe<TranscriptionCancellationResult>(invoke, 'transcript:cancel', request),
   },
   speechAnalysis: {
-    checkAvailability: () =>
-      invokeSafe<PublicMessage | null>(invoke, 'speech-analysis:check-availability'),
+    checkAvailability: (tasks) =>
+      invokeSafe<PublicMessage | null>(invoke, 'speech-analysis:check-availability', tasks),
     start: (request: SpeechAnalysisJobRequest) =>
       invokeSafe<
         SessionJobResult<RendererSession, SpeechAnalysisJobId> & { batch?: SpeechBatchSummary }

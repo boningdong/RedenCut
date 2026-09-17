@@ -21,9 +21,9 @@ test('real track occurrences align locally and follow clip movement and undo', a
         .toBe('false')
     }
     await importAudio(1)
-    await ui.call('browser_click', { target: 'button:has-text("Generate")' })
+    await ui.call('browser_click', { target: 'button:has-text("AI processing")' })
     await ui.call('browser_click', {
-      target: 'section[aria-label="Transcript panel"] button:text-is("Track 1")',
+      target: 'button:text-is("Start processing")',
     })
     await expect
       .poll(() => ui.page.locator('[data-testid="canonical-transcript"]').count(), {
@@ -32,9 +32,8 @@ test('real track occurrences align locally and follow clip movement and undo', a
       .toBe(1)
     await importAudio(2, 'mandarin-short-female.m4a')
     await expect.poll(() => ui.page.locator('canvas').count()).toBe(2)
-    const generateSecond = ui.page.getByRole('button', { name: 'Generate Track 2', exact: true })
-    if (await generateSecond.count())
-      await ui.call('browser_click', { target: 'button:text-is("Generate Track 2")' })
+    await ui.call('browser_click', { target: 'button:has-text("AI processing")' })
+    await ui.call('browser_click', { target: 'button:text-is("Start processing")' })
     const cards = ui.page.getByRole('region', { name: 'Simultaneous speech', exact: true })
     await expect.poll(() => cards.count(), { timeout: 240_000 }).toBeGreaterThan(0)
     const firstCard = cards.first()

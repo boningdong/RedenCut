@@ -1,3 +1,4 @@
+import { planSpeechTasks, type SpeechTaskSelection } from '../../shared/SpeechTaskPlanner'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { SpeechAnalysisJobRequest } from '../../shared/ipc.types'
 import type { SpeechBatchProgress, SpeechBatchSummary } from '../../shared/speechBatch.types'
@@ -26,7 +27,7 @@ interface Dependencies {
   controller: WorkspaceController
   jobs: SessionJobRegistry
   coordinator: Pick<SpeechAnalysisCoordinator, 'transcribeAndAlign' | 'identifySpeakers'>
-  prepare(): Promise<SpeechBatchRuntime>
+  prepare(tasks?: SpeechTaskSelection): Promise<SpeechBatchRuntime>
   diagnosticSink(error: unknown): void
 }
 
@@ -49,7 +50,9 @@ export function createSpeechBatchHandler({
       const source = project.audioSources.find((source) => source.id === id)
       if (!source) throw new PublicIpcError('invalid-request')
       if (
-        request.mode === 'regenerate' &&
+        (request.mode === 'regenerate' ||
+          request.tasks?.text === 'replace' ||
+          request.tasks?.speakers === 'replace') &&
         !request.confirmSpeakerLabelReset &&
         project.speakerLabelOverrides.some((override) => override.audioSourceId === id)
       )
@@ -66,7 +69,7 @@ export function createSpeechBatchHandler({
       return {
         source: structuredClone(source),
         guard,
-        artifact: request.mode !== 'regenerate' && valid ? cached : undefined,
+        artifact: valid ? cached : undefined,
       }
     })
     const resolvePcm = controller.captureBackgroundSpeechPcmResolver(request)
@@ -82,7 +85,35 @@ export function createSpeechBatchHandler({
     const run = async () => {
       if (event.sender.isDestroyed()) abort.abort()
       abort.signal.throwIfAborted()
-      const runtime = await prepare()
+      const preview = request.tasks
+        ? planSpeechTasks(
+            contexts.map((context) => ({
+              audioSourceId: context.source.id,
+              text: !!context.artifact,
+              speakers: !!context.artifact?.diarization,
+            })),
+            request.tasks,
+          )
+        : undefined
+      if (preview?.missingText.length) throw new PublicIpcError('invalid-request')
+      const runtime = await prepare(
+        request.tasks && preview
+          ? {
+              text: preview.text.length ? request.tasks.text : 'skip',
+              speakers: preview.speakers.length ? request.tasks.speakers : 'skip',
+            }
+          : undefined,
+      )
+      const tasks =
+        request.tasks ??
+        ({
+          text: request.mode === 'regenerate' ? 'replace' : 'missing',
+          speakers: runtime.speakerRecognitionEnabled
+            ? request.mode === 'regenerate'
+              ? 'replace'
+              : 'missing'
+            : 'skip',
+        } as SpeechTaskSelection)
       abort.signal.throwIfAborted()
       let lastBatch: SpeechBatchProgress | undefined
       const trackers = new Map<string, ReturnType<SpeechStagePolicy['createProgressTracker']>>()
@@ -125,7 +156,8 @@ export function createSpeechBatchHandler({
               language: request.language,
               alignmentModel: 'auto',
               diarizationModel: 'diarization-default',
-              speakerRecognitionEnabled: runtime.speakerRecognitionEnabled,
+              speakerRecognitionEnabled: tasks.speakers !== 'skip',
+              replaceSpeakers: tasks.speakers === 'replace',
               modelPaths: runtime.modelPaths,
               transcriptionModel: runtime.transcriptionModel,
             }
@@ -191,7 +223,7 @@ export function createSpeechBatchHandler({
           displayName: context.source.displayName,
           artifact: context.artifact,
         })),
-        runtime.speakerRecognitionEnabled,
+        tasks,
         abort.signal,
         report,
       )

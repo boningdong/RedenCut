@@ -1,3 +1,4 @@
+import type { SpeechTaskSelection } from '@shared/SpeechTaskPlanner'
 import { saveSpeakerIdentities } from './actions/SpeakerIdentityActions'
 import { useSpeechBatchStore } from './stores/speechBatch.store'
 import type { PublicMessage } from '@shared/publicMessages'
@@ -696,7 +697,10 @@ export default function App() {
   }, [enqueueOpen])
 
   const generateTranscript = useCallback(
-    async (trackId?: string, mode: 'missing' | 'regenerate' = 'missing') => {
+    async (
+      trackId?: string,
+      tasks: SpeechTaskSelection = { text: 'missing', speakers: 'missing' },
+    ) => {
       const selectedTracks = useTimelineStore
         .getState()
         .tracks.filter((track) => trackId === undefined || track.id === trackId)
@@ -719,7 +723,7 @@ export default function App() {
         if (!draft) return
         speechDraft.current = draft
         const resetsLabels =
-          mode === 'regenerate' &&
+          (tasks.text === 'replace' || tasks.speakers === 'replace') &&
           useTranscriptStore
             .getState()
             .analyses.some(
@@ -729,7 +733,7 @@ export default function App() {
         const confirmSpeakerLabelReset =
           resetsLabels && window.confirm(t('dialogs.resetSpeakerNames'))
         if (resetsLabels && !confirmSpeakerLabelReset) return
-        const unavailable = await window.electronAPI.speechAnalysis.checkAvailability()
+        const unavailable = await window.electronAPI.speechAnalysis.checkAvailability(tasks)
         if (
           transcriptJobMatches(cancelledTranscriptJob.current, job) ||
           !transcriptJobMatches(transcriptJob.current, job) ||
@@ -742,7 +746,7 @@ export default function App() {
           revision: currentSession.revision,
           jobId,
           scope: trackId === undefined ? { kind: 'all' } : { kind: 'track', trackId },
-          mode,
+          tasks,
           language: 'auto',
           draft,
           ...(confirmSpeakerLabelReset ? { confirmSpeakerLabelReset: true } : {}),
@@ -944,7 +948,9 @@ export default function App() {
             }
             workspaceControls={workspaceControls}
             onGenerate={(trackId) => void generateTranscript(trackId)}
-            onRegenerate={() => void generateTranscript(undefined, 'regenerate')}
+            onRun={(scope, tasks) =>
+              void generateTranscript(scope.kind === 'track' ? scope.trackId : undefined, tasks)
+            }
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
             onCancel={cancelSpeechAnalysis}

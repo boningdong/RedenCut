@@ -1,3 +1,4 @@
+import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
 import { createSpeechBatchHandler } from './speechBatch.ipc'
 import { ProjectFileSchema } from '../../shared/project.types'
 import type { ResourceManager } from '../resources/ResourceManager'
@@ -79,8 +80,10 @@ export function registerSpeechAnalysisIpc(
   })
   const coordinator = new SpeechAnalysisCoordinator(whisperTranscriber, worker, randomUUID)
 
-  ipcMain.handle('speech-analysis:check-availability', () =>
+  ipcMain.handle('speech-analysis:check-availability', (_event, input: unknown) =>
     toIpcResult(async () => {
+      const tasks = input === undefined ? undefined : SpeechTaskSelectionSchema.parse(input)
+      const needsText = !tasks || tasks.text !== 'skip'
       if (services) {
         const preferences = await services.preferences.read()
         if (!preferences.textEditingEnabled) return { reason: 'speech-models-missing' as const }
@@ -92,13 +95,13 @@ export function registerSpeechAnalysisIpc(
           ? join(paths[transcription.id], transcription.files[0].path)
           : null
         if (
-          !paths['alignment-zh'] ||
-          !paths['alignment-en'] ||
-          (preferences.speakerRecognitionEnabled && !paths['diarization-default'])
+          (needsText && (!managedWhisper || !paths['alignment-zh'] || !paths['alignment-en'])) ||
+          ((tasks ? tasks.speakers !== 'skip' : preferences.speakerRecognitionEnabled) &&
+            !paths['diarization-default'])
         )
           return { reason: 'speech-models-missing' as const }
       }
-      const whisperReason = await whisperTranscriber.unavailableReason()
+      const whisperReason = needsText ? await whisperTranscriber.unavailableReason() : null
       if (whisperReason) return whisperReason
       if (!existsSync(python)) return { reason: 'speech-worker-missing' as const }
       if (!existsSync(manifest) || (!services && !existsSync(modelCache)))
@@ -112,11 +115,15 @@ export function registerSpeechAnalysisIpc(
     jobs,
     coordinator,
     diagnosticSink,
-    prepare: async () => {
+    prepare: async (tasks) => {
       if (!python || !existsSync(python))
         throw new TranscriberUnavailableError('speech-worker-missing')
       const preferences = services ? await services.preferences.read() : undefined
       const modelPaths = services ? await services.resources.getModelPaths() : undefined
+      const needsText = !tasks || tasks.text !== 'skip'
+      const needsSpeakers = tasks
+        ? tasks.speakers !== 'skip'
+        : (preferences?.speakerRecognitionEnabled ?? true)
       let transcriptionModel: string | undefined
       if (services && modelPaths) {
         const model = services.resources.models.find(
@@ -124,16 +131,17 @@ export function registerSpeechAnalysisIpc(
         )!
         if (
           !preferences?.textEditingEnabled ||
-          !modelPaths[model.id] ||
-          !modelPaths['alignment-zh'] ||
-          !modelPaths['alignment-en'] ||
-          (preferences.speakerRecognitionEnabled && !modelPaths['diarization-default'])
+          (needsText &&
+            (!modelPaths[model.id] ||
+              !modelPaths['alignment-zh'] ||
+              !modelPaths['alignment-en'])) ||
+          (needsSpeakers && !modelPaths['diarization-default'])
         )
           throw new TranscriberUnavailableError('speech-models-missing')
-        transcriptionModel = join(modelPaths[model.id], model.files[0].path)
-        managedWhisper = transcriptionModel
+        transcriptionModel = needsText ? join(modelPaths[model.id], model.files[0].path) : undefined
+        managedWhisper = transcriptionModel ?? null
       }
-      const unavailable = await whisperTranscriber.unavailableReason()
+      const unavailable = needsText ? await whisperTranscriber.unavailableReason() : null
       if (unavailable)
         throw new TranscriberUnavailableError(
           unavailable.reason as ConstructorParameters<typeof TranscriberUnavailableError>[0],
@@ -339,6 +347,8 @@ function parseStartRequest(input: unknown): SpeechAnalysisJobRequest {
         candidate.mode !== 'regenerate')
     )
       throw new PublicIpcError('invalid-request')
+    const tasks =
+      candidate.tasks === undefined ? undefined : SpeechTaskSelectionSchema.parse(candidate.tasks)
     const tracks = ProjectFileSchema.shape.tracks.parse(candidate.draft.tracks)
     return {
       ...precondition,
@@ -350,6 +360,7 @@ function parseStartRequest(input: unknown): SpeechAnalysisJobRequest {
       language: candidate.language,
       draft: { ...candidate.draft, tracks },
       mode: candidate.mode,
+      ...(tasks ? { tasks } : {}),
       ...(candidate.confirmSpeakerLabelReset === true ? { confirmSpeakerLabelReset: true } : {}),
     }
   }

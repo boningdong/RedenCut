@@ -346,6 +346,33 @@ it('publishes text before speakers and enriches without changing text identities
     speakers: [],
     alignment: { validation: { version: 1, method: 'audio-evidence' } },
   })
+  const replaced = await coordinator.identifySpeakers(
+    { ...input, replaceSpeakers: true },
+    completed,
+    signal,
+  )
+  expect(replaced.transcript).toEqual(completed.transcript)
+  expect(replaced.alignment).toEqual(completed.alignment)
+  expect(replaced.diarization?.id).not.toBe(completed.diarization?.id)
+  expect(transcriber.transcribe).toHaveBeenCalledTimes(1)
+  const legacyArtifact = {
+    schemaVersion: 1 as const,
+    analysisRevisionId: completed.analysisRevisionId,
+    audioSourceId: completed.audioSourceId,
+    sourceFingerprint: completed.sourceFingerprint,
+    transcript: completed.transcript,
+    alignment: completed.alignment,
+    diarization: completed.diarization!,
+    speakerAttribution: completed.speakerAttribution!,
+    speakers: completed.speakers,
+  }
+  const legacyReplaced = await coordinator.identifySpeakers(
+    { ...input, replaceSpeakers: true },
+    legacyArtifact,
+    signal,
+  )
+  expect(legacyReplaced.schemaVersion).toBe(2)
+  expect(legacyReplaced.transcript).toEqual(completed.transcript)
   const disabled = await coordinator.transcribeAndAlign(
     { ...input, speakerRecognitionEnabled: false },
     signal,

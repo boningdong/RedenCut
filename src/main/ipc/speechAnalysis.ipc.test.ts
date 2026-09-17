@@ -335,3 +335,29 @@ it('rejects unavailable shared transcription runtime before beginning a batch', 
   expect(result).toMatchObject({ ok: false, error: { reason: 'whisper-missing' } })
   expect(mocks.prepare).not.toHaveBeenCalled()
 })
+it('checks only speaker resources for a speaker-only rerun', async () => {
+  const preferences = deferredPreferences()
+  vi.mocked(preferences.services.resources.getModelPaths).mockResolvedValue({
+    'diarization-default': '/models/speakers',
+  })
+  setup(preferences.services)
+  mocks.unavailableReason.mockClear()
+  mocks.unavailableReason.mockResolvedValue({ reason: 'whisper-missing' })
+  const result = mocks.handlers.get('speech-analysis:check-availability')!(undefined, {
+    text: 'skip',
+    speakers: 'replace',
+  })
+  preferences.resolve(true)
+  expect(await result).toEqual({ ok: true, value: null })
+  expect(mocks.unavailableReason).not.toHaveBeenCalled()
+})
+it('does not require speaker resources when generating only text', async () => {
+  const preferences = deferredPreferences()
+  setup(preferences.services)
+  const result = mocks.handlers.get('speech-analysis:check-availability')!(undefined, {
+    text: 'missing',
+    speakers: 'skip',
+  })
+  preferences.resolve(true)
+  expect(await result).toEqual({ ok: true, value: null })
+})

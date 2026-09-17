@@ -1,3 +1,7 @@
+import type { SpeechBatchScope } from '@shared/speechBatch.types'
+import type { SpeechTaskSelection } from '@shared/SpeechTaskPlanner'
+import { SpeechTaskPopover } from './SpeechTaskPopover'
+import { TranscriptDisplaySwitch } from './TranscriptDisplaySwitch'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
@@ -25,7 +29,7 @@ import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { togglePlayback } from '../../actions/playbackActions'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorStore } from '../../stores/editor.store'
@@ -46,6 +50,7 @@ export interface TranscriptPanelProps {
   /** Called when the user clicks "Generate Transcript". Optionally scoped to a track. */
   onGenerate: (trackId?: string) => void
   onRegenerate?: () => void
+  onRun?: (scope: SpeechBatchScope, tasks: SpeechTaskSelection) => void
   /** True while transcription is running. */
   isGenerating: boolean
   onCancel?: () => void
@@ -65,6 +70,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 function LegacyTranscriptPanel({
   workspaceControls,
   onGenerate,
+  onRun,
   isGenerating,
   generatingStatus,
   onCancel,
@@ -107,18 +113,6 @@ function LegacyTranscriptPanel({
     () => tracks.filter((t) => words.some((w) => w.trackId === t.id)),
     [tracks, words],
   )
-
-  // Tracks with no words yet — these appear in the Generate dropdown
-  const ungeneratedTracks = useMemo(
-    () => tracks.filter((t) => t.clips.length > 0 && !words.some((w) => w.trackId === t.id)),
-    [tracks, words],
-  )
-
-  // True when all tracks are generated (generate button becomes inactive)
-  const allGenerated = ungeneratedTracks.length === 0
-
-  // Dropdown state at component level — NEVER inside an IIFE or conditional (Rules of Hooks)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
 
   // True when any words exist, regardless of visibility filter — guards empty-state copy
   const hasAnyWords = words.length > 0
@@ -411,107 +405,15 @@ function LegacyTranscriptPanel({
               )}
             </div>
 
-            {/* Right: Generate dropdown button */}
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <button
-                className="toolbar-outline"
-                disabled={allGenerated || isGenerating}
-                onClick={() => !allGenerated && setDropdownOpen((o) => !o)}
-                aria-expanded={dropdownOpen}
-              >
-                {t('transcript.generateMenu')}
-              </button>
-
-              {dropdownOpen && !allGenerated && (
-                <>
-                  {/* Click-away backdrop */}
-                  <div
-                    style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-                    onClick={() => setDropdownOpen(false)}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: '100%',
-                      marginTop: 3,
-                      background: 'var(--color-bg-elevated)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 5,
-                      padding: '3px 0',
-                      zIndex: 50,
-                      minWidth: 140,
-                      boxShadow: 'var(--shadow-dropdown)',
-                    }}
-                  >
-                    {ungeneratedTracks.map((track) => (
-                      <button
-                        key={track.id}
-                        onClick={() => {
-                          setDropdownOpen(false)
-                          onGenerate(track.id)
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          width: '100%',
-                          padding: '4px 10px',
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--color-text-secondary)',
-                          fontSize: 10,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')
-                        }
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                      >
-                        <span
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            backgroundColor: trackPresentationColor(track.color),
-                            flexShrink: 0,
-                          }}
-                        />
-                        {track.name}
-                      </button>
-                    ))}
-                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '2px 0' }} />
-                    <button
-                      onClick={() => {
-                        setDropdownOpen(false)
-                        onGenerate()
-                      }}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '4px 10px',
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-accent-light)',
-                        fontSize: 10,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontWeight: 500,
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = 'var(--color-accent-dropdown-hover)')
-                      }
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                    >
-                      {tracksWithTranscript.length === 0
-                        ? t('transcript.allTracks')
-                        : t('transcript.allRemaining')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <TranscriptDisplaySwitch />
+            <SpeechTaskPopover
+              tracks={tracks}
+              analyses={[]}
+              isGenerating={isGenerating}
+              onRun={
+                onRun ?? ((scope) => onGenerate(scope.kind === 'track' ? scope.trackId : undefined))
+              }
+            />
           </div>
         )}
       </div>
