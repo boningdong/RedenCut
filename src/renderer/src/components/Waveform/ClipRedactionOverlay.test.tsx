@@ -101,7 +101,7 @@ it('previews a boundary drag without mutating history; commits once and undoes o
   expect(state().tracks[0].clips[0].redactions![0].sourceEnd).toBe(17)
   expect(state().selectedClipId).toBeNull()
   expect(state().timelineSelection).toBeNull()
-  act(() => state().undo())
+  void act(() => state().undo())
   expect(state().tracks[0].clips[0].redactions![0].sourceEnd).toBe(15)
 })
 
@@ -158,7 +158,7 @@ it('moves the whole overlay with a single undo and without moving its clip', () 
     redactions: [{ id: 'r', sourceStart: 14, sourceEnd: 17 }],
   })
   expect(state().undoStack).toHaveLength(1)
-  act(() => state().undo())
+  void act(() => state().undo())
   expect(state().tracks[0].clips[0].redactions).toEqual(clip.redactions)
 })
 

@@ -303,6 +303,7 @@ function installApi(initial: RendererSession) {
       }),
       cancel: vi.fn(async () => 'not-found' as const),
     },
+    speakerIdentity: { save: vi.fn() },
     speakerLabel: {
       rename: vi.fn(),
     },
@@ -917,7 +918,7 @@ describe('App transcription job identity', () => {
         useTimelineStore.getState().splitAt(5)
         const second = useTimelineStore.getState().tracks[0].clips[1]
         useTimelineStore.getState().moveClip(second.id, 7)
-        useTimelineStore.getState().undo()
+        void useTimelineStore.getState().undo()
       })
       const publish = async () => {
         await act(async () =>
@@ -944,20 +945,20 @@ describe('App transcription job identity', () => {
       expect(useSpeechBatchStore.getState().isGenerating).toBe(true)
       expect(useSpeechBatchStore.getState().generatingStatus?.stage).toBe('diarizing')
       expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
-      act(() => useTimelineStore.getState().redo())
+      void act(() => useTimelineStore.getState().redo())
       expect(useTimelineStore.getState().tracks[0].clips[1].outputStart).toBe(7)
       expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
         true,
       )
       act(() => {
-        useTimelineStore.getState().undo()
-        useTimelineStore.getState().undo()
+        void useTimelineStore.getState().undo()
+        void useTimelineStore.getState().undo()
       })
       expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(1)
       expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
         true,
       )
-      act(() => useTimelineStore.getState().redo())
+      void act(() => useTimelineStore.getState().redo())
       expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
       expect(useTimelineStore.getState().tracks.some((track) => track.id === 'track-added')).toBe(
         true,

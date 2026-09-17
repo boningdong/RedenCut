@@ -59,9 +59,9 @@ it('redacts selected speech without splitting the clip and restores one atomic e
     sourceEnd: 20,
     redactions: [{ sourceStart: 2, sourceEnd: 4 }],
   })
-  state().undo()
+  void state().undo()
   expect(state().tracks[0].clips[0].redactions ?? []).toEqual([])
-  state().redo()
+  void state().redo()
   expect(state().tracks[0].clips[0].redactions).toHaveLength(1)
 })
 
@@ -79,7 +79,7 @@ it('keeps touching and overlapping overlays individually removable; ordinary mut
   state().removeRedaction('c', second.id)
   expect(state().tracks[0].clips[0]).toMatchObject({ muted: true, redactions: [] })
   expect(redactionSkipRanges(state().tracks)).toEqual([])
-  state().undo()
+  void state().undo()
   expect(state().tracks[0].clips[0].redactions).toEqual([second])
 })
 
@@ -98,7 +98,7 @@ it('moves overlays with their clip and partitions crossing coverage on explicit 
   expect(clips[0].redactions![0].id).not.toBe(clips[1].redactions![0].id)
   expect(redactionSkipRanges(state().tracks)).toEqual([{ start: 12, end: 16 }])
   expect(state().timelineSelection).toBeNull()
-  state().undo()
+  void state().undo()
   expect(state().tracks[0].clips).toHaveLength(1)
 })
 
@@ -116,9 +116,9 @@ it('validates resize, restores independent history, and projects partial coverag
   state().updateRedaction('c', id, { sourceStart: 3, sourceEnd: 6 })
   expect(redactionCoverage(state().tracks[0].clips[0], 2, 4)).toBe('partial')
   expect(state().undoStack).toHaveLength(2)
-  state().undo()
+  void state().undo()
   expect(redactionCoverage(state().tracks[0].clips[0], 2, 4)).toBe('full')
-  state().redo()
+  void state().redo()
   expect(redactionCoverage(state().tracks[0].clips[0], 2, 4)).toBe('partial')
 })
 
@@ -141,7 +141,7 @@ it('clears overlay selection when its clip disappears or a different project loa
   state().selectRedaction('c', id)
   state().removeClip('c')
   expect(state().timelineSelection).toBeNull()
-  state().undo()
+  void state().undo()
   state().selectRedaction('c', id)
   state().loadFromProject([], tracks())
   expect(state().timelineSelection).toBeNull()

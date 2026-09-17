@@ -1,3 +1,4 @@
+import { registerSpeakerIdentityIpc } from './ipc/SpeakerIdentityIpc'
 import appIcon from './assets/icons/macos/neon-dark-lavender.xcassets/AppIcon.appiconset/1024-mac.png?asset'
 import { LocalHuggingFaceLogin } from './speech/huggingface/LocalHuggingFaceLogin'
 import { DevelopmentEnvironmentChecker } from './runtime/DevelopmentEnvironmentChecker'
@@ -167,6 +168,7 @@ startApplicationLifecycle({
       manifestPath,
     })
     registerSpeakerLabelIpc(controller)
+    registerSpeakerIdentityIpc(controller)
     registerWorkspaceLayoutIpc(
       new WorkspaceLayoutStore(join(app.getPath('userData'), 'workspace-layout.json')),
     )

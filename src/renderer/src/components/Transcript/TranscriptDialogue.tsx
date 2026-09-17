@@ -10,7 +10,12 @@ import {
 } from '../../domain/transcriptDialogue'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useSpeakerColors } from '../../hooks/useSpeakerColors'
-import { speakerName, speakerKey } from '../../domain/speakerPresentation'
+import { useEditorStore } from '../../stores/editor.store'
+import {
+  linkedSpeakerPresentation,
+  speakerName,
+  speakerKey,
+} from '../../domain/speakerPresentation'
 
 function timestamp(time: number): string {
   return `${Math.floor(time / 60)
@@ -32,18 +37,28 @@ function lanes(units: TranscriptOccurrence[], tracks?: Track[]) {
 function Speaker({ unit }: { unit: TranscriptOccurrence }) {
   const { t } = useTranslation()
   const colors = useSpeakerColors()
+  const catalog = useEditorStore((s) => s.session?.speakerIdentities)
   const speaker = unit.speakerId ?? unit.contextSpeakerId
+  const display = linkedSpeakerPresentation(catalog, unit.analysis, speaker)
   const color = speaker
     ? colors.get(speakerKey(unit.analysis, speaker))
     : trackPresentationColor(unit.track.color)
   return (
     <div className="transcript-speaker" contentEditable={false}>
-      <span className="transcript-speaker-dot" style={{ background: color }} />
+      <span
+        className="transcript-speaker-dot"
+        style={{
+          background: display?.background ?? color,
+          outline: display?.associated ? '1px solid var(--color-text-muted)' : undefined,
+          outlineOffset: display?.associated ? 2 : undefined,
+        }}
+      />
       <div>
         <span>
-          {speakerName(unit.analysis, unit.speakerId ?? unit.contextSpeakerId, (number) =>
-            t('transcript.speakerNumber', { number }),
-          ) ??
+          {display?.name ??
+            speakerName(unit.analysis, unit.speakerId ?? unit.contextSpeakerId, (number) =>
+              t('transcript.speakerNumber', { number }),
+            ) ??
             (unit.analysis.diarizationStatus === 'completed'
               ? t('transcript.unassignedSpeaker')
               : unit.track.name)}

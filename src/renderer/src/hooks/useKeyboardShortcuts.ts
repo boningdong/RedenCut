@@ -67,14 +67,14 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
       // ── Cmd+Z — Undo last timeline operation ──────────────────────────
       if (isMeta && !e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault()
-        useTimelineStore.getState().undo()
+        void useTimelineStore.getState().undo()
         return
       }
 
       // ── Cmd+Shift+Z — Redo ────────────────────────────────────────────
       if (isMeta && e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault()
-        useTimelineStore.getState().redo()
+        void useTimelineStore.getState().redo()
         return
       }
 

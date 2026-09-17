@@ -103,6 +103,7 @@ describe('toRendererSession', () => {
         export: project.export,
       },
       speechAnalyses: [],
+      speakerIdentities: { version: 1, people: [], associations: [] },
     })
   })
 })

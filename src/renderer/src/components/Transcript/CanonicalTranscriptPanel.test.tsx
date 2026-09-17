@@ -90,6 +90,27 @@ describe('canonical transcript editability', () => {
       } as never,
     ])
   })
+
+  it('keeps recognized people editable after their last timeline clip is removed', () => {
+    const analysis = useTranscriptStore.getState().analyses[0]
+    const detached = {
+      ...analysis,
+      audioSourceId: 'detached' as never,
+      speakers: [
+        {
+          id: 'guest' as never,
+          analysisRevisionId: analysis.analysisRevisionId,
+          diarizationLabel: 'SPEAKER_00',
+          defaultDisplayName: 'Detached guest',
+        },
+      ],
+    }
+    useTranscriptStore.getState().loadAnalyses([analysis, detached])
+    render(<TranscriptPanel onGenerate={() => {}} isGenerating={false} generatingStatus={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Manage people' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit Detached guest' }).slice(-1)[0])
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false)
+  })
   afterEach(() => {
     cleanup()
     useLocaleStore.setState({ resolvedLocale: 'en' })
@@ -434,9 +455,9 @@ describe('canonical transcript editability', () => {
           (c.redactions ?? []).map((r) => c.outputStart + r.sourceStart - c.sourceStart),
         ),
     ).toEqual([8.5])
-    act(() => useTimelineStore.getState().undo())
+    void act(() => useTimelineStore.getState().undo())
     expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
-    act(() => useTimelineStore.getState().redo())
+    void act(() => useTimelineStore.getState().redo())
     expect(document.querySelectorAll('[data-unit-id="speech"]')).toHaveLength(2)
   })
   it('rejects a native selection spanning tracks without muting either track', () => {

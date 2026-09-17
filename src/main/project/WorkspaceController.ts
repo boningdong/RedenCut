@@ -1,3 +1,6 @@
+import { reconcileSpeakerIdentities } from '../../shared/SpeakerIdentityReconciler'
+import type { SaveSpeakerIdentitiesRequest } from '../../shared/SpeakerIdentityTypes'
+import { validateSpeakerIdentityChange } from '../speakers/SpeakerIdentityService'
 import {
   assertSpeechGuard,
   captureSpeechGuard,
@@ -27,7 +30,7 @@ import { AsyncMutex } from './AsyncMutex'
 import { discardCleanupWarnings, type CleanupWarningSink } from './CleanupWarningSink'
 import { ProjectPathResolver } from './ProjectPathResolver'
 import { ProjectWorkspace } from './ProjectWorkspace'
-import { mergeProjectDraft, toRendererSession } from './sessionProjection'
+import { mergeProjectDraft, toRendererSession, toRendererSpeechAnalysis } from './sessionProjection'
 
 export interface PreparedWorkspace {
   readonly workspace: ProjectWorkspace
@@ -168,6 +171,27 @@ export class WorkspaceController {
     }, signal)
   }
 
+  async saveSpeakerIdentities(request: SaveSpeakerIdentitiesRequest): Promise<RendererSession> {
+    return this.mutex.runExclusive(async () => {
+      this.assertWorkspaceCurrent({ workspaceToken: request.workspaceToken as WorkspaceToken })
+      const state = this.captureState()
+      const workspace = state.workspace
+      const analyses = workspace.speechArtifacts.map((artifact) =>
+        toRendererSpeechAnalysis(artifact, workspace.project),
+      )
+      const current = reconcileSpeakerIdentities(
+        workspace.project.speakerIdentities,
+        analyses,
+        workspace.project.tracks,
+      )
+      const next = validateSpeakerIdentityChange(current, request.expected, request.next, analyses)
+      const descriptors = await this.descriptors(workspace, workspace.project, 'quick')
+      await workspace.save({ ...workspace.project, speakerIdentities: next })
+      this.advanceRetainingWorkspace(state, workspace)
+      return toRendererSession(workspace, state.workspaceToken, state.revision, descriptors)
+    })
+  }
+
   async renameSpeaker(request: RenameSpeakerRequest): Promise<RendererSession> {
     return this.runTransition(
       { workspaceToken: request.workspaceToken as WorkspaceToken, revision: request.revision },
@@ -187,8 +211,41 @@ export class WorkspaceController {
         if (!reference || !artifact) throw new Error('Speaker label request is stale')
         if (!artifact.speakers.some((speaker) => speaker.id === request.speakerId))
           throw new Error('Speaker label references an unknown speaker')
+        const analyses = workspace.speechArtifacts.map((artifact) =>
+          toRendererSpeechAnalysis(artifact, workspace.project),
+        )
+        const currentCatalog = reconcileSpeakerIdentities(
+          workspace.project.speakerIdentities,
+          analyses,
+          workspace.project.tracks,
+        )
+        const person = currentCatalog.people.find(
+          (person) =>
+            person.binding.audioSourceId === request.audioSourceId &&
+            person.binding.analysisRevisionId === request.analysisRevisionId &&
+            person.binding.speakerId === request.speakerId,
+        )
+        if (!person) throw new Error('Speaker source is unavailable or needs review')
+        const speakerIdentities = validateSpeakerIdentityChange(
+          currentCatalog,
+          currentCatalog,
+          {
+            ...currentCatalog,
+            people: currentCatalog.people.map((candidate) =>
+              candidate.id === person.id
+                ? {
+                    ...candidate,
+                    displayName: request.displayName,
+                    color: request.color ?? candidate.color,
+                  }
+                : candidate,
+            ),
+          },
+          analyses,
+        )
         const project = ProjectFileSchema.parse({
           ...workspace.project,
+          speakerIdentities,
           speakerLabelOverrides: [
             ...workspace.project.speakerLabelOverrides.filter(
               (override) =>
@@ -446,7 +503,10 @@ export class WorkspaceController {
     authoritativeProject: ProjectFile,
   ): Promise<RendererSession> {
     const workspace = state.workspace
-    const project = ProjectFileSchema.parse(authoritativeProject)
+    const project = ProjectFileSchema.parse({
+      ...authoritativeProject,
+      speakerIdentities: workspace.project.speakerIdentities,
+    })
     const descriptors = await this.descriptors(workspace, project, 'quick')
     await workspace.save(project)
     this.advanceRetainingWorkspace(state, workspace)
@@ -469,7 +529,17 @@ export class WorkspaceController {
       source.fingerprint.sha256 !== artifact.sourceFingerprint.sha256
     )
       throw new Error('Speech analysis source fingerprint is stale')
-    const baseProject = draft ? mergeProjectDraft(workspace.project, draft) : workspace.project
+    const currentCatalog = reconcileSpeakerIdentities(
+      workspace.project.speakerIdentities,
+      workspace.speechArtifacts.map((artifact) =>
+        toRendererSpeechAnalysis(artifact, workspace.project),
+      ),
+      workspace.project.tracks,
+    )
+    const baseProject = {
+      ...(draft ? mergeProjectDraft(workspace.project, draft) : workspace.project),
+      speakerIdentities: currentCatalog,
+    }
     const descriptors = await this.descriptors(workspace, baseProject, 'full')
     const store = new SpeechArtifactStore(workspace.root)
     const staged = await store.stage(store.prepare(artifact))

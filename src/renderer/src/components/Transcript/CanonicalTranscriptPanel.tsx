@@ -23,6 +23,7 @@ import './transcript.css'
 type SessionSelection = OccurrenceSelection & { workspaceToken: string | undefined }
 
 export function CanonicalTranscriptPanel({
+  onSaveSpeakerIdentities,
   workspaceControls,
   onGenerate,
   onRegenerate,
@@ -294,9 +295,8 @@ export function CanonicalTranscriptPanel({
         <span className="panel-count">{t('common.trackCount', { count: tracks.length })}</span>
         <div className="toolbar-spacer" />
         <SpeakerLabels
-          analyses={analyses.filter((a) =>
-            tracks.some((t) => t.clips.some((c) => c.audioSourceId === a.audioSourceId)),
-          )}
+          onSave={onSaveSpeakerIdentities}
+          analyses={analyses}
           isGenerating={isGenerating}
           unassignedSourceIds={unassignedSourceIds}
         />

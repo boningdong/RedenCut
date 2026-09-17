@@ -1,4 +1,30 @@
 export const englishResources = {
+  speakerIdentity: {
+    manage: 'Manage people',
+    edit: 'Edit {{name}}',
+    basic: 'Basic information',
+    name: 'Name',
+    members: 'Associated people',
+    add: 'Add person',
+    addPerson: 'Add {{name}}',
+    remove: 'Remove {{name}}',
+    rename: 'Rename {{name}}',
+    review: 'Needs review',
+    reviewHelp: 'Recognition has changed. These historical identities are read-only.',
+    empty: 'No associated people',
+    automatic: 'Automatic color',
+    expand: 'Expand {{name}}',
+    collapse: 'Collapse {{name}}',
+    color: 'Color for {{name}}',
+    hex: 'Hex',
+    apply: 'Apply color',
+    invalid: 'Enter a name (1–80 characters) and a valid six-digit Hex color.',
+    failed: 'Could not save speaker changes. Please try again.',
+    changed:
+      'Speaker identities changed while this editor was open. Close and reopen to review the latest version.',
+    association: 'Association',
+    person: 'Person',
+  },
   settings: {
     localLogin: 'Local Hugging Face login',
     localLoginHelp:

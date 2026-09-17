@@ -103,10 +103,10 @@ describe('timeline editing state', () => {
   it('clears multi-selection on undo, redo, load, and reset', () => {
     state().setSelectedClipIds(['one', 'two'])
     state().removeClips(['one'])
-    state().undo()
+    void state().undo()
     expect(state().selectedClipIds).toEqual([])
     expect(state().selectedClipId).toBeNull()
-    state().redo()
+    void state().redo()
     expect(state().selectedClipIds).toEqual([])
 
     state().setSelectedClipIds(['two'])

@@ -1,3 +1,4 @@
+import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis, SpeakerId } from '@shared/speech.types'
 import type { Track } from '@shared/project.types'
 import { TRACK_COLORS, trackPresentationColor } from '@shared/trackColors'
@@ -76,4 +77,34 @@ export function buildSpeakerColors(
     }
   }
   return colors
+}
+
+/** Resolve display identity without altering recognition or transcript timing. */
+export function linkedSpeakerPresentation(
+  catalog: SpeakerIdentityCatalog | undefined,
+  analysis: RendererSpeechAnalysis,
+  id?: SpeakerId,
+) {
+  const person = catalog?.people.find(
+    (p) =>
+      p.binding.audioSourceId === analysis.audioSourceId &&
+      p.binding.analysisRevisionId === analysis.analysisRevisionId &&
+      p.binding.speakerId === id,
+  )
+  if (!person) return undefined
+  const association = catalog?.associations.find((a) => a.memberPersonIds.includes(person.id))
+  const memberColors =
+    association?.memberPersonIds.flatMap(
+      (member) => catalog?.people.find((p) => p.id === member)?.color ?? [],
+    ) ?? []
+  return {
+    name: association?.displayName ?? person.displayName,
+    solidColor: association?.color.mode === 'custom' ? association.color.value : person.color,
+    background: association
+      ? association.color.mode === 'custom'
+        ? association.color.value
+        : `linear-gradient(135deg, ${memberColors.join(', ')})`
+      : person.color,
+    associated: !!association,
+  }
 }

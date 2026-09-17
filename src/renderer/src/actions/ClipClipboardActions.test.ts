@@ -133,7 +133,7 @@ describe('clip clipboard actions', () => {
     expect(useTimelineStore.getState().undoStack).toHaveLength(1)
     expect(useTimelineClipboardStore.getState().contents?.clips).toHaveLength(2)
 
-    useTimelineStore.getState().undo()
+    void useTimelineStore.getState().undo()
     usePlaybackStore.getState().setCurrentTime(8)
     expect(pasteClips()).toBe(true)
     expect(allClips()).toHaveLength(4)

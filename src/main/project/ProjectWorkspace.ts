@@ -1,3 +1,5 @@
+import { reconcileSpeakerIdentities } from '../../shared/SpeakerIdentityReconciler'
+import { toRendererSpeechAnalysis } from './sessionProjection'
 import { randomUUID } from 'crypto'
 import {
   cp,
@@ -88,6 +90,11 @@ export class ProjectWorkspace {
     const store = new SpeechArtifactStore(this.root)
     const speechArtifacts = await Promise.all(
       validated.speechArtifacts.map((reference) => store.load(reference)),
+    )
+    validated.speakerIdentities = reconcileSpeakerIdentities(
+      validated.speakerIdentities,
+      speechArtifacts.map((artifact) => toRendererSpeechAnalysis(artifact, validated)),
+      validated.tracks,
     )
     const temporaryFile = join(this.root, `.project-${randomUUID()}.json`)
     try {

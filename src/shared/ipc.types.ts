@@ -1,3 +1,4 @@
+import type { SaveSpeakerIdentitiesRequest } from './SpeakerIdentityTypes'
 import type { SpeechBatchScope, SpeechBatchProgress, SpeechBatchSummary } from './speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from './resources.types'
 import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from './modelAccess.types'
@@ -171,6 +172,9 @@ export interface IElectronAPI {
     cancel(
       request: CancelSessionJobRequest<SpeechAnalysisJobId>,
     ): Promise<TranscriptionCancellationResult>
+  }
+  speakerIdentity: {
+    save(request: SaveSpeakerIdentitiesRequest): Promise<RendererSession>
   }
   speakerLabel: {
     rename(request: RenameSpeakerRequest): Promise<RendererSession>

@@ -1,3 +1,4 @@
+import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessages'
 import { TranscriptStatusFooter } from './TranscriptStatusFooter'
@@ -37,6 +38,10 @@ import { trackPresentationColor } from '../../themes/trackColors'
 import { CanonicalTranscriptPanel } from './CanonicalTranscriptPanel'
 
 export interface TranscriptPanelProps {
+  onSaveSpeakerIdentities?: (
+    expected: SpeakerIdentityCatalog,
+    next: SpeakerIdentityCatalog,
+  ) => Promise<void>
   workspaceControls?: React.ReactNode
   /** Called when the user clicks "Generate Transcript". Optionally scoped to a track. */
   onGenerate: (trackId?: string) => void

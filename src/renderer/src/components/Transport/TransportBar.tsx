@@ -1,3 +1,4 @@
+import { useEditorHistoryStore } from '../../stores/EditorHistoryStore'
 import { useTranslation } from '../../i18n/useTranslation'
 // ─────────────────────────────────────────────────────────────────────────────
 // TransportBar
@@ -38,6 +39,7 @@ export function TransportBar({
   onOpenSettings?: () => void
 }) {
   const { t } = useTranslation()
+  const historyBusy = useEditorHistoryStore((s) => s.busy)
   const canUndo = useTimelineStore((s) => s.undoStack.length > 0)
   const canRedo = useTimelineStore((s) => s.redoStack.length > 0)
   const undo = useTimelineStore((s) => s.undo)
@@ -66,8 +68,10 @@ export function TransportBar({
         <Button
           size="sm"
           variant="ghost"
-          disabled={!canUndo}
-          onClick={undo}
+          disabled={!canUndo || historyBusy}
+          onClick={() => {
+            void undo()
+          }}
           aria-label={t('transport.undo')}
           title={t('transport.undoHint')}
         >
@@ -76,8 +80,10 @@ export function TransportBar({
         <Button
           size="sm"
           variant="ghost"
-          disabled={!canRedo}
-          onClick={redo}
+          disabled={!canRedo || historyBusy}
+          onClick={() => {
+            void redo()
+          }}
           aria-label={t('transport.redo')}
           title={t('transport.redoHint')}
         >

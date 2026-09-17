@@ -1,3 +1,4 @@
+import { reconcileSpeakerIdentities } from '../../shared/SpeakerIdentityReconciler'
 import type { AudioSourceCacheDescriptor } from '../../shared/import.types'
 import { ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
 import type { ProjectDraft, RendererSession, WorkspaceToken } from '../../shared/session.types'
@@ -27,13 +28,20 @@ export function toRendererSession(
       tracks: workspace.project.tracks,
       export: workspace.project.export,
     },
+    speakerIdentities: reconcileSpeakerIdentities(
+      workspace.project.speakerIdentities,
+      workspace.speechArtifacts.map((artifact) =>
+        toRendererSpeechAnalysis(artifact, workspace.project),
+      ),
+      workspace.project.tracks,
+    ),
     speechAnalyses: workspace.speechArtifacts.map((artifact) =>
       toRendererSpeechAnalysis(artifact, workspace.project),
     ),
   }
 }
 
-function toRendererSpeechAnalysis(
+export function toRendererSpeechAnalysis(
   artifact: ProjectWorkspace['speechArtifacts'][number],
   project: ProjectFile,
 ): RendererSpeechAnalysis {

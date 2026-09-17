@@ -100,7 +100,7 @@ it('previews the destination lane then commits a cross-track move once', () => {
     outputStart: 2,
   })
   expect(useTimelineStore.getState().undoStack).toHaveLength(1)
-  act(() => useTimelineStore.getState().undo())
+  void act(() => useTimelineStore.getState().undo())
   expect(useTimelineStore.getState().tracks[0].clips[0].outputStart).toBe(0)
 })
 it('Escape cancels an active move without creating history', () => {

@@ -1035,3 +1035,183 @@ it('rejects regeneration when a speaker label was edited after admission', async
   )
   expect(controller.workspace.project.speakerLabelOverrides[0].displayName).toBe('Host')
 })
+
+function completedIdentityArtifact(controller: WorkspaceController) {
+  const text = backgroundArtifact(controller)
+  const diarizationId = '550e8400-e29b-41d4-a716-446655440006'
+  return SpeechArtifactSchema.parse({
+    ...text,
+    diarizationStatus: 'completed',
+    speakers: [
+      {
+        id: '550e8400-e29b-41d4-a716-446655440007',
+        analysisRevisionId: text.analysisRevisionId,
+        diarizationLabel: 'SPEAKER_00',
+        defaultDisplayName: 'Speaker 1',
+      },
+    ],
+    diarization: {
+      id: diarizationId,
+      analysisRevisionId: text.analysisRevisionId,
+      audioSourceId: SOURCE_ID,
+      sourceFingerprint: text.sourceFingerprint,
+      turns: [],
+      provenance: text.transcript.provenance,
+    },
+    speakerAttribution: {
+      analysisRevisionId: text.analysisRevisionId,
+      alignmentArtifactId: text.alignment.id,
+      diarizationArtifactId: diarizationId,
+      attributions: [],
+      provenance: {
+        algorithmId: 'overlap',
+        algorithmVersion: '1',
+        configHash: 'c'.repeat(64),
+        artifactSchemaVersion: 1,
+        createdAt: '2026-09-09T00:00:00.000Z',
+      },
+    },
+  })
+}
+
+it('saves identities over unrelated revisions, atomically rolls back failures, and guards stale undo', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-identities-')))
+  try {
+    const opened = await controller.open(root)
+    const analyzed = await controller.commitBackgroundSpeechAnalysis(
+      controller.captureBackgroundSpeechGuard(opened, SOURCE_ID),
+      completedIdentityArtifact(controller),
+    )
+    const expected = analyzed.speakerIdentities!
+    const next = structuredClone(expected)
+    next.people[0].displayName = 'Host'
+    const saved = await controller.save(request(analyzed, draftWithLufs(analyzed, -9)))
+    const committed = await controller.saveSpeakerIdentities({
+      workspaceToken: analyzed.workspaceToken,
+      expected,
+      next,
+    })
+    expect(committed.revision).toBe(saved.revision + 1)
+    expect(committed.draft.export.targetLUFS).toBe(-9)
+    expect((await ProjectWorkspace.open(root)).project.speakerIdentities).toEqual(next)
+    await expect(
+      controller.saveSpeakerIdentities({ workspaceToken: analyzed.workspaceToken, expected, next }),
+    ).rejects.toThrow('changed')
+    const fail = vi
+      .spyOn(controller.workspace, 'save')
+      .mockRejectedValueOnce(new Error('disk full'))
+    await expect(
+      controller.saveSpeakerIdentities({
+        workspaceToken: committed.workspaceToken,
+        expected: next,
+        next: expected,
+      }),
+    ).rejects.toThrow('disk full')
+    expect((await controller.describe()).speakerIdentities).toEqual(next)
+    expect((await controller.describe()).revision).toBe(committed.revision)
+    fail.mockRestore()
+    const undone = await controller.saveSpeakerIdentities({
+      workspaceToken: committed.workspaceToken,
+      expected: next,
+      next: expected,
+    })
+    expect(undone.speakerIdentities).toEqual(expected)
+    expect(undone.draft.export.targetLUFS).toBe(-9)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('retains identities through same-revision enrichment and isolates new recognition revisions', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-identity-analysis-')))
+  try {
+    const opened = await controller.open(root)
+    const artifact = completedIdentityArtifact(controller)
+    const analyzed = await controller.commitBackgroundSpeechAnalysis(
+      controller.captureBackgroundSpeechGuard(opened, SOURCE_ID),
+      artifact,
+    )
+    const expected = analyzed.speakerIdentities!
+    const next = structuredClone(expected)
+    next.people[0].displayName = 'Host'
+    const guard = controller.captureBackgroundSpeechGuard(analyzed, SOURCE_ID)
+    await controller.saveSpeakerIdentities({
+      workspaceToken: analyzed.workspaceToken,
+      expected,
+      next,
+    })
+    const enriched = await controller.commitBackgroundSpeechAnalysis(guard, {
+      ...artifact,
+      transcript: { ...artifact.transcript, revision: 2 },
+      alignment: { ...artifact.alignment, transcriptRevision: 2 },
+    })
+    expect(enriched.speakerIdentities).toEqual(next)
+    const revision = '550e8400-e29b-41d4-a716-446655440009'
+    const regenerated = SpeechArtifactSchema.parse({
+      ...artifact,
+      analysisRevisionId: revision,
+      transcript: { ...artifact.transcript, analysisRevisionId: revision },
+      alignment: { ...artifact.alignment, analysisRevisionId: revision },
+      diarization: { ...artifact.diarization, analysisRevisionId: revision },
+      speakerAttribution: { ...artifact.speakerAttribution, analysisRevisionId: revision },
+      speakers: artifact.speakers.map((speaker) => ({ ...speaker, analysisRevisionId: revision })),
+    })
+    const current = await controller.commitBackgroundSpeechAnalysis(
+      controller.captureBackgroundSpeechGuard(enriched, SOURCE_ID),
+      regenerated,
+    )
+    expect(current.speakerIdentities!.people.map((person) => person.displayName)).toEqual([
+      'Host',
+      'Speaker 1',
+    ])
+    const edited = structuredClone(current.speakerIdentities!)
+    edited.people[0].displayName = 'Stale rename'
+    await expect(
+      controller.saveSpeakerIdentities({
+        workspaceToken: current.workspaceToken,
+        expected: current.speakerIdentities!,
+        next: edited,
+      }),
+    ).rejects.toThrow('needs review')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+it('preserves speaker metadata when an import admitted earlier publishes its project', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-identity-import-')))
+  try {
+    const opened = await controller.open(root)
+    const analyzed = await controller.commitBackgroundSpeechAnalysis(
+      controller.captureBackgroundSpeechGuard(opened, SOURCE_ID),
+      completedIdentityArtifact(controller),
+    )
+    const importedProject = structuredClone(controller.workspace.project)
+    importedProject.tracks.push({ ...importedProject.tracks[0], id: 'imported-track', clips: [] })
+    const expected = analyzed.speakerIdentities!
+    const next = structuredClone(expected)
+    next.people[0].displayName = 'Edited during import'
+    await controller.saveSpeakerIdentities({
+      workspaceToken: analyzed.workspaceToken,
+      expected,
+      next,
+    })
+    const result = await controller.runBackgroundTransition(analyzed, (transaction) =>
+      transaction.commitImport(importedProject),
+    )
+    expect(result.draft.tracks).toHaveLength(2)
+    expect(result.speakerIdentities).toEqual(next)
+    expect((await ProjectWorkspace.open(root)).project.speakerIdentities).toEqual(next)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})

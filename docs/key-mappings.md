@@ -18,8 +18,8 @@ Update the implementation and this document together whenever a mapping or its c
 | Shift+Left Arrow | Nudge backward farther | Seeks five seconds backward, clamped to zero. |
 | Shift+Right Arrow | Nudge forward farther | Seeks five seconds forward, clamped to the player duration. |
 | Command+S or Control+S | Save project | Calls the save callback supplied by the application. |
-| Command+Z or Control+Z | Undo | Undoes the last timeline operation. |
-| Command+Shift+Z or Control+Shift+Z | Redo | Redoes the last undone timeline operation. |
+| Command+Z or Control+Z | Undo | Undoes the last timeline or saved person/association edit in chronological order. |
+| Command+Shift+Z or Control+Shift+Z | Redo | Redoes the last undone timeline or person/association edit. |
 
 ## Clip Clipboard and Selection
 
@@ -87,9 +87,13 @@ Other chords, composition events, and key releases restore normal menu shortcut 
 ## Speaker Labels
 
 Click a speaker label to show or hide that speaker's transcript; this does not mute their audio.
-Double-click the label or press F2 while it is focused to rename it.
-Enter saves the edited name and Escape cancels it.
-The separate color button opens a color picker; Apply color persists the choice and Escape dismisses the picker.
+The pencil button opens one anchored editor with basic information and person associations.
+Edits are a draft until Save; Escape, Cancel, or a click outside discards the draft.
+Inside an association editor, double-click a member name (or Enter/F2 while focused) to edit it inline.
+Drag a person tag onto another to create an association named after the receiving tag; association tags filter all their members together.
+Manage people presents associations as parent nodes and their people as children.
+People with unavailable or outdated diarization bindings are read-only and cannot be associated.
+Keyboard input inside the editor stays local, including native text undo; saved edits participate in project Undo/Redo.
 
 ## Settings and Onboarding Dialogs
 

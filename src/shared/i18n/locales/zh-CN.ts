@@ -1,5 +1,30 @@
 import type { TranslationResource } from './en'
 export const simplifiedChineseResources = {
+  speakerIdentity: {
+    manage: '人物管理',
+    edit: '编辑{{name}}',
+    basic: '基本信息',
+    name: '名称',
+    members: '关联人物',
+    add: '添加人物',
+    addPerson: '添加{{name}}',
+    remove: '移除{{name}}',
+    rename: '重命名{{name}}',
+    review: '需要检查',
+    reviewHelp: '识别结果已更改，历史人物信息为只读。',
+    empty: '暂无关联人物',
+    automatic: '自动颜色',
+    expand: '展开{{name}}',
+    collapse: '收起{{name}}',
+    color: '{{name}}的颜色',
+    hex: 'Hex',
+    apply: '应用颜色',
+    invalid: '请输入 1–80 字符的名称和有效的六位 Hex 颜色。',
+    failed: '无法保存人物更改，请重试。',
+    changed: '编辑期间人物信息已更改，请关闭并重新打开以查看最新版本。',
+    association: '关联',
+    person: '人物',
+  },
   settings: {
     localLogin: '本机 Hugging Face 登录',
     localLoginHelp:

@@ -1,3 +1,4 @@
+import type { SaveSpeakerIdentitiesRequest } from '../shared/SpeakerIdentityTypes'
 import type { SpeechBatchSummary } from '../shared/speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from '../shared/resources.types'
 import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from '../shared/modelAccess.types'
@@ -156,6 +157,10 @@ const api = {
     get: () => invokeSafe<WorkspaceLayoutReadResult>(invoke, 'workspace-layout:get'),
     set: (layout: WorkspaceLayout) =>
       invokeSafe<WorkspaceLayout>(invoke, 'workspace-layout:set', layout),
+  },
+  speakerIdentity: {
+    save: (request: SaveSpeakerIdentitiesRequest) =>
+      invokeSafe<RendererSession>(invoke, 'speaker-identity:save', request),
   },
   speakerLabel: {
     rename: (request: RenameSpeakerRequest) =>

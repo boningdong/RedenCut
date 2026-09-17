@@ -1,3 +1,4 @@
+import type { SpeakerIdentityCatalog } from './SpeakerIdentityTypes'
 import type { AudioSourceCacheDescriptor, WorkspaceDescriptor } from './import.types'
 import type { AudioMetadata, AudioSourceId, ProjectFile, Track } from './project.types'
 import type { RendererSpeechAnalysis } from './speech.types'
@@ -25,6 +26,7 @@ export interface RendererSession extends SessionPrecondition {
   workspace: WorkspaceDescriptor
   sources: RendererAudioSource[]
   draft: ProjectDraft
+  speakerIdentities?: SpeakerIdentityCatalog
   speechAnalyses: RendererSpeechAnalysis[]
 }
 

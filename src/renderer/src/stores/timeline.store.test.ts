@@ -430,7 +430,7 @@ describe('undo', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     expect(primaryClips()).toHaveLength(2)
-    tl().undo()
+    void tl().undo()
     expect(primaryClips()).toHaveLength(1)
     expect(primaryClips()[0].sourceStart).toBe(0)
     expect(primaryClips()[0].sourceEnd).toBe(100)
@@ -438,7 +438,7 @@ describe('undo', () => {
 
   it('reverts a redactRange operation', () => {
     tl().redactRange(primaryTrackId(), 20, 60)
-    tl().undo()
+    void tl().undo()
     expect(primaryClips()).toHaveLength(1)
     expect(primaryClips()[0].muted).toBe(false)
   })
@@ -446,7 +446,7 @@ describe('undo', () => {
   it('unmutes transcript words when undoing a mute', () => {
     useTranscriptStore.getState().setWords([makeWord('w1', 22, 30), makeWord('w2', 35, 45)])
     tl().redactRange(primaryTrackId(), 20, 60)
-    tl().undo()
+    void tl().undo()
     const { words } = useTranscriptStore.getState()
     expect(words.find((w) => w.id === 'w1')!.muted).toBe(false)
     expect(words.find((w) => w.id === 'w2')!.muted).toBe(false)
@@ -459,9 +459,9 @@ describe('undo', () => {
     tl().setSelectedClipId(secondClip.id)
     tl().splitAt(60)
     expect(tl().undoStack).toHaveLength(2)
-    tl().undo()
+    void tl().undo()
     expect(tl().undoStack).toHaveLength(1)
-    tl().undo()
+    void tl().undo()
     expect(tl().undoStack).toHaveLength(0)
   })
 
@@ -474,9 +474,9 @@ describe('undo', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(40) // op 1: [0–40][40–100]
     tl().redactRange(primaryTrackId(), 60, 80) // op 2: [0–40][40–60][60–80 muted][80–100]
-    tl().undo() // undo op 2
+    void tl().undo() // undo op 2
     expect(primaryClips()).toHaveLength(2)
-    tl().undo() // undo op 1
+    void tl().undo() // undo op 1
     expect(primaryClips()).toHaveLength(1)
   })
 
@@ -484,7 +484,7 @@ describe('undo', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     tl().setSelectedClipId(primaryClips()[0].id)
-    tl().undo()
+    void tl().undo()
     expect(tl().selectedClipId).toBeNull()
   })
 })
@@ -502,9 +502,9 @@ describe('redo', () => {
   it('re-applies a split that was undone', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
-    tl().undo()
+    void tl().undo()
     expect(primaryClips()).toHaveLength(1)
-    tl().redo()
+    void tl().redo()
     expect(primaryClips()).toHaveLength(2)
     expect(primaryClips()[0].sourceEnd).toBe(50)
     expect(primaryClips()[1].sourceStart).toBe(50)
@@ -512,9 +512,9 @@ describe('redo', () => {
 
   it('re-applies a redactRange that was undone', () => {
     tl().redactRange(primaryTrackId(), 20, 60)
-    tl().undo()
+    void tl().undo()
     expect(primaryClips().every((c) => !c.muted)).toBe(true)
-    tl().redo()
+    void tl().redo()
     expect(primaryClips()).toHaveLength(1)
     expect(primaryClips()[0].redactions).toMatchObject([{ sourceStart: 20, sourceEnd: 60 }])
   })
@@ -522,9 +522,9 @@ describe('redo', () => {
   it('redo restores coverage without mutating raw transcript words', () => {
     useTranscriptStore.getState().setWords([makeWord('w1', 22, 30), makeWord('w2', 35, 45)])
     tl().redactRange(primaryTrackId(), 20, 60)
-    tl().undo()
+    void tl().undo()
     expect(useTranscriptStore.getState().words.find((w) => w.id === 'w1')!.muted).toBe(false)
-    tl().redo()
+    void tl().redo()
     expect(useTranscriptStore.getState().words.find((w) => w.id === 'w1')!.muted).toBe(false)
     expect(useTranscriptStore.getState().words.find((w) => w.id === 'w2')!.muted).toBe(false)
   })
@@ -539,14 +539,14 @@ describe('redo', () => {
   it('clears the redo stack when a new mutation is made after undo', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
-    tl().undo()
+    void tl().undo()
     expect(tl().redoStack).toHaveLength(1)
 
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(30)
     expect(tl().redoStack).toHaveLength(0)
 
-    tl().redo() // no-op now
+    void tl().redo() // no-op now
     expect(primaryClips()).toHaveLength(2) // only the new split at 30
   })
 
@@ -554,9 +554,9 @@ describe('redo', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
     for (let i = 0; i < 3; i++) {
-      tl().undo()
+      void tl().undo()
       expect(primaryClips()).toHaveLength(1)
-      tl().redo()
+      void tl().redo()
       expect(primaryClips()).toHaveLength(2)
     }
   })
@@ -564,10 +564,10 @@ describe('redo', () => {
   it('pushes a redo entry back to undoStack (enabling undo after redo)', () => {
     tl().setSelectedClipId(primaryClips()[0].id)
     tl().splitAt(50)
-    tl().undo()
-    tl().redo()
+    void tl().undo()
+    void tl().redo()
     expect(tl().undoStack).toHaveLength(1)
-    tl().undo()
+    void tl().undo()
     expect(primaryClips()).toHaveLength(1)
   })
 
@@ -577,13 +577,13 @@ describe('redo', () => {
     const secondClip = primaryClips().find((c) => c.sourceStart === 30)!
     tl().setSelectedClipId(secondClip.id)
     tl().splitAt(70) // op2: [0–30][30–70][70–100]
-    tl().undo() // undo op2
-    tl().undo() // undo op1
+    void tl().undo() // undo op2
+    void tl().undo() // undo op1
     expect(primaryClips()).toHaveLength(1)
 
-    tl().redo() // redo op1
+    void tl().redo() // redo op1
     expect(primaryClips()).toHaveLength(2)
-    tl().redo() // redo op2
+    void tl().redo() // redo op2
     expect(primaryClips()).toHaveLength(3)
   })
 })
@@ -739,9 +739,9 @@ describe('occurrence-scoped transcript muting', () => {
     ])
     expect(tl().undoStack).toHaveLength(1)
     const edited = tl().tracks
-    tl().undo()
+    void tl().undo()
     expect(tl().tracks).toEqual(before)
-    tl().redo()
+    void tl().redo()
     expect(tl().tracks).toEqual(edited)
   })
 
@@ -815,7 +815,7 @@ it('atomically redacts continuous sibling clips, retains other occurrences and u
     tl().tracks[0].clips.map((c) => c.redactions?.map((r) => [r.sourceStart, r.sourceEnd]) ?? []),
   ).toEqual([[[1, 2]], [[2, 3]], []])
   expect(tl().undoStack).toHaveLength(1)
-  tl().undo()
+  void tl().undo()
   expect(tl().tracks).toEqual([track])
   const stale = { ...next, outputStart: 14 }
   expect(tl().redactTranscriptRange('t', [original, stale] as never, { start: 1, end: 3 })).toBe(

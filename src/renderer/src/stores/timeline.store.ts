@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand'
+import { useEditorHistoryStore, type DomainHistoryEdit } from './EditorHistoryStore'
 import type { AudioSourceId, Clip, ClipRedaction, Track } from '@shared/project.types'
 import type { RendererAudioSource } from '@shared/session.types'
 import { useEditorStore } from './editor.store'
@@ -78,6 +79,7 @@ function tracksEqual(left: Track[], right: Track[]): boolean {
 // ── History entry ──────────────────────────────────────────────────────────────
 
 interface HistoryEntry {
+  domainEdit?: DomainHistoryEdit
   /** Snapshot of tracks[] BEFORE this operation — restored on undo. */
   before: Track[]
   /** Human-readable description for debugging. */
@@ -209,8 +211,9 @@ interface TimelineState {
 
   // ── Undo / Redo ────────────────────────────────────────────────────────────
 
-  undo(): void
-  redo(): void
+  recordDomainEdit(edit: DomainHistoryEdit): void
+  undo(): void | Promise<void>
+  redo(): void | Promise<void>
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -823,10 +826,22 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   // ── undo ────────────────────────────────────────────────────────────────────
+  recordDomainEdit(edit) {
+    set((state) => ({
+      undoStack: [
+        ...state.undoStack,
+        { before: cloneTracks(state.tracks), label: edit.label, domainEdit: edit },
+      ],
+      redoStack: [],
+    }))
+  },
+
   undo() {
+    if (useEditorHistoryStore.getState().busy) return
     const { undoStack, tracks } = get()
     if (undoStack.length === 0) return
     const entry = undoStack[undoStack.length - 1]
+    if (entry.domainEdit) return useEditorHistoryStore.getState().perform(entry.domainEdit, 'undo')
 
     // Capture current state as a redo entry so we can re-apply this op.
     // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
@@ -848,9 +863,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── redo ────────────────────────────────────────────────────────────────────
   redo() {
+    if (useEditorHistoryStore.getState().busy) return
     const { redoStack, tracks } = get()
     if (redoStack.length === 0) return
     const entry = redoStack[redoStack.length - 1]
+    if (entry.domainEdit) return useEditorHistoryStore.getState().perform(entry.domainEdit, 'redo')
 
     // Capture current (pre-redo) state as an undo entry so the user can undo again.
     const undoEntry: HistoryEntry = {

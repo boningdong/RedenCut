@@ -1,3 +1,4 @@
+import { saveSpeakerIdentities } from './actions/SpeakerIdentityActions'
 import { useSpeechBatchStore } from './stores/speechBatch.store'
 import type { PublicMessage } from '@shared/publicMessages'
 import type { ImportProgress } from '@shared/import.types'
@@ -935,6 +936,12 @@ export default function App() {
         )}
         transcript={(workspaceControls) => (
           <TranscriptPanel
+            onSaveSpeakerIdentities={(expected, next) =>
+              saveSpeakerIdentities(expected, next, async (updated) => {
+                const draft = snapshotDraft()
+                if (draft) await applyBackgroundSession(updated, draft)
+              })
+            }
             workspaceControls={workspaceControls}
             onGenerate={(trackId) => void generateTranscript(trackId)}
             onRegenerate={() => void generateTranscript(undefined, 'regenerate')}

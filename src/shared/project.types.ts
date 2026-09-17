@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SpeakerIdentityCatalogSchema } from './SpeakerIdentityTypes'
 import {
   AudioSourceFingerprintSchema,
   AudioSourceIdSchema,
@@ -195,6 +196,7 @@ export const ProjectFileSchema = z
     audioSources: z.array(AudioSourceSchema),
     speechArtifacts: z.array(SpeechArtifactRefSchema).default([]),
     speakerLabelOverrides: z.array(SpeakerLabelOverrideSchema).default([]),
+    speakerIdentities: SpeakerIdentityCatalogSchema.optional(),
     adjustments: z.array(AdjustmentSchema).default([]),
     markers: z.array(MarkerSchema).default([]),
     export: ExportSettingsSchema.prefault({}),
