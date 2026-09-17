@@ -3,11 +3,9 @@ import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 import { useTranslation } from '../../i18n/useTranslation'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
-import { getAudioPlayerInstance } from '@shared/player.types'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorStore } from '../../stores/editor.store'
-import { usePlaybackStore } from '../../stores/playback.store'
 import { projectTranscript, type TranscriptOccurrence } from '../../domain/transcriptProjection'
 import {
   resolveTranscriptSelection,
@@ -15,6 +13,7 @@ import {
 } from '../../domain/transcriptSelection'
 import type { TranscriptPanelProps } from './TranscriptPanel'
 import { TranscriptDialogue } from './TranscriptDialogue'
+import { CanonicalTranscriptUnit } from './CanonicalTranscriptUnit'
 import { SpeakerLabels } from './SpeakerLabels'
 import { speakerKey, unassignedSpeakerKey } from '../../domain/speakerPresentation'
 import { useSpeakerColors } from '../../hooks/useSpeakerColors'
@@ -34,7 +33,6 @@ export function CanonicalTranscriptPanel({
 }: TranscriptPanelProps & { analyses: RendererSpeechAnalysis[] }) {
   const { t } = useTranslation()
   const tracks = useTimelineStore((s) => s.tracks)
-  const currentTime = usePlaybackStore((s) => s.currentTime)
   const setSelection = useEditorStore((s) => s.setSelection)
   const colors = useSpeakerColors()
   const hidden = useTranscriptStore((s) => s.hiddenSpeakerKeys)
@@ -179,104 +177,19 @@ export function CanonicalTranscriptPanel({
     } else if (event.key.length === 1) event.preventDefault()
   }
   const renderUnit = (u: TranscriptOccurrence) => {
-    const editable = u.unit.kind === 'speech' && u.outputStart !== null
-    const current =
-      editable && !u.muted && currentTime >= u.outputStart! && currentTime < u.outputEnd!
-    const highlighted =
-      pending?.occurrence.track.id === u.track.id &&
-      pending.clips.some((c) => c.id === u.clip.id) &&
-      pending.resolvedUnitIds.includes(u.unit.id)
     const speaker = u.speakerId ?? u.contextSpeakerId
-    const color = speaker ? colors.get(speakerKey(u.analysis, speaker)) : undefined
     return (
-      <span
+      <CanonicalTranscriptUnit
         key={u.id}
-        ref={(element) => {
-          if (element) elements.current.set(u.id, element)
-          else elements.current.delete(u.id)
-        }}
-        data-occurrence-id={u.id}
-        data-unit-id={u.unit.id}
-        data-track-id={u.track.id}
-        data-clip-id={u.clip.id}
-        data-unit-kind={u.unit.kind}
-        data-acoustic-editable={editable}
-        data-timing-origin={u.timingOrigin}
-        data-acoustic-unit-size={u.acousticUnitSize}
-        data-current={current}
-        data-playing={current}
-        data-partial={u.partial}
-        data-redaction={u.redaction ?? 'none'}
-        data-output-start={u.outputStart ?? undefined}
-        data-output-end={u.outputEnd ?? undefined}
-        data-speaker-id={u.speakerId}
-        title={
-          u.redaction === 'partial'
-            ? t('transcript.partiallyRedactedHint')
-            : u.unit.kind === 'punctuation'
-              ? t('transcript.punctuationHint')
-              : !hasValidatedTiming(u.analysis)
-                ? t('transcript.unverifiedHint')
-                : !editable
-                  ? t('transcript.unalignedHint')
-                  : u.ambiguous
-                    ? t('transcript.uncertainHint')
-                    : t(
-                        u.partial
-                          ? 'transcript.partialUnitHint'
-                          : u.timingOrigin === 'anchor-inferred' ||
-                              u.timingOrigin === 'group-fallback'
-                            ? 'transcript.estimatedUnitHint'
-                            : (u.acousticUnitSize ?? 1) > 1
-                              ? 'transcript.groupedUnitHint'
-                              : 'transcript.unitHint',
-                        {
-                          name: u.track.name,
-                          seconds: u.outputStart!.toFixed(2),
-                        },
-                      )
-        }
-        onClick={() => {
-          if (editable && window.getSelection()?.isCollapsed)
-            getAudioPlayerInstance()?.seekTo(u.outputStart!)
-        }}
-        className="transcript-unit"
-        style={
-          {
-            textDecoration:
-              u.redaction === 'full' && editable
-                ? 'line-through'
-                : u.redaction === 'partial' && editable
-                  ? 'underline dashed'
-                  : !editable && u.unit.kind === 'speech'
-                    ? 'underline dotted'
-                    : current
-                      ? 'underline'
-                      : 'none',
-            opacity: u.muted && editable ? 0.5 : u.unit.kind === 'punctuation' ? 0.65 : 1,
-            background: highlighted
-              ? 'var(--color-warning-muted)'
-              : current
-                ? 'var(--color-accent-subtle)'
-                : undefined,
-            color: undefined,
-            '--track-color': color,
-            borderBottom: current && color ? `2px solid ${color}` : undefined,
-          } as React.CSSProperties
-        }
-      >
-        {u.leadingSpace ? ' ' : ''}
-        {u.unit.text}
-        {u.partial && (
-          <sup
-            contentEditable={false}
-            className="transcript-partial-label"
-            title={t('transcript.partialHint')}
-          >
-            {t('transcript.partial')}
-          </sup>
+        unit={u}
+        elements={elements}
+        color={speaker ? colors.get(speakerKey(u.analysis, speaker)) : undefined}
+        highlighted={Boolean(
+          pending?.occurrence.track.id === u.track.id &&
+          pending.clips.some((c) => c.id === u.clip.id) &&
+          pending.resolvedUnitIds.includes(u.unit.id),
         )}
-      </span>
+      />
     )
   }
   const missing = tracks.filter((t) =>
@@ -331,12 +244,7 @@ export function CanonicalTranscriptPanel({
         onKeyDown={keyDown}
         className="transcript-document"
       >
-        <TranscriptDialogue
-          units={units}
-          tracks={tracks}
-          renderUnit={renderUnit}
-          currentTime={currentTime}
-        />
+        <TranscriptDialogue units={units} tracks={tracks} renderUnit={renderUnit} />
         {!units.length && (
           <p>{t(allUnits.length ? 'transcript.allSpeakersHidden' : 'transcript.emptyTimeline')}</p>
         )}

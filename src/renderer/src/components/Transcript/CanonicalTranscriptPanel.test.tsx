@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
+import type { TranscriptUnitId, AcousticEditUnitId } from '@shared/speech.types'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEditorStore } from '../../stores/editor.store'
@@ -16,6 +17,7 @@ const sourceId = '550e8400-e29b-41d4-a716-446655440000'
 describe('canonical transcript editability', () => {
   beforeEach(() => {
     useLocaleStore.setState({ resolvedLocale: 'en' })
+    usePlaybackStore.getState().reset()
     useEditorStore.getState().reset()
     useTimelineStore.getState().reset()
     useTranscriptStore.getState().reset()
@@ -89,6 +91,64 @@ describe('canonical transcript editability', () => {
         speakerLabelOverrides: [],
       } as never,
     ])
+  })
+
+  it('updates playback highlighting without rerendering a long transcript or disturbing selection', () => {
+    const analysis = useTranscriptStore.getState().analyses[0]
+    let textReads = 0
+    const units = Array.from({ length: 2000 }, (_, index) => ({
+      id: `word-${index}` as TranscriptUnitId,
+      kind: 'speech' as const,
+      get text() {
+        textReads++
+        return '字'
+      },
+    }))
+    useTranscriptStore.getState().loadAnalyses([
+      {
+        ...analysis,
+        transcript: { ...analysis.transcript, units },
+        alignment: {
+          ...analysis.alignment,
+          acousticEditUnits: units.map((unit, index) => ({
+            ...analysis.alignment.acousticEditUnits[0],
+            id: `acoustic-${index}` as AcousticEditUnitId,
+            transcriptUnitIds: [unit.id],
+            sourceStart: index,
+            sourceEnd: index + 0.5,
+          })),
+        },
+      },
+    ])
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: [{ ...track.clips[0], muted: false, sourceEnd: 2000 }] }],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const first = document.querySelector('[data-unit-id="word-0"]')!
+    const second = document.querySelector('[data-unit-id="word-1"]')!
+    const range = document.createRange()
+    range.setStart(first.firstChild!, 0)
+    range.setEnd(second.firstChild!, 1)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    textReads = 0
+
+    for (let tick = 1; tick <= 20; tick++) {
+      act(() => usePlaybackStore.getState().setCurrentTime(tick / 100))
+    }
+    act(() => usePlaybackStore.getState().setCurrentTime(1000.25))
+    expect(document.querySelector('[data-playing="true"]')?.getAttribute('data-unit-id')).toBe(
+      'word-1000',
+    )
+    act(() => usePlaybackStore.getState().setCurrentTime(0.25))
+    expect(first.getAttribute('data-playing')).toBe('true')
+    act(() => usePlaybackStore.getState().setCurrentTime(0.5))
+    expect(document.querySelectorAll('[data-playing="true"]')).toHaveLength(0)
+    expect(window.getSelection()?.toString()).toBe('字字')
+    expect(document.querySelector('[data-unit-id="word-0"]')).toBe(first)
+    // Only words entering/leaving the playhead may need their display content again.
+    expect(textReads).toBeLessThan(50)
   })
 
   it('hides recognized people without timeline clips from management', () => {

@@ -1,3 +1,4 @@
+import { usePlaybackStore } from '../../stores/playback.store'
 import type { Track } from '@shared/project.types'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -96,12 +97,10 @@ function OverlapCard({
   block,
   tracks,
   renderUnit,
-  currentTime,
 }: {
   block: DialogueBlock
   tracks?: Track[]
   renderUnit: RenderUnit
-  currentTime: number
 }) {
   const { t } = useTranslation()
   const [aligned, setAligned] = useState(false)
@@ -116,7 +115,9 @@ function OverlapCard({
     observer.observe(ref.current)
     return () => observer.disconnect()
   }, [])
-  const active = block.overlaps.some((o) => currentTime >= o.start && currentTime < o.end)
+  const active = usePlaybackStore((state) =>
+    block.overlaps.some((o) => state.currentTime >= o.start && state.currentTime < o.end),
+  )
   const start = block.overlaps[0].start,
     end = block.overlaps[block.overlaps.length - 1].end
   const lines = useMemo(() => {
@@ -241,25 +242,17 @@ export function TranscriptDialogue({
   units,
   tracks,
   renderUnit,
-  currentTime,
 }: {
   units: TranscriptOccurrence[]
   tracks?: Track[]
   renderUnit: RenderUnit
-  currentTime: number
 }) {
   const blocks = useMemo(() => buildDialogueBlocks(units, tracks), [units, tracks])
   return (
     <div className="transcript-dialogue">
       {blocks.map((block) =>
         block.overlaps.length ? (
-          <OverlapCard
-            key={block.id}
-            block={block}
-            tracks={tracks}
-            renderUnit={renderUnit}
-            currentTime={currentTime}
-          />
+          <OverlapCard key={block.id} block={block} tracks={tracks} renderUnit={renderUnit} />
         ) : (
           <ReadRows tracks={tracks} key={block.id} units={block.units} renderUnit={renderUnit} />
         ),

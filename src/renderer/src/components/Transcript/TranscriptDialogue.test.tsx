@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { usePlaybackStore } from '../../stores/playback.store'
 import { TranscriptDialogue } from './TranscriptDialogue'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 function occurrence(
@@ -22,6 +23,7 @@ function occurrence(
     muted: false,
   } as unknown as TranscriptOccurrence
 }
+beforeEach(() => usePlaybackStore.getState().reset())
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -47,7 +49,6 @@ it('wraps shared measured columns inside each speaker lane and preserves every u
     <TranscriptDialogue
       units={units}
       renderUnit={(u) => <span data-rendered-unit={u.id}>{u.unit.text}</span>}
-      currentTime={1.5}
     />,
   )
   fireEvent.click(screen.getByRole('button', { name: 'Align' }))
@@ -95,7 +96,6 @@ it('renders deleted words inline with a single speaker label across audio fragme
   render(
     <TranscriptDialogue
       units={units}
-      currentTime={0}
       renderUnit={(u) => (u.muted ? <s>{u.unit.text}</s> : <span>{u.unit.text}</span>)}
     />,
   )
@@ -106,22 +106,24 @@ it('renders deleted words inline with a single speaker label across audio fragme
 })
 
 it('renders short boundary context inside the card without marking its time as simultaneous', () => {
+  usePlaybackStore.getState().setCurrentTime(8.54)
   const units = [
     occurrence('a', 'a', 6.984, 8.533),
     occurrence('b', 'b', 6.984, 8.533),
     occurrence('tail', 'a', 8.535, 8.555, '楚'),
   ]
-  render(
-    <TranscriptDialogue
-      units={units}
-      currentTime={8.54}
-      renderUnit={(u) => <span>{u.unit.text}</span>}
-    />,
-  )
+  render(<TranscriptDialogue units={units} renderUnit={(u) => <span>{u.unit.text}</span>} />)
   const card = document.querySelector('.transcript-overlap')!
   expect(card.textContent).toContain('楚')
   expect(card.classList.contains('is-live')).toBe(false)
   expect(card.getAttribute('data-overlap-end')).toBe('8.533')
+  act(() => usePlaybackStore.getState().setCurrentTime(7))
+  expect(card.classList.contains('is-live')).toBe(true)
+  act(() => usePlaybackStore.getState().setCurrentTime(8.533))
+  expect(card.classList.contains('is-live')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'Align' }))
+  act(() => usePlaybackStore.getState().setCurrentTime(7.5))
+  expect(card.classList.contains('is-live')).toBe(true)
 })
 
 it('renders one reading row across a silent interstitial clip', () => {
@@ -145,7 +147,6 @@ it('renders one reading row across a silent interstitial clip', () => {
     <TranscriptDialogue
       units={units}
       tracks={tracks}
-      currentTime={0}
       renderUnit={(u) => <span>{u.unit.text}</span>}
     />,
   )
@@ -158,7 +159,6 @@ it('labels unattributed completed diarization as unassigned while skipped analys
   const { rerender } = render(
     <TranscriptDialogue
       units={[{ ...base, analysis: { ...base.analysis, diarizationStatus: 'completed' } }]}
-      currentTime={0}
       renderUnit={(u) => <span>{u.unit.text}</span>}
     />,
   )
@@ -168,7 +168,6 @@ it('labels unattributed completed diarization as unassigned while skipped analys
   rerender(
     <TranscriptDialogue
       units={[{ ...base, analysis: { ...base.analysis, diarizationStatus: 'skipped-disabled' } }]}
-      currentTime={0}
       renderUnit={(u) => <span>{u.unit.text}</span>}
     />,
   )
