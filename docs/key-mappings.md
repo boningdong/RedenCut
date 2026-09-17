@@ -8,9 +8,9 @@ Update the implementation and this document together whenever a mapping or its c
 | Key | Action | Context and behavior |
 | --- | --- | --- |
 | Space | Play or pause | Requires an active player. In preview mode, playback skips redacted sections. |
-| S | Split at playhead | Requires an active player and a selected clip; the playhead must be strictly inside that clip's output range. |
-| M | Mute clip or redact selection | Toggles ordinary mute for a selected clip. Otherwise redacts a waveform range on the selected track. In canonical transcript text, creates overlays in the exact occurrence, asking for confirmation when acoustic boundaries expand the selection. |
-| U | Unmute clip | Unmutes the selected clip, or muted clips overlapping the waveform selection; overlays are unchanged. |
+| S | Split at playhead | Requires an active player and exactly one selected clip; the playhead must be strictly inside that clip's output range. |
+| M | Mute clips or redact selection | Applies the inverse of the primary clip’s mute state to all selected clips in one edit. Otherwise redacts a waveform range on the selected track. In canonical transcript text, creates overlays in the exact occurrence, asking for confirmation when acoustic boundaries expand the selection. |
+| U | Unmute clips | Unmutes all selected clips in one edit, or muted clips overlapping the waveform selection; overlays are unchanged. |
 | Delete or Backspace | Remove selected object or redact selection | Removes a selected overlay to restore its audio; a selected clip is removed instead. With a range or transcript selection, creates clip-owned overlays. |
 | Escape | Cancel drag or clear selection | Cancels an active overlay move or resize without an edit; otherwise clears waveform and timeline selection. |
 | Left Arrow | Nudge backward | Seeks one second backward, clamped to zero. |
@@ -20,6 +20,21 @@ Update the implementation and this document together whenever a mapping or its c
 | Command+S or Control+S | Save project | Calls the save callback supplied by the application. |
 | Command+Z or Control+Z | Undo | Undoes the last timeline operation. |
 | Command+Shift+Z or Control+Shift+Z | Redo | Redoes the last undone timeline operation. |
+
+## Clip Clipboard and Selection
+
+With focus in Audio, Command/Control+C copies selected clips, X cuts them, V pastes at the playhead on the selected track, and D duplicates after the selection.
+The clip actions menu exposes the same commands.
+Clipboard contents are local to the project and reset on project replacement; text inputs and transcript copy/paste retain their native behavior.
+Copies share source audio but receive independent clip and redaction identities.
+Shift-click toggles clips in the selection; dragging from blank lane space marquee-selects clips, with Shift adding to the selection.
+Moving a selection preserves its time spacing and relative track positions; deleting clips leaves gaps.
+
+Drag a clip onto another lane to preview the exact placement in a bordered frame; release commits one undoable edit, and Escape cancels.
+The Snap button toggles clip-edge alignment; the Insert button places the selection at a seam and shifts following clips on affected destination tracks only.
+An invalid destination does not commit.
+Drag clip edges to trim or reveal source audio without changing the source file or deleting hidden redactions.
+Focused trim handles use Left/Right for 10 ms adjustments and Shift+Left/Right for 100 ms adjustments.
 
 ## Audio Toolbar
 

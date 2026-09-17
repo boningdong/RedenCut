@@ -6,6 +6,14 @@ import { useTimelineStore } from '../stores/timeline.store'
 import { useTranscriptStore } from '../stores/transcript.store'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 
+const clipboardActions = vi.hoisted(() => ({
+  copyClips: vi.fn(() => true),
+  cutClips: vi.fn(() => true),
+  pasteClips: vi.fn(() => true),
+  duplicateClips: vi.fn(() => true),
+}))
+vi.mock('../actions/ClipClipboardActions', () => clipboardActions)
+
 const player = vi.hoisted(() => ({
   isPlaying: () => true,
   getCurrentTime: () => 2,
@@ -21,7 +29,10 @@ function Controls({ onSave }: { onSave?: () => void } = {}) {
   useKeyboardShortcuts({ onSave })
   return (
     <>
-      <input aria-label="Name" />
+      <div className="audio-panel-view">
+        <input aria-label="Name" />
+        <div tabIndex={0}>Audio editor</div>
+      </div>
       <div contentEditable suppressContentEditableWarning data-testid="transcript">
         Transcript
       </div>
@@ -158,3 +169,88 @@ it.each(['KeyM', 'KeyS', 'KeyU', 'Delete'])(
     expect(useTimelineStore.getState().undoStack).toHaveLength(0)
   },
 )
+
+it.each([
+  ['KeyC', 'copyClips', 'ctrlKey'],
+  ['KeyX', 'cutClips', 'metaKey'],
+  ['KeyV', 'pasteClips', 'ctrlKey'],
+  ['KeyD', 'duplicateClips', 'metaKey'],
+] as const)('routes %s to clipboard actions from Audio focus', (code, action, modifier) => {
+  render(<Controls />)
+  const event = new KeyboardEvent('keydown', {
+    key: code.slice(-1).toLowerCase(),
+    code,
+    [modifier]: true,
+    bubbles: true,
+    cancelable: true,
+  })
+
+  fireEvent(screen.getByText('Audio editor'), event)
+
+  expect(event.defaultPrevented).toBe(true)
+  expect(clipboardActions[action]).toHaveBeenCalledOnce()
+})
+
+it('unmutes the complete selected clip batch with U', () => {
+  useTimelineStore.setState((state) => ({
+    tracks: state.tracks.map((track) => ({
+      ...track,
+      clips: [
+        ...track.clips.map((clip) => ({ ...clip, muted: true })),
+        { ...track.clips[0], id: 'clip-b', outputStart: 5, muted: true },
+      ],
+    })),
+    selectedClipIds: ['clip', 'clip-b'],
+    selectedClipId: 'clip',
+  }))
+  render(<Controls />)
+
+  fireEvent.keyDown(screen.getByText('Audio editor'), { key: 'u', code: 'KeyU' })
+
+  expect(useTimelineStore.getState().tracks[0].clips.map((clip) => clip.muted)).toEqual([
+    false,
+    false,
+  ])
+  expect(useTimelineStore.getState().undoStack).toHaveLength(1)
+})
+
+it('leaves clipboard chords native outside Audio focus and in editable content', () => {
+  render(<Controls />)
+  const transcript = screen.getByTestId('transcript')
+  Object.defineProperty(transcript, 'isContentEditable', { value: true })
+
+  const outside = new KeyboardEvent('keydown', {
+    key: 'c',
+    code: 'KeyC',
+    metaKey: true,
+    bubbles: true,
+    cancelable: true,
+  })
+  fireEvent(screen.getByText('Editor'), outside)
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'x', code: 'KeyX', metaKey: true })
+  fireEvent.keyDown(transcript, { key: 'v', code: 'KeyV', metaKey: true })
+
+  expect(outside.defaultPrevented).toBe(false)
+  expect(clipboardActions.copyClips).not.toHaveBeenCalled()
+  expect(clipboardActions.cutClips).not.toHaveBeenCalled()
+  expect(clipboardActions.pasteClips).not.toHaveBeenCalled()
+})
+
+it('does not run Audio clipboard actions while a transcript selection remains active', () => {
+  render(<Controls />)
+  act(() => {
+    useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['word']))
+  })
+  const event = new KeyboardEvent('keydown', {
+    key: 'x',
+    code: 'KeyX',
+    metaKey: true,
+    bubbles: true,
+    cancelable: true,
+  })
+
+  fireEvent(screen.getByText('Audio editor'), event)
+
+  expect(event.defaultPrevented).toBe(false)
+  expect(clipboardActions.cutClips).not.toHaveBeenCalled()
+})

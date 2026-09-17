@@ -80,3 +80,10 @@ describe('createTranslator', () => {
     expect(translator.t('app.languageLabel')).toBe('Language')
   })
 })
+
+it('interpolates clip selection counts in both bundled locales', () => {
+  expect(createTranslator('en').t('waveform.clipsSelected', { count: 2 })).toBe('2 clips selected')
+  expect(createTranslator('zh-CN').t('waveform.clipsSelected', { count: 3 })).toBe(
+    '已选中 3 个片段',
+  )
+})

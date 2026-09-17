@@ -23,7 +23,8 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 
 - [x] Register multiple managed audio sources and persist stable source identities.
 - [x] Render stacked track lanes with shared playback position.
-- [x] Move clips on the output timeline with snapping and overlap resolution.
+- [x] Move clips across tracks with exact placement previews, multi-selection, optional snapping, overlap resolution, and seam insertion.
+- [x] Trim and restore clip edges non-destructively; cut, copy, paste, duplicate, and batch mute/delete clips with atomic undo.
 - [x] Edit track names and expose mute, solo, volume, and removal controls.
 - [x] Add tracks through the native audio-file browser.
 - [ ] Accept supported audio through file drop with the same validation and loading path as browse-based import.

@@ -18,8 +18,8 @@ import { useTranslation } from '../../i18n/useTranslation'
 // Architecture:
 //   • One shared binary waveform provider for each AudioSourceId.
 //   • Only the source interval intersecting the viewport is drawn to canvas.
-//   • Clip blocks: absolutely positioned % within lane (auto-scales with zoom).
-//   • Clip drag: pointer events → moveClip() on pointer up. Snap within 5px.
+//   • Clips, ruler and previews share pixel-per-second geometry.
+//   • Gesture previews remain transient until one guarded timeline commit.
 //   • The playhead overlay remains independent from static waveform pixels.
 //
 // Log prefix: [WaveformView]
@@ -27,19 +27,21 @@ import { useTranslation } from '../../i18n/useTranslation'
 
 import { splitAtPlayhead, muteSelection, deleteSelection } from '../../actions/timelineActions'
 import { Icon } from '../ui/Icon'
-import { trackPresentationColor } from '../../themes/trackColors'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { AudioSourceId, Clip } from '@shared/project.types'
+import type { AudioSourceId } from '@shared/project.types'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
-import { CanvasWaveform } from './CanvasWaveform'
-import { ClipRedactionOverlay } from './ClipRedactionOverlay'
+import { ClipView } from './ClipView'
+import { ClipDragPreview } from './ClipDragPreview'
+import { useClipInteraction } from './UseClipInteraction'
+import { useTimelineClipboardStore } from '../../stores/TimelineClipboardStore'
+import { copyClips, cutClips, pasteClips, duplicateClips } from '../../actions/ClipClipboardActions'
+import './ClipEditing.css'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { TrackHeader } from './TrackHeader'
-import { calculateVisibleWaveformRange } from './waveformRange'
 
 interface WaveformViewProps {
   workspaceControls?: React.ReactNode
@@ -65,13 +67,17 @@ export function WaveformView({
   isImporting = false,
 }: WaveformViewProps) {
   const { t } = useTranslation()
+  const clipboardAvailable = useTimelineClipboardStore((state) => state.contents !== null)
+  const [actionFailed, setActionFailed] = useState(false)
   const tracks = useTimelineStore((s) => s.tracks)
+  const projectGeneration = useTimelineStore((s) => s.projectGeneration)
+  const audioSources = useTimelineStore((s) => s.audioSources)
   const removeTrack = useTimelineStore((s) => s.removeTrack)
-  const moveClip = useTimelineStore((s) => s.moveClip)
+  const selectedClipIds = useTimelineStore((s) => s.selectedClipIds)
+  const snappingEnabled = useTimelineStore((s) => s.snappingEnabled)
+  const insertMode = useTimelineStore((s) => s.insertMode)
   const selectedClipId = useTimelineStore((s) => s.selectedClipId)
   const timelineSelection = useTimelineStore((s) => s.timelineSelection)
-  const setSelectedClipId = useTimelineStore((s) => s.setSelectedClipId)
-  const selectedTrackId = useTimelineStore((s) => s.selectedTrackId)
   const setSelectedTrackId = useTimelineStore((s) => s.setSelectedTrackId)
 
   const currentTime = usePlaybackStore((s) => s.currentTime)
@@ -84,6 +90,12 @@ export function WaveformView({
     .flatMap((t) => t.clips)
     .reduce((max, c) => Math.max(max, c.outputStart + (c.sourceEnd - c.sourceStart)), 0)
   const duration = Math.max(sourceDuration, maxClipEnd)
+  const fitKey = `${projectGeneration}:${audioSources.map((source) => source.id).join(',')}`
+  const initialExtent = duration
+  const [fitBasis, setFitBasis] = useState({ key: fitKey, duration: initialExtent })
+  if (fitBasis.key !== fitKey || (fitBasis.duration === 0 && initialExtent > 0)) {
+    setFitBasis({ key: fitKey, duration: initialExtent })
+  }
 
   const hasTranscriptSelection = useTranscriptStore(
     (state) => state.selectedTranscriptUnitIds.size > 0,
@@ -102,11 +114,11 @@ export function WaveformView({
     .find((clip) => clip.id === selectedClipId)
   const canSplit = Boolean(
     getAudioPlayerInstance() &&
+    selectedClipIds.length === 1 &&
     selectedClip &&
     currentTime > selectedClip.outputStart &&
     currentTime < selectedClip.outputStart + selectedClip.sourceEnd - selectedClip.sourceStart,
   )
-  const setSelection = useEditorStore((s) => s.setSelection)
 
   const [altPressed, setAltPressed] = useState(false)
   const [pointerOwner, setPointerOwner] = useState<'clip' | 'redaction' | null>(null)
@@ -166,17 +178,34 @@ export function WaveformView({
   }, [])
 
   // basePxPerSec: fills viewport at zoom=1. Falls back to 100 when duration unknown.
-  const basePxPerSec = duration > 0 && viewport.width > 0 ? viewport.width / duration : 100
+  const basePxPerSec =
+    fitBasis.duration > 0 && viewport.width > 0 ? viewport.width / fitBasis.duration : 100
   const pxPerSec = basePxPerSec * zoomLevel
 
-  const handleZoomIn = useCallback(() => setZoomLevel((z) => Math.min(32, z * 2)), [])
-  const handleZoomOut = useCallback(() => setZoomLevel((z) => Math.max(MIN_ZOOM, z / 2)), [])
+  const interaction = useClipInteraction({
+    containerRef: audioPanel,
+    viewportRef: scrollViewportRef,
+    pxPerSec,
+    focusTimeline,
+  })
+  const isInteracting = interaction.isActive
+
+  const handleZoomIn = useCallback(() => {
+    if (!isInteracting()) setZoomLevel((z) => Math.min(32, z * 2))
+  }, [isInteracting])
+  const handleZoomOut = useCallback(() => {
+    if (!isInteracting()) setZoomLevel((z) => Math.max(MIN_ZOOM, z / 2))
+  }, [isInteracting])
 
   // ── Scroll-to-zoom (imperative — must be non-passive to call preventDefault) ──
   useEffect(() => {
     const el = scrollViewportRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
+      if (isInteracting()) {
+        e.preventDefault()
+        return
+      }
       // Horizontal trackpad swipe — let native overflow-x:auto handle pan
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
       // Vertical scroll / pinch → zoom
@@ -186,29 +215,21 @@ export function WaveformView({
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, []) // setZoomLevel is stable; MIN_ZOOM is a constant
-
-  // scaleFactor compresses clip positions when zoomed out below 1×.
-  // At zoomLevel ≥ 1 it equals 1 (no change). At zoomLevel < 1 clips scale
-  // proportionally so a larger time span is visible in the full-width viewport.
-  const scaleFactor = Math.min(1, zoomLevel)
+  }, [isInteracting])
 
   // ── Shared playhead position ──────────────────────────────────────────────
-  const playheadPct = duration > 0 ? (currentTime / duration) * scaleFactor * 100 : 0
+  const playheadLeft = currentTime * pxPerSec
 
   // ── Seek on lane/ruler click ───────────────────────────────────────────────
-  // At zoom < 1, clips occupy only scaleFactor * 100% of the content div.
-  // Dividing by scaleFactor maps click position back to the correct time.
   const handleLaneClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>, trackId?: string) => {
       focusTimeline()
       if (trackId) setSelectedTrackId(trackId)
       const rect = e.currentTarget.getBoundingClientRect()
-      const pct = (e.clientX - rect.left) / rect.width
-      const t = Math.min(duration, Math.max(0, (pct / scaleFactor) * duration))
+      const t = Math.min(duration, Math.max(0, (e.clientX - rect.left) / pxPerSec))
       getAudioPlayerInstance()?.seekTo(t)
     },
-    [duration, focusTimeline, scaleFactor, setSelectedTrackId],
+    [duration, focusTimeline, pxPerSec, setSelectedTrackId],
   )
 
   // ── Remove track ─────────────────────────────────────────────────────────
@@ -220,94 +241,18 @@ export function WaveformView({
     [removeTrack],
   )
 
-  // ── Clip drag ─────────────────────────────────────────────────────────────
-  const dragRef = useRef<{
-    clipId: string
-    origStart: number
-    ghostPct: number
-    trackId: string
-    startX: number
-    clipDur: number
-  } | null>(null)
-  const [ghostState, setGhostState] = useState<{ pct: number; widthPct: number } | null>(null)
-
-  const handleClipPointerDown = useCallback(
-    (e: React.PointerEvent, clip: Clip) => {
-      if (e.button !== 0) return
-      e.preventDefault()
-      focusTimeline()
-      e.currentTarget.setPointerCapture(e.pointerId)
-      const sf = Math.min(1, zoomLevel)
-      dragRef.current = {
-        clipId: clip.id,
-        origStart: clip.outputStart,
-        ghostPct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0,
-        trackId: clip.trackId,
-        startX: e.clientX,
-        clipDur: clip.sourceEnd - clip.sourceStart,
-      }
-      const widthPct =
-        duration > 0 ? ((clip.sourceEnd - clip.sourceStart) / duration) * sf * 100 : 0
-      setGhostState({ pct: duration > 0 ? (clip.outputStart / duration) * sf * 100 : 0, widthPct })
-    },
-    [duration, focusTimeline, zoomLevel],
+  const previewClips = new Map(
+    interaction.preview?.tracks.flatMap((track) =>
+      track.clips.map((clip) => [clip.id, clip] as const),
+    ) ?? [],
   )
-
-  const handleClipPointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragRef.current) return
-      const delta = e.clientX - dragRef.current.startX
-      const laneEl = (e.currentTarget as HTMLDivElement).closest('[data-lane]') as HTMLDivElement
-      const laneW = laneEl?.getBoundingClientRect().width ?? 1
-      const deltaPct = (delta / laneW) * 100
-      const rawPct = Math.max(0, dragRef.current.ghostPct + deltaPct)
-
-      // Convert to output-time, snap to nearby edges, convert back to pct
-      const sf = Math.min(1, zoomLevel)
-      const rawStart = (rawPct / 100) * (duration / sf)
-      const clipDur = dragRef.current.clipDur
-      const snapThreshSec = 5 / pxPerSec
-      const { tracks: all } = useTimelineStore.getState()
-      const allEdges = all.flatMap((t) =>
-        t.clips
-          .filter((c) => c.id !== dragRef.current!.clipId)
-          .flatMap((c) => [c.outputStart, c.outputStart + (c.sourceEnd - c.sourceStart)]),
-      )
-      let snapped = rawStart
-      for (const edge of allEdges) {
-        if (Math.abs(rawStart - edge) < snapThreshSec) {
-          snapped = edge
-          break
-        }
-        if (Math.abs(rawStart + clipDur - edge) < snapThreshSec) {
-          snapped = edge - clipDur
-          break
-        }
-      }
-      const snappedPct = (snapped / duration) * sf * 100
-
-      setGhostState((g) => (g ? { ...g, pct: snappedPct } : null))
-    },
-    [duration, zoomLevel, pxPerSec],
-  )
-
-  const handleClipPointerUp = useCallback(
-    (_e: React.PointerEvent) => {
-      if (!dragRef.current || !ghostState) {
-        dragRef.current = null
-        setGhostState(null)
-        return
-      }
-      const sf = Math.min(1, zoomLevel)
-      // Snap already applied by handleClipPointerMove — recover output time and commit.
-      // Overlap resolution is handled entirely inside moveClip (slot-based, no oscillation).
-      const rawStart = (ghostState.pct / 100) * (duration / sf)
-      moveClip(dragRef.current.clipId, Math.max(0, rawStart))
-      dragRef.current = null
-      setGhostState(null)
-    },
-    [ghostState, duration, zoomLevel, moveClip],
-  )
+  const previewEnd =
+    interaction.preview?.tracks
+      .flatMap((track) => track.clips)
+      .reduce(
+        (end, clip) => Math.max(end, clip.outputStart + clip.sourceEnd - clip.sourceStart),
+        duration,
+      ) ?? duration
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -317,6 +262,7 @@ export function WaveformView({
       tabIndex={-1}
       data-redaction-bypass={pointerOwner ? pointerOwner === 'clip' : altPressed}
       onPointerDownCapture={(e) => {
+        setActionFailed(false)
         if (e.button !== 0) return
         const target = e.target as HTMLElement
         if (target.closest('.waveform-clip'))
@@ -360,6 +306,72 @@ export function WaveformView({
           onClick={deleteSelection}
         >
           <Icon name="trash" />
+        </button>
+        <details
+          className="clip-actions"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              event.stopPropagation()
+              event.currentTarget.open = false
+            }
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+              event.currentTarget.open = false
+          }}
+        >
+          <summary aria-label={t('waveform.clipActions')} title={t('waveform.clipActions')}>
+            ···
+          </summary>
+          <div className="clip-actions-menu">
+            {(
+              [
+                ['copyClips', 'C', copyClips],
+                ['cutClips', 'X', cutClips],
+                ['pasteClips', 'V', pasteClips],
+                ['duplicateClips', 'D', duplicateClips],
+              ] as const
+            ).map(([key, shortcut, action]) => (
+              <button
+                key={key}
+                disabled={
+                  hasTranscriptSelection ||
+                  (key === 'pasteClips' ? !clipboardAvailable : !selectedClipIds.length)
+                }
+                onClick={(event) => {
+                  setActionFailed(!action())
+                  event.currentTarget.closest('details')?.removeAttribute('open')
+                  audioPanel.current?.focus()
+                }}
+              >
+                <span>{t(`waveform.${key}`)}</span>
+                <kbd>
+                  {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl+'}
+                  {shortcut}
+                </kbd>
+              </button>
+            ))}
+          </div>
+        </details>
+        <span className="transport-separator" />
+        <button
+          className="clip-mode"
+          aria-label={t('waveform.snapping')}
+          title={t('waveform.snappingHint')}
+          aria-pressed={snappingEnabled}
+          onClick={() => useTimelineStore.getState().setSnappingEnabled(!snappingEnabled)}
+        >
+          <Icon name="magnet" />
+        </button>
+        <button
+          className="clip-mode"
+          aria-label={t('waveform.insertMode')}
+          title={t('waveform.insertModeHint')}
+          aria-pressed={insertMode}
+          onClick={() => useTimelineStore.getState().setInsertMode(!insertMode)}
+        >
+          <Icon name="insert" />
         </button>
         <div className="toolbar-spacer" />
         <button
@@ -407,7 +419,10 @@ export function WaveformView({
             <div
               style={{
                 minWidth: '100%',
-                width: duration > 0 ? `${pxPerSec * duration}px` : '100%',
+                width:
+                  duration > 0
+                    ? `${pxPerSec * previewEnd + (interaction.preview ? 40 : 0)}px`
+                    : '100%',
                 position: 'relative',
               }}
             >
@@ -428,7 +443,6 @@ export function WaveformView({
                 <TimelineRuler
                   duration={duration || 60}
                   pxPerSec={duration ? pxPerSec : (viewport.width || 900) / 60}
-                  scaleFactor={duration ? scaleFactor : 1}
                   empty={duration === 0}
                 />
               </div>
@@ -447,121 +461,50 @@ export function WaveformView({
                       cursor: 'crosshair',
                       overflow: 'hidden',
                       borderBottom: '1px solid var(--color-border)',
-                      borderLeft:
-                        track.id === selectedTrackId
-                          ? '2px solid var(--color-accent)'
-                          : '2px solid transparent',
+                      borderLeft: '2px solid transparent',
                     }}
-                    onClick={(e) => handleLaneClick(e, track.id)}
-                    onPointerMove={handleClipPointerMove}
-                    onPointerUp={handleClipPointerUp}
+                    data-drop-target={interaction.preview?.targetTrackId === track.id}
+                    data-drop-invalid={
+                      interaction.preview?.targetTrackId === track.id && interaction.preview.invalid
+                    }
+                    onClick={(e) => {
+                      if (!interaction.consumeClick()) handleLaneClick(e, track.id)
+                    }}
+                    onPointerDown={(e) => interaction.begin(e)}
                   >
-                    {/* Clip blocks */}
                     {track.clips.map((clip) => {
-                      const waveformProvider = providersBySource.get(clip.audioSourceId)
-                      const clipDur = clip.sourceEnd - clip.sourceStart
-                      const leftPct =
-                        duration > 0 ? (clip.outputStart / duration) * scaleFactor * 100 : 0
-                      const widthPct = duration > 0 ? (clipDur / duration) * scaleFactor * 100 : 0
-                      const isDragging = dragRef.current?.clipId === clip.id
-                      const visible = waveformProvider
-                        ? calculateVisibleWaveformRange({
-                            outputStart: clip.outputStart,
-                            sourceStart: clip.sourceStart,
-                            sourceEnd: clip.sourceEnd,
-                            pxPerSec,
-                            viewportStartPx: viewport.scrollLeft,
-                            viewportWidthPx: viewport.width,
-                          })
-                        : null
+                      const proposed = previewClips.get(clip.id)
+                      const dimmed =
+                        !!interaction.preview &&
+                        (interaction.preview.clipIds.includes(clip.id) ||
+                          proposed?.outputStart !== clip.outputStart)
                       return (
-                        <div
+                        <ClipView
                           key={clip.id}
-                          className="waveform-clip"
-                          data-selected={clip.id === selectedClipId}
-                          data-muted={clip.muted}
-                          data-clip-id={clip.id}
-                          data-audio-source-id={clip.audioSourceId}
-                          data-source-start={clip.sourceStart}
-                          data-source-end={clip.sourceEnd}
-                          onPointerDown={(e) => handleClipPointerDown(e, clip)}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedTrackId(track.id)
-                            setSelectedClipId(clip.id === selectedClipId ? null : clip.id)
-                            setSelection({
-                              start: clip.outputStart,
-                              end: clip.outputStart + clipDur,
-                            })
-                          }}
-                          style={
-                            {
-                              position: 'absolute',
-                              left: `${leftPct}%`,
-                              width: `${widthPct}%`,
-                              top: 8,
-                              bottom: 8,
-                              borderRadius: 6,
-                              '--track-color': trackPresentationColor(track.color),
-                              opacity: isDragging ? 0.4 : undefined,
-                              cursor: 'grab',
-                              pointerEvents: 'all',
-                              zIndex: isDragging ? 0 : 5,
-                              boxSizing: 'border-box',
-                              overflow: 'hidden',
-                            } as React.CSSProperties
-                          }
-                        >
-                          <span
-                            className="clip-label"
-                            style={{ color: trackPresentationColor(track.color) }}
-                          >
-                            {track.name}
-                          </span>
-                          {waveformProvider && visible && (
-                            <CanvasWaveform
-                              provider={waveformProvider}
-                              sourceStartSeconds={visible.sourceStartSeconds}
-                              sourceEndSeconds={visible.sourceEndSeconds}
-                              leftInClipPx={visible.leftInClipPx}
-                              widthPx={visible.widthPx}
-                              heightPx={LANE_HEIGHT - 35}
-                              color={trackPresentationColor(track.color)}
-                              muted={clip.muted}
-                            />
-                          )}
-                          {(clip.redactions ?? []).map((redaction) => (
-                            <ClipRedactionOverlay
-                              key={redaction.id}
-                              clip={clip}
-                              redaction={redaction}
-                              pxPerSec={pxPerSec}
-                              onFocusTimeline={focusTimeline}
-                            />
-                          ))}
-                        </div>
+                          clip={clip}
+                          track={track}
+                          provider={providersBySource.get(clip.audioSourceId)}
+                          pxPerSec={pxPerSec}
+                          viewport={viewport}
+                          selected={selectedClipIds.includes(clip.id)}
+                          dimmed={dimmed}
+                          onBegin={interaction.begin}
+                          onClick={interaction.clickClip}
+                          onTrimKey={interaction.trimKey}
+                          onFocusTimeline={focusTimeline}
+                        />
                       )
                     })}
-
-                    {/* Drag ghost */}
-                    {ghostState &&
-                      dragRef.current &&
-                      track.clips.some((c) => c.id === dragRef.current!.clipId) && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            left: `${ghostState.pct}%`,
-                            width: `${ghostState.widthPct}%`,
-                            top: 8,
-                            bottom: 8,
-                            borderRadius: 6,
-                            border: '1px dashed var(--color-accent)',
-                            backgroundColor: 'var(--color-accent-ghost)',
-                            pointerEvents: 'none',
-                            zIndex: 20,
-                          }}
-                        />
-                      )}
+                    {interaction.preview && (
+                      <ClipDragPreview
+                        original={track}
+                        track={
+                          interaction.preview.tracks.find((item) => item.id === track.id) ?? track
+                        }
+                        preview={interaction.preview}
+                        pxPerSec={pxPerSec}
+                      />
+                    )}
 
                     {/* Gap overlays — cover waveform between clips */}
                     {(() => {
@@ -570,16 +513,15 @@ export function WaveformView({
                         const clipEnd = clip.outputStart + (clip.sourceEnd - clip.sourceStart)
                         const nextStart = sorted[i + 1].outputStart
                         if (nextStart <= clipEnd + 0.001) return []
-                        const leftPct = duration > 0 ? (clipEnd / duration) * scaleFactor * 100 : 0
-                        const widthPct =
-                          duration > 0 ? ((nextStart - clipEnd) / duration) * scaleFactor * 100 : 0
+                        const left = clipEnd * pxPerSec
+                        const width = (nextStart - clipEnd) * pxPerSec
                         return [
                           <div
                             key={`gap-${clip.id}`}
                             style={{
                               position: 'absolute',
-                              left: `${leftPct}%`,
-                              width: `${widthPct}%`,
+                              left,
+                              width,
                               top: 0,
                               bottom: 0,
                               backgroundColor: 'var(--color-bg-secondary)',
@@ -590,26 +532,6 @@ export function WaveformView({
                         ]
                       })
                     })()}
-
-                    {/* Split markers */}
-                    {track.clips.slice(1).map((clip) => (
-                      <div
-                        key={`split-${clip.id}`}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          bottom: 0,
-                          left:
-                            duration > 0
-                              ? `calc(${(clip.outputStart / duration) * scaleFactor * 100}% - 1px)`
-                              : '0',
-                          width: 2,
-                          backgroundColor: 'var(--color-accent-split)',
-                          pointerEvents: 'none',
-                          zIndex: 10,
-                        }}
-                      />
-                    ))}
                   </div>
                 )
               })}
@@ -620,7 +542,7 @@ export function WaveformView({
                   position: 'absolute',
                   top: 0,
                   bottom: 0,
-                  left: `${playheadPct}%`,
+                  left: playheadLeft,
                   width: 1,
                   backgroundColor: 'var(--color-playhead)',
                   pointerEvents: 'none',
@@ -634,20 +556,23 @@ export function WaveformView({
           {t('waveform.addTrack')}
         </button>
       </div>
+      {interaction.marquee && <div className="clip-marquee" style={interaction.marquee} />}
       <div className="audio-footer">
         <span>
           {timelineSelection?.kind === 'redaction'
             ? t('waveform.redactionSelected')
             : selectedClipId
-              ? t('waveform.clipSelected')
+              ? t('waveform.clipsSelected', { count: selectedClipIds.length })
               : t('waveform.noClipSelected')}
         </span>
         <span className="audio-footer-hint">
-          {t(
-            timelineSelection?.kind === 'redaction'
-              ? 'waveform.redactionHint'
-              : 'waveform.editHint',
-          )}
+          {interaction.preview?.invalid || actionFailed
+            ? t('waveform.invalidDrop')
+            : t(
+                timelineSelection?.kind === 'redaction'
+                  ? 'waveform.redactionHint'
+                  : 'waveform.editHint',
+              )}
         </span>
         {audioDetails}
       </div>
@@ -656,16 +581,15 @@ export function WaveformView({
 }
 
 // ── TimelineRuler ─────────────────────────────────────────────────────────────
-// Uses the same scaleFactor-based positioning as clips so it works at any zoom.
+// Uses the same pixel-per-second positions as clips at every zoom level.
 
 interface TimelineRulerProps {
   duration: number
   pxPerSec: number
-  scaleFactor: number
   empty?: boolean
 }
 
-function TimelineRuler({ duration, pxPerSec, scaleFactor, empty }: TimelineRulerProps) {
+function TimelineRuler({ duration, pxPerSec, empty }: TimelineRulerProps) {
   if (duration <= 0 || pxPerSec <= 0) return null
 
   // Pick the smallest "nice" interval that keeps ticks ≥ 40px apart
@@ -680,8 +604,8 @@ function TimelineRuler({ duration, pxPerSec, scaleFactor, empty }: TimelineRuler
   return (
     <>
       {ticks.map((t) => {
-        const left = (t / duration) * scaleFactor * 100
-        if (left > scaleFactor * 100 + 0.1) return null
+        const left = t * pxPerSec
+        if (t > duration) return null
         const label =
           t >= 3600
             ? `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}m`
@@ -693,7 +617,7 @@ function TimelineRuler({ duration, pxPerSec, scaleFactor, empty }: TimelineRuler
             key={t}
             style={{
               position: 'absolute',
-              left: `${left}%`,
+              left,
               top: 0,
               bottom: 0,
               borderLeft: '1px solid var(--color-border-subtle)',

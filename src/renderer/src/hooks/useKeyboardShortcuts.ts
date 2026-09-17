@@ -7,14 +7,15 @@
 // Shortcuts:
 //   Space                  — Play / Pause (via IAudioPlayer)
 //   S                      — Split clip at playhead
-//   M                      — Mute selected region (waveform drag-selection)
-//   U                      — Unmute: remove selected clip or overlapping clips
-//   Delete / Backspace     — If clip selected: remove it (unmute); else mute drag-selection
+//   M                      — Mute selected clips or redact a waveform selection
+//   U                      — Unmute selected clips or overlapping clips
+//   Delete / Backspace     — Remove selected clips/overlay or redact a waveform selection
 //   Escape                 — Clear selection + deselect clip
 //   ← / →                  — Nudge playhead ±1 s
 //   Shift+← / Shift+→     — Nudge playhead ±5 s
 //   Cmd+S / Ctrl+S         — Save project
 //   Cmd+Z / Ctrl+Z         — Undo last timeline operation
+//   Cmd/Ctrl+C/X/V/D       — Audio-focus clip clipboard actions
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react'
@@ -22,7 +23,13 @@ import { togglePlayback } from '../actions/playbackActions'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/timeline.store'
 import { useTranscriptStore } from '../stores/transcript.store'
-import { splitAtPlayhead, muteSelection, deleteSelection } from '../actions/timelineActions'
+import {
+  splitAtPlayhead,
+  muteSelection,
+  deleteSelection,
+  unmuteSelection,
+} from '../actions/timelineActions'
+import { copyClips, cutClips, duplicateClips, pasteClips } from '../actions/ClipClipboardActions'
 import { getAudioPlayerInstance } from '@shared/player.types'
 
 interface Options {
@@ -71,6 +78,26 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         return
       }
 
+      if (
+        isMeta &&
+        !e.shiftKey &&
+        !isContentEditable &&
+        target.closest('.audio-panel-view') &&
+        useTranscriptStore.getState().selectedTranscriptUnitIds.size === 0
+      ) {
+        const clipboardAction = {
+          KeyC: copyClips,
+          KeyX: cutClips,
+          KeyV: pasteClips,
+          KeyD: duplicateClips,
+        }[e.code]
+        if (clipboardAction) {
+          e.preventDefault()
+          clipboardAction()
+          return
+        }
+      }
+
       if (isMeta) return
       if (isContentEditable && e.code !== 'Space') return
       // Canonical text edits are resolved by the transcript, never as a broad timeline range.
@@ -114,33 +141,17 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         }
 
         // ── U — Unmute ─────────────────────────────────────────────────────
-        // If a clip region is selected, unmute it.
+        // If clips are selected, unmute them atomically.
         // Otherwise unmute all muted clips overlapping the drag-selection.
         case 'KeyU': {
           e.preventDefault()
-          const { selectedClipId, tracks, unmuteClip } = useTimelineStore.getState()
-          if (selectedClipId) {
-            unmuteClip(selectedClipId)
-            break
-          }
-          if (!selection) break
-          const overlapping = tracks
-            .flatMap((t) => t.clips)
-            .filter((c) => {
-              if (!c.muted) return false
-              const outputEnd = c.outputStart + (c.sourceEnd - c.sourceStart)
-              return c.outputStart < selection.end && outputEnd > selection.start
-            })
-          overlapping.forEach((c) => {
-            useTimelineStore.getState().unmuteClip(c.id)
-          })
-          setSelection(null)
+          unmuteSelection()
           break
         }
 
         // ── Delete / Backspace ─────────────────────────────────────────────
-        // If a clip region is selected: remove it.
-        // If a drag-selection is active: add a mute.
+        // If clips or an overlay are selected: remove them.
+        // If a drag-selection is active: add a redaction.
         case 'Delete':
         case 'Backspace': {
           if (
@@ -158,7 +169,7 @@ export function useKeyboardShortcuts({ onSave }: Options = {}) {
         case 'Escape': {
           e.preventDefault()
           setSelection(null)
-          useTimelineStore.getState().setSelectedClipId(null)
+          useTimelineStore.getState().setSelectedClipIds([])
           break
         }
 

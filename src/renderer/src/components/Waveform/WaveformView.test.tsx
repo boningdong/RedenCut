@@ -147,6 +147,11 @@ describe('WaveformView managed providers', () => {
     expect(useTimelineStore.getState().tracks[0].clips.map((item) => item.id)).toEqual([
       'duplicate',
     ])
+    expect(useEditorStore.getState().selection).toBeNull()
+    expect(
+      (screen.getByRole('button', { name: 'Redact selection' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    act(() => useEditorStore.getState().setSelection({ start: 1, end: 2 }))
     fireEvent.click(screen.getByRole('button', { name: 'Redact selection' }))
     expect(
       useTimelineStore

@@ -4,17 +4,23 @@ import { useTimelineStore } from '../stores/timeline.store'
 
 export function splitAtPlayhead(): void {
   const player = getAudioPlayerInstance()
-  if (player) useTimelineStore.getState().splitAt(player.getCurrentTime())
+  const timeline = useTimelineStore.getState()
+  if (player && timeline.selectedClipIds.length <= 1) timeline.splitAt(player.getCurrentTime())
 }
 
 export function muteSelection(): void {
   const { selection, setSelection } = useEditorStore.getState()
   const timeline = useTimelineStore.getState()
-  if (timeline.selectedClipId) {
+  const selectedClipIds = timeline.selectedClipIds.length
+    ? timeline.selectedClipIds
+    : timeline.selectedClipId
+      ? [timeline.selectedClipId]
+      : []
+  if (selectedClipIds.length) {
     const clip = timeline.tracks
       .flatMap((t) => t.clips)
-      .find((c) => c.id === timeline.selectedClipId)
-    if (clip) timeline.setClipMuted(clip.id, !clip.muted)
+      .find((c) => c.id === (timeline.selectedClipId ?? selectedClipIds[0]))
+    if (clip) timeline.setClipsMuted(selectedClipIds, !clip.muted)
     return
   }
   if (!selection) return
@@ -33,8 +39,14 @@ export function deleteSelection(): void {
     )
     return
   }
-  if (timeline.selectedClipId) {
-    timeline.removeClip(timeline.selectedClipId)
+  const selectedClipIds = timeline.selectedClipIds.length
+    ? timeline.selectedClipIds
+    : timeline.selectedClipId
+      ? [timeline.selectedClipId]
+      : []
+  if (selectedClipIds.length) {
+    timeline.removeClips(selectedClipIds)
+    useEditorStore.getState().setSelection(null)
     return
   }
   const { selection, setSelection } = useEditorStore.getState()
@@ -48,4 +60,30 @@ export function deleteSelection(): void {
   )
   if (hits) muteSelection()
   else setSelection(null)
+}
+
+export function unmuteSelection(): void {
+  const timeline = useTimelineStore.getState()
+  const selectedClipIds = timeline.selectedClipIds.length
+    ? timeline.selectedClipIds
+    : timeline.selectedClipId
+      ? [timeline.selectedClipId]
+      : []
+  if (selectedClipIds.length) {
+    timeline.setClipsMuted(selectedClipIds, false)
+    return
+  }
+
+  const { selection, setSelection } = useEditorStore.getState()
+  if (!selection) return
+  const overlappingIds = timeline.tracks
+    .flatMap((track) => track.clips)
+    .filter((clip) => {
+      if (!clip.muted) return false
+      const outputEnd = clip.outputStart + clip.sourceEnd - clip.sourceStart
+      return clip.outputStart < selection.end && outputEnd > selection.start
+    })
+    .map((clip) => clip.id)
+  timeline.setClipsMuted(overlappingIds, false)
+  setSelection(null)
 }

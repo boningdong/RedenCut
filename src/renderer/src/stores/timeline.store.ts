@@ -31,6 +31,7 @@ import type { AudioSourceId, Clip, ClipRedaction, Track } from '@shared/project.
 import type { RendererAudioSource } from '@shared/session.types'
 import { useEditorStore } from './editor.store'
 import { redactionCoverage } from '@shared/ClipRedactions'
+import { planClipPlacement } from '../domain/TimelinePlacement'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,22 @@ function markTimelineEdited(): void {
   }
 }
 
+function normalizedSelection(tracks: Track[], ids: string[], primaryId?: string) {
+  const available = new Set(tracks.flatMap((track) => track.clips.map((clip) => clip.id)))
+  const selectedClipIds = [...new Set(ids)].filter((id) => available.has(id))
+  const selectedClipId =
+    primaryId && selectedClipIds.includes(primaryId) ? primaryId : (selectedClipIds[0] ?? null)
+  return {
+    selectedClipIds,
+    selectedClipId,
+    timelineSelection: selectedClipId ? ({ kind: 'clip', clipId: selectedClipId } as const) : null,
+  }
+}
+
+function tracksEqual(left: Track[], right: Track[]): boolean {
+  return left === right || JSON.stringify(left) === JSON.stringify(right)
+}
+
 // ── History entry ──────────────────────────────────────────────────────────────
 
 interface HistoryEntry {
@@ -78,6 +95,8 @@ interface TimelineState {
    * Each entry holds a snapshot of tracks[] before the operation was undone,
    */
   redoStack: HistoryEntry[]
+  /** Changes whenever the active project timeline is replaced. */
+  projectGeneration: number
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -137,6 +156,7 @@ interface TimelineState {
    * Clears selectedClipId if it matches the removed clip.
    */
   removeClip(clipId: string): void
+  removeClips(ids: string[]): void
 
   /**
    * Restore ordinary clip audibility without changing its overlays or boundaries.
@@ -154,11 +174,13 @@ interface TimelineState {
    * Clips on the same track after the moved clip are reflowed.
    */
   moveClip(clipId: string, newOutputStart: number, newTrackId?: string): void
+  commitTracks(expected: Track[], next: Track[], label: string, selectedIds?: string[]): boolean
 
   // ── Selection ──────────────────────────────────────────────────────────────
 
   /** ID of the clip the user has clicked on the waveform. null = none. */
   selectedClipId: string | null
+  selectedClipIds: string[]
   timelineSelection:
     | { kind: 'clip'; clipId: string }
     | { kind: 'redaction'; clipId: string; redactionId: string }
@@ -172,7 +194,14 @@ interface TimelineState {
   ): void
   removeRedaction(clipId: string, redactionId: string): void
   setClipMuted(clipId: string, muted: boolean): void
+  setClipsMuted(ids: string[], muted: boolean): void
   setSelectedClipId(id: string | null): void
+  setSelectedClipIds(ids: string[], primaryId?: string): void
+
+  snappingEnabled: boolean
+  setSnappingEnabled(enabled: boolean): void
+  insertMode: boolean
+  setInsertMode(enabled: boolean): void
 
   /** ID of the currently selected track. Used by splitAt to target the right track. */
   selectedTrackId: string | null
@@ -207,9 +236,13 @@ const initialState = {
   tracks: [] as Track[],
   undoStack: [] as HistoryEntry[],
   redoStack: [] as HistoryEntry[],
+  projectGeneration: 0,
   selectedClipId: null as string | null,
+  selectedClipIds: [] as string[],
   timelineSelection: null as TimelineState['timelineSelection'],
   selectedTrackId: null as string | null,
+  snappingEnabled: true,
+  insertMode: false,
 }
 
 export const useTimelineStore = create<TimelineState>()((set, get) => ({
@@ -249,9 +282,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks: [track],
       undoStack: [],
       redoStack: [],
+      projectGeneration: get().projectGeneration + 1,
       selectedTrackId: null,
       selectedClipId: null,
+      selectedClipIds: [],
       timelineSelection: null,
+      snappingEnabled: true,
+      insertMode: false,
     })
   },
 
@@ -262,9 +299,13 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks,
       undoStack: [],
       redoStack: [],
+      projectGeneration: get().projectGeneration + 1,
       selectedTrackId: null,
       selectedClipId: null,
+      selectedClipIds: [],
       timelineSelection: null,
+      snappingEnabled: true,
+      insertMode: false,
     })
   },
 
@@ -340,12 +381,14 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   // ── removeTrack ─────────────────────────────────────────────────────────────
   removeTrack(trackId) {
     if (!get().tracks.some((track) => track.id === trackId)) return
-    set((s) => ({
-      tracks: s.tracks.filter((t) => t.id !== trackId),
-      selectedClipId: null,
-      timelineSelection: null,
-      selectedTrackId: s.selectedTrackId === trackId ? null : s.selectedTrackId,
-    }))
+    set((s) => {
+      const tracks = s.tracks.filter((t) => t.id !== trackId)
+      return {
+        tracks,
+        ...normalizedSelection(tracks, s.selectedClipIds, s.selectedClipId ?? undefined),
+        selectedTrackId: s.selectedTrackId === trackId ? null : s.selectedTrackId,
+      }
+    })
     markTimelineEdited()
   },
 
@@ -515,25 +558,23 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── removeClip ──────────────────────────────────────────────────────────────
   removeClip(clipId) {
-    const { tracks } = get()
-    const track = tracks.find((t) => t.clips.some((c) => c.id === clipId))
-    if (!track) {
-      console.warn(`[Timeline] removeClip — clip ${clipId} not found`)
-      return
-    }
+    get().removeClips([clipId])
+  },
 
-    const before = cloneTracks(tracks)
-
-    set((s) => ({
-      tracks: s.tracks.map((t) =>
-        t.id === track.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
-      ),
-      undoStack: [...s.undoStack, { before, label: `remove clip ${clipId}` }],
-      redoStack: [],
-      selectedClipId: s.selectedClipId === clipId ? null : s.selectedClipId,
-      timelineSelection: s.timelineSelection?.clipId === clipId ? null : s.timelineSelection,
-    }))
-    markTimelineEdited()
+  removeClips(ids) {
+    const { tracks, selectedClipIds } = get()
+    const removed = new Set(ids)
+    if (!tracks.some((track) => track.clips.some((clip) => removed.has(clip.id)))) return
+    const next = tracks.map((track) => {
+      const clips = track.clips.filter((clip) => !removed.has(clip.id))
+      return clips.length === track.clips.length ? track : { ...track, clips }
+    })
+    get().commitTracks(
+      tracks,
+      next,
+      ids.length === 1 ? `remove clip ${ids[0]}` : 'Remove clips',
+      selectedClipIds.filter((id) => !removed.has(id)),
+    )
   },
 
   // ── unmuteClip ──────────────────────────────────────────────────────────────
@@ -603,6 +644,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       undoStack: [...s.undoStack, { before, label: `split at ${time.toFixed(1)}` }],
       redoStack: [], // new mutation invalidates the redo future
       selectedClipId: null,
+      selectedClipIds: [],
       timelineSelection: null,
     }))
     markTimelineEdited()
@@ -613,82 +655,43 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const { tracks } = get()
     const srcTrack = tracks.find((t) => t.clips.some((c) => c.id === clipId))
     if (!srcTrack) return
-
-    const before = cloneTracks(tracks)
-    const clip = srcTrack.clips.find((c) => c.id === clipId)!
     const destId = newTrackId ?? srcTrack.id
-    const clipDur = clip.sourceEnd - clip.sourceStart
-
-    set((s) => {
-      let newTracks = s.tracks
-
-      // Remove clip from source track
-      newTracks = newTracks.map((t) =>
-        t.id === srcTrack.id ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t,
-      )
-
-      // Insert into dest track at the nearest valid (non-overlapping) position.
-      // Uses slot enumeration rather than iterative pushing to avoid oscillation
-      // when the drop zone gap is too small for the clip.
-      // Cross-track overlap is allowed (clips on different tracks mix in audio).
-      const movedClip: Clip = { ...clip, trackId: destId, outputStart: newOutputStart }
-      newTracks = newTracks.map((t) => {
-        if (t.id !== destId) return t
-        const others = t.clips // source clip was already removed above
-
-        // Sort others by outputStart to enumerate valid placement slots
-        const sorted = [...others].sort((a, b) => a.outputStart - b.outputStart)
-        let bestStart = Math.max(0, newOutputStart)
-        let bestDist = Infinity
-
-        const tryCandidate = (pos: number) => {
-          const dist = Math.abs(pos - newOutputStart)
-          if (dist < bestDist) {
-            bestDist = dist
-            bestStart = pos
-          }
-        }
-
-        if (sorted.length === 0) {
-          bestStart = Math.max(0, newOutputStart)
-        } else {
-          // Slot before first clip: [0, first.outputStart - clipDur]
-          const firstStart = sorted[0].outputStart
-          if (firstStart >= clipDur) {
-            tryCandidate(Math.min(Math.max(0, newOutputStart), firstStart - clipDur))
-          }
-          // Slots between consecutive clips
-          for (let i = 0; i < sorted.length - 1; i++) {
-            const slotFrom = sorted[i].outputStart + (sorted[i].sourceEnd - sorted[i].sourceStart)
-            const slotTo = sorted[i + 1].outputStart - clipDur
-            if (slotFrom <= slotTo) {
-              tryCandidate(Math.min(Math.max(slotFrom, newOutputStart), slotTo))
-            }
-          }
-          // Slot after last clip: [lastEnd, ∞)
-          const lastEnd =
-            sorted[sorted.length - 1].outputStart +
-            (sorted[sorted.length - 1].sourceEnd - sorted[sorted.length - 1].sourceStart)
-          tryCandidate(Math.max(lastEnd, newOutputStart))
-        }
-
-        const resolved = { ...movedClip, outputStart: bestStart }
-        const inserted = [...others, resolved].sort((a, b) => a.outputStart - b.outputStart)
-        return { ...t, clips: inserted }
-      })
-
-      return {
-        tracks: newTracks,
-        undoStack: [...s.undoStack, { before, label: `move clip ${clipId}` }],
-        redoStack: [], // new mutation invalidates the redo future
-      }
+    if (!tracks.some((track) => track.id === destId)) return
+    const placement = planClipPlacement(tracks, [clipId], clipId, newOutputStart, destId, {
+      insert: false,
     })
+    if (placement) get().commitTracks(tracks, placement.tracks, `move clip ${clipId}`, [clipId])
+  },
+
+  commitTracks(expected, next, label, selectedIds) {
+    const state = get()
+    if (state.tracks !== expected || tracksEqual(expected, next)) return false
+    const ids = selectedIds ?? state.selectedClipIds
+    const primary =
+      selectedIds === undefined && state.selectedClipId ? state.selectedClipId : selectedIds?.[0]
+    const selection = normalizedSelection(next, ids, primary)
+    const selectedTrackId = selection.selectedClipId
+      ? (next.find((track) => track.clips.some((clip) => clip.id === selection.selectedClipId))
+          ?.id ?? state.selectedTrackId)
+      : state.selectedTrackId
+    set((current) => ({
+      tracks: next,
+      undoStack: [...current.undoStack, { before: cloneTracks(expected), label }],
+      redoStack: [],
+      ...selection,
+      selectedTrackId,
+    }))
     markTimelineEdited()
+    return true
   },
 
   // ── selectedClipId ──────────────────────────────────────────────────────────
   setSelectedClipId(id) {
-    set({ selectedClipId: id, timelineSelection: id ? { kind: 'clip', clipId: id } : null })
+    get().setSelectedClipIds(id ? [id] : [], id ?? undefined)
+  },
+
+  setSelectedClipIds(ids, primaryId) {
+    set((state) => normalizedSelection(state.tracks, ids, primaryId))
   },
 
   selectRedaction(clipId, redactionId) {
@@ -698,6 +701,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!track) return
     set({
       selectedClipId: null,
+      selectedClipIds: [],
       selectedTrackId: track.id,
       timelineSelection: { kind: 'redaction', clipId, redactionId },
     })
@@ -781,20 +785,36 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   setClipMuted(clipId, muted) {
+    get().setClipsMuted([clipId], muted)
+  },
+
+  setClipsMuted(ids, muted) {
     const { tracks } = get()
-    if (!tracks.some((t) => t.clips.some((c) => c.id === clipId && c.muted !== muted))) return
-    set((s) => ({
-      tracks: tracks.map((t) => ({
-        ...t,
-        clips: t.clips.map((c) => (c.id === clipId ? { ...c, muted } : c)),
-      })),
-      undoStack: [
-        ...s.undoStack,
-        { before: cloneTracks(tracks), label: muted ? 'Mute clip' : 'Unmute clip' },
-      ],
-      redoStack: [],
-    }))
-    markTimelineEdited()
+    const selected = new Set(ids)
+    if (
+      !tracks.some((track) =>
+        track.clips.some((clip) => selected.has(clip.id) && clip.muted !== muted),
+      )
+    )
+      return
+    const next = tracks.map((track) => {
+      if (!track.clips.some((clip) => selected.has(clip.id) && clip.muted !== muted)) return track
+      return {
+        ...track,
+        clips: track.clips.map((clip) =>
+          selected.has(clip.id) && clip.muted !== muted ? { ...clip, muted } : clip,
+        ),
+      }
+    })
+    get().commitTracks(tracks, next, muted ? 'Mute clips' : 'Unmute clips')
+  },
+
+  setSnappingEnabled(enabled) {
+    set({ snappingEnabled: enabled })
+  },
+
+  setInsertMode(enabled) {
+    set({ insertMode: enabled })
   },
 
   // ── selectedTrackId ─────────────────────────────────────────────────────────
@@ -820,6 +840,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       undoStack: s.undoStack.slice(0, -1),
       redoStack: [...s.redoStack, redoEntry],
       selectedClipId: null,
+      selectedClipIds: [],
       timelineSelection: null,
     }))
     markTimelineEdited()
@@ -842,6 +863,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       redoStack: s.redoStack.slice(0, -1),
       undoStack: [...s.undoStack, undoEntry],
       selectedClipId: null,
+      selectedClipIds: [],
       timelineSelection: null,
     }))
     markTimelineEdited()
@@ -862,7 +884,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── reset ────────────────────────────────────────────────────────────────────
   reset() {
-    set({ ...initialState })
+    set((state) => ({ ...initialState, projectGeneration: state.projectGeneration + 1 }))
   },
 }))
 

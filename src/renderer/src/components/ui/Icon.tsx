@@ -12,6 +12,8 @@ const paths = {
   folder: 'M3 7V4h7l3 3h8v13H3z',
   play: 'm7 4 14 8-14 8z',
 
+  magnet: 'M5 3v10a7 7 0 0 0 14 0V3h-4v10a3 3 0 0 1-6 0V3zM5 7h4m6 0h4',
+  insert: 'M3 5h5v14H3zM16 5h5v14h-5zM12 2v20m-3-10h6',
   split: 'M4 4l16 16M4 20 20 4M8 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
   mute: 'M11 4 5 9H2v6h3l6 5V4m5 5 6 6m0-6-6 6',
   trash: 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7',
