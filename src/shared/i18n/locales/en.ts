@@ -1,6 +1,6 @@
 export const englishResources = {
   speechTasks: {
-    title: 'AI processing',
+    title: 'Generate',
     text: 'Generate text',
     speakers: 'Identify speakers',
     textHelp: 'Transcribe and align audio timing.',
@@ -360,7 +360,7 @@ export const englishResources = {
     view: 'View:',
     empty: 'No transcript yet',
     addTrackHint: 'Add a track to get started',
-    generateHint: 'Use AI processing above to transcribe a track',
+    generateHint: 'Use Generate above to transcribe a track',
     generating: 'Generating transcript…',
     speakerNumber: 'Speaker {{number}}',
     changeColor: 'Change color for {{name}}',

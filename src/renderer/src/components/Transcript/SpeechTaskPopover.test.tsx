@@ -23,7 +23,7 @@ function setup() {
   render(
     <SpeechTaskPopover tracks={tracks} analyses={analyses} isGenerating={false} onRun={onRun} />,
   )
-  fireEvent.click(screen.getByRole('button', { name: 'AI processing' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
   return onRun
 }
 it('submits two independent steps once and shows only their target tracks', () => {

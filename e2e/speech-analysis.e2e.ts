@@ -30,7 +30,7 @@ test('real speech analysis publishes an editable durable transcript and survives
     })
     .toBeGreaterThan(0)
 
-  await session.call('browser_click', { target: 'button:has-text("AI processing")' })
+  await session.call('browser_click', { target: 'button:has-text("Generate")' })
   await session.call('browser_click', {
     target: 'button:text-is("Start processing")',
   })

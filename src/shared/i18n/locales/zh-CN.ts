@@ -1,7 +1,7 @@
 import type { TranslationResource } from './en'
 export const simplifiedChineseResources = {
   speechTasks: {
-    title: 'AI 处理',
+    title: '生成',
     text: '生成文字',
     speakers: '识别人声',
     textHelp: '转写并对齐音频时间。',
@@ -341,7 +341,7 @@ export const simplifiedChineseResources = {
     view: '显示：',
     empty: '暂无转写',
     addTrackHint: '添加轨道以开始',
-    generateHint: '使用上方的“AI 处理”按钮转写轨道',
+    generateHint: '使用上方的“生成”按钮转写轨道',
     generating: '正在生成转写…',
     speakerNumber: '说话人 {{number}}',
     changeColor: '更改 {{name}} 的颜色',
