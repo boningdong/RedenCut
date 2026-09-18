@@ -3,6 +3,7 @@ import { useSpeechBatchStore } from '../../stores/speechBatch.store'
 import { useTranslation } from '../../i18n/useTranslation'
 import { publicMessage } from '../../i18n/messages'
 import { SpeechProgressStatus } from './SpeechProgressStatus'
+import { TranscriptProgressDetails } from './TranscriptProgressDetails'
 
 export function SpeechBatchProgress({
   isGenerating,
@@ -34,7 +35,7 @@ export function SpeechBatchProgress({
   return (
     <div role="status" className="transcript-progress transcript-progress-complete">
       <div className="transcript-progress-row">
-        <span>
+        <span className="transcript-progress-phase">
           {t(
             summary?.cancelled || cancelled
               ? 'transcript.batchStopped'
@@ -52,8 +53,7 @@ export function SpeechBatchProgress({
         </button>
       </div>
       {summary && (
-        <details className="transcript-progress-details">
-          <summary>{t('transcript.analysisDetails')}</summary>
+        <TranscriptProgressDetails>
           <p>
             {t(summary.cancelled ? 'transcript.batchCancelled' : 'transcript.batchComplete', {
               count: summary.sourceCount,
@@ -67,7 +67,7 @@ export function SpeechBatchProgress({
               {failure.displayName}: {publicMessage(t, failure.error)}
             </div>
           ))}
-        </details>
+        </TranscriptProgressDetails>
       )}
     </div>
   )

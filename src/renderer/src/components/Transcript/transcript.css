@@ -218,7 +218,7 @@
   position: relative;
 }
 .transcript-footer {
-  padding: 10px 17px;
+  padding: 0 17px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--color-text-muted);
@@ -226,6 +226,7 @@
   flex-shrink: 0;
   max-height: 40%;
   overflow-y: auto;
+  container-type: inline-size;
 }
 .transcript-footer:empty {
   display: none;
@@ -413,24 +414,38 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 16px;
+  column-gap: 6px;
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 .transcript-progress-row {
   display: flex;
-  flex-wrap: wrap;
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 31px;
   min-width: 0;
   align-items: center;
   gap: 12px;
 }
 .transcript-progress-phase {
   color: var(--color-text-primary);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .transcript-status-action {
   margin-left: 0;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
   padding: 3px 8px;
   border: 0;
   border-radius: 4px;
@@ -448,15 +463,32 @@
   margin: 0;
 }
 .transcript-progress > .transcript-progress-meta,
-.transcript-progress-details[open] {
+.transcript-progress-details {
   grid-column: 1 / -1;
 }
-.transcript-progress-details[open] {
-  margin-top: 6px;
+.transcript-progress-details {
+  padding: 9px 0 10px;
+  border-top: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
 }
-.transcript-progress-details summary {
-  width: fit-content;
-  cursor: pointer;
+.transcript-details-toggle {
+  grid-column: 2;
+  grid-row: 1;
+  color: var(--color-text-primary);
+}
+.transcript-details-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.transcript-progress-row > .transcript-progress-meta {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.transcript-progress > .transcript-progress-meta {
+  padding-bottom: 8px;
+}
+.transcript-footer > [role='status']:not(.transcript-progress) {
+  padding: 8px 0;
 }
 .transcript-progress-details p {
   margin: 4px 0;
@@ -480,7 +512,7 @@
 }
 .transcript-progress-track {
   display: block;
-  width: clamp(64px, 10vw, 144px);
+  width: 104px;
   height: 3px;
   border-radius: 2px;
   overflow: hidden;
@@ -511,10 +543,20 @@
 .transcript-progress-complete .transcript-status-action {
   margin-left: auto;
 }
-.transcript-status-action:focus-visible,
-.transcript-progress-details summary:focus-visible {
+.transcript-status-action:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+@container (max-width: 640px) {
+  .transcript-progress-row {
+    gap: 8px;
+  }
+  .transcript-progress-track {
+    width: 64px;
+  }
+  .transcript-progress-row > .transcript-progress-meta {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .transcript-progress-fill {

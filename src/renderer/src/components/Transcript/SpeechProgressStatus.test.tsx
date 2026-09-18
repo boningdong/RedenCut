@@ -70,3 +70,24 @@ it('shows an advisory rounded stage estimate before overrun and retranslates it'
   rerender(<SpeechProgressStatus status={{ stage: 'aligning', stageStartedAtMs: 10000 }} />)
   expect(screen.queryByText(/本阶段预计/)).toBeNull()
 })
+
+it('keeps one accessible disclosure trigger and places details below the main status', () => {
+  render(
+    <SpeechProgressStatus
+      status={{ stage: 'aligning', percent: 35, estimatedDurationMs: 60000 }}
+      onCancel={vi.fn()}
+    />,
+  )
+  const trigger = screen.getByRole('button', { name: 'Details' })
+  const panel = document.getElementById(trigger.getAttribute('aria-controls')!)!
+  expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  expect(panel.hidden).toBe(true)
+  fireEvent.click(trigger)
+  expect(screen.getByRole('button', { name: 'Details' })).toBe(trigger)
+  expect(trigger.getAttribute('aria-expanded')).toBe('true')
+  expect(panel.hidden).toBe(false)
+  expect(trigger.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+  fireEvent.click(trigger)
+  expect(panel.hidden).toBe(true)
+})

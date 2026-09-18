@@ -3,6 +3,7 @@ import type { SpeechProgress, TranscriptionProgress } from '@shared/publicMessag
 import type { SpeechBatchProgress } from '@shared/speechBatch.types'
 import { useTranslation } from '../../i18n/useTranslation'
 import { progressMessage } from '../../i18n/messages'
+import { TranscriptProgressDetails } from './TranscriptProgressDetails'
 
 interface SpeechProgressStatusProps {
   status: SpeechProgress | TranscriptionProgress | null
@@ -96,8 +97,7 @@ function TimedSpeechProgressStatus({
         )}
       </div>
       {(progress || estimate !== undefined) && (
-        <details className="transcript-progress-details">
-          <summary>{t('transcript.analysisDetails')}</summary>
+        <TranscriptProgressDetails>
           {progress && <div className="transcript-progress-filename">{progress.displayName}</div>}
           {estimate !== undefined && (
             <p>
@@ -106,7 +106,7 @@ function TimedSpeechProgressStatus({
               })}
             </p>
           )}
-        </details>
+        </TranscriptProgressDetails>
       )}
       {overrun && <p className="transcript-progress-meta">{t('transcript.estimateOverrun')}</p>}
     </div>
