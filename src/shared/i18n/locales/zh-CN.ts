@@ -5,6 +5,8 @@ export const simplifiedChineseResources = {
     text: '生成文字',
     speakers: '识别人声',
     textHelp: '转写并对齐音频时间。',
+    textHelpWithModel: '使用 {{model}} 转写并对齐音频时间。',
+    nextModel: '下次生成使用的模型',
     speakersHelp: '在文字与时间对齐上标注说话人。',
     completed: '已完成',
     partial: '{{complete}} / {{total}} 个音频源已完成 · 自动跳过',

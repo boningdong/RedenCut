@@ -4,6 +4,8 @@ export const englishResources = {
     text: 'Generate text',
     speakers: 'Identify speakers',
     textHelp: 'Transcribe and align audio timing.',
+    textHelpWithModel: 'Transcribe and align using {{model}}.',
+    nextModel: 'Model for the next generation',
     speakersHelp: 'Identify speakers in the aligned transcript.',
     completed: 'Completed',
     partial: '{{complete}} / {{total}} sources completed · skipped',
