@@ -16,6 +16,15 @@ import type { LocalePreference } from '../../shared/i18n/locale.types'
 import { resolveLocale } from '../../shared/i18n/resolveLocale'
 
 export class AppPreferencesStore {
+  private readonly listeners = new Set<(snapshot: AppPreferencesSnapshot) => void>()
+
+  subscribe(listener: (snapshot: AppPreferencesSnapshot) => void): () => void {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
   private writes: Promise<void> = Promise.resolve()
   private hydration: Promise<void> | null = null
   private snapshot: AppPreferencesSnapshot = {
@@ -100,6 +109,7 @@ export class AppPreferencesStore {
       next.warning = null
       await this.persist(next)
       this.snapshot = next
+      for (const listener of this.listeners) listener(this.getSnapshot())
       return this.getSnapshot()
     })
     this.writes = operation.then(

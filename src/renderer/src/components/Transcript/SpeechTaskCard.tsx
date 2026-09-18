@@ -1,7 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation'
 import { useLocaleStore } from '../../stores/locale.store'
 import { whisperModelVariant } from '@shared/WhisperModelPresentation'
-import { Fragment } from 'react'
 import { Icon } from '../ui/Icon'
 import type { speechTargetTracks } from '../../domain/SpeechTaskPresentation'
 
@@ -56,22 +55,15 @@ export function SpeechTaskCard({
       </div>
       <div className="speech-task-content">
         <span>{title}</span>
-        <p>
-          {phase === 'text' && modelVariant
-            ? t('speechTasks.textHelpWithModel', { model: '\uFFFC' })
-                .split('\uFFFC')
-                .map((part, index) => (
-                  <Fragment key={index}>
-                    {index > 0 && (
-                      <span className="speech-task-model" title={t('speechTasks.nextModel')}>
-                        Whisper {t(`settings.whisperModels.${modelVariant}`)}
-                      </span>
-                    )}
-                    {part}
-                  </Fragment>
-                ))
-            : t(phase === 'text' ? 'speechTasks.textHelp' : 'speechTasks.speakersHelp')}
-        </p>
+        <p>{t(phase === 'text' ? 'speechTasks.textHelp' : 'speechTasks.speakersHelp')}</p>
+        {phase === 'text' && (
+          <p className="speech-task-model-row">
+            {t('speechTasks.modelsSelected')}
+            <span className="speech-task-model" title={t('speechTasks.nextModel')}>
+              Whisper {t(`settings.whisperModels.${modelVariant}`)}
+            </span>
+          </p>
+        )}
         {complete > 0 && !rearmed && (
           <small className="speech-task-complete">
             {done ? t('speechTasks.completed') : t('speechTasks.partial', { complete, total })}

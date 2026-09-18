@@ -167,3 +167,12 @@ test('a closing window does not reject a committed preference or block other sub
   expect(secondSend).toHaveBeenCalledWith('app-preferences:changed', store.getSnapshot())
   expect(sink).toHaveBeenCalled()
 })
+
+test('publishes model selections made outside preference IPC without another settings change', async () => {
+  const { store } = await setup()
+  await store.read()
+  const selected = await store.setWhisperModel('transcription-whisper-medium')
+  expect(send.mock.calls).toEqual([['app-preferences:changed', selected]])
+  expect(secondSend.mock.calls).toEqual([['app-preferences:changed', selected]])
+  expect(destroyedSend).not.toHaveBeenCalled()
+})

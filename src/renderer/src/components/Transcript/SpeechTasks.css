@@ -176,3 +176,11 @@ html[data-theme='light'] .speech-task-complete {
   font-size: 10px;
   line-height: 1.4;
 }
+
+.speech-task-content .speech-task-model-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 7px 0;
+}
