@@ -38,6 +38,10 @@ Focused trim handles use Left/Right for 10 ms adjustments and Shift+Left/Right f
 
 ## Audio Toolbar
 
+Timeline zoom reaches up to 1,000 pixels per second independently of recording duration; exceptionally long timelines lower this ceiling to keep their full extent within browser layout limits.
+Zoom keeps the pointer time anchored for wheel gestures and the viewport center anchored for toolbar buttons.
+At close zoom, the ruler shows fractional-second labels and intermediate ticks, rendering only the visible range.
+
 Drag directly on the time ruler to select an output-time range, even without an active track; a click without dragging still seeks.
 Hovering the ruler shows a subdued purple dashed guide through every track.
 The selected time range remains highlighted across the ruler and all tracks after release, with its owning track emphasized in its track color; Delete/Backspace or Redact applies clip-owned overlays to every intersecting clip on that track in one undoable edit, ignoring gaps and preserving clip positions.

@@ -1,3 +1,4 @@
+import { TimelineRuler } from './TimelineRuler'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useRangeSelection } from './UseRangeSelection'
 import { TimelineSelectionOverlay } from './TimelineSelectionOverlay'
@@ -485,6 +486,8 @@ export function WaveformView({
                 }}
               >
                 <TimelineRuler
+                  scrollLeft={viewport.scrollLeft}
+                  viewportWidth={viewport.width}
                   duration={rulerDuration}
                   pxPerSec={duration ? pxPerSec : (viewport.width || 900) / 60}
                   empty={duration === 0}
@@ -645,62 +648,5 @@ export function WaveformView({
         {audioDetails}
       </div>
     </div>
-  )
-}
-
-// ── TimelineRuler ─────────────────────────────────────────────────────────────
-// Uses the same pixel-per-second positions as clips at every zoom level.
-
-interface TimelineRulerProps {
-  duration: number
-  pxPerSec: number
-  empty?: boolean
-}
-
-function TimelineRuler({ duration, pxPerSec, empty }: TimelineRulerProps) {
-  if (duration <= 0 || pxPerSec <= 0) return null
-
-  // Pick the smallest "nice" interval that keeps ticks ≥ 40px apart
-  const MIN_PX = 40
-  const rawSec = MIN_PX / pxPerSec
-  const NICE = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 3600]
-  const interval = empty ? 5 : (NICE.find((n) => n >= rawSec) ?? NICE[NICE.length - 1])
-
-  const ticks: number[] = []
-  for (let t = 0; t <= duration + interval; t += interval) ticks.push(t)
-
-  return (
-    <>
-      {ticks.map((t) => {
-        const left = t * pxPerSec
-        if (t > duration) return null
-        const label =
-          t >= 3600
-            ? `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}m`
-            : t >= 60
-              ? `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
-              : `${t}s`
-        return (
-          <div
-            key={t}
-            style={{
-              position: 'absolute',
-              left,
-              top: 0,
-              bottom: 0,
-              borderLeft: '1px solid var(--color-border-subtle)',
-              paddingLeft: 3,
-              display: 'flex',
-              alignItems: 'flex-end',
-              paddingBottom: 2,
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span style={{ fontSize: 9, color: 'var(--color-text-muted)' }}>{label}</span>
-          </div>
-        )
-      })}
-    </>
   )
 }

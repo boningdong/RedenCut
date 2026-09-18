@@ -153,7 +153,9 @@ describe('WaveformView managed providers', () => {
     fireEvent.wheel(viewport, { clientX: 550, deltaY: -100 })
     expect(viewport.scrollLeft).toBeCloseTo(72)
     expect(Number.parseFloat(content.style.width)).toBe(1280)
-    expect(ruler.textContent).toContain('20s')
+    // Visible trailing space ends at 18.17s; offscreen ticks are now culled.
+    expect(ruler.textContent).toContain('18s')
+    expect(ruler.textContent).not.toContain('20s')
     // Two wheel events before React commits must accumulate against the padded extent.
     act(() => {
       viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))

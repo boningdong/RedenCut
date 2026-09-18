@@ -5,20 +5,24 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { getTimelineContentWidth } from './TimelineViewportGeometry'
 import { useTimelineZoom } from './UseTimelineZoom'
 
-function setup() {
+function setup(basePxPerSec = 80, duration = 10) {
   let controls: ReturnType<typeof useTimelineZoom>
   function Timeline() {
     const viewportRef = useRef<HTMLDivElement>(null)
     const [visibleStart, setVisibleStart] = useState(0)
     controls = useTimelineZoom({
       viewportRef,
-      basePxPerSec: 80,
-      duration: 10,
+      basePxPerSec,
+      duration,
       onScrollChange: setVisibleStart,
     })
     return (
       <div ref={viewportRef} data-visible-start={visibleStart}>
-        <div style={{ width: getTimelineContentWidth(10, 80 * controls.zoomLevel, 800) }} />
+        <div
+          style={{
+            width: getTimelineContentWidth(duration, basePxPerSec * controls.zoomLevel, 800),
+          }}
+        />
       </div>
     )
   }
@@ -134,4 +138,28 @@ it('anchors the visible left edge after panning instead of jumping to time zero'
   expect(viewport.scrollLeft).toBe(400)
   act(() => zoom(0.5, 196))
   expect(viewport.scrollLeft).toBe(200)
+})
+
+it.each([10, 3600, 7200])(
+  'allows precise editing independently of duration (%s seconds)',
+  (duration) => {
+    const scale = 800 / duration
+    const { controls, zoom, viewport } = setup(scale, duration)
+    act(() => zoom(1e6, 590))
+    expect(controls().zoomLevel * scale).toBeCloseTo(1000)
+    expect(controls().canZoomIn).toBe(false)
+    expect((viewport.scrollLeft + 400) / 1000).toBeCloseTo(duration / 2)
+    act(() => zoom(0.5, 590))
+    expect(controls().canZoomIn).toBe(true)
+    expect((viewport.scrollLeft + 400) / 500).toBeCloseTo(duration / 2)
+  },
+)
+
+it('keeps day-long audio inside browser layout limits and its end reachable', () => {
+  const scale = 800 / 86400
+  const { controls, zoom, viewport } = setup(scale, 86400)
+  viewport.scrollLeft = 800
+  act(() => zoom(1e9, 190))
+  expect(viewport.scrollWidth).toBeLessThan(33_000_000)
+  expect(viewport.scrollLeft / (scale * controls().zoomLevel)).toBeCloseTo(86400)
 })

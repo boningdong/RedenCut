@@ -3,7 +3,9 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from '
 import { getTimelineContentWidth } from './TimelineViewportGeometry'
 
 const MIN_ZOOM = 1 / 32
-const MAX_ZOOM = 32
+const MAX_PIXELS_PER_SECOND = 1000
+// Leave headroom below Chromium’s layout limit for the trailing viewport.
+const MAX_AUDIO_WIDTH = 32_000_000
 const LEFT_EDGE_SNAP_PX = 12
 
 interface ZoomAnchor {
@@ -25,6 +27,10 @@ export function useTimelineZoom({
   onScrollChange,
 }: TimelineZoomOptions) {
   const [zoom, setZoom] = useState({ level: 1 })
+  const maxScale = Math.min(MAX_PIXELS_PER_SECOND, MAX_AUDIO_WIDTH / Math.max(1, duration))
+  const maxZoom = maxScale / basePxPerSec
+  const minZoom = Math.min(MIN_ZOOM, maxZoom)
+  const zoomLevel = Math.min(zoom.level, maxZoom)
   const pending = useRef<{
     level: number
     scrollLeft: number
@@ -35,8 +41,8 @@ export function useTimelineZoom({
     (factor: number, clientX?: number) => {
       const viewport = viewportRef.current
       if (!viewport || viewport.clientWidth <= 0) return
-      const previousLevel = pending.current?.level ?? zoom.level
-      const level = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, previousLevel * factor))
+      const previousLevel = pending.current?.level ?? zoomLevel
+      const level = Math.min(maxZoom, Math.max(minZoom, previousLevel * factor))
       if (level === previousLevel) return
       const pointerX =
         clientX === undefined
@@ -70,7 +76,7 @@ export function useTimelineZoom({
       }
       setZoom({ level })
     },
-    [basePxPerSec, duration, viewportRef, zoom.level],
+    [basePxPerSec, duration, viewportRef, zoomLevel, maxZoom, minZoom],
   )
 
   useLayoutEffect(() => {
@@ -83,16 +89,16 @@ export function useTimelineZoom({
       0,
       Math.min(
         Math.max(0, viewport.scrollWidth - viewport.clientWidth),
-        request.anchor.timeSeconds * basePxPerSec * zoom.level - request.anchor.viewportX,
+        request.anchor.timeSeconds * basePxPerSec * zoomLevel - request.anchor.viewportX,
       ),
     )
     onScrollChange(viewport.scrollLeft)
-  }, [basePxPerSec, onScrollChange, viewportRef, zoom])
+  }, [basePxPerSec, onScrollChange, viewportRef, zoom, zoomLevel])
 
   return {
-    zoomLevel: zoom.level,
+    zoomLevel,
     zoomBy,
-    canZoomIn: zoom.level < MAX_ZOOM,
-    canZoomOut: zoom.level > MIN_ZOOM,
+    canZoomIn: zoomLevel < maxZoom,
+    canZoomOut: zoomLevel > minZoom,
   }
 }
