@@ -93,6 +93,71 @@ describe('canonical transcript editability', () => {
     ])
   })
 
+  it('offers transient follow and jump feedback without seeking or changing modes', () => {
+    vi.useFakeTimers()
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const follow = screen.getByRole('button', { name: 'Follow playback' })
+    const jump = screen.getByRole('button', { name: 'Jump to playhead' })
+    expect(follow.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.mouseEnter(follow)
+    void act(() => vi.advanceTimersByTime(599))
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    void act(() => vi.advanceTimersByTime(1))
+    expect(screen.getByRole('tooltip').textContent).toBe('Follow playback')
+    fireEvent.click(follow)
+    expect(follow.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByText('Follow playback: On')).toBeTruthy()
+    void act(() => vi.advanceTimersByTime(1200))
+    expect(screen.queryByText('Follow playback: On')).toBeNull()
+    fireEvent.click(jump)
+    expect(screen.getByText('No transcript at the current position')).toBeTruthy()
+    expect(usePlaybackStore.getState().currentTime).toBe(0)
+    expect(follow.getAttribute('aria-pressed')).toBe('true')
+    void act(() => vi.advanceTimersByTime(1200))
+    expect(screen.queryByText('No transcript at the current position')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Continuous text' }))
+    expect(follow.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.wheel(screen.getByTestId('canonical-transcript'), { deltaY: 30 })
+    expect(follow.getAttribute('aria-pressed')).toBe('false')
+    act(() => useTranscriptStore.getState().reset())
+    expect(useTranscriptStore.getState().followPlayback).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('announces a successful paused jump for 1.2 seconds without changing playback', () => {
+    vi.useFakeTimers()
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: [{ ...track.clips[0], muted: false }] }],
+    })
+    usePlaybackStore.getState().setCurrentTime(0.75)
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const viewport = screen.getByTestId('canonical-transcript')
+    const unit = document.querySelector('[data-unit-id="speech"]')!
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      top: 0,
+      bottom: 400,
+      height: 400,
+    } as DOMRect)
+    vi.spyOn(unit, 'getBoundingClientRect').mockReturnValue({
+      top: 600,
+      bottom: 620,
+      height: 20,
+    } as DOMRect)
+    const scroll = vi.fn()
+    viewport.scrollTo = scroll
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to playhead' }))
+    expect(scroll).toHaveBeenCalledWith({ top: 410, behavior: 'smooth' })
+    expect(screen.getByRole('status').textContent).toBe('Jumped to current playback position')
+    expect(usePlaybackStore.getState().currentTime).toBe(0.75)
+    expect(usePlaybackStore.getState().isPlaying).toBe(false)
+    expect(useTranscriptStore.getState().followPlayback).toBe(false)
+    void act(() => vi.advanceTimersByTime(1200))
+    expect(screen.queryByText('Jumped to current playback position')).toBeNull()
+    vi.useRealTimers()
+  })
+
   it('keeps toolbar controls mounted and puts unassigned speech in the speaker tag row', () => {
     render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const manage = screen.getByRole('button', { name: 'Manage people' }) as HTMLButtonElement

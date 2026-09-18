@@ -1,3 +1,5 @@
+import { TranscriptPlaybackControls } from './TranscriptPlaybackControls'
+import { useTranscriptPlaybackFollow } from './UseTranscriptPlaybackFollow'
 import { SpeechTaskPopover } from './SpeechTaskPopover'
 import { TranscriptDisplaySwitch } from './TranscriptDisplaySwitch'
 import { ContinuousTranscript } from './ContinuousTranscript'
@@ -65,6 +67,7 @@ export function CanonicalTranscriptPanel({
   )
   const container = useRef<HTMLDivElement>(null)
   const elements = useRef(new Map<string, HTMLSpanElement>())
+  const jumpToPlayhead = useTranscriptPlaybackFollow(units, container, elements, displayMode)
   const [pending, setPending] = useState<SessionSelection | null>(null)
   useEffect(() => {
     setPending(null)
@@ -235,27 +238,32 @@ export function CanonicalTranscriptPanel({
           }
         />
       </div>
-      <div
-        ref={container}
-        contentEditable
-        suppressContentEditableWarning
-        role="region"
-        aria-label={t('transcript.title')}
-        data-testid="canonical-transcript"
-        onBeforeInput={(e) => e.preventDefault()}
-        onPaste={(e) => e.preventDefault()}
-        onDrop={(e) => e.preventDefault()}
-        onKeyDown={keyDown}
-        className="transcript-document"
-      >
-        {displayMode === 'continuous' ? (
-          <ContinuousTranscript units={units} tracks={tracks} renderUnit={renderUnit} />
-        ) : (
-          <TranscriptDialogue units={units} tracks={tracks} renderUnit={renderUnit} />
-        )}
-        {!units.length && (
-          <p>{t(allUnits.length ? 'transcript.allSpeakersHidden' : 'transcript.emptyTimeline')}</p>
-        )}
+      <div className="transcript-viewport">
+        <div
+          ref={container}
+          contentEditable
+          suppressContentEditableWarning
+          role="region"
+          aria-label={t('transcript.title')}
+          data-testid="canonical-transcript"
+          onBeforeInput={(e) => e.preventDefault()}
+          onPaste={(e) => e.preventDefault()}
+          onDrop={(e) => e.preventDefault()}
+          onKeyDown={keyDown}
+          className="transcript-document"
+        >
+          {displayMode === 'continuous' ? (
+            <ContinuousTranscript units={units} tracks={tracks} renderUnit={renderUnit} />
+          ) : (
+            <TranscriptDialogue units={units} tracks={tracks} renderUnit={renderUnit} />
+          )}
+          {!units.length && (
+            <p>
+              {t(allUnits.length ? 'transcript.allSpeakersHidden' : 'transcript.emptyTimeline')}
+            </p>
+          )}
+        </div>
+        <TranscriptPlaybackControls onJump={jumpToPlayhead} />
       </div>
       <TranscriptStatusFooter
         isGenerating={isGenerating}

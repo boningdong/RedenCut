@@ -16,6 +16,8 @@ import type { Word } from '@shared/project.types'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 
 interface TranscriptState {
+  followPlayback: boolean
+  setFollowPlayback: (enabled: boolean) => void
   displayMode: 'continuous' | 'speakers'
   setDisplayMode: (mode: 'continuous' | 'speakers') => void
   hiddenSpeakerKeys: string[]
@@ -88,6 +90,7 @@ interface TranscriptState {
 }
 
 const initialState = {
+  followPlayback: false,
   displayMode: 'speakers' as 'continuous' | 'speakers',
   hiddenSpeakerKeys: [] as string[],
   analyses: [] as RendererSpeechAnalysis[],
@@ -100,6 +103,7 @@ const initialState = {
 
 export const useTranscriptStore = create<TranscriptState>()((set) => ({
   ...initialState,
+  setFollowPlayback: (followPlayback) => set({ followPlayback }),
   setDisplayMode: (displayMode) =>
     set({ displayMode, selectedTranscriptUnitIds: new Set(), selectedWordIds: new Set() }),
   toggleSpeakerVisibility: (key) =>

@@ -318,6 +318,14 @@ export const simplifiedChineseResources = {
     channelCount: '{{count}} 个声道',
   },
   transcript: {
+    playbackNavigation: '播放位置导航',
+    followPlayback: '跟随播放',
+    jumpToPlayhead: '定位当前播放位置',
+    followOn: '跟随播放：开启',
+    followOff: '跟随播放：关闭',
+    jumped: '已定位到当前播放位置',
+    noPosition: '当前位置没有可定位的文字',
+
     partiallyRedactedHint: '这段发言已部分删除。可拖动覆盖层边界微调。',
     batchPosition: '{{phase}} · {{index}} / {{count}}',
     textReady: '文本已可编辑',

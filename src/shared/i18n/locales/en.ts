@@ -336,6 +336,14 @@ export const englishResources = {
     channelCount: '{{count}} ch',
   },
   transcript: {
+    playbackNavigation: 'Playback navigation',
+    followPlayback: 'Follow playback',
+    jumpToPlayhead: 'Jump to playhead',
+    followOn: 'Follow playback: On',
+    followOff: 'Follow playback: Off',
+    jumped: 'Jumped to current playback position',
+    noPosition: 'No transcript at the current position',
+
     partiallyRedactedHint:
       'Part of this speech is redacted. Adjust the overlay edges to refine it.',
     batchPosition: '{{phase}} · {{index}} of {{count}}',
