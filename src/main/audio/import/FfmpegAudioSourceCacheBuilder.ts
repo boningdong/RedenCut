@@ -1,3 +1,4 @@
+import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
 import { once } from 'events'
 import type { EventEmitter } from 'events'
@@ -31,7 +32,7 @@ interface CacheBuilderDependencies {
   spawn: (
     command: string,
     arguments_: string[],
-    options: { stdio: ['ignore', 'pipe', 'pipe'] },
+    options: { stdio: ['ignore', 'pipe', 'pipe']; env: NodeJS.ProcessEnv },
   ) => FfmpegChild
   createWriteStream: typeof createWriteStream
   remove?: typeof rm
@@ -129,7 +130,7 @@ export class FfmpegAudioSourceCacheBuilder {
           String(request.metadata.channels),
           'pipe:1',
         ],
-        { stdio: ['ignore', 'pipe', 'pipe'] },
+        { stdio: ['ignore', 'pipe', 'pipe'], env: runtimeEnvironment(process.env) },
       )
       child.once('error', recordFailure)
       child.stdout.once('error', recordFailure)

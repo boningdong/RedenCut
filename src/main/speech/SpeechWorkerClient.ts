@@ -13,7 +13,7 @@ import {
 interface ClientOptions {
   terminateGraceMs?: number
   maxLineBytes?: number
-  env?: NodeJS.ProcessEnv
+  env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv)
   cwd?: string
   spawn?: SpeechWorkerSpawn
 }
@@ -28,7 +28,11 @@ interface SpeechWorkerChild extends EventEmitter {
 type SpeechWorkerSpawn = (
   command: string,
   args: string[],
-  options: { stdio: ['pipe', 'pipe', 'pipe']; cwd?: string; env?: NodeJS.ProcessEnv },
+  options: {
+    stdio: ['pipe', 'pipe', 'pipe']
+    cwd?: string
+    env?: NodeJS.ProcessEnv
+  },
 ) => SpeechWorkerChild
 
 const DEFAULT_MAX_JSONL_MESSAGE_BYTES = 32 * 1024 * 1024
@@ -38,7 +42,7 @@ export class SpeechWorkerClient {
     Pick<ClientOptions, 'env' | 'cwd'> & { spawn: SpeechWorkerSpawn }
 
   constructor(
-    private readonly command: string,
+    private readonly command: string | (() => string),
     private readonly args: string[],
     options: ClientOptions = {},
   ) {
@@ -66,11 +70,18 @@ export class SpeechWorkerClient {
     let terminal: SpeechWorkerResult | undefined
     const operation = manageProcess(
       () =>
-        this.options.spawn(this.command, this.args, {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          cwd: this.options.cwd,
-          env: offlineEnvironment(this.options.env ?? process.env),
-        }),
+        this.options.spawn(
+          typeof this.command === 'function' ? this.command() : this.command,
+          this.args,
+          {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            cwd: this.options.cwd,
+            env: offlineEnvironment(
+              (typeof this.options.env === 'function' ? this.options.env() : this.options.env) ??
+                process.env,
+            ),
+          },
+        ),
       signal,
       {
         terminateGraceMs: this.options.terminateGraceMs,

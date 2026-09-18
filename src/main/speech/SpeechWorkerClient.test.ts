@@ -134,6 +134,21 @@ describe('SpeechWorkerClient', () => {
       vi.useRealTimers()
     }
   })
+  it('resolves the current runtime at each job after setup or repair', async () => {
+    let command = '/runtime/before/python'
+    const spawn = vi.fn(() => new BrokenPipeChild())
+    const client = new SpeechWorkerClient(() => command, [], {
+      spawn,
+      env: () => ({ PATH: command + '/bin' }),
+    })
+    command = '/runtime/repaired/python'
+    await expect(client.run(request, new AbortController().signal)).rejects.toThrow()
+    expect(spawn).toHaveBeenCalledWith(
+      command,
+      [],
+      expect.objectContaining({ env: expect.objectContaining({ PATH: command + '/bin' }) }),
+    )
+  })
   it('never forwards Hugging Face credentials to offline inference', async () => {
     const child = new BrokenPipeChild()
     const spawn = vi.fn(() => child)
@@ -149,6 +164,8 @@ describe('SpeechWorkerClient', () => {
       expect.objectContaining({
         env: {
           PATH: '/runtime',
+          PYTHONNOUSERSITE: '1',
+          PYTHONDONTWRITEBYTECODE: '1',
           HF_HUB_OFFLINE: '1',
           TRANSFORMERS_OFFLINE: '1',
           HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',

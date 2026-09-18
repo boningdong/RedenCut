@@ -140,27 +140,22 @@ export const englishResources = {
     devOnly: 'Development only',
     devRequired: 'Setup required',
     devMissing: 'Not ready',
-    devIntro: 'Check local tools and prepare an isolated Python environment for this project.',
+    devIntro: 'Validate the managed tools and Python environment prepared for this project.',
     devTools: 'Local tools',
     devToolsHelp: 'Programs for audio processing and transcription.',
-    devToolLocations: 'Checks system and project installations',
+    devToolLocations: 'Uses only the selected project runtime',
     devGuide: 'Install guide',
     devValidate: 'Validate',
     devChecking: 'Validating…',
-    devBrewTools: 'macOS · If Homebrew is installed, run in Terminal:',
-    devOtherTools:
-      'Install FFmpeg, FFprobe and whisper.cpp for your system and add their executables to PATH.',
-    devToolReturn: 'FFmpeg includes FFprobe. Return here to validate after installation.',
+    devToolReturn:
+      'The setup command prepares FFmpeg, FFprobe and whisper.cpp. Return here to validate.',
     devPython: 'Python runtime',
-    devPythonHelp: 'Install uv, then set up Python and dependencies with the project command.',
+    devPythonHelp: 'Python and speech libraries are prepared together with the managed runtime.',
     devLibraries: 'Speech libraries',
-    devInstallUv: '1. Install uv',
-    devUvHelp:
-      'Skip if already installed. Use Homebrew on macOS or follow the installation documentation for your platform.',
-    devSetup: '2. Set up the speech runtime',
+    devSetup: 'Prepare the managed runtime',
     devRunAtRoot: 'Open Terminal at the current RedenCut project root and run:',
     devSetupHelp:
-      'Prepares Python 3.11 and installs locked speech dependencies in speech-worker/.venv.',
+      'Installs the pinned Python runtime and speech dependencies under .runtime. No separate uv installation is needed.',
     devReturn: 'Then click Validate. Models are downloaded separately below.',
     devModelsBlocked: 'Prepare the tools needed by each model above, then click Validate.',
     devRuntimeError:
@@ -537,6 +532,8 @@ export const englishResources = {
     invalidPreferences: 'Language settings were invalid. Default settings are being used.',
     generic: 'Something went wrong.',
     openFile: 'Could not open {{filename}}.',
+    'runtime-unavailable':
+      'The managed runtime is missing or invalid. In development, run npm run runtime:setup, then validate again in Settings. For an installed app, repair or reinstall the application.',
     'operation-failed': 'The operation could not be completed.',
     'stale-session': 'This project session is no longer current.',
     cancelled: 'The operation was cancelled.',
@@ -546,10 +543,11 @@ export const englishResources = {
     'job-settlement-failed': 'Background work could not be stopped safely.',
     'switch-unacknowledged': 'Playback could not be stopped safely.',
     'whisper-missing':
-      'whisper-cli not found. Install with: brew install whisper-cpp. Then restart the app.',
+      'The transcription engine is missing from the managed runtime. Repair the runtime and retry.',
     'whisper-model-missing':
       'No transcription model is ready. Open Settings to prepare the speech models.',
-    'speech-worker-missing': 'Speech worker is not installed. Run: npm run setup:speech',
+    'speech-worker-missing':
+      'The speech engine is unavailable. In development, run npm run runtime:setup; for an installed app, repair or reinstall the application.',
     'speech-language-unsupported':
       'Text alignment currently supports Chinese and English. This recording uses an unsupported language.',
     'speech-models-missing':

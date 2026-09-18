@@ -441,12 +441,10 @@ describe('App transcription job identity', () => {
     const player = getAudioPlayerInstance()
     const before = useEditorStore.getState().session
     fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toContain('whisper-cli not found'),
-    )
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('managed runtime'))
     act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
-    expect(screen.getByRole('alert').textContent).toContain('找不到 whisper-cli')
-    expect(screen.getByRole('alert').textContent).toContain('brew install whisper-cpp')
+    expect(screen.getByRole('alert').textContent).toContain('受管运行环境中缺少转录引擎')
+    expect(screen.getByRole('alert').textContent).toContain('修复运行环境')
     expect(getAudioPlayerInstance()).toBe(player)
     expect(useEditorStore.getState().session).toBe(before)
     expect(requests).toHaveLength(0)

@@ -1,3 +1,4 @@
+import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
 import { redactedTimelineDuration } from '../../../shared/redactionTimeline'
 import { randomUUID } from 'crypto'
@@ -74,7 +75,10 @@ export class ExportCoordinator {
     const remove = dependencies.remove ?? ((path: string) => rm(path, { force: true }))
     this.dependencies = {
       spawn: (command, arguments_) =>
-        spawn(command, arguments_, { stdio: ['ignore', 'ignore', 'pipe'] }) as ExportChild,
+        spawn(command, arguments_, {
+          stdio: ['ignore', 'ignore', 'pipe'],
+          env: runtimeEnvironment(process.env),
+        }) as ExportChild,
       createId: randomUUID,
       ffmpegPath: getFfmpegPath,
       rename,

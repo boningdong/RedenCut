@@ -1,6 +1,7 @@
 /** Stable business reasons, independent of translation keys. No diagnostic text crosses this contract. */
 export type PublicReason =
   | 'operation-failed'
+  | 'runtime-unavailable'
   | 'stale-session'
   | 'cancelled'
   | 'invalid-request'

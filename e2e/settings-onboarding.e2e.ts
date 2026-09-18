@@ -30,8 +30,11 @@ test('first-run preparation is optional and settings persist appearance and feat
       .toBe(1)
     await ui.call('browser_click', { target: 'button[data-value="resources"]' })
     await expect
-      .poll(() => ui.page.getByRole('switch', { name: 'Speaker recognition', exact: true }).count())
-      .toBe(1)
+      .poll(
+        () => ui.page.getByRole('switch', { name: 'Speaker recognition', exact: true }).isEnabled(),
+        { timeout: 70_000 },
+      )
+      .toBe(true)
     await ui.call('browser_click', { target: 'input[aria-label="Speaker recognition"]' })
     await expect
       .poll(() =>
@@ -68,6 +71,12 @@ test.each(['sample', 'empty'] as const)(
     try {
       await ui.start({ keepOnboarding: true })
       await ui.call('browser_click', { target: 'button:text-is("Continue")' })
+      await expect
+        .poll(
+          () => ui.page.getByRole('switch', { name: 'Text editing', exact: true }).isEnabled(),
+          { timeout: 70_000 },
+        )
+        .toBe(true)
       await ui.call('browser_click', { target: 'input[aria-label="Text editing"]' })
       await expect
         .poll(() => ui.page.getByRole('button', { name: 'Continue', exact: true }).isEnabled())
@@ -97,7 +106,7 @@ test.each(['sample', 'empty'] as const)(
 test('development setup explains missing runtime and validates without starting downloads', async () => {
   const ui = new McpTestSession()
   try {
-    await ui.start({ keepOnboarding: true })
+    await ui.start({ keepOnboarding: true, missingRuntime: true })
     await ui.call('browser_click', { target: 'button:text-is("Continue")' })
     await expect
       .poll(() => ui.page.getByText('Development environment', { exact: true }).count(), {
@@ -111,7 +120,7 @@ test('development setup explains missing runtime and validates without starting 
     await ui.call('browser_click', {
       target: '.dev-block:nth-child(2) button:text-is("Install guide")',
     })
-    expect(await ui.page.getByText('npm run setup:speech', { exact: true }).count()).toBe(1)
+    expect(await ui.page.getByText('npm run runtime:setup', { exact: true }).count()).toBe(1)
     await ui.screenshot('development-install-guide')
     await ui.call('browser_click', { target: '.dev-block:nth-child(2) button:text-is("Validate")' })
     await expect

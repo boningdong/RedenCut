@@ -21,44 +21,49 @@
 
 Files: runtime/runtime-lock.json, scripts/runtime native build/provision/check modules, scripts/runtime tests, speech-worker/pyproject.toml, speech-worker/uv.lock.
 Produces: a real task-local native/Python runtime, recorded build evidence, and a documented manifest contract for application integration.
-- [ ] Inspect native toolchain, Python cache, Docker and model availability without reading credentials.
-- [ ] Freeze manifest fields with Task 2 before implementation: schemaVersion, runtimeId, platform, arch, executables, components, files.
-- [ ] Add installer failure tests for mismatched hashes, traversal and incomplete staged installation; run them red before implementation.
-- [ ] Build LGPL FFmpeg with shared libraries, ffprobe and libmp3lame, excluding GPL/nonfree components; retain exact source hashes/configuration/licenses.
-- [ ] Build or provision pinned whisper.cpp and relocatable Python, then build compatible PyAV and bind TorchCodec to audited shared libraries.
-- [ ] Verify binary -L/-buildconf, library loading and actual audio operations; retain source archives and output hashes.
-- [ ] Exercise script tests and real Python imports; record unresolved external constraints precisely.
+- [x] Inspect native toolchain, Python cache, Docker and model availability without reading credentials.
+- [x] Freeze manifest fields with Task 2 before implementation: schemaVersion, runtimeId, platform, arch, executables, components, files.
+- [x] Add installer failure tests for mismatched hashes, traversal and incomplete staged installation; run them red before implementation.
+- [x] Build LGPL FFmpeg with shared libraries, ffprobe and libmp3lame, excluding GPL/nonfree components; retain exact source hashes/configuration/licenses.
+- [x] Build or provision pinned whisper.cpp and relocatable Python, then build compatible PyAV and bind TorchCodec to audited shared libraries.
+- [x] Verify binary -L/-buildconf, library loading and actual audio operations; retain source archives and output hashes.
+- [x] Exercise script tests and real Python imports; record unresolved external constraints precisely.
 
 ## Task 2: Application runtime boundary
 
 Files: src/main/runtime/AppRuntimeLocator.ts, src/main/runtime/RuntimeValidator.ts, src/shared/RuntimeManifest.ts, runtime tests, src/main/ipc/speechAnalysis.ipc.ts, runtime setup/check UI and localization consumers where needed.
 Consumes: Task 1 manifest and relative runtime paths.
 Produces: deterministic runtime selection with typed failures and no implicit executable discovery.
-- [ ] Add failing tests that a valid system executable is not selected when the managed executable is absent.
-- [ ] Add real filesystem tests for invalid manifests, wrong architecture, relative-path containment and missing components.
-- [ ] Replace system/package fallback resolution with manifest-backed resolution; route all Python worker paths through it.
-- [ ] Preserve live developer worker source and offline inference configuration; separate uv setup availability from runtime readiness.
-- [ ] Expose actionable runtime errors through existing settings/onboarding patterns and localizations without raw internal data in normal UI.
-- [ ] Run affected runtime/resource/IPC tests and typecheck.
+- [x] Add failing tests that a valid system executable is not selected when the managed executable is absent.
+- [x] Add real filesystem tests for invalid manifests, wrong architecture, relative-path containment and missing components.
+- [x] Replace system/package fallback resolution with manifest-backed resolution; route all Python worker paths through it.
+- [x] Preserve live developer worker source and offline inference configuration; separate uv setup availability from runtime readiness.
+- [x] Expose actionable runtime errors through existing settings/onboarding patterns and localizations without raw internal data in normal UI.
+- [x] Run affected runtime/resource/IPC tests and typecheck.
 
 ## Task 3: Development, packaging and documentation integration
 
 Files: package.json, package-lock.json, .gitignore, scripts/runtime development/release entrypoints, harness/container scripts and image, README.md, docs/architecture-standards.md, docs/speech-models-and-dependencies.md.
 Consumes: Tasks 1–2.
-- [ ] Remove static npm packages using npm lockfile tooling.
-- [ ] Add runtime:setup, runtime:check and controlled dev launch commands; record build/source provenance.
-- [ ] Stage a release runtime using the same artifacts, with relative library paths and license/source materials; do not copy a nonportable venv blindly.
-- [ ] Adapt Docker harness to an explicit identified runtime; do not silently certify distribution packages as LGPL builds.
-- [ ] Update active documentation for managed runtime behavior and retain historical docs unchanged.
-- [ ] Run setup from empty destination and repeat setup; verify failure leaves the earlier validated runtime intact.
+- [x] Remove static npm packages using npm lockfile tooling.
+- [x] Add runtime:setup, runtime:check and controlled dev launch commands; record build/source provenance.
+- [x] Stage a release runtime using the same artifacts, with relative library paths and license/source materials; do not copy a nonportable venv blindly.
+- [x] Adapt Docker harness to an explicit identified runtime; do not silently certify distribution packages as LGPL builds.
+- [x] Update active documentation for managed runtime behavior and retain historical docs unchanged.
+- [x] Run setup from empty destination and repeat setup; verify failure leaves the earlier validated runtime intact.
 
 ## Task 4: Regression, independent review and handoff
 
 Files: docs/superpowers/reports/2026-09-18-managed-runtime-license.md and task-owned .harness-runs evidence.
-- [ ] Run npm run format and npm run check, Python unittest discovery, harness normal/fault tests, container smoke and complete product E2Es.
-- [ ] Run real audio import/export smoke in all supported export formats and compare durations/decoding behavior.
-- [ ] Run available real-model speech checks with existing authorized caches; no credential disclosure.
-- [ ] Exercise Docker MCP editing baseline, UI consistency, settings and change-specific checks against the final source snapshot.
-- [ ] Obtain independent code/spec review, address actionable findings, and repeat only affected checks.
-- [ ] Archive exact commands, results, failures, scope limitations, provenance and migration decisions.
-- [ ] Keep the branch/worktree for review; do not claim signing, clean-machine, unavailable model or platform acceptance.
+- [x] Run npm run format and npm run check, Python unittest discovery, harness normal/fault tests, container smoke and complete product E2Es.
+- [x] Run real audio import/export smoke in all supported export formats and compare durations/decoding behavior.
+- [x] Run available real-model speech checks with existing authorized caches; no credential disclosure.
+- [x] Exercise Docker MCP editing baseline, UI consistency, settings and change-specific checks against the final source snapshot.
+- [x] Obtain independent code/spec review, address actionable findings, and repeat only affected checks.
+- [x] Archive exact commands, results, failures, scope limitations, provenance and migration decisions.
+- [x] Keep the branch/worktree for review; do not claim signing, clean-machine, unavailable model or platform acceptance.
+
+## Completion evidence
+
+See [the implementation and verification record](../reports/2026-09-18-managed-runtime-license.md) for exact results, corrected intermediate failures and release boundaries.
+Completed implementation and applicable regressions do not certify signed distribution, other native platforms or a project-license change.

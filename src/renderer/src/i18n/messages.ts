@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next'
 import type { PublicMessage, PublicReason } from '@shared/publicMessages'
 const reasonKeys = {
+  'runtime-unavailable': 'errors.runtime-unavailable',
   'operation-failed': 'errors.operation-failed',
   'stale-session': 'errors.stale-session',
   cancelled: 'errors.cancelled',

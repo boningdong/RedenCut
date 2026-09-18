@@ -12,12 +12,6 @@
     "harness/tests/**/*.integration.ts",
     "harness/tests/fixtures/*.cjs",
   ],
-  "ignoreDependencies": [
-    // Apple Silicon fallbacks loaded by resolveFromStaticPackage(packageName)
-    // through runtime require(packageName) in src/main/audio/binaries.ts.
-    "ffmpeg-static",
-    "ffprobe-static",
-  ],
   // Shared schemas and branded types are the deliberate domain/API surface even when a
   // particular member is only consumed by validation or external project files today.
   "ignoreIssues": {

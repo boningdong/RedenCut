@@ -3,32 +3,44 @@ FROM ${REDENCUT_HARNESS_BASE}
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-venv libsndfile1 build-essential cmake git \
+    python3 python3-pip libsndfile1 build-essential cmake pkg-config curl patchelf \
     && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --no-cache-dir --break-system-packages uv==0.12.12
 
-ARG WHISPER_CPP_REVISION=a8d002cfd879315632a579e73f0148d06959de36
-RUN git clone --filter=blob:none https://github.com/ggerganov/whisper.cpp.git /tmp/whisper.cpp \
-    && git -C /tmp/whisper.cpp checkout "$WHISPER_CPP_REVISION" \
-    && cmake -S /tmp/whisper.cpp -B /tmp/whisper.cpp/build -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON -DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8-a \
-    && cmake --build /tmp/whisper.cpp/build --target whisper-cli -j2 \
-    && install /tmp/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli \
-    && rm -rf /tmp/whisper.cpp
+RUN curl --fail --location --retry 3 https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.9.3.tar.gz -o /tmp/whisper.tar.gz \
+    && echo '1650f884effba487025143bd8facd2f9fb40a83b3737a732803c67a8d659d9c0  /tmp/whisper.tar.gz' | sha256sum -c - \
+    && tar -C /tmp -xf /tmp/whisper.tar.gz \
+    && cmake -S /tmp/whisper.cpp-1.9.3 -B /tmp/whisper-build -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON -DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8-a \
+    && cmake --build /tmp/whisper-build --target whisper-cli -j2 \
+    && install /tmp/whisper-build/bin/whisper-cli /opt/redencut-runtime/bin/whisper-cli \
+    && cp /tmp/whisper.cpp-1.9.3/LICENSE /opt/redencut-runtime/licenses/whisper.cpp-LICENSE \
+    && cp /tmp/whisper.tar.gz /opt/redencut-runtime/sources/whisper.cpp-1.9.3.tar.gz \
+    && rm -rf /tmp/whisper.cpp-1.9.3 /tmp/whisper-build /tmp/whisper.tar.gz
 
+# Linux CPU regression image only: full macOS release certification is separate.
+ENV UV_PYTHON_INSTALL_DIR=/opt/redencut-runtime/python
+ENV UV_PROJECT_ENVIRONMENT=/opt/redencut-runtime/speech-env
+ENV UV_NO_BINARY_PACKAGE=av
+ENV PKG_CONFIG_PATH=/opt/redencut-runtime/lib/pkgconfig
+ENV LDFLAGS=-Wl,-rpath,/opt/redencut-runtime/lib
+RUN uv python install 3.11.16
 COPY speech-worker/pyproject.toml speech-worker/uv.lock /opt/redencut-speech-worker/
 RUN --mount=type=cache,target=/root/.cache/uv \
     cd /opt/redencut-speech-worker \
-    && uv sync --frozen --no-dev --no-install-project
+    && uv sync --python 3.11.16 --frozen --no-dev --no-install-project
 COPY speech-worker/src /opt/redencut-speech-worker/src
 COPY speech-worker/models.json /opt/redencut-speech-worker/models.json
 RUN --mount=type=cache,target=/root/.cache/uv \
     cd /opt/redencut-speech-worker \
-    && uv sync --frozen --no-dev \
+    && uv sync --python 3.11.16 --frozen --no-dev \
     && mkdir -p /models \
     && chown -R node:node /opt/redencut-speech-worker /models
+COPY harness/container/WriteSpeechManifest.mjs /tmp/WriteSpeechManifest.mjs
+RUN node /tmp/WriteSpeechManifest.mjs
 
-ENV PATH="/opt/redencut-speech-worker/.venv/bin:${PATH}"
+ENV PATH="/opt/redencut-runtime/speech-env/bin:/opt/redencut-runtime/bin:${PATH}"
 ENV PYTHONPATH="/opt/redencut-speech-worker/src"
+ENV PYTHONNOUSERSITE=1
 ENV REDENCUT_SPEECH_MANIFEST="/opt/redencut-speech-worker/models.json"
 ENV REDENCUT_SPEECH_MODEL_CACHE="/models"
 ENV HF_HOME="/models/.huggingface"

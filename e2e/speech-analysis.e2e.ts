@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
@@ -14,7 +15,7 @@ afterEach(async () => {
 
 test('real speech analysis publishes an editable durable transcript and survives reopen', async () => {
   session = new McpTestSession()
-  await session.start()
+  await session.start({ speechModels: true })
 
   await session.call('redencut_prepare_dialog', {
     request: {
@@ -51,28 +52,16 @@ test('real speech analysis publishes an editable durable transcript and survives
   expect(await transcript.locator('[data-acoustic-editable="true"]').count()).toBeGreaterThan(0)
   expect(await transcript.innerText()).not.toBe('')
 
-  await session.call('browser_click', {
-    target: 'button[title^="Machine label"]',
-    doubleClick: true,
-  })
-  await session.call('browser_fill_form', {
-    fields: [
-      {
-        name: 'Speaker name',
-        type: 'textbox',
-        target: 'input[aria-label^="Rename"]',
-        value: 'Host',
-      },
-    ],
-  })
-  await session.call('browser_click', { target: 'input[aria-label^="Rename"] + button' })
   await expect
-    .poll(() => session!.page.getByRole('button', { name: 'Show Host', exact: true }).count(), {
-      timeout: 10_000,
-      interval: 200,
+    .poll(() => session!.page.locator('[data-redencut-busy]').getAttribute('data-redencut-busy'), {
+      timeout: 240_000,
     })
-    .toBe(1)
-  await session.call('browser_click', { target: 'button[aria-label="Change color for Host"]' })
+    .toBe('false')
+  await session.call('browser_click', { target: '.identity-tag .identity-edit-button >> nth=0' })
+  await session.call('browser_fill_form', {
+    fields: [{ name: 'Name', type: 'textbox', target: 'input[aria-label="Name"]', value: 'Host' }],
+  })
+  await session.call('browser_click', { target: '[role="dialog"] button:text-is("Hex")' })
   await session.call('browser_fill_form', {
     fields: [
       {
@@ -83,9 +72,19 @@ test('real speech analysis publishes an editable durable transcript and survives
       },
     ],
   })
-  await session.call('browser_click', { target: 'button:text-is("Apply color")' })
+  await session.call('browser_click', {
+    target: '[role="dialog"] button[aria-label="Apply color"]',
+  })
+  await session.call('browser_click', { target: '[role="dialog"] button:text-is("Save")' })
   await expect
-    .poll(() => session!.page.locator('.speaker-color-button span').getAttribute('style'))
+    .poll(() => session!.page.getByRole('button', { name: 'Show Host', exact: true }).count())
+    .toBe(1)
+  const hostTag = () =>
+    session!.page
+      .locator('.identity-tag')
+      .filter({ has: session!.page.getByRole('button', { name: 'Show Host', exact: true }) })
+  await expect
+    .poll(() => hostTag().locator('.identity-dot').getAttribute('style'))
     .toContain('rgb(220, 139, 156)')
   const transcriptText = await transcript.innerText()
   expect(transcriptText).toContain('Host')
@@ -108,12 +107,20 @@ test('real speech analysis publishes an editable durable transcript and survives
     JSON.parse(readFileSync(join(projectRoot, 'project.json'), 'utf8')),
   )
   expect(project.speechArtifacts).toHaveLength(1)
-  expect(project.speakerLabelOverrides.map((override) => override.displayName)).toEqual(['Host'])
-  expect(project.speakerLabelOverrides[0].color).toBe('#dc8b9c')
+  expect(
+    project.speakerIdentities?.people.some(
+      (person) => person.displayName === 'Host' && person.color === '#dc8b9c',
+    ),
+  ).toBe(true)
   const reference = project.speechArtifacts[0]
   expect(reference.artifactPath).toBe(
-    `speech/${reference.audioSourceId}/revision-${reference.analysisRevisionId}.json`,
+    `speech/${reference.audioSourceId}/revision-${reference.analysisRevisionId}-${reference.artifactSha256}.json`,
   )
+  expect(
+    createHash('sha256')
+      .update(readFileSync(join(projectRoot, reference.artifactPath)))
+      .digest('hex'),
+  ).toBe(reference.artifactSha256)
   const artifact = SpeechArtifactSchema.parse(
     JSON.parse(readFileSync(join(projectRoot, reference.artifactPath), 'utf8')),
   )
@@ -135,15 +142,15 @@ test('real speech analysis publishes an editable durable transcript and survives
     })
     .toBe(transcriptText)
   expect(await session.page.getByRole('button', { name: 'Show Host', exact: true }).count()).toBe(1)
-  expect(await session.page.locator('.speaker-color-button span').getAttribute('style')).toContain(
+  expect(await hostTag().locator('.identity-dot').getAttribute('style')).toContain(
     'rgb(220, 139, 156)',
   )
   await session.screenshot('speech-analysis-reopened')
 
   writeFileSync(
-    join(session.directory, 'agent-testing-report.md'),
+    join(session.directory, 'e2e-report.md'),
     [
-      '# Speech analysis agent testing report',
+      '# Fixed speech analysis E2E report',
       '',
       '- PASS `speech-import`: imported the real 13.5 second Mandarin fixture through the UI.',
       '- PASS `speech-generate`: whisper.cpp, WhisperX, and pyannote completed through the job-scoped worker.',

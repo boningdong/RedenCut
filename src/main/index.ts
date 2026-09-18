@@ -115,13 +115,16 @@ startApplicationLifecycle({
       undefined,
       app.isPackaged ? undefined : new LocalHuggingFaceLogin(),
     )
+    const developmentEnvironment = app.isPackaged
+      ? undefined
+      : new DevelopmentEnvironmentChecker(runtime)
     const resources = new ResourceManager(
       manifest.models,
       new ModelRegistry(app.getPath('userData')),
       new ModelDownloader(),
       access,
       createModelLoadValidator(runtime, manifestPath),
-      app.isPackaged ? undefined : new DevelopmentEnvironmentChecker(runtime),
+      developmentEnvironment,
       appPreferences,
     )
     registerResourcesIpc(resources)
@@ -245,6 +248,7 @@ startApplicationLifecycle({
         window.webContents.send('project:pending-open', pending)
       },
       shutdown: async () => {
+        await developmentEnvironment?.shutdown()
         await resources.cancel()
         await mediaRecovery.shutdown()
         await barrier.shutdown()

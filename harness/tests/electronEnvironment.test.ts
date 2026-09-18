@@ -34,7 +34,7 @@ test('forwards non-secret speech paths but never Hugging Face credentials', () =
   expect(
     electronEnvironment({
       REDENCUT_SPEECH_WORKER_ROOT: '/opt/redencut-speech-worker',
-      REDENCUT_SPEECH_WORKER_PYTHON: '/opt/redencut-speech-worker/.venv/bin/python',
+      REDENCUT_RUNTIME_ROOT: '/opt/redencut-runtime',
       REDENCUT_SPEECH_MANIFEST: '/opt/redencut-speech-worker/models.json',
       REDENCUT_SPEECH_MODEL_CACHE: '/models',
       REDENCUT_WHISPER_MODEL_DIR: '/models/whisper',
@@ -43,7 +43,7 @@ test('forwards non-secret speech paths but never Hugging Face credentials', () =
     }),
   ).toEqual({
     REDENCUT_SPEECH_WORKER_ROOT: '/opt/redencut-speech-worker',
-    REDENCUT_SPEECH_WORKER_PYTHON: '/opt/redencut-speech-worker/.venv/bin/python',
+    REDENCUT_RUNTIME_ROOT: '/opt/redencut-runtime',
     REDENCUT_SPEECH_MANIFEST: '/opt/redencut-speech-worker/models.json',
     REDENCUT_SPEECH_MODEL_CACHE: '/models',
     REDENCUT_WHISPER_MODEL_DIR: '/models/whisper',

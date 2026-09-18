@@ -37,6 +37,16 @@ vi.mock('../speech/transcriber/whisper', () => ({
   whisperTranscriber: { unavailableReason: mocks.unavailableReason, setModelResolver: vi.fn() },
 }))
 vi.mock('fs', () => ({ existsSync: mocks.existsSync }))
+vi.mock('../runtime/AppRuntimeLocator', () => ({
+  AppRuntimeLocator: class {
+    getFfmpegPath() {
+      return '/managed/bin/ffmpeg'
+    }
+    getSpeechPythonPath() {
+      return '/managed/python'
+    }
+  },
+}))
 import { registerSpeechAnalysisIpc } from './speechAnalysis.ipc'
 
 beforeEach(() => {
@@ -201,7 +211,7 @@ function deferredPreferences() {
       })),
       models: [{ id: 'whisper', capability: 'transcription', files: [{ path: 'model.bin' }] }],
     },
-    runtime: { getSpeechPythonPath: () => '/python' },
+    runtime: { getSpeechPythonPath: () => '/python', getFfmpegPath: () => '/managed/bin/ffmpeg' },
     manifestPath: '/worker/models.json',
   } as unknown as NonNullable<Parameters<typeof registerSpeechAnalysisIpc>[3]>
   return {

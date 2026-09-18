@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Job-scoped forced-alignment and diarization worker for RedenCut"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+  "av==14.4.0",
   "huggingface-hub==0.36.0",
   "pyannote-audio==4.0.7",
   "torch==2.8.0",

@@ -35,14 +35,22 @@ export function DevelopmentEnvironmentPanel() {
   )
   const actions = (group: 'tools' | 'python') => {
     const checks: DevelopmentCheck[] =
-      group === 'tools' ? ['ffmpeg', 'ffprobe', 'whisper'] : ['uv', 'python', 'libraries']
+      group === 'tools' ? ['ffmpeg', 'ffprobe', 'whisper'] : ['python', 'libraries']
     const checking = dev.checking?.some((key) => checks.includes(key)) ?? false
     return (
       <div className="dev-block-footer">
         <button className="outline" onClick={() => setGuide(guide === group ? null : group)}>
           {t('settings.devGuide')}
         </button>
-        <button className="recheck-action" disabled={pending} onClick={() => void refresh()}>
+        <button
+          className="recheck-action"
+          aria-disabled={pending}
+          onClick={() => {
+            if (pending) return
+            setExpanded(true)
+            void refresh()
+          }}
+        >
           {checking ? <i className="loading-spinner" /> : <Icon name="refresh" />}
           {t(checking ? 'settings.devChecking' : 'settings.devValidate')}
         </button>
@@ -90,52 +98,25 @@ export function DevelopmentEnvironmentPanel() {
               {actions('tools')}
               {guide === 'tools' && (
                 <div className="dev-guide">
-                  <p>
-                    {t(
-                      dev.platform === 'darwin'
-                        ? 'settings.devBrewTools'
-                        : 'settings.devOtherTools',
-                    )}
-                  </p>
-                  {dev.platform === 'darwin' && <code>brew install ffmpeg whisper-cpp</code>}
+                  <p>{t('settings.devRunAtRoot')}</p>
+                  <code>npm run runtime:setup</code>
                   <p>{t('settings.devToolReturn')}</p>
-                  <button
-                    className="textbutton"
-                    onClick={() =>
-                      void window.electronAPI.resourcesOpenGuide('tools').catch(() => {})
-                    }
-                  >
-                    Homebrew ↗
-                  </button>
                 </div>
               )}
             </section>
             <section className="dev-block">
               <h3>{t('settings.devPython')}</h3>
               <p>{t('settings.devPythonHelp')}</p>
-              {row('uv', dev.uv, 'uv')}
               {row('Python 3.11', dev.python, 'python')}
               {row(t('settings.devLibraries'), dev.libraries, 'libraries')}
               <p className="dev-note">WhisperX · PyTorch · pyannote.audio</p>
-              <p className="dev-note">speech-worker/.venv</p>
+              <p className="dev-note">.runtime</p>
               {actions('python')}
               {guide === 'python' && (
                 <div className="dev-guide">
-                  <b>{t('settings.devInstallUv')}</b>
-                  <p>{t('settings.devUvHelp')}</p>
-                  {dev.platform === 'darwin' && <code>brew install uv</code>}
-                  <button
-                    className="textbutton"
-                    onClick={() =>
-                      void window.electronAPI.resourcesOpenGuide('python').catch(() => {})
-                    }
-                  >
-                    uv ↗
-                  </button>
-                  <hr />
                   <b>{t('settings.devSetup')}</b>
                   <p>{t('settings.devRunAtRoot')}</p>
-                  <code>npm run setup:speech</code>
+                  <code>npm run runtime:setup</code>
                   <p>{t('settings.devSetupHelp')}</p>
                   <p>{t('settings.devReturn')}</p>
                 </div>

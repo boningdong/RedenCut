@@ -14,9 +14,11 @@ docker build -f harness/container/Dockerfile -t redencut-harness:local .
 The launcher uses the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
 The image uses the repository's Node version and lockfile, installing Linux-native dependencies rather than reusing Mac `node_modules`.
 The image includes Noto CJK fonts so Simplified Chinese UI acceptance can inspect rendered glyphs.
-Debian FFmpeg supplies `/usr/bin/ffmpeg` and `/usr/bin/ffprobe`, avoiding reliance on static npm binary availability for Linux ARM64.
+The audio harness builds pinned FFmpeg 7.1.5 and LAME 3.100 sources into `/opt/redencut-runtime`, with GPL/nonfree features and automatic system codec discovery disabled.
+The generated manifest inventories executables, libraries, source archives and license materials; `REDENCUT_RUNTIME_ROOT` selects it explicitly.
+This minimal Linux runtime supports audio UI regression; it does not certify the full macOS Python/speech release runtime.
 Debian packages are installed from the configured repositories at build time, so rebuilding without cache is not a bit-for-bit reproducibility guarantee.
-Only the dependency manifests and container startup/supervisor scripts enter the image build context; product source code and Git metadata are not uploaded to a registry or baked into the image.
+Only dependency manifests and container build/startup/supervisor files are copied into the audio image; product source code and Git metadata are not uploaded to a registry or baked into the image.
 Rebuild after dependency manifests or container image configuration change; ordinary source changes do not need an image rebuild.
 The entrypoint rejects dependency manifest drift instead of silently running an old dependency set.
 
@@ -98,3 +100,12 @@ The destination is `<runDirectory>/exports/<filename>`, retained on the host und
 Preparation and consumption reject existing outputs, symlink parent changes and format mismatches; no arbitrary path or other run destination is accepted.
 To inspect an actual export, wait for the UI’s Done confirmation, then read only that run-owned output using FFprobe/FFmpeg.
 This file inspection verifies produced media and is separate from live audio recording, which MCP does not expose.
+
+## Real speech E2E model fixture
+
+The two real speech E2Es require an already provisioned application model directory containing valid model markers and pinned model files.
+Set `REDENCUT_TEST_MODEL_FIXTURE=/absolute/path/to/app/models` when running `run.sh` with the speech image.
+The launcher mounts only this directory read-only at `/test-models`; the tests link it into their disposable user-data directory and the application verifies its contents normally.
+No token, account profile, download, or modification of the original model directory is involved.
+A missing fixture is an explicit test prerequisite failure, not a skipped or simulated speech success.
+Use the audio-only image to exercise missing-Python setup feedback and the speech image for complete real-model E2Es.

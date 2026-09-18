@@ -2,6 +2,9 @@ import type { DevelopmentEnvironment } from '../../shared/developmentEnvironment
 import { expect, test, vi } from 'vitest'
 import { DevelopmentEnvironmentChecker } from './DevelopmentEnvironmentChecker'
 import { AppRuntimeLocator } from './AppRuntimeLocator'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 function locator() {
   const runtime = new AppRuntimeLocator({ packaged: false, resourcesPath: '', appPath: '' })
   for (const [method, path] of Object.entries({
@@ -69,4 +72,69 @@ test('publishes completed rows while speech library imports are still running', 
   )
   finish()
   expect(await checking).toMatchObject({ ready: true, checking: [] })
+})
+
+test('shutdown aborts an in-flight library probe and settles the check', async () => {
+  let librarySignal: AbortSignal | undefined
+  const checker = new DevelopmentEnvironmentChecker(locator(), async (_file, args, signal) => {
+    if (!args.join(' ').includes('whisperx')) return
+    librarySignal = signal
+    await new Promise<void>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  })
+  const checking = checker.check()
+  await vi.waitFor(() => expect(librarySignal).toBeDefined())
+  await checker.shutdown()
+  expect(librarySignal!.aborted).toBe(true)
+  expect(await checking).toMatchObject({ ready: false, libraries: false, checking: [] })
+})
+
+test('a late resource read after shutdown never starts new runtime probes', async () => {
+  const probe = vi.fn(async () => {})
+  const checker = new DevelopmentEnvironmentChecker(locator(), probe)
+  await checker.shutdown()
+  expect(await checker.check()).toMatchObject({ ready: false, checking: [] })
+  expect(probe).not.toHaveBeenCalled()
+})
+
+test('shutdown terminates real child processes owned by the default probe', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'redencut-runtime-probes-'))
+  const executable = join(directory, 'probe')
+  await writeFile(
+    executable,
+    `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(directory)} + '/' + process.pid, ''); setInterval(() => {}, 1000)\n`,
+    { mode: 0o755 },
+  )
+  const runtime = locator()
+  for (const method of [
+    'getFfmpegPath',
+    'getFfprobePath',
+    'getWhisperExecutablePath',
+    'getUvPath',
+    'getSpeechPythonPath',
+  ] as const)
+    vi.mocked(runtime[method]).mockReturnValue(executable)
+  const checker = new DevelopmentEnvironmentChecker(runtime)
+  const checking = checker.check()
+  const childPids = async () =>
+    (await readdir(directory)).filter((name) => /^\d+$/.test(name)).map(Number)
+  try {
+    await vi.waitFor(async () => expect(await childPids()).toHaveLength(5))
+    await checker.shutdown()
+    expect(await checking).toMatchObject({ ready: false })
+    await vi.waitFor(async () => {
+      for (const pid of await childPids()) expect(() => process.kill(pid, 0)).toThrow()
+    })
+  } finally {
+    for (const pid of await childPids()) {
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {
+        /* The owned child already exited. */
+      }
+    }
+    await checking
+    await rm(directory, { recursive: true, force: true })
+  }
 })

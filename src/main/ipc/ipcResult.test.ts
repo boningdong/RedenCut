@@ -1,3 +1,4 @@
+import { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
 import { describe, expect, it, vi } from 'vitest'
 import { SpeechAnalysisError } from '../speech/SpeechAnalysisError'
 import { PublicIpcError, toIpcResult } from './ipcResult'
@@ -53,4 +54,24 @@ it('retains safe speech stage and failure kind while hiding diagnostics', async 
     error: { reason: 'speech-diarizing', failureKind: 'protocol' },
   })
   expect(JSON.stringify(result)).not.toContain('/private')
+})
+
+it('reports a missing managed runtime without exposing its filesystem paths', async () => {
+  const runtime = new AppRuntimeLocator({
+    packaged: true,
+    resourcesPath: '/missing-private-runtime-fixture',
+    appPath: '',
+  })
+  const result = await toIpcResult(
+    () => runtime.getFfmpegPath(),
+    () => {},
+  )
+  expect(result).toEqual({
+    ok: false,
+    error: {
+      code: 'operation-failed',
+      reason: 'runtime-unavailable',
+      message: 'The managed runtime is missing or invalid.',
+    },
+  })
 })

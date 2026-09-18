@@ -1,3 +1,4 @@
+import { RuntimeValidationError } from '../runtime/RuntimeValidator'
 import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUnavailableError'
 import type { IpcError, IpcResult } from '../../shared/ipc.types'
 import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
@@ -34,6 +35,12 @@ export async function toIpcResult<T>(
 }
 
 function mapError(error: unknown): IpcError {
+  if (error instanceof RuntimeValidationError)
+    return {
+      code: 'operation-failed',
+      reason: 'runtime-unavailable',
+      message: 'The managed runtime is missing or invalid.',
+    }
   if (error instanceof TranscriberUnavailableError)
     return { code: 'operation-failed', reason: error.reason, message: error.message }
   if (error instanceof SpeechAnalysisError)

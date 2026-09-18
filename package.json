@@ -19,7 +19,7 @@
     "speech:docker:preflight": "sh harness/container/run-speech.sh preflight",
     "clear:onboarding": "node scripts/clear-app-data.mjs onboarding",
     "clear:models": "node scripts/clear-app-data.mjs models",
-    "setup:speech": "sh speech-worker/run-native.sh setup",
+    "setup:speech": "npm run runtime:setup",
     "speech:native:setup": "npm run setup:speech",
     "setup:speech-models": "sh speech-worker/run-native.sh provision",
     "speech:native:provision": "npm run setup:speech-models",
@@ -30,7 +30,12 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\" \"harness/**/*.{ts,cjs,json}\" \"e2e/**/*.ts\" \"*.{ts,mjs,json}\" .prettierrc.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"harness/**/*.ts\" \"e2e/**/*.ts\" \"*.config.ts\"",
     "deadcode": "knip",
-    "check": "npm run format:check && npm run lint && npm run deadcode && npm run typecheck && npm test && npm run build"
+    "check": "npm run format:check && npm run lint && npm run deadcode && npm run typecheck && npm test && npm run build",
+    "runtime:build": "node scripts/runtime/BuildRuntime.mjs",
+    "runtime:setup": "node scripts/runtime/SetupRuntime.mjs",
+    "runtime:check": "node scripts/runtime/CheckRuntime.mjs",
+    "test:runtime": "node --test scripts/runtime/*.test.mjs",
+    "runtime:stage": "node scripts/StageReleaseResources.mjs"
   },
   "keywords": [],
   "author": "",
@@ -67,8 +72,6 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "ffmpeg-static": "^5.2.0",
-    "ffprobe-static": "^3.1.0",
     "i18next": "^26.4.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

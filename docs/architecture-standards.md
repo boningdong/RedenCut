@@ -55,7 +55,7 @@
 - AppRuntimeLocator is the single executable-location boundary; development runtime availability does not certify packaged distribution.
 - Non-bundled builds use DevelopmentEnvironmentChecker for read-only executable and Python import checks, exposed in ResourceManager snapshots.
 - Model selection, preparation and cancellation reuse the latest environment result; first access and explicit resource refresh validate the environment. Per-group progress reflects active check keys, not unrelated resource operations.
-- Developer installation is explicit through `npm run setup:speech`; the app validates the result and blocks model preparation while required runtime checks fail.
+- Developer installation is explicit through `npm run runtime:setup`; the app validates the result and blocks model preparation while required runtime checks fail.
 - uv is only an environment-setup tool; an already usable runtime does not require uv for inference or model preparation.
 - Bundled snapshots omit development setup; installation guide IPC accepts fixed guide IDs rather than renderer-supplied URLs.
 - Explicit onboarding skip/close and completion persist independently of resources; dialog closure does not cancel preparation.
@@ -66,7 +66,7 @@
 - Serve only validated cache artifacts through `redencut://cache/<audio-source-id>/pcm` and `/waveform/<level>`; do not expose arbitrary paths or direct renderer `file://` access.
 - Require and forward bounded byte ranges, and preserve binary MIME and CORS headers when changing the custom protocol.
 - Treat continuous Float32 PCM, binary waveform levels, and cache manifests as regenerable data; copied files under `media/` remain durable originals.
-- Resolve FFmpeg, FFprobe, and whisper.cpp binaries through [`src/main/runtime/AppRuntimeLocator.ts`](../src/main/runtime/AppRuntimeLocator.ts) so platform lookup, package fallback, caching, and actionable errors remain centralized.
+- Resolve FFmpeg, FFprobe, and whisper.cpp binaries through [`src/main/runtime/AppRuntimeLocator.ts`](../src/main/runtime/AppRuntimeLocator.ts) so manifest validation, architecture checks, file integrity and actionable errors remain centralized. No system/Homebrew/npm fallback is permitted.
 
 ## Playback
 

@@ -1,0 +1,14 @@
+.git
+.worktrees
+node_modules
+out
+dist
+.harness-runs
+.superpowers
+.runtime
+.runtime-build
+.runtime-cache
+speech-worker/.venv
+**/__pycache__
+.env*
+*.tsbuildinfo

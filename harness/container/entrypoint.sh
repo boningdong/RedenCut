@@ -11,6 +11,8 @@ fi
 snapshot=$(mktemp /tmp/redencut-source.XXXXXX.tar)
 tar -C /source --exclude=./node_modules --exclude=./out --exclude=./dist \
   --exclude=./.harness-runs --exclude=./.worktrees --exclude=./.git \
+  --exclude=./.runtime --exclude=./.runtime-build --exclude=./.runtime-cache \
+  --exclude=./.superpowers --exclude=./speech-worker/.venv \
   --exclude='./.env*' --exclude='./*.tsbuildinfo' -cf "$snapshot" .
 tar -C /workspace -xf "$snapshot" --no-same-owner
 rm "$snapshot"

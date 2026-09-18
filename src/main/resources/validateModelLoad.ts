@@ -1,3 +1,4 @@
+import { offlineEnvironment } from '../speech/inferenceEnvironment'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { writeFile, rm } from 'node:fs/promises'
@@ -13,13 +14,13 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
     directory: string,
     signal: AbortSignal,
   ): Promise<void> => {
-    const env = {
+    const env = offlineEnvironment({
       ...process.env,
       HF_HUB_OFFLINE: '1',
       TRANSFORMERS_OFFLINE: '1',
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
       PYTHONPATH: join(dirname(manifest), 'src'),
-    }
+    })
     for (const key of Object.keys(env))
       if (/TOKEN|SECRET|PASSWORD/i.test(key)) delete (env as NodeJS.ProcessEnv)[key]
     env.HF_HUB_DISABLE_IMPLICIT_TOKEN = '1'
@@ -72,11 +73,12 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
       if (models.some((model) => model.capability === 'transcription'))
         runtime.getWhisperExecutablePath()
       if (models.some((model) => model.capability !== 'transcription')) {
-        const env: NodeJS.ProcessEnv = {
+        const env: NodeJS.ProcessEnv = offlineEnvironment({
           ...process.env,
           HF_HUB_OFFLINE: '1',
           TRANSFORMERS_OFFLINE: '1',
-        }
+          PYTHONPATH: '',
+        })
         for (const key of Object.keys(env)) if (/TOKEN|SECRET|PASSWORD/i.test(key)) delete env[key]
         env.HF_HUB_DISABLE_IMPLICIT_TOKEN = '1'
         const imports = models.some((model) => model.capability === 'diarization')

@@ -160,7 +160,7 @@ it('shows development instructions, blocks model downloads, and unlocks after va
   )
   expect(screen.getByText(/Prepare the tools needed by each model above/)).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: 'Install guide' })[1])
-  expect(screen.getByText('npm run setup:speech')).toBeTruthy()
+  expect(screen.getByText('npm run runtime:setup')).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: 'Validate' })[1])
   await waitFor(() =>
     expect((screen.getByRole('button', { name: 'Download' }) as HTMLButtonElement).disabled).toBe(

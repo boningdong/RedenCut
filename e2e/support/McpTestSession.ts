@@ -1,3 +1,5 @@
+import { ElectronSession } from '../../harness/runtime/ElectronSession'
+import { prepareSpeechModelFixture } from './SpeechModelFixture'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -20,6 +22,7 @@ export class McpTestSession {
   private readonly server = createMcpFacade(new RuntimeToolBackend(this.runtime))
   private readonly client = new Client({ name: 'redencut-visible-e2e', version: '1.0.0' })
   private observer: ReturnType<typeof vi.spyOn> | undefined
+  private launchPreparation: ReturnType<typeof vi.spyOn> | undefined
   private currentPage: Page | undefined
   private identity: { runId: string; generation: number } | undefined
   directory = ''
@@ -29,7 +32,28 @@ export class McpTestSession {
     return this.currentPage
   }
 
-  async start(options: { keepOnboarding?: boolean } = {}): Promise<void> {
+  async start(
+    options: { keepOnboarding?: boolean; speechModels?: boolean; missingRuntime?: boolean } = {},
+  ): Promise<void> {
+    if (options.speechModels || options.missingRuntime) {
+      const launch = ElectronSession.launch.bind(ElectronSession)
+      this.launchPreparation = vi
+        .spyOn(ElectronSession, 'launch')
+        .mockImplementation(async (...args) => {
+          if (options.speechModels) prepareSpeechModelFixture(args[1].directory)
+          if (!options.missingRuntime) return launch(...args)
+          // A genuinely absent runtime under the owned run tests setup guidance in either image.
+          // E2E files run serially; restore the environment even if launch fails.
+          const previousRoot = process.env.REDENCUT_RUNTIME_ROOT
+          process.env.REDENCUT_RUNTIME_ROOT = join(args[1].directory, 'missing-runtime')
+          try {
+            return await launch(...args)
+          } finally {
+            if (previousRoot === undefined) delete process.env.REDENCUT_RUNTIME_ROOT
+            else process.env.REDENCUT_RUNTIME_ROOT = previousRoot
+          }
+        })
+    }
     const create = PlaywrightMcpAdapter.create.bind(PlaywrightMcpAdapter)
 
     // Observe the existing shared Context without replacing the real adapter or opening CDP.
@@ -102,6 +126,7 @@ export class McpTestSession {
           await this.server.close()
         } finally {
           this.observer?.mockRestore()
+          this.launchPreparation?.mockRestore()
         }
       }
     }

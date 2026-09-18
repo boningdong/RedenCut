@@ -26,7 +26,18 @@ export function PreferencesDialog({
         event.preventDefault()
         onClose()
       }}
-      onKeyDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (
+          event.key !== 'Escape' ||
+          event.defaultPrevented ||
+          event.nativeEvent.isComposing ||
+          (event.target instanceof Element && event.target.closest('select'))
+        )
+          return
+        event.preventDefault()
+        onClose()
+      }}
     >
       {children}
     </dialog>

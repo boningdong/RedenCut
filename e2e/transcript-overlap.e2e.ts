@@ -4,7 +4,7 @@ import { McpTestSession } from './support/McpTestSession'
 test('real track occurrences align locally and follow clip movement and undo', async () => {
   const ui = new McpTestSession()
   try {
-    await ui.start()
+    await ui.start({ speechModels: true })
     const importAudio = async (expectedTracks: number, filename = 'mandarin-short-female.wav') => {
       await ui.call('redencut_prepare_dialog', {
         request: {
@@ -30,12 +30,22 @@ test('real track occurrences align locally and follow clip movement and undo', a
         timeout: 240_000,
       })
       .toBe(1)
+    await expect
+      .poll(() => ui.page.locator('[data-redencut-busy]').getAttribute('data-redencut-busy'), {
+        timeout: 240_000,
+      })
+      .toBe('false')
     await importAudio(2, 'mandarin-short-female.m4a')
     await expect.poll(() => ui.page.locator('canvas').count()).toBe(2)
     await ui.call('browser_click', { target: 'button:has-text("Generate")' })
     await ui.call('browser_click', { target: 'button:text-is("Start processing")' })
     const cards = ui.page.getByRole('region', { name: 'Simultaneous speech', exact: true })
     await expect.poll(() => cards.count(), { timeout: 240_000 }).toBeGreaterThan(0)
+    await expect
+      .poll(() => ui.page.locator('[data-redencut-busy]').getAttribute('data-redencut-busy'), {
+        timeout: 240_000,
+      })
+      .toBe('false')
     const firstCard = cards.first()
     const oldStart = Number(await firstCard.getAttribute('data-overlap-start'))
     const movedClipId = await ui.page.locator('.waveform-clip').nth(1).getAttribute('data-clip-id')

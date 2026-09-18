@@ -1,3 +1,5 @@
+import { RuntimeValidationError } from '../../runtime/RuntimeValidator'
+import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
 import type { EventEmitter } from 'events'
 import type { Readable } from 'stream'
@@ -28,7 +30,7 @@ interface ProbeDependencies {
   spawn: (
     command: string,
     arguments_: string[],
-    options: { stdio: ['ignore', 'pipe', 'pipe'] },
+    options: { stdio: ['ignore', 'pipe', 'pipe']; env: NodeJS.ProcessEnv },
   ) => ProbeChild
 }
 
@@ -47,9 +49,10 @@ export async function probeAudio(
     child = dependencies.spawn(
       getFfprobePath(),
       ['-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', filePath],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['ignore', 'pipe', 'pipe'], env: runtimeEnvironment(process.env) },
     )
   } catch (error) {
+    if (error instanceof RuntimeValidationError) throw error
     throw new Error(`ffprobe failed for "${filePath}": ${(error as Error).message}`, {
       cause: error,
     })

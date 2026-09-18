@@ -4,7 +4,7 @@ import { createSpeechBatchHandler } from './speechBatch.ipc'
 import { ProjectFileSchema } from '../../shared/project.types'
 import type { ResourceManager } from '../resources/ResourceManager'
 import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
-import type { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
+import { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
 import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUnavailableError'
 import { randomUUID } from 'crypto'
 import { existsSync } from 'fs'
@@ -51,15 +51,21 @@ export function registerSpeechAnalysisIpc(
     : (process.env.REDENCUT_SPEECH_WORKER_ROOT ?? join(process.cwd(), 'speech-worker'))
   let managedWhisper: string | null = null
   if (services) whisperTranscriber.setModelResolver(() => managedWhisper)
-  const python = services
-    ? (() => {
-        try {
-          return services.runtime.getSpeechPythonPath()
-        } catch {
-          return ''
-        }
-      })()
-    : (process.env.REDENCUT_SPEECH_WORKER_PYTHON ?? join(workerRoot, '.venv', 'bin', 'python'))
+  const runtime =
+    services?.runtime ??
+    new AppRuntimeLocator({
+      packaged: false,
+      resourcesPath: '',
+      appPath: process.cwd(),
+    })
+  const python = () => {
+    try {
+      return runtime.getSpeechPythonPath()
+    } catch {
+      // Registration remains available so the UI can explain a missing runtime.
+      return ''
+    }
+  }
   const manifest =
     services?.manifestPath ??
     process.env.REDENCUT_SPEECH_MANIFEST ??
@@ -67,14 +73,15 @@ export function registerSpeechAnalysisIpc(
   const modelCache =
     process.env.REDENCUT_SPEECH_MODEL_CACHE ??
     join(homedir(), 'Library', 'Caches', 'RedenCut', 'speech-models')
-  const workerEnvironment = {
+  const workerEnvironment = () => ({
     ...process.env,
+    PATH: dirname(runtime.getFfmpegPath()),
     PYTHONPATH: join(workerRoot, 'src'),
     REDENCUT_SPEECH_MANIFEST: manifest,
     REDENCUT_SPEECH_MODEL_CACHE: modelCache,
     HF_HUB_OFFLINE: '1',
     TRANSFORMERS_OFFLINE: '1',
-  }
+  })
   const worker = new SpeechWorkerClient(python, ['-m', 'redencut_speech_worker'], {
     cwd: workerRoot,
     env: workerEnvironment,
@@ -105,7 +112,7 @@ export function registerSpeechAnalysisIpc(
       }
       const whisperReason = needsText ? await whisperTranscriber.unavailableReason() : null
       if (whisperReason) return whisperReason
-      if (!existsSync(python)) return { reason: 'speech-worker-missing' as const }
+      if (!existsSync(python())) return { reason: 'speech-worker-missing' as const }
       if (!existsSync(manifest) || (!services && !existsSync(modelCache)))
         return { reason: 'speech-models-missing' as const }
       return null
@@ -118,7 +125,7 @@ export function registerSpeechAnalysisIpc(
     coordinator,
     diagnosticSink,
     prepare: async (tasks) => {
-      if (!python || !existsSync(python))
+      if (!python() || !existsSync(python()))
         throw new TranscriberUnavailableError('speech-worker-missing')
       const preferences = services ? await services.preferences.read() : undefined
       const modelPaths = services ? await services.resources.getModelPaths() : undefined
@@ -161,7 +168,7 @@ export function registerSpeechAnalysisIpc(
           cpuModels: cpus().map((cpu) => cpu.model),
           device: 'cpu',
           modelPaths,
-          environment: workerEnvironment,
+          environment: workerEnvironment(),
         }),
       }
     },
@@ -190,7 +197,7 @@ export function registerSpeechAnalysisIpc(
             !request.confirmSpeakerLabelReset
           )
             throw new PublicIpcError('invalid-request')
-          if (services && !python) throw new TranscriberUnavailableError('speech-worker-missing')
+          if (services && !python()) throw new TranscriberUnavailableError('speech-worker-missing')
           const identity = {
             kind: 'speech-analysis' as const,
             jobId: request.jobId,
@@ -244,7 +251,7 @@ export function registerSpeechAnalysisIpc(
                 cpuModels: cpus().map((cpu) => cpu.model),
                 device: 'cpu',
                 modelPaths,
-                environment: workerEnvironment,
+                environment: workerEnvironment(),
               })
               const resolvePcm = controller.captureSpeechPcmResolver(request)
               abortController.signal.throwIfAborted()

@@ -72,7 +72,8 @@ html[data-theme='light'] .preferences-dialog {
   background: var(--raised);
   color: var(--text);
 }
-.preferences-dialog button:disabled {
+.preferences-dialog button:disabled,
+.preferences-dialog button[aria-disabled='true'] {
   opacity: 0.45;
   cursor: default;
 }
@@ -1282,7 +1283,7 @@ html[data-theme='light'] .preferences-dialog {
   font-weight: 500;
   box-shadow: none;
 }
-.preferences-dialog button.recheck-action:hover:not(:disabled) {
+.preferences-dialog button.recheck-action:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--raised);
   border-color: var(--muted);
   color: var(--text);

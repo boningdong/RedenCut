@@ -69,35 +69,35 @@ Windows support is planned; the Linux Docker environment is a development and te
 Prerequisites:
 
 - Git and Node.js **24.14.0**, the version pinned in `package.json`, with npm.
-- Homebrew for the native tools in the example below.
-- FFmpeg and FFprobe for audio import and export.
-- For speech analysis: whisper.cpp, uv, and the Python **3.11** worker environment.
+- Apple command-line developer tools, CMake, Ninja and pkg-config for the initial native runtime build.
+- Internet access and disk space for the pinned source archives and Python dependencies.
+- The managed runtime currently targets macOS ARM64; Windows and Intel macOS are not certified by this recipe.
 
 ```sh
 git clone https://github.com/boningdong/RedenCut.git
 cd RedenCut
 npm ci
 
-# Install native audio and speech tools.
-brew install ffmpeg whisper-cpp uv
-
-# Create the locked Python speech environment.
-npm run setup:speech
+# Build and install the complete managed audio/Python runtime.
+npm run runtime:setup
+npm run runtime:check
 
 # Start the desktop app.
 npm run dev
 ```
 
 We recommend installing the local AI tools for the full transcript-based editing experience.
-Although not recommended, you can skip the speech tools, Python environment, and AI model downloads and use RedenCut solely for waveform and multitrack audio editing.
+The managed runtime supplies the native tools and Python dependencies together; AI models are downloaded separately.
+You can skip AI model downloads and use RedenCut solely for waveform and multitrack audio editing.
 Choose to skip speech preparation during onboarding; transcription, text-based editing, and speaker analysis will remain unavailable until you complete setup.
-You can enable these features later through Settings after installing the required tools.
+You can enable these features later through Settings after preparing the required models.
 
 For text based editing, open **Settings → Speech & resources**, validate the development environment, and download the text-editing models.
 Optional speaker recognition has a separate authorization and model-download step.
 The app's model preparation does not install native executables or the Python environment.
 
-See [speech models and dependencies](docs/speech-models-and-dependencies.md) for runtime overrides, model caches, and setup details.
+See [speech models and dependencies](docs/speech-models-and-dependencies.md) for managed runtime, model caches, and setup details.
+The app never falls back to a system/Homebrew FFmpeg, an npm static binary, or an unrelated Python environment; a missing or invalid managed runtime produces a setup error.
 
 ### Your first edit
 

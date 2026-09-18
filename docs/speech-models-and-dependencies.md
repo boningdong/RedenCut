@@ -10,7 +10,7 @@ The first implementation has fixed defaults and no model-selection UI. Future tr
 
 Settings and onboarding now use ResourceManager to download the fixed multilingual transcription model and both Chinese and English alignment models into Electron userData's managed model directories.
 They do not discover or migrate developer caches described below.
-The native executable/Python runtime is still prepared externally for development; final runtime bundling and distribution remain a separate pending phase.
+The native executable/Python runtime is prepared by the managed runtime scripts for development and release-resource staging; signed application packaging and distribution remain separate release work.
 Downloads are staged, integrity checked and load-tested before installation, and can be canceled/resumed without changing existing project results.
 The optional diarization model requires explicit Hugging Face file-access verification; credentials are platform-protected and never passed to normal inference.
 Public files have pinned hashes in models.json; gated metadata must be verified with authorized immutable-revision metadata where public hashes are unavailable.
@@ -41,7 +41,7 @@ Each dependency class has one version owner:
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Node/Electron harness dependencies | Root `package-lock.json` and container base-image digest/tag                                                                  |
 | Python worker dependencies         | Worker `pyproject.toml` plus committed lockfile introduced with the worker                                                    |
-| Native whisper.cpp executable      | Availability descriptor plus recorded executable version; development installation remains external; application lookup uses AppRuntimeLocator                                       |
+| Native whisper.cpp executable      | `runtime/runtime-lock.json`, pinned build recipes and installed manifest; application lookup uses AppRuntimeLocator                                       |
 | Model repositories                 | Committed speech-model manifest containing repository ID, immutable revision, purpose, license/terms note, and expected files |
 | Engine defaults                    | Validated speech-engine configuration, hashed into artifact provenance                                                        |
 | Test fixtures and expectations     | Repository `e2e/fixtures/audio/` and named speech acceptance scenarios                                                        |
@@ -219,12 +219,13 @@ Only `speech:docker:provision` forwards the read-only Hugging Face token. `speec
 For native macOS development, dependency installation and model provisioning are also explicit:
 
 ```sh
-npm run setup:speech
+npm run runtime:setup
+npm run runtime:check
 npm run setup:speech-models
 npm run speech:native:preflight
 ```
 
-The native launcher uses the same username-agnostic token lookup as Docker. Its default model location is `$HOME/Library/Caches/RedenCut/speech-models` (or `$XDG_CACHE_HOME/RedenCut/speech-models` when set). The app never installs or downloads anything at startup. `REDENCUT_SPEECH_WORKER_ROOT`, `REDENCUT_SPEECH_WORKER_PYTHON`, `REDENCUT_SPEECH_MODEL_CACHE`, and `REDENCUT_SPEECH_MANIFEST` can point a development or packaged build at an independently managed runtime.
+The native launcher uses the same username-agnostic token lookup as Docker. Its default model location is `$HOME/Library/Caches/RedenCut/speech-models` (or `$XDG_CACHE_HOME/RedenCut/speech-models` when set). The app never installs or downloads anything at startup. `REDENCUT_RUNTIME_ROOT` selects an explicit managed runtime in development and the Docker harness. Packaged builds always use `resources/runtime`. The legacy per-executable overrides, including `REDENCUT_SPEECH_WORKER_PYTHON`, are ignored; worker-source and model-cache settings remain separate from the interpreter.
 
 ### Reusing a model cache created before the rename
 
@@ -248,8 +249,9 @@ When adding or replacing a speech dependency, update this document in the same c
 ### Development onboarding
 
 Non-bundled builds show read-only tool and Python import checks in Settings and onboarding.
-Run `npm run setup:speech` at the current project root after installing uv, then click Validate in the app.
-This prepares `speech-worker/.venv`; it does not install FFmpeg or whisper-cli and does not download models.
+Run `npm run runtime:setup` at the current project root, then click Validate in the app.
+This prepares `.runtime/<platform>-<arch>` with FFmpeg, FFprobe, whisper-cli and a Python environment; it does not download models.
+The setup command obtains its pinned uv tool; developers and end users do not need a separately installed uv for inference.
 `speech:native:setup` remains a compatibility alias for existing scripts and older instructions, not a harness-specific requirement.
 Model preparation is blocked until the required runtime checks pass; uv itself is only needed for environment setup.
 Bundled builds omit developer instructions and validate their supplied runtime instead.
@@ -268,7 +270,7 @@ Reference: https://huggingface.co/docs/huggingface_hub/package_reference/environ
 ### Model preparation entry points
 
 For the app, use Download in Text editing, then authorize speaker recognition and return to the resource panel to download its model. Authorization checks permissions only; the download is a separate explicit action with progress in the resource panel.
-`npm run setup:speech` installs the development Python environment.
+`npm run runtime:setup` prepares the complete managed development runtime; `setup:speech` remains a compatibility alias.
 `npm run setup:speech-models` is the standalone worker model-provisioning command; `speech:native:provision` remains a compatibility alias for existing developer scripts and older instructions.
 This command uses `REDENCUT_SPEECH_MODEL_CACHE` or the standalone worker cache documented above, and does not populate the app ResourceManager. App users should use the UI download flow rather than this command.
 
@@ -280,3 +282,51 @@ Exit RedenCut before using either command so running downloads or in-memory pref
 Both commands target Electron's default user-data directory for the package name (`~/Library/Application Support/redencut` on macOS), shared by normal worktrees.
 Use `-- --dry-run` to preview, or `-- --user-data-dir /absolute/path` to target an isolated test profile.
 These commands do not stop the running app automatically.
+
+## Managed runtime artifact and release resources
+
+The macOS ARM64 recipe pins FFmpeg 7.1.5, LAME 4.0, whisper.cpp 1.9.3 and a relocatable CPython 3.11.16 distribution.
+FFmpeg uses shared libraries, disables GPL/nonfree/version3 components and automatic external codec discovery, and includes MP3 encoding through LAME.
+PyAV 14.4.0 is built from source against that FFmpeg; TorchCodec 0.7.0 is paired with PyTorch 2.8 and patched to resolve the same relative libraries.
+The CLI, PyAV and TorchCodec therefore use one native library artifact on this target, with both Python import orders checked.
+The Linux ARM64 speech harness uses the supported in-memory waveform path without TorchCodec, whose wheel is unavailable for that target.
+
+```sh
+# Compile a bundle without installing it.
+npm run runtime:build
+# Install a supplied, validated bundle instead of compiling again.
+npm run runtime:setup -- --bundle /absolute/path/to/bundle
+# Prepare a NEW directory for the application packager.
+npm run runtime:stage -- --resources-dir /absolute/path/to/new-resources
+# Exercise installer/integrity failure behavior.
+npm run test:runtime
+```
+
+Development resolves `.runtime/<platform>-<arch>` or an explicit `REDENCUT_RUNTIME_ROOT`; packaged applications resolve `resources/runtime` only.
+The artifact includes `manifest.json`, executable and shared-library directories, the Python tree, source archives, build configuration, package metadata and license notices.
+The setup tool uses its own hash-pinned uv download; uv, a global Python and Homebrew FFmpeg are not inference requirements.
+Initial source builds still require the documented compiler/CMake/Ninja/pkg-config tools.
+Models stay in their existing cache and projects retain their existing schemas.
+
+Staging also copies the live worker source and model manifest, unchanged project license, and Electron/Chromium notices.
+It is a resources input, not a signed application or proof of distribution compliance.
+A final packager must preserve executable permissions/symlinks, keep native files outside `app.asar`, verify post-signing loading on a clean machine, and retain the corresponding LGPL source and replacement/relinking materials.
+The repository license remains GPL-3.0-only; removing incompatible artifacts does not by itself authorize relicensing existing code to Apache-2.0.
+See the migration design and verification report under `docs/superpowers/` for decisions and evidence.
+
+### Rebuilding or replacing LGPL libraries in an unsigned development build
+
+1. Keep the distributed runtime's `sources/`, `licenses/`, build configuration and manifest together with the matching application checkout and Python lockfile.
+2. Make a separate checkout for the modification; unpack the retained FFmpeg/LAME source archives, make the library changes, and retain the patch and changed-source archive.
+3. Update that checkout's `runtime/runtime-lock.json` source URL and SHA-256 to identify a fetch-accessible modified archive, preserving or updating its expected `sourceDirectory`; retain the LGPL-compatible configuration and compatible FFmpeg major ABI, or rebuild dependent PyAV/TorchCodec code against the changed ABI.
+   If Python dependencies change, update `speech-worker/pyproject.toml`, regenerate `speech-worker/uv.lock`, and update both SHA-256 entries under `runtime-lock.json.pythonDependencies`; same-ABI native-only changes do not require changing Python inputs.
+4. Run `npm run runtime:build -- --work-dir /absolute/new-build-cache --bundle-dir /absolute/new-bundle` in the modified checkout.
+   New cache and bundle directories prevent accidentally reusing the original recipe's artifacts; the build creates a new hash inventory from the deliberate source inputs.
+5. Run `npm run runtime:setup -- --bundle /absolute/new-bundle --runtime-root /absolute/new-runtime`, then `node scripts/runtime/CheckRuntime.mjs --runtime-root /absolute/new-runtime`.
+6. Start the development application with `REDENCUT_RUNTIME_ROOT=/absolute/new-runtime npm run dev` and exercise import/export and speech decoding.
+   The runtime manifest checks consistency; it is not signed and does not require an application vendor's private key.
+7. For an unsigned staged application, create fresh resources with `npm run runtime:stage -- --bundle /absolute/new-runtime --resources-dir /absolute/new-resources` and place those resources through the same application packager.
+
+Do not replace an in-use runtime tree one file at a time, or merely change a file's hash while retaining provenance that describes a different source build.
+The native recipe ad-hoc signs its macOS libraries after adjusting relative load paths; this is separate from Developer ID signing of a distributable application.
+A future signed application still needs an independently verified user-replacement/re-signing procedure and all applicable distribution notices/source obligations before release.

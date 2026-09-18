@@ -7,15 +7,17 @@ import type {
 import type { AppRuntimeLocator } from './AppRuntimeLocator'
 import { offlineEnvironment } from '../speech/inferenceEnvironment'
 const execute = promisify(execFile)
-type Probe = (file: string, args: string[]) => Promise<void>
+type Probe = (file: string, args: string[], signal: AbortSignal) => Promise<void>
 /** Read-only checks: installation stays an explicit developer terminal action. */
 export class DevelopmentEnvironmentChecker {
   private active: Promise<DevelopmentEnvironment> | null = null
+  private readonly lifetime = new AbortController()
   constructor(
     private runtime: AppRuntimeLocator,
-    private probe: Probe = async (file, args) => {
+    private probe: Probe = async (file, args, signal) => {
       await execute(file, args, {
-        env: offlineEnvironment(process.env),
+        signal,
+        env: offlineEnvironment({ ...process.env, PYTHONPATH: '' }),
         timeout: 60_000,
         killSignal: 'SIGKILL',
         maxBuffer: 512 * 1024,
@@ -27,6 +29,10 @@ export class DevelopmentEnvironmentChecker {
       this.active = null
     })
     return this.active
+  }
+  async shutdown(): Promise<void> {
+    this.lifetime.abort()
+    await this.active
   }
   private async inspect(
     onProgress?: (state: DevelopmentEnvironment) => void,
@@ -42,11 +48,16 @@ export class DevelopmentEnvironmentChecker {
       ready: false,
       checking: ['ffmpeg', 'ffprobe', 'whisper', 'uv', 'python', 'libraries'],
     }
-    const emit = () => onProgress?.({ ...state, checking: [...state.checking!] })
+    const signal = this.lifetime.signal
+    const emit = () => {
+      if (!signal.aborted) onProgress?.({ ...state, checking: [...state.checking!] })
+    }
     emit()
     const check = async (key: DevelopmentCheck, resolve: () => string, args: string[]) => {
       try {
-        await this.probe(resolve(), args)
+        signal.throwIfAborted()
+        await this.probe(resolve(), args, signal)
+        signal.throwIfAborted()
         state[key] = true
         return true
       } catch {
@@ -70,7 +81,8 @@ export class DevelopmentEnvironmentChecker {
       python &&
       (await check('libraries', () => this.runtime.getSpeechPythonPath(), [
         '-c',
-        'import torch, torchaudio; from whisperx import load_align_model; from pyannote.audio import Pipeline',
+        'import av, torch, torchaudio, sys, platform; from whisperx import load_align_model; from pyannote.audio import Pipeline; ' +
+          "exec('from torchcodec.decoders import AudioDecoder' if not (sys.platform == 'linux' and platform.machine() == 'aarch64') else '')",
       ]))
     // uv is a setup tool, not an inference dependency once Python is ready.
     return {
