@@ -50,7 +50,7 @@ npm run test:e2e -- project-import-save-reopen
 Each run retains screenshots, `ui-actions.jsonl`, WAV recordings, capture logs and successful observation reports under `.harness-runs/container/<runId>/`.
 Recordings are bounded to 120 seconds of audio; startup and stop have explicit deadlines, and only the owned recorder process is signaled.
 Audio checks use 100 ms RMS windows: at least five windows above 0.002 full-scale RMS for audible output; paused output must remain below 0.0001 after a one-second buffer allowance.
-Rendered clip-position tolerances are 0.1–0.15 seconds, derived from visible ruler spacing; the displayed transport time has whole-second precision.
+Rendered clip-position tolerances are 0.1–0.15 seconds, derived from visible ruler spacing; the displayed transport time has centisecond precision, and seek assertions account for mouse-coordinate rounding.
 These checks do not certify sample-exact source-position matching, device latency, transcription or host audio hardware.
 
 The test uses a real MCP client/facade and Runtime within the container; `node --test harness/tests/container.smoke.mjs` separately verifies the host-to-container stdio transport.

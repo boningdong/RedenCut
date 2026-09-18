@@ -92,12 +92,14 @@ test('split and drag survive save and reopen as visible clips with audible playb
     const scale = await ruler(ui.page)
     await ui.call('browser_click', { target: 'canvas' })
 
-    // Aim one pixel past the tick: displayed seconds are floored, and mouse coordinates round.
+    // Aim just past the tick; allow the click offset, pixel rounding and centisecond display precision.
     await ui.call('browser_mouse_click_xy', {
       x: scale.x + 5 * scale.pixelsPerSecond + 1,
       y: scale.y,
     })
-    expect(await visibleTime(ui.page)).toBe(5)
+    expect(Math.abs((await visibleTime(ui.page)) - 5)).toBeLessThan(
+      2 / scale.pixelsPerSecond + 0.01,
+    )
     await ui.call('browser_press_key', { key: 's' })
     await drawnWaveforms(ui.page, 2)
     const split = await layout(ui.page)

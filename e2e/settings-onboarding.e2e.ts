@@ -123,9 +123,7 @@ test('development setup explains missing runtime and validates without starting 
       true,
     )
     await ui.call('browser_click', { target: '.dev-summary' })
-    expect(
-      await ui.page.getByText(/Complete the development environment setup above/).count(),
-    ).toBe(1)
+    expect(await ui.page.getByText(/Prepare the tools needed by each model above/).count()).toBe(1)
     await ui.screenshot('development-models-locked')
     await ui.call('browser_click', { target: '.section-disclosure' })
     expect(
