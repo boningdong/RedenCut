@@ -149,19 +149,19 @@ describe('WaveformView managed providers', () => {
     })
     vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 190 } as DOMRect)
     fireEvent.click(screen.getByTitle('Zoom out'))
-    // 9 seconds is at x=360 within the viewport at 50% fit.
-    fireEvent.wheel(viewport, { clientX: 550, deltaY: -100 })
-    expect(viewport.scrollLeft).toBeCloseTo(72)
-    expect(Number.parseFloat(content.style.width)).toBe(1280)
-    // Visible trailing space ends at 18.17s; offscreen ticks are now culled.
-    expect(ruler.textContent).toContain('18s')
+    // 9 seconds is at x=540 within the viewport at the 75% overview.
+    fireEvent.wheel(viewport, { clientX: 730, deltaY: -100 })
+    expect(viewport.scrollLeft).toBeCloseTo(108)
+    expect(Number.parseFloat(content.style.width)).toBe(1520)
+    // Visible trailing space ends at 12.61s; offscreen ticks are culled.
+    expect(ruler.textContent).toContain('12s')
     expect(ruler.textContent).not.toContain('20s')
     // Two wheel events before React commits must accumulate against the padded extent.
     act(() => {
-      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))
-      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))
+      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 730, deltaY: -100 }))
+      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 730, deltaY: -100 }))
     })
-    expect(viewport.scrollLeft).toBeCloseTo(262.08)
+    expect(viewport.scrollLeft).toBeCloseTo(393.12)
     expect(useTimelineStore.getState().undoStack).toHaveLength(0)
     vi.restoreAllMocks()
   })
