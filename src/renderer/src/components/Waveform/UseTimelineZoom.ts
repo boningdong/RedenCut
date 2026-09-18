@@ -2,8 +2,10 @@ import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from '
 
 import { getTimelineContentWidth } from './TimelineViewportGeometry'
 
-const MIN_ZOOM = 1 / 32
-const MAX_ZOOM = 32
+const OVERVIEW_CONTENT_FRACTION = 0.75
+const MAX_PIXELS_PER_SECOND = 1000
+// Leave headroom below Chromium’s layout limit for the trailing viewport.
+const MAX_AUDIO_WIDTH = 32_000_000
 const LEFT_EDGE_SNAP_PX = 12
 
 interface ZoomAnchor {
@@ -15,6 +17,8 @@ interface TimelineZoomOptions {
   viewportRef: RefObject<HTMLDivElement | null>
   basePxPerSec: number
   duration: number
+  audioDuration: number
+  viewportWidth: number
   onScrollChange(scrollLeft: number): void
 }
 
@@ -22,9 +26,21 @@ export function useTimelineZoom({
   viewportRef,
   basePxPerSec,
   duration,
+  audioDuration,
+  viewportWidth,
   onScrollChange,
 }: TimelineZoomOptions) {
   const [zoom, setZoom] = useState({ level: 1 })
+  const maxScale = Math.min(MAX_PIXELS_PER_SECOND, MAX_AUDIO_WIDTH / Math.max(1, duration))
+  const maxZoom = maxScale / basePxPerSec
+  // Derive blank time from source audio, so moving clips cannot grow the margin.
+  const overviewTail = audioDuration * (1 / OVERVIEW_CONTENT_FRACTION - 1)
+  const overviewZoom =
+    duration > 0 && viewportWidth > 0
+      ? viewportWidth / ((duration + overviewTail) * basePxPerSec)
+      : 1
+  const minZoom = Math.min(overviewZoom, maxZoom)
+  const zoomLevel = Math.min(Math.max(zoom.level, minZoom), maxZoom)
   const pending = useRef<{
     level: number
     scrollLeft: number
@@ -35,8 +51,8 @@ export function useTimelineZoom({
     (factor: number, clientX?: number) => {
       const viewport = viewportRef.current
       if (!viewport || viewport.clientWidth <= 0) return
-      const previousLevel = pending.current?.level ?? zoom.level
-      const level = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, previousLevel * factor))
+      const previousLevel = pending.current?.level ?? zoomLevel
+      const level = Math.min(maxZoom, Math.max(minZoom, previousLevel * factor))
       if (level === previousLevel) return
       const pointerX =
         clientX === undefined
@@ -51,6 +67,12 @@ export function useTimelineZoom({
       const anchor = {
         timeSeconds: (scrollLeft + viewportX) / (basePxPerSec * previousLevel),
         viewportX,
+      }
+      // At the overview limit, show the whole extent from zero with the fixed overview tail.
+      // Above the limit, preserve the pointer/center anchor and trailing scroll room.
+      if (level === minZoom && factor < 1) {
+        anchor.timeSeconds = 0
+        anchor.viewportX = 0
       }
       // Accumulate events that arrive before React commits the new content width.
       pending.current = {
@@ -70,29 +92,38 @@ export function useTimelineZoom({
       }
       setZoom({ level })
     },
-    [basePxPerSec, duration, viewportRef, zoom.level],
+    [basePxPerSec, duration, viewportRef, zoomLevel, maxZoom, minZoom],
   )
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
     const request = pending.current
-    if (!viewport || !request) return
+    if (!viewport) return
+    if (!request) {
+      // Shortening the timeline can raise the overview floor above the stored scale.
+      if (zoom.level < minZoom) {
+        setZoom({ level: minZoom })
+        viewport.scrollLeft = 0
+        onScrollChange(0)
+      }
+      return
+    }
     pending.current = null
     // The browser must see the new content width before it clamps scrollLeft.
     viewport.scrollLeft = Math.max(
       0,
       Math.min(
         Math.max(0, viewport.scrollWidth - viewport.clientWidth),
-        request.anchor.timeSeconds * basePxPerSec * zoom.level - request.anchor.viewportX,
+        request.anchor.timeSeconds * basePxPerSec * zoomLevel - request.anchor.viewportX,
       ),
     )
     onScrollChange(viewport.scrollLeft)
-  }, [basePxPerSec, onScrollChange, viewportRef, zoom])
+  }, [basePxPerSec, onScrollChange, viewportRef, zoom, zoomLevel, minZoom])
 
   return {
-    zoomLevel: zoom.level,
+    zoomLevel,
     zoomBy,
-    canZoomIn: zoom.level < MAX_ZOOM,
-    canZoomOut: zoom.level > MIN_ZOOM,
+    canZoomIn: zoomLevel < maxZoom,
+    canZoomOut: zoomLevel > minZoom,
   }
 }

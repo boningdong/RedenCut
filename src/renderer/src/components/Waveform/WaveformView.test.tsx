@@ -149,19 +149,43 @@ describe('WaveformView managed providers', () => {
     })
     vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 190 } as DOMRect)
     fireEvent.click(screen.getByTitle('Zoom out'))
-    // 9 seconds is at x=360 within the viewport at 50% fit.
-    fireEvent.wheel(viewport, { clientX: 550, deltaY: -100 })
-    expect(viewport.scrollLeft).toBeCloseTo(72)
-    expect(Number.parseFloat(content.style.width)).toBe(1280)
-    expect(ruler.textContent).toContain('20s')
+    // 9 seconds is at x=540 within the viewport at the 75% overview.
+    fireEvent.wheel(viewport, { clientX: 730, deltaY: -100 })
+    expect(viewport.scrollLeft).toBeCloseTo(108)
+    expect(Number.parseFloat(content.style.width)).toBe(1520)
+    // Visible trailing space ends at 12.61s; offscreen ticks are culled.
+    expect(ruler.textContent).toContain('12s')
+    expect(ruler.textContent).not.toContain('20s')
     // Two wheel events before React commits must accumulate against the padded extent.
     act(() => {
-      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))
-      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))
+      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 730, deltaY: -100 }))
+      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 730, deltaY: -100 }))
     })
-    expect(viewport.scrollLeft).toBeCloseTo(262.08)
+    expect(viewport.scrollLeft).toBeCloseTo(393.12)
     expect(useTimelineStore.getState().undoStack).toHaveLength(0)
     vi.restoreAllMocks()
+  })
+
+  it('derives overview blank time from source metadata when opening moved clips', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const tracks = useTimelineStore.getState().tracks.map((track) => ({
+      ...track,
+      clips: track.clips.map((clip) => ({ ...clip, outputStart: 10 })),
+    }))
+    useTimelineStore.setState({ tracks })
+    const { container } = render(
+      <WaveformView duration={20} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    const content = container.querySelector('#waveform-timeline')!.parentElement!
+    const viewport = content.parentElement!
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 800 },
+      scrollWidth: { get: () => Math.max(800, Number.parseFloat(content.style.width)) },
+    })
+    fireEvent.click(screen.getByTitle('Zoom out'))
+    // 20s timeline + 10/3s blank, while retaining a full viewport of scroll room.
+    expect(Number.parseFloat(content.style.width)).toBeCloseTo(800 + (800 * 20) / (20 + 10 / 3))
+    expect((screen.getByTitle('Zoom out') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('reuses the provider selected by each clip audioSourceId', () => {

@@ -5,20 +5,26 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { getTimelineContentWidth } from './TimelineViewportGeometry'
 import { useTimelineZoom } from './UseTimelineZoom'
 
-function setup() {
+function setup(basePxPerSec = 80, duration = 10, audioDuration = duration) {
   let controls: ReturnType<typeof useTimelineZoom>
   function Timeline() {
     const viewportRef = useRef<HTMLDivElement>(null)
     const [visibleStart, setVisibleStart] = useState(0)
     controls = useTimelineZoom({
       viewportRef,
-      basePxPerSec: 80,
-      duration: 10,
+      basePxPerSec,
+      duration,
+      audioDuration,
+      viewportWidth: 800,
       onScrollChange: setVisibleStart,
     })
     return (
       <div ref={viewportRef} data-visible-start={visibleStart}>
-        <div style={{ width: getTimelineContentWidth(10, 80 * controls.zoomLevel, 800) }} />
+        <div
+          style={{
+            width: getTimelineContentWidth(duration, basePxPerSec * controls.zoomLevel, 800),
+          }}
+        />
       </div>
     )
   }
@@ -38,6 +44,14 @@ function setup() {
   vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 190 } as DOMRect)
   return {
     viewport,
+    updateExtent: (nextDuration: number) => {
+      duration = nextDuration
+      view.rerender(
+        <StrictMode>
+          <Timeline />
+        </StrictMode>,
+      )
+    },
     zoom: (factor: number, clientX?: number) => controls!.zoomBy(factor, clientX),
     controls: () => controls!,
   }
@@ -134,4 +148,87 @@ it('anchors the visible left edge after panning instead of jumping to time zero'
   expect(viewport.scrollLeft).toBe(400)
   act(() => zoom(0.5, 196))
   expect(viewport.scrollLeft).toBe(200)
+})
+
+it.each([10, 3600, 7200])(
+  'allows precise editing independently of duration (%s seconds)',
+  (duration) => {
+    const scale = 800 / duration
+    const { controls, zoom, viewport } = setup(scale, duration)
+    act(() => zoom(1e6, 590))
+    expect(controls().zoomLevel * scale).toBeCloseTo(1000)
+    expect(controls().canZoomIn).toBe(false)
+    expect((viewport.scrollLeft + 400) / 1000).toBeCloseTo(duration / 2)
+    act(() => zoom(0.5, 590))
+    expect(controls().canZoomIn).toBe(true)
+    expect((viewport.scrollLeft + 400) / 500).toBeCloseTo(duration / 2)
+  },
+)
+
+it('keeps day-long audio inside browser layout limits and its end reachable', () => {
+  const scale = 800 / 86400
+  const { controls, zoom, viewport } = setup(scale, 86400)
+  viewport.scrollLeft = 800
+  act(() => zoom(1e9, 190))
+  expect(viewport.scrollWidth).toBeLessThan(33_000_000)
+  expect(viewport.scrollLeft / (scale * controls().zoomLevel)).toBeCloseTo(86400)
+})
+
+it.each([3600, 5400])(
+  'fits the complete current timeline into 75 percent of the viewport (%s seconds)',
+  (duration) => {
+    const base = 800 / 3600
+    const { controls, zoom, viewport } = setup(base, duration)
+    act(() => zoom(8))
+    viewport.scrollLeft = 2000
+    act(() => zoom(0.00001, 900))
+    expect(duration * base * controls().zoomLevel).toBeCloseTo(600)
+    expect(viewport.scrollLeft).toBe(0)
+    expect(controls().canZoomOut).toBe(false)
+    expect(viewport.scrollWidth).toBeCloseTo(1400)
+    // Audio tail stays at x=600 when zooming in, with space on its right.
+    act(() => zoom(2, 790))
+    expect(viewport.scrollLeft).toBeCloseTo(600)
+    expect(duration * base * controls().zoomLevel - viewport.scrollLeft).toBeCloseTo(600)
+  },
+)
+
+it('recalculates overview after edits without changing scale during an extension', () => {
+  const { controls, zoom, viewport, updateExtent } = setup()
+  act(() => zoom(0.001))
+  expect(controls().zoomLevel).toBeCloseTo(0.75)
+  updateExtent(20)
+  expect(controls().zoomLevel).toBeCloseTo(0.75)
+  expect(controls().canZoomOut).toBe(true)
+  act(() => zoom(0.001))
+  expect(controls().zoomLevel).toBeCloseTo(3 / 7)
+  viewport.scrollLeft = 300
+  updateExtent(5)
+  expect(controls().zoomLevel).toBeCloseTo(1.2)
+  expect(viewport.scrollLeft).toBe(0)
+  updateExtent(10)
+  expect(controls().zoomLevel).toBeCloseTo(1.2)
+  expect(controls().canZoomOut).toBe(true)
+})
+
+it('keeps a twenty-minute overview tail after repeatedly moving one-hour audio right', () => {
+  const base = 800 / 3600
+  const { controls, zoom, updateExtent, viewport } = setup(base, 3600)
+  for (const end of [3600, 5400, 7200, 10800, 3600]) {
+    updateExtent(end)
+    act(() => zoom(0.00001))
+    const scale = base * controls().zoomLevel
+    expect(800 / scale - end).toBeCloseTo(1200)
+    expect(controls().canZoomOut).toBe(false)
+    const tailX = end * scale
+    act(() => zoom(2, 190 + tailX))
+    expect(end * base * controls().zoomLevel - viewport.scrollLeft).toBeCloseTo(tailX)
+  }
+})
+
+it('uses the same fixed tail when reopening audio that has already been moved', () => {
+  const base = 800 / 7200
+  const { controls, zoom } = setup(base, 7200, 3600)
+  act(() => zoom(0.00001))
+  expect(800 / (base * controls().zoomLevel)).toBeCloseTo(8400)
 })
