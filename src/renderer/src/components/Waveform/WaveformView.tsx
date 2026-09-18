@@ -12,8 +12,8 @@ import { useTranslation } from '../../i18n/useTranslation'
 //   └─ + Add Track ─────────────────────────────────────────────────────────── ┘
 //
 // Zoom:
-//   At zoomLevel=1 the content exactly fills the viewport (minWidth:100%).
-//   At zoomLevel>1 the content is zoomLevel× wider and the viewport scrolls.
+//   At zoomLevel=1 the audio extent fills the viewport.
+//   One extra viewport of trailing time allows pointer-anchored zoom below fit.
 //
 // Architecture:
 //   • One shared binary waveform provider for each AudioSourceId.
@@ -42,6 +42,8 @@ import { copyClips, cutClips, pasteClips, duplicateClips } from '../../actions/C
 import './ClipEditing.css'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { TrackHeader } from './TrackHeader'
+import { getTimelineContentWidth } from './TimelineViewportGeometry'
+import { useTimelineZoom } from './UseTimelineZoom'
 
 interface WaveformViewProps {
   workspaceControls?: React.ReactNode
@@ -56,7 +58,6 @@ interface WaveformViewProps {
 const HEADER_WIDTH = 190 // px — header column width
 const RULER_HEIGHT = 28 // px — ruler row height
 const LANE_HEIGHT = 64 // px — clip lane height
-const MIN_ZOOM = 1 / 32 // symmetrical with max zoom-in of 32×
 
 export function WaveformView({
   workspaceControls,
@@ -139,7 +140,6 @@ export function WaveformView({
   }, [])
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
-  const [zoomLevel, setZoomLevel] = useState(1.0)
   const [viewport, setViewport] = useState({ scrollLeft: 0, width: 800 })
   const scrollViewportRef = useRef<HTMLDivElement>(null)
 
@@ -180,6 +180,17 @@ export function WaveformView({
   // basePxPerSec: fills viewport at zoom=1. Falls back to 100 when duration unknown.
   const basePxPerSec =
     fitBasis.duration > 0 && viewport.width > 0 ? viewport.width / fitBasis.duration : 100
+  const handleZoomScroll = useCallback((scrollLeft: number) => {
+    setViewport((current) =>
+      current.scrollLeft === scrollLeft ? current : { ...current, scrollLeft },
+    )
+  }, [])
+  const { zoomLevel, zoomBy, canZoomIn, canZoomOut } = useTimelineZoom({
+    viewportRef: scrollViewportRef,
+    basePxPerSec,
+    duration,
+    onScrollChange: handleZoomScroll,
+  })
   const pxPerSec = basePxPerSec * zoomLevel
 
   const interaction = useClipInteraction({
@@ -191,11 +202,11 @@ export function WaveformView({
   const isInteracting = interaction.isActive
 
   const handleZoomIn = useCallback(() => {
-    if (!isInteracting()) setZoomLevel((z) => Math.min(32, z * 2))
-  }, [isInteracting])
+    if (!isInteracting()) zoomBy(2)
+  }, [isInteracting, zoomBy])
   const handleZoomOut = useCallback(() => {
-    if (!isInteracting()) setZoomLevel((z) => Math.max(MIN_ZOOM, z / 2))
-  }, [isInteracting])
+    if (!isInteracting()) zoomBy(1 / 2)
+  }, [isInteracting, zoomBy])
 
   // ── Scroll-to-zoom (imperative — must be non-passive to call preventDefault) ──
   useEffect(() => {
@@ -210,12 +221,13 @@ export function WaveformView({
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
       // Vertical scroll / pinch → zoom
       e.preventDefault()
+      if (e.deltaY === 0) return
       const factor = e.deltaY > 0 ? 1 / 1.2 : 1.2
-      setZoomLevel((z) => Math.min(32, Math.max(MIN_ZOOM, z * factor)))
+      zoomBy(factor, e.clientX)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [isInteracting])
+  }, [isInteracting, zoomBy])
 
   // ── Shared playhead position ──────────────────────────────────────────────
   const playheadLeft = currentTime * pxPerSec
@@ -253,6 +265,9 @@ export function WaveformView({
         (end, clip) => Math.max(end, clip.outputStart + clip.sourceEnd - clip.sourceStart),
         duration,
       ) ?? duration
+
+  const contentWidth = getTimelineContentWidth(previewEnd, pxPerSec, viewport.width)
+  const rulerDuration = duration > 0 ? contentWidth / pxPerSec : 60
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -374,15 +389,11 @@ export function WaveformView({
           <Icon name="insert" />
         </button>
         <div className="toolbar-spacer" />
-        <button
-          onClick={handleZoomOut}
-          disabled={zoomLevel <= MIN_ZOOM}
-          title={t('waveform.zoomOut')}
-        >
+        <button onClick={handleZoomOut} disabled={!canZoomOut} title={t('waveform.zoomOut')}>
           −
         </button>
         <span className="zoom-level">{Math.round(zoomLevel * 100)}%</span>
-        <button onClick={handleZoomIn} disabled={zoomLevel >= 32} title={t('waveform.zoomIn')}>
+        <button onClick={handleZoomIn} disabled={!canZoomIn} title={t('waveform.zoomIn')}>
           +
         </button>
       </div>
@@ -415,14 +426,11 @@ export function WaveformView({
 
           {/* ── Scrollable timeline viewport ──────────────────────────────── */}
           <div ref={scrollViewportRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
-            {/* Timeline content — width = zoomLevel × viewport width (min 100%) */}
+            {/* Audio extent plus one viewport of scrollable trailing time. */}
             <div
               style={{
                 minWidth: '100%',
-                width:
-                  duration > 0
-                    ? `${pxPerSec * previewEnd + (interaction.preview ? 40 : 0)}px`
-                    : '100%',
+                width: duration > 0 ? `${contentWidth}px` : '100%',
                 position: 'relative',
               }}
             >
@@ -441,7 +449,7 @@ export function WaveformView({
                 }}
               >
                 <TimelineRuler
-                  duration={duration || 60}
+                  duration={rulerDuration}
                   pxPerSec={duration ? pxPerSec : (viewport.width || 900) / 60}
                   empty={duration === 0}
                 />
