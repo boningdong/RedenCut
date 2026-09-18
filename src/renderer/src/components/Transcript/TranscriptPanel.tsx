@@ -34,7 +34,7 @@ import { usePlaybackStore } from '../../stores/playback.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorStore, type EditorSelection } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
-import { getAudioPlayerInstance } from '@shared/player.types'
+import { seekFromTranscript } from '../../actions/playbackActions'
 import type { Word } from '@shared/project.types'
 import { getWordClipState, type WordClipState } from '../../utils/wordClipState'
 import { getWordOutputTime } from '../../utils/wordOutputTime'
@@ -189,7 +189,7 @@ function LegacyTranscriptPanel({
       e.stopPropagation()
       // Seek to the word's output-timeline position so the playhead lands at
       // the correct time even when clips have been repositioned.
-      if (duration > 0) getAudioPlayerInstance()?.seekTo(getWordOutputTime(word, tracks))
+      if (duration > 0) seekFromTranscript(getWordOutputTime(word, tracks))
     },
     [duration, tracks],
   )

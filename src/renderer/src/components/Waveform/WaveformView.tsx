@@ -207,6 +207,30 @@ export function WaveformView({
   })
   const pxPerSec = basePxPerSec * zoomLevel
 
+  useEffect(
+    () =>
+      usePlaybackStore.subscribe((state, previous) => {
+        const request = state.timelineRevealRequest
+        const viewport = scrollViewportRef.current
+        if (
+          !request ||
+          request === previous.timelineRevealRequest ||
+          !viewport ||
+          viewport.clientWidth <= 0
+        )
+          return
+        const x = request.time * pxPerSec
+        const left = viewport.scrollLeft
+        if (x >= left && x < left + viewport.clientWidth - 2) return
+        viewport.scrollLeft = Math.max(
+          0,
+          Math.min(viewport.scrollWidth - viewport.clientWidth, x - viewport.clientWidth / 2),
+        )
+        handleZoomScroll(viewport.scrollLeft)
+      }),
+    [pxPerSec, handleZoomScroll],
+  )
+
   const interaction = useClipInteraction({
     containerRef: audioPanel,
     viewportRef: scrollViewportRef,

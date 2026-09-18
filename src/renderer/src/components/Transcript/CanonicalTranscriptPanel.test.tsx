@@ -599,6 +599,74 @@ describe('canonical transcript editability', () => {
     act(() => useTimelineStore.getState().updateTrack('guest', { muted: true }))
     expect(screen.queryByRole('button', { name: 'Align' })).toBeNull()
   })
+  it('reveals offscreen transcript seeks at the current zoom without following ordinary playback', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        { ...track, clips: track.clips.map((clip) => ({ ...clip, muted: false, outputStart: 8 })) },
+      ],
+    })
+    setAudioPlayerInstance({
+      seekTo: (time: number) => usePlaybackStore.getState().setCurrentTime(time),
+    } as never)
+    render(
+      <>
+        <TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />
+        <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />
+      </>,
+    )
+    const content = document.querySelector('#waveform-timeline')!.parentElement!
+    const viewport = content.parentElement!
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 800 },
+      scrollWidth: { get: () => Number.parseFloat(content.style.width) },
+    })
+    fireEvent.click(screen.getByTitle('Zoom in'))
+    viewport.scrollLeft = 0
+    const zoomedWidth = content.style.width
+    const word = document.querySelector('[data-unit-id="speech"]')!
+    window.getSelection()?.removeAllRanges()
+    fireEvent.click(word)
+    // Output 8.5s at 160px/s is centered in the 800px viewport.
+    expect(viewport.scrollLeft).toBe(960)
+    expect(content.style.width).toBe(zoomedWidth)
+    expect(usePlaybackStore.getState().isPlaying).toBe(false)
+    viewport.scrollLeft = 1000
+    fireEvent.click(word)
+    expect(viewport.scrollLeft).toBe(1000)
+    viewport.scrollLeft = 0
+    fireEvent.click(word)
+    expect(viewport.scrollLeft).toBe(960)
+    act(() => usePlaybackStore.getState().setCurrentTime(0))
+    expect(viewport.scrollLeft).toBe(960)
+    // Drag selection must not navigate or scroll.
+    viewport.scrollLeft = 0
+    const range = document.createRange()
+    range.selectNodeContents(word)
+    window.getSelection()?.addRange(range)
+    fireEvent.click(word)
+    expect(viewport.scrollLeft).toBe(0)
+    expect(usePlaybackStore.getState().currentTime).toBe(0)
+    // Seeking toward the beginning reveals a target to the left, clamped at zero.
+    window.getSelection()?.removeAllRanges()
+    act(() =>
+      useTimelineStore.setState({
+        tracks: [{ ...track, clips: track.clips.map((clip) => ({ ...clip, muted: false })) }],
+      }),
+    )
+    viewport.scrollLeft = 1000
+    fireEvent.click(document.querySelector('[data-unit-id="speech"]')!)
+    expect(viewport.scrollLeft).toBe(0)
+    vi.unstubAllGlobals()
+  })
+
   it('seeks the clicked duplicate output time and highlights simultaneous tracks', () => {
     const track = useTimelineStore.getState().tracks[0]
     useTimelineStore.setState({

@@ -1,5 +1,5 @@
 import React, { memo, type RefObject } from 'react'
-import { getAudioPlayerInstance } from '@shared/player.types'
+import { seekFromTranscript } from '../../actions/playbackActions'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 import { hasValidatedTiming } from '../../domain/transcriptReliability'
 import { usePlaybackStore } from '../../stores/playback.store'
@@ -74,8 +74,7 @@ export const CanonicalTranscriptUnit = memo(function CanonicalTranscriptUnit({
                     )
       }
       onClick={() => {
-        if (editable && window.getSelection()?.isCollapsed)
-          getAudioPlayerInstance()?.seekTo(u.outputStart!)
+        if (editable && window.getSelection()?.isCollapsed) seekFromTranscript(u.outputStart!)
       }}
       className="transcript-unit"
       style={

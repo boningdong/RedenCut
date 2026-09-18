@@ -23,6 +23,9 @@ interface PlaybackState {
   currentTime: number // seconds — updated on every animation tick
   duration: number // seconds — set once when audio is loaded
 
+  timelineRevealRequest: { time: number } | null
+  revealTimelineTime: (time: number) => void
+
   // ── Actions ──────────────────────────────────────────────────────────────
   setPlaying: (playing: boolean) => void
   setCurrentTime: (time: number) => void
@@ -34,6 +37,7 @@ const initialState = {
   isPlaying: false,
   currentTime: 0,
   duration: 0,
+  timelineRevealRequest: null,
 }
 
 export const usePlaybackStore = create<PlaybackState>()((set) => ({
@@ -42,6 +46,9 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
   setPlaying: (playing) => set({ isPlaying: playing }),
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (duration) => set({ duration }),
+
+  // A fresh request also handles clicking the same word after manually scrolling away.
+  revealTimelineTime: (time) => set({ timelineRevealRequest: { time } }),
 
   reset: () => set(initialState),
 }))

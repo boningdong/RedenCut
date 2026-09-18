@@ -1,7 +1,16 @@
 import { getAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
+import { usePlaybackStore } from '../stores/playback.store'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/timeline.store'
 import { redactionSkipRanges } from '@shared/redactionTimeline'
+
+/** Explicit transcript navigation reveals the destination without changing zoom or playback mode. */
+export function seekFromTranscript(time: number): void {
+  const player = getAudioPlayerInstance()
+  if (!player) return
+  player.seekTo(time)
+  usePlaybackStore.getState().revealTimelineTime(time)
+}
 
 function previewTarget(
   time: number,
