@@ -77,10 +77,11 @@ export function registerProjectIpc(
 function openProjectRequest(input: unknown): OpenProjectRequest {
   const precondition = requireSessionPrecondition(input)
   if (!input || typeof input !== 'object') throw new PublicIpcError('invalid-request')
+  const operationId = requireJobId((input as { operationId?: unknown }).operationId)
   const candidate = input as { isDirty?: unknown; draft?: unknown }
-  if (candidate.isDirty === false) return { ...precondition, isDirty: false }
+  if (candidate.isDirty === false) return { ...precondition, operationId, isDirty: false }
   if (candidate.isDirty === true && candidate.draft)
-    return { ...precondition, isDirty: true, draft: candidate.draft as ProjectDraft }
+    return { ...precondition, operationId, isDirty: true, draft: candidate.draft as ProjectDraft }
   throw new PublicIpcError('invalid-request')
 }
 

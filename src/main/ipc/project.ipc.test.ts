@@ -29,7 +29,12 @@ import { WorkspaceController } from '../project/WorkspaceController'
 
 const TOKEN = 'workspace-a' as WorkspaceToken
 const roots: string[] = []
-const request = { workspaceToken: TOKEN, revision: 3, isDirty: false as const }
+const request = {
+  operationId: 'open-test',
+  workspaceToken: TOKEN,
+  revision: 3,
+  isDirty: false as const,
+}
 const stayed: OpenProjectResult = {
   outcome: 'stayed',
   reason: 'cancelled',
@@ -303,3 +308,22 @@ describe('project IPC', () => {
     await expect(stat(destination)).resolves.toBeTruthy()
   })
 })
+
+it.each([undefined, '', 12])(
+  'rejects an invalid open operation identity (%s) before transition',
+  async (operationId) => {
+    const openDialog = vi.fn()
+    registerProjectIpc(
+      {} as WorkspaceController,
+      { openDialog } as unknown as ProjectTransitionCoordinator,
+      {} as PendingProjectOpenRegistry,
+      {} as SessionSwitchBarrier,
+      mutationStub(),
+      vi.fn(),
+    )
+    await expect(
+      mocks.handlers.get('project:open-dialog')!({ sender: sender() }, { ...request, operationId }),
+    ).resolves.toMatchObject({ ok: false, error: { code: 'invalid-request' } })
+    expect(openDialog).not.toHaveBeenCalled()
+  },
+)

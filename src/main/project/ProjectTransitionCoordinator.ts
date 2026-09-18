@@ -1,3 +1,4 @@
+import type { ProjectOpenProgressEvent } from '../../shared/AudioPreparationTypes'
 import { MediaRecoveryCancelled } from './MediaRecoveryCoordinator'
 import type { ProjectWorkspace } from './ProjectWorkspace'
 import type {
@@ -64,9 +65,22 @@ export class ProjectTransitionCoordinator {
     chooseCandidate: () => Promise<string | null>,
     starterKind?: 'sample' | 'empty',
   ): Promise<OpenProjectResult> {
+    let sequence = 0
+    const onProgress = (update: Omit<ProjectOpenProgressEvent, 'operationId' | 'sequence'>) => {
+      try {
+        if (!sender.isDestroyed())
+          sender.send('project:open-progress', {
+            ...update,
+            operationId: request.operationId,
+            sequence: ++sequence,
+          })
+      } catch {
+        // A lost observer does not change preparation or transaction ownership.
+      }
+    }
     return this.dependencies.controller.runTransition(request, async (transaction) => {
       const startingToken = transaction.precondition.workspaceToken
-      let rollback = await transaction.describe()
+      let rollback = await transaction.describe(onProgress)
       let retainedStartingWorkspace = false
       const settledClosedTokens = new Set<WorkspaceToken>()
 
@@ -79,7 +93,7 @@ export class ProjectTransitionCoordinator {
             mutation = await this.mutations.begin(transaction)
           } catch (error) {
             if (error instanceof SessionMutationSettlementError)
-              return stayed(await transaction.describe(), 'job-settlement-failed')
+              return stayed(await transaction.describe(onProgress), 'job-settlement-failed')
             throw error
           }
           try {
@@ -96,7 +110,7 @@ export class ProjectTransitionCoordinator {
               rollback = await mutation.save(request.draft)
             }
           } catch {
-            return stayed(await transaction.describe(), 'save-failed')
+            return stayed(await transaction.describe(onProgress), 'save-failed')
           }
         }
       }
@@ -122,14 +136,18 @@ export class ProjectTransitionCoordinator {
       let candidate
       try {
         candidate = starterKind
-          ? await transaction.prepareStarter(starterKind)
-          : await transaction.prepareOpen(candidatePath!, async (workspace) => {
-              if (
-                this.dependencies.recoverMedia &&
-                !(await this.dependencies.recoverMedia(sender, workspace))
-              )
-                throw new MediaRecoveryCancelled()
-            })
+          ? await transaction.prepareStarter(starterKind, onProgress)
+          : await transaction.prepareOpen(
+              candidatePath!,
+              async (workspace) => {
+                if (
+                  this.dependencies.recoverMedia &&
+                  !(await this.dependencies.recoverMedia(sender, workspace))
+                )
+                  throw new MediaRecoveryCancelled()
+              },
+              onProgress,
+            )
       } catch (error) {
         const reason = error instanceof MediaRecoveryCancelled ? 'cancelled' : 'candidate-invalid'
         return retainedStartingWorkspace
@@ -137,6 +155,11 @@ export class ProjectTransitionCoordinator {
           : stayed(rollback, reason)
       }
 
+      onProgress({
+        stage: 'settling-jobs',
+        projectDisplayName: candidate.workspace.descriptor.displayName,
+        progress: { kind: 'indeterminate' },
+      })
       const closingTokens = uniqueTokens(startingToken, rollback.workspaceToken).filter(
         (token) => !settledClosedTokens.has(token),
       )
@@ -148,6 +171,11 @@ export class ProjectTransitionCoordinator {
       }
       if (retainedStartingWorkspace) await transaction.releaseRetiredWorkspaces().catch(() => {})
       try {
+        onProgress({
+          stage: 'switching-session',
+          projectDisplayName: candidate.workspace.descriptor.displayName,
+          progress: { kind: 'indeterminate' },
+        })
         await this.dependencies.barrier.wait(sender, rollback)
       } catch (error) {
         if (error instanceof ProjectSwitchShutdownError) throw error

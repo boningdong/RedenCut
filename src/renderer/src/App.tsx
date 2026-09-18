@@ -1,11 +1,12 @@
+import { AudioPreparationProgress } from './components/audio-preparation/AudioPreparationProgress'
+import { usePreparationProgressStore } from './stores/PreparationProgressStore'
 import { MissingMediaDialog } from './components/project/MissingMediaDialog'
 import { useMediaRecoveryStore } from './stores/MediaRecoveryStore'
 import type { SpeechTaskSelection } from '@shared/SpeechTaskPlanner'
 import { saveSpeakerIdentities } from './actions/SpeakerIdentityActions'
 import { useSpeechBatchStore } from './stores/speechBatch.store'
 import type { PublicMessage } from '@shared/publicMessages'
-import type { ImportProgress } from '@shared/import.types'
-import { normalizePublicError, publicMessage, progressMessage } from './i18n/messages'
+import { normalizePublicError, publicMessage } from './i18n/messages'
 import { useTranslation } from './i18n/useTranslation'
 import { SettingsDialog } from './components/settings/SettingsDialog'
 import { OnboardingDialog } from './components/onboarding/OnboardingDialog'
@@ -49,9 +50,6 @@ interface ImportState {
   id: string
   workspaceToken: WorkspaceToken
   revision: number
-  displayName: string
-  stage: ImportProgress['stage']
-  percent: number
 }
 
 interface TranscriptJobIdentity extends SessionPrecondition {
@@ -226,6 +224,7 @@ export default function App() {
   }, [])
 
   const invalidateImportJob = useCallback(() => {
+    if (importJob.current) usePreparationProgressStore.getState().end(importJob.current.jobId)
     importJob.current = null
     setImportState(null)
   }, [])
@@ -292,20 +291,19 @@ export default function App() {
     () =>
       window.electronAPI.on.importProgress((progress) => {
         const editorSession = useEditorStore.getState().session
-        setImportState((current) =>
-          current?.id === progress.jobId &&
-          current.workspaceToken === progress.workspaceToken &&
-          current.revision === progress.revision &&
+        if (
           importJobMatches(importJob.current, progress) &&
           sessionMatchesTranscriptJob(editorSession, progress)
-            ? {
-                ...current,
-                displayName: progress.displayName,
-                stage: progress.stage,
-                percent: progress.percent,
-              }
-            : current,
         )
+          usePreparationProgressStore.getState().receiveImport(progress)
+      }),
+    [],
+  )
+
+  useEffect(
+    () =>
+      window.electronAPI.on.projectOpenProgress((event) => {
+        usePreparationProgressStore.getState().receiveOpen(event)
       }),
     [],
   )
@@ -444,6 +442,7 @@ export default function App() {
     const visibleDraft = snapshotDraft()
     if (!visibleDraft) return null
     const editor = useEditorStore.getState()
+    const operationId = crypto.randomUUID()
     const ledger = {
       startingSession: current,
       visibleDraft,
@@ -454,6 +453,7 @@ export default function App() {
       return {
         ledger,
         request: {
+          operationId,
           workspaceToken: current.workspaceToken,
           revision: current.revision,
           isDirty: false,
@@ -462,6 +462,7 @@ export default function App() {
     return {
       ledger,
       request: {
+        operationId,
         workspaceToken: current.workspaceToken,
         revision: current.revision,
         isDirty: true,
@@ -510,6 +511,7 @@ export default function App() {
         if (!captured) return
         const operation = openQueue.current.shift()!
         activeOpenRequests.current += 1
+        usePreparationProgressStore.getState().beginOpen(captured.request.operationId)
         try {
           const result =
             operation.descriptor.kind === 'manual'
@@ -523,6 +525,11 @@ export default function App() {
                     ...captured.request,
                     requestId: operation.descriptor.requestId,
                   })
+          if (
+            result.outcome === 'switched' ||
+            sameSession(suspendedSession.current, result.session)
+          )
+            usePreparationProgressStore.getState().prepareEditor(captured.request.operationId)
           await applyOpenResult(result, captured.ledger)
           if (operation.descriptor.kind === 'starter')
             operation.descriptor.onOutcome(result.outcome === 'switched')
@@ -531,6 +538,7 @@ export default function App() {
           setError(normalizePublicError(reason))
           operation.reject(reason)
         } finally {
+          usePreparationProgressStore.getState().end(captured.request.operationId)
           activeOpenRequests.current -= 1
           if (operation.descriptor.kind === 'manual') manualOpenPromise.current = null
         }
@@ -631,15 +639,13 @@ export default function App() {
         id,
         workspaceToken: submittedSession.workspaceToken,
         revision: submittedSession.revision,
-        displayName: selection.displayName,
-        stage: 'selected',
-        percent: 0,
       })
       importJob.current = {
         jobId: id,
         workspaceToken: submittedSession.workspaceToken,
         revision: submittedSession.revision,
       }
+      usePreparationProgressStore.getState().beginImport(importJob.current, selection.displayName)
       setError(null)
       try {
         const imported = await window.electronAPI.audio.startImport({
@@ -661,6 +667,7 @@ export default function App() {
           importJobMatches(imported, identity) &&
           latestSession?.workspaceToken === imported.workspaceToken
         ) {
+          usePreparationProgressStore.getState().prepareEditor(id)
           await applyBackgroundSession(imported.value, submittedDraft)
         }
       } catch (reason) {
@@ -692,11 +699,19 @@ export default function App() {
 
   const cancelImport = useCallback(async () => {
     if (!importState) return
-    await window.electronAPI.audio.cancelImport({
-      workspaceToken: importState.workspaceToken,
-      revision: importState.revision,
-      jobId: importState.id,
-    })
+    const progress = usePreparationProgressStore.getState()
+    if (progress.importing?.id !== importState.id || !progress.importing.canCancel) return
+    progress.cancelling(importState.id)
+    try {
+      await window.electronAPI.audio.cancelImport({
+        workspaceToken: importState.workspaceToken,
+        revision: importState.revision,
+        jobId: importState.id,
+      })
+    } catch (reason) {
+      usePreparationProgressStore.getState().cancelFailed(importState.id)
+      throw reason
+    }
   }, [importState])
 
   const openProject = useCallback(async () => {
@@ -894,34 +909,11 @@ export default function App() {
           {publicMessage(t, error)}
         </div>
       )}
-      {importState && (
-        <div
-          style={{
-            padding: '8px 12px',
-            display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-            borderBottom: '1px solid var(--color-border)',
-          }}
-        >
-          <span style={{ flex: 1 }}>
-            {t('app.importing', {
-              name: importState.displayName,
-              stage: progressMessage(t, importState),
-              percent: Math.round(importState.percent * 100),
-            })}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() =>
-              void cancelImport().catch((reason: unknown) => setError(normalizePublicError(reason)))
-            }
-          >
-            {t('common.cancel')}
-          </Button>
-        </div>
-      )}
+      <AudioPreparationProgress
+        onCancel={() =>
+          void cancelImport().catch((reason: unknown) => setError(normalizePublicError(reason)))
+        }
+      />
 
       <EditorWorkspace
         audio={(workspaceControls) => (

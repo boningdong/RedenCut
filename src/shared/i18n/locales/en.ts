@@ -1,4 +1,27 @@
 export const englishResources = {
+  preparation: {
+    cancelImport: 'Cancel import',
+    opening: 'Opening project',
+    importing: 'Importing audio',
+    sourceCount: '{{index}} / {{total}} files',
+    stages: {
+      'reading-project': 'Reading project…',
+      'waiting-for-media': 'Waiting for audio…',
+      'verifying-audio': 'Verifying audio…',
+      'checking-cache': 'Checking cache…',
+      'building-cache': 'Preparing audio…',
+      'settling-jobs': 'Finishing active tasks…',
+      'switching-session': 'Switching project…',
+      selected: 'Preparing import…',
+      validating: 'Validating audio…',
+      copying: 'Copying audio…',
+      referencing: 'Linking audio…',
+      publishing: 'Saving audio…',
+      ready: 'Audio ready',
+      'preparing-editor': 'Preparing editor…',
+      cancelling: 'Cancelling…',
+    },
+  },
   mediaRecovery: {
     title: 'Locate missing audio',
     description: 'Find the original files on this computer to continue opening the project.',

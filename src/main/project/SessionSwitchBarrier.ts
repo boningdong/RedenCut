@@ -1,3 +1,4 @@
+import type { ProjectOpenProgressEvent } from '../../shared/AudioPreparationTypes'
 import { randomUUID } from 'crypto'
 import type { SessionPrecondition } from '../../shared/session.types'
 
@@ -7,7 +8,7 @@ export interface ProjectSwitchAcknowledgement extends SessionPrecondition {
 
 export interface ProjectSwitchSender {
   id: number
-  send(channel: string, value: ProjectSwitchAcknowledgement): void
+  send(channel: string, value: ProjectSwitchAcknowledgement | ProjectOpenProgressEvent): void
   isDestroyed(): boolean
   once(event: 'destroyed' | 'did-start-loading' | 'render-process-gone', listener: () => void): void
   removeListener(

@@ -1,3 +1,4 @@
+import { usePreparationProgressStore } from './stores/PreparationProgressStore'
 import { useSpeechBatchStore } from './stores/speechBatch.store'
 import type { PublicMessage } from '@shared/publicMessages'
 // @vitest-environment jsdom
@@ -211,6 +212,7 @@ function session(
 }
 
 function installApi(initial: RendererSession) {
+  let projectOpenProgress!: Parameters<IElectronAPI['on']['projectOpenProgress']>[0]
   let importProgress!: Parameters<IElectronAPI['on']['importProgress']>[0]
   let speechAnalysisProgress!: Parameters<IElectronAPI['on']['speechAnalysisProgress']>[0]
   let projectWillSwitch!: Parameters<IElectronAPI['on']['projectWillSwitch']>[0]
@@ -296,7 +298,7 @@ function installApi(initial: RendererSession) {
     audio: {
       selectImportFile: vi.fn<IElectronAPI['audio']['selectImportFile']>(async () => null),
       startImport: vi.fn<IElectronAPI['audio']['startImport']>(),
-      cancelImport: vi.fn(async () => 'not-found' as const),
+      cancelImport: vi.fn<IElectronAPI['audio']['cancelImport']>(async () => 'not-found'),
     },
     transcript: {
       checkAvailability: vi.fn(async (): Promise<PublicMessage | null> => null),
@@ -322,6 +324,10 @@ function installApi(initial: RendererSession) {
     },
     on: {
       mediaRecoveryChanged: vi.fn(() => vi.fn()),
+      projectOpenProgress: vi.fn((callback) => {
+        projectOpenProgress = callback
+        return vi.fn()
+      }),
       importProgress: vi.fn((callback) => {
         importProgress = callback
         return vi.fn()
@@ -350,6 +356,7 @@ function installApi(initial: RendererSession) {
     api,
     requests,
     importProgress: () => importProgress,
+    openProgress: () => projectOpenProgress,
     progress: () => speechAnalysisProgress,
     willSwitch: () => projectWillSwitch,
     pendingOpen: () => pendingProjectOpen,
@@ -365,6 +372,7 @@ async function renderInitialized(initial: RendererSession) {
 
 describe('App transcription job identity', () => {
   beforeEach(() => {
+    usePreparationProgressStore.setState({ active: null, opening: null, importing: null })
     useLocaleStore.setState({ preference: 'en', resolvedLocale: 'en' })
     useEditorStore.getState().reset()
     useTimelineStore.getState().reset()
@@ -775,7 +783,7 @@ describe('App transcription job identity', () => {
     saving.resolve(saved)
 
     await waitFor(() => expect(useEditorStore.getState().session?.revision).toBe(2))
-    expect(screen.queryByText(/Importing late\.mp3/)).not.toBeNull()
+    expect(screen.queryByTitle('late.mp3')).not.toBeNull()
     act(() =>
       importProgress()({
         workspaceToken: TOKEN_A,
@@ -790,7 +798,7 @@ describe('App transcription job identity', () => {
     await act(async () => Promise.resolve())
 
     expect(useEditorStore.getState().session).toEqual(saved)
-    expect(screen.queryByText(/Importing late\.mp3/)).toBeNull()
+    expect(screen.queryByTitle('late.mp3')).toBeNull()
     expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.')
   })
 
@@ -866,6 +874,77 @@ describe('App transcription job identity', () => {
 
     expect(api.project.acknowledgeSwitch).not.toHaveBeenCalled()
     expect(screen.getByRole('alert').textContent).toBe('The operation could not be completed.')
+  })
+
+  it('cancels an ongoing import while a pending project open is visible', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const { api, pendingOpen, openProgress } = await renderInitialized(initial)
+    const importing = deferred<Awaited<ReturnType<IElectronAPI['audio']['startImport']>>>()
+    const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openPending']>>>()
+    api.audio.selectImportFile.mockResolvedValueOnce({
+      token: 'selection',
+      displayName: 'voice.wav',
+    })
+    api.audio.startImport.mockReturnValueOnce(importing.promise)
+    api.project.openPending.mockReturnValueOnce(opening.promise)
+    fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
+    await waitFor(() => expect(api.audio.startImport).toHaveBeenCalledOnce())
+    act(() => {
+      void pendingOpen()({ requestId: 'pending-overlap', displayName: 'Other.redencut' })
+    })
+    await waitFor(() => expect(api.project.openPending).toHaveBeenCalledOnce())
+    const operationId = api.project.openPending.mock.calls[0][0].operationId
+    act(() =>
+      openProgress()({
+        operationId,
+        sequence: 1,
+        stage: 'reading-project',
+        progress: { kind: 'indeterminate' },
+      }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }))
+    await waitFor(() =>
+      expect(api.audio.cancelImport).toHaveBeenCalledWith({
+        workspaceToken: TOKEN_A,
+        revision: 1,
+        jobId: 'job-a',
+      }),
+    )
+    expect(screen.getByText('Reading project…')).toBeTruthy()
+    expect(
+      (screen.getByRole('button', { name: 'Cancel import' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+    importing.reject(new Error('cancelled'))
+    opening.resolve({ outcome: 'stayed', reason: 'cancelled', session: initial })
+    await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
+  })
+
+  it('holds cancellation pending and applies a commit-won import before clearing progress', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const imported = session(TOKEN_A, 2, SOURCE_B, 'Imported')
+    const { api } = await renderInitialized(initial)
+    const importing = deferred<Awaited<ReturnType<IElectronAPI['audio']['startImport']>>>()
+    const registration = deferred<void>()
+    api.audio.selectImportFile.mockResolvedValueOnce({
+      token: 'selection',
+      displayName: 'voice.wav',
+    })
+    api.audio.startImport.mockReturnValueOnce(importing.promise)
+    api.audio.cancelImport.mockResolvedValueOnce('commit-won')
+    fireEvent.click(screen.getByRole('button', { name: 'Add Track' }))
+    await waitFor(() => expect(api.audio.startImport).toHaveBeenCalledOnce())
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(api.audio.cancelImport).toHaveBeenCalledOnce())
+    expect(screen.getByText('Cancelling…')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    mocks.registerAudioSource.mockReturnValueOnce(registration.promise)
+    importing.resolve({ workspaceToken: TOKEN_A, revision: 1, jobId: 'job-a', value: imported })
+    await waitFor(() => expect(screen.getByText('Preparing editor…')).toBeTruthy())
+    registration.resolve()
+    await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
+    expect(useEditorStore.getState().session?.revision).toBe(2)
   })
 
   it('ignores import registration completion after a project switch', async () => {
@@ -1074,6 +1153,7 @@ describe('App transcription job identity', () => {
     await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
     expect(screen.getByRole('alert').textContent).toContain('selected project could not be opened')
     expect(api.project.openDialog).toHaveBeenCalledWith({
+      operationId: expect.any(String),
       workspaceToken: TOKEN_A,
       revision: 1,
       isDirty: true,
@@ -1092,6 +1172,7 @@ describe('App transcription job identity', () => {
     })
 
     expect(api.project.openPending).toHaveBeenCalledWith({
+      operationId: expect.any(String),
       workspaceToken: TOKEN_A,
       revision: 1,
       isDirty: false,
@@ -1099,6 +1180,51 @@ describe('App transcription job identity', () => {
     })
     expect(JSON.stringify(api.project.openPending.mock.calls)).not.toContain('/private')
     await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
+  })
+
+  it('keeps open progress through renderer preparation and ignores late main ticks', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const successor = session(TOKEN_B, 1, SOURCE_B, 'B')
+    const { api, openProgress } = await renderInitialized(initial)
+    const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
+    const registration = deferred<void>()
+    api.project.openDialog.mockReturnValueOnce(opening.promise)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledOnce())
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    const operationId = api.project.openDialog.mock.calls[0][0].operationId
+    act(() =>
+      openProgress()({
+        operationId,
+        sequence: 1,
+        stage: 'reading-project',
+        progress: { kind: 'indeterminate' },
+      }),
+    )
+    expect(screen.getByText('Reading project…')).toBeTruthy()
+    mocks.registerAudioSource.mockReturnValueOnce(registration.promise)
+    opening.resolve({ outcome: 'switched', session: successor })
+    await waitFor(() => expect(screen.getByText('Preparing editor…')).toBeTruthy())
+    act(() =>
+      openProgress()({
+        operationId,
+        sequence: 2,
+        stage: 'switching-session',
+        progress: { kind: 'indeterminate' },
+      }),
+    )
+    expect(screen.getByText('Preparing editor…')).toBeTruthy()
+    registration.resolve()
+    await waitFor(() => expect(screen.queryByRole('progressbar')).toBeNull())
+    act(() =>
+      openProgress()({
+        operationId,
+        sequence: 3,
+        stage: 'switching-session',
+        progress: { kind: 'indeterminate' },
+      }),
+    )
+    expect(screen.queryByRole('progressbar')).toBeNull()
   })
 
   it('rebuilds the current session when a post-acknowledgement switch failure stays', async () => {
@@ -1236,6 +1362,7 @@ describe('App transcription job identity', () => {
 
     await waitFor(() => expect(installed.api.project.openPending).toHaveBeenCalledTimes(1))
     expect(installed.api.project.openPending).toHaveBeenCalledWith({
+      operationId: expect.any(String),
       workspaceToken: TOKEN_A,
       revision: 1,
       isDirty: false,
@@ -1285,6 +1412,7 @@ describe('App transcription job identity', () => {
     await queued
 
     expect(installed.api.project.openPending).toHaveBeenCalledWith({
+      operationId: expect.any(String),
       workspaceToken: TOKEN_B,
       revision: 2,
       isDirty: false,
@@ -1313,6 +1441,7 @@ describe('App transcription job identity', () => {
     await waitFor(() => expect(installed.api.project.openDialog).toHaveBeenCalledTimes(1))
 
     expect(installed.api.project.openDialog).toHaveBeenCalledWith({
+      operationId: expect.any(String),
       workspaceToken: TOKEN_B,
       revision: 2,
       isDirty: false,
@@ -1340,6 +1469,7 @@ describe('App transcription job identity', () => {
     await queued
 
     expect(installed.api.project.openPending).toHaveBeenCalledWith({
+      operationId: expect.any(String),
       workspaceToken: TOKEN_A,
       revision: 1,
       isDirty: false,

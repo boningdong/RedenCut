@@ -1,5 +1,28 @@
 import type { TranslationResource } from './en'
 export const simplifiedChineseResources = {
+  preparation: {
+    cancelImport: '取消导入',
+    opening: '打开项目',
+    importing: '导入音频',
+    sourceCount: '第 {{index}} / {{total}} 个文件',
+    stages: {
+      'reading-project': '正在读取项目…',
+      'waiting-for-media': '等待音频…',
+      'verifying-audio': '正在验证音频…',
+      'checking-cache': '正在检查缓存…',
+      'building-cache': '正在准备音频…',
+      'settling-jobs': '正在完成当前任务…',
+      'switching-session': '正在切换项目…',
+      selected: '正在准备导入…',
+      validating: '正在验证音频…',
+      copying: '正在复制音频…',
+      referencing: '正在链接音频…',
+      publishing: '正在保存音频…',
+      ready: '音频已就绪',
+      'preparing-editor': '正在准备编辑器…',
+      cancelling: '正在取消…',
+    },
+  },
   mediaRecovery: {
     title: '找不到工程的音频素材',
     description: '请在此电脑上找到原始文件，以继续打开工程。',

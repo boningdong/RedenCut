@@ -31,7 +31,9 @@ function deferred<T = void>() {
 }
 
 function request(session: RendererSession, isDirty = false): OpenProjectRequest {
-  return isDirty ? { ...session, isDirty, draft: session.draft } : { ...session, isDirty }
+  return isDirty
+    ? { ...session, operationId: 'open-test', isDirty, draft: session.draft }
+    : { ...session, operationId: 'open-test', isDirty }
 }
 
 async function packageRoot(parent: string, name: string): Promise<string> {
@@ -597,4 +599,50 @@ it('continues through the existing switch barrier after recovery succeeds', asyn
   expect(result.outcome).toBe('switched')
   expect(h.barrier.wait).toHaveBeenCalledTimes(1)
   expect(controller.workspace.root).toBe(candidate)
+})
+
+it('publishes candidate progress with request identity before switching and survives sender failure', async () => {
+  const controller = new WorkspaceController()
+  const parent = await mkdtemp(join(tmpdir(), 'redencut-progress-'))
+  const current = await controller.initialize(parent)
+  const root = await packageRoot(parent, 'candidate.redencut')
+  const origin = sender()
+  const { coordinator } = harness(controller)
+  const opened = await coordinator.openPath(
+    origin,
+    { ...request(current), operationId: 'open-a' },
+    root,
+  )
+  expect(opened.outcome).toBe('switched')
+  const events = origin.send.mock.calls
+    .filter(([channel]) => channel === 'project:open-progress')
+    .map(([, value]) => value)
+  expect(events.map((event) => event.stage)).toEqual([
+    'reading-project',
+    'settling-jobs',
+    'switching-session',
+  ])
+  expect(events.map((event) => [event.operationId, event.sequence])).toEqual([
+    ['open-a', 1],
+    ['open-a', 2],
+    ['open-a', 3],
+  ])
+  origin.send.mockImplementation(() => {
+    throw new Error('Window closed during progress delivery')
+  })
+  await expect(
+    coordinator.openPath(origin, { ...request(opened.session), operationId: 'open-b' }, root),
+  ).resolves.toMatchObject({ outcome: 'switched' })
+})
+
+it('does not show candidate preparation when the native chooser is cancelled', async () => {
+  const controller = new WorkspaceController()
+  const current = await controller.initialize(
+    await mkdtemp(join(tmpdir(), 'redencut-progress-cancel-')),
+  )
+  const origin = sender()
+  await expect(
+    harness(controller).coordinator.openDialog(origin, request(current)),
+  ).resolves.toMatchObject({ outcome: 'stayed', reason: 'cancelled' })
+  expect(origin.send).not.toHaveBeenCalled()
 })

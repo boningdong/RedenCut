@@ -34,8 +34,9 @@ export interface ProjectMutationRequest extends SessionPrecondition {
   draft: ProjectDraft
 }
 
-export type OpenProjectRequest = SessionPrecondition &
-  ({ isDirty: false } | { isDirty: true; draft: ProjectDraft })
+export type OpenProjectRequest = SessionPrecondition & { operationId: string } & (
+    { isDirty: false } | { isDirty: true; draft: ProjectDraft }
+  )
 
 export type OpenProjectStayedReason =
   | 'cancelled'

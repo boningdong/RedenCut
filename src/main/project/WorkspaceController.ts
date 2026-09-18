@@ -1,3 +1,4 @@
+import type { ProjectOpenProgressEvent } from '../../shared/AudioPreparationTypes'
 import { reconcileSpeakerIdentities } from '../../shared/SpeakerIdentityReconciler'
 import type { SaveSpeakerIdentitiesRequest } from '../../shared/SpeakerIdentityTypes'
 import { validateSpeakerIdentityChange } from '../speakers/SpeakerIdentityService'
@@ -32,6 +33,9 @@ import { ProjectPathResolver } from './ProjectPathResolver'
 import { ProjectWorkspace } from './ProjectWorkspace'
 import { mergeProjectDraft, toRendererSession, toRendererSpeechAnalysis } from './sessionProjection'
 
+type PreparationUpdate = Omit<ProjectOpenProgressEvent, 'operationId' | 'sequence'>
+type PreparationObserver = (update: PreparationUpdate) => void
+
 export interface PreparedWorkspace {
   readonly workspace: ProjectWorkspace
   readonly descriptors: AudioSourceCacheDescriptor[]
@@ -39,7 +43,7 @@ export interface PreparedWorkspace {
 
 export interface WorkspaceTransaction {
   readonly precondition: SessionPrecondition
-  describe(): Promise<RendererSession>
+  describe(onProgress?: PreparationObserver): Promise<RendererSession>
   save(draft: ProjectDraft): Promise<RendererSession>
   saveAs(destination: string, draft: ProjectDraft): Promise<RendererSession>
   saveAsForOpen(destination: string, draft: ProjectDraft): Promise<RendererSession>
@@ -47,8 +51,12 @@ export interface WorkspaceTransaction {
   prepareOpen(
     root: string,
     recover?: (workspace: ProjectWorkspace) => Promise<void>,
+    onProgress?: PreparationObserver,
   ): Promise<PreparedWorkspace>
-  prepareStarter(kind: 'sample' | 'empty'): Promise<PreparedWorkspace>
+  prepareStarter(
+    kind: 'sample' | 'empty',
+    onProgress?: PreparationObserver,
+  ): Promise<PreparedWorkspace>
   commitPreparedOpen(candidate: PreparedWorkspace): Promise<RendererSession>
   commitImport(authoritativeProject: ProjectFile): Promise<RendererSession>
   commitSpeechAnalysis(artifact: SpeechArtifact, draft: ProjectDraft): Promise<RendererSession>
@@ -116,13 +124,18 @@ export class WorkspaceController {
   async prepareOpen(
     root: string,
     recover?: (workspace: ProjectWorkspace) => Promise<void>,
+    onProgress?: PreparationObserver,
   ): Promise<PreparedWorkspace> {
+    observePreparation(onProgress, {
+      stage: 'reading-project',
+      progress: { kind: 'indeterminate' },
+    })
     const workspace = await ProjectWorkspace.open(root, {
       saveAsPolicy: this.saveAsPolicy,
       cleanupWarningSink: this.cleanupWarningSink,
     })
     await recover?.(workspace)
-    const descriptors = await this.descriptors(workspace)
+    const descriptors = await this.descriptors(workspace, workspace.project, 'full', onProgress)
     return { workspace, descriptors }
   }
 
@@ -331,7 +344,7 @@ export class WorkspaceController {
             revision: state.revision,
           }
         },
-        describe: () => this.describeState(state),
+        describe: (onProgress) => this.describeState(state, onProgress),
         save: (draft) => this.saveState(state, draft),
         saveAs: (destination, draft) => this.saveAsState(state, destination, draft),
         saveAsForOpen: (destination, draft) =>
@@ -340,11 +353,19 @@ export class WorkspaceController {
             this.retainedRetiredWorkspaces.add(retired)
           }),
         releaseRetiredWorkspaces: () => this.releaseRetiredWorkspaces(transactionRetiredWorkspaces),
-        prepareOpen: (root, recover) => this.prepareOpenState(state, root, recover),
-        prepareStarter: async (kind) => {
+        prepareOpen: (root, recover, onProgress) =>
+          this.prepareOpenState(state, root, recover, onProgress),
+        prepareStarter: async (kind, onProgress) => {
+          observePreparation(onProgress, {
+            stage: 'reading-project',
+            progress: { kind: 'indeterminate' },
+          })
           const workspace = await createStarterWorkspace(tmpdir(), kind)
           try {
-            const candidate = { workspace, descriptors: await this.descriptors(workspace) }
+            const candidate = {
+              workspace,
+              descriptors: await this.descriptors(workspace, workspace.project, 'full', onProgress),
+            }
             this.preparedAgainstWorkspace.set(candidate, state.workspace)
             return candidate
           } catch (error) {
@@ -429,9 +450,12 @@ export class WorkspaceController {
     }
   }
 
-  private async describeState(state: TransactionState): Promise<RendererSession> {
+  private async describeState(
+    state: TransactionState,
+    onProgress?: PreparationObserver,
+  ): Promise<RendererSession> {
     const workspace = state.workspace
-    const descriptors = await this.descriptors(workspace)
+    const descriptors = await this.descriptors(workspace, workspace.project, 'full', onProgress)
     return toRendererSession(workspace, state.workspaceToken, state.revision, descriptors)
   }
 
@@ -494,9 +518,10 @@ export class WorkspaceController {
     state: TransactionState,
     root: string,
     recover?: (workspace: ProjectWorkspace) => Promise<void>,
+    onProgress?: PreparationObserver,
   ): Promise<PreparedWorkspace> {
     await assertSafeSwitchRoot(state.workspace, root)
-    const candidate = await this.prepareOpen(root, recover)
+    const candidate = await this.prepareOpen(root, recover, onProgress)
     try {
       await assertSafeSwitchRoot(state.workspace, candidate.workspace.root)
       this.preparedAgainstWorkspace.set(candidate, state.workspace)
@@ -606,16 +631,35 @@ export class WorkspaceController {
     workspace: ProjectWorkspace,
     project: ProjectFile = workspace.project,
     originalValidation: 'full' | 'quick' = 'full',
+    onProgress?: PreparationObserver,
   ): Promise<AudioSourceCacheDescriptor[]> {
     const store = new AudioSourceCacheStore(workspace.root)
     const result: AudioSourceCacheDescriptor[] = []
-    for (const source of project.audioSources) {
+    for (const [index, source] of project.audioSources.entries()) {
+      const report = (stage: PreparationUpdate['stage'], fraction?: number) =>
+        observePreparation(onProgress, {
+          stage,
+          projectDisplayName: workspace.descriptor.displayName,
+          source: {
+            audioSourceId: source.id,
+            displayName: source.displayName,
+            index: index + 1,
+            total: project.audioSources.length,
+          },
+          progress:
+            fraction === undefined || !Number.isFinite(fraction)
+              ? { kind: 'indeterminate' }
+              : { kind: 'determinate', fraction: Math.max(0, Math.min(1, fraction)) },
+        })
+      report('verifying-audio')
       const original = await resolveOriginal(workspace, source)
       await verifyAudioFingerprint(original, source.fingerprint, originalValidation)
+      report('checking-cache')
       let manifest = await store.validate(source)
       if (!manifest) {
         if (originalValidation === 'quick')
           await verifyAudioFingerprint(original, source.fingerprint, 'full')
+        report('building-cache', 0)
         manifest = await this.cacheBuilder.build(
           {
             projectRoot: workspace.root,
@@ -627,7 +671,9 @@ export class WorkspaceController {
             processingSampleRate: 48_000,
           },
           new AbortController().signal,
+          (fraction) => report('building-cache', fraction),
         )
+        report('verifying-audio')
         await verifyAudioFingerprint(original, source.fingerprint, 'full')
       }
       result.push(store.descriptor(manifest))
@@ -682,5 +728,16 @@ async function resolveOriginal(
     return path
   } catch (error) {
     throw new Error(`Original audio is unavailable for ${source.displayName}`, { cause: error })
+  }
+}
+
+function observePreparation(
+  observer: PreparationObserver | undefined,
+  update: PreparationUpdate,
+): void {
+  try {
+    observer?.(update)
+  } catch {
+    // Preparation feedback must never change the outcome of a workspace transaction.
   }
 }

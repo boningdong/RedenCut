@@ -1215,3 +1215,100 @@ it('preserves speaker metadata when an import admitted earlier publishes its pro
     await rm(root, { recursive: true, force: true })
   }
 })
+
+it('observes per-source cache rebuild progress and returns to verification before readiness', async () => {
+  const root = await packageWithoutCache()
+  const updates: { stage: string; progress: unknown; source?: unknown }[] = []
+  const builder = {
+    build: async (
+      request: Parameters<FfmpegAudioSourceCacheBuilder['build']>[0],
+      _signal: AbortSignal,
+      report?: (fraction: number) => void,
+    ) => {
+      report?.(0.42)
+      report?.(1)
+      return generatedManifest(request)
+    },
+  } as FfmpegAudioSourceCacheBuilder
+  const controller = new WorkspaceController(builder)
+  const prepared = await controller.prepareOpen(root, undefined, (event) => updates.push(event))
+  expect(prepared.descriptors).toHaveLength(1)
+  expect(updates.map((event) => event.stage)).toEqual([
+    'reading-project',
+    'verifying-audio',
+    'checking-cache',
+    'building-cache',
+    'building-cache',
+    'building-cache',
+    'verifying-audio',
+  ])
+  expect(updates[4]).toMatchObject({
+    source: { audioSourceId: SOURCE_ID, displayName: 'source.wav', index: 1, total: 1 },
+    progress: { kind: 'determinate', fraction: 0.42 },
+  })
+})
+
+it('reports verification and cache checking but never rebuilding for valid caches', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const builder = {
+    build: async () => {
+      throw new Error('Valid caches must not rebuild')
+    },
+  } as unknown as FfmpegAudioSourceCacheBuilder
+  const stages: string[] = []
+  const prepared = await new WorkspaceController(builder).prepareOpen(root, undefined, (event) =>
+    stages.push(event.stage),
+  )
+  expect(prepared.descriptors).toHaveLength(1)
+  expect(stages).toEqual(['reading-project', 'verifying-audio', 'checking-cache'])
+})
+
+it('counts each source independently and isolates exceptions from observers', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const project = JSON.parse(await readFile(join(root, 'project.json'), 'utf8'))
+  const secondId = '00000000-0000-4000-8000-000000000002'
+  await mkdir(join(root, 'media', secondId), { recursive: true })
+  await writeFile(join(root, 'media', secondId, 'second.wav'), new Uint8Array([1, 2, 3, 4]))
+  project.audioSources.push({
+    ...project.audioSources[0],
+    id: secondId,
+    displayName: 'second.wav',
+    location: { mode: 'copy', path: `media/${secondId}/second.wav` },
+  })
+  await writeFile(join(root, 'project.json'), JSON.stringify(project))
+  const builder = {
+    build: async (request: Parameters<FfmpegAudioSourceCacheBuilder['build']>[0]) =>
+      generatedManifest(request),
+  } as unknown as FfmpegAudioSourceCacheBuilder
+  const seen: {
+    stage: string
+    source?: { index: number; total: number; audioSourceId: string }
+  }[] = []
+  const result = await new WorkspaceController(builder).prepareOpen(root, undefined, (event) => {
+    seen.push(event)
+    throw new Error('Observer unavailable')
+  })
+  expect(result.descriptors).toHaveLength(2)
+  expect(
+    seen.filter((event) => event.stage === 'checking-cache').map((event) => event.source),
+  ).toMatchObject([
+    { audioSourceId: SOURCE_ID, index: 1, total: 2 },
+    { audioSourceId: secondId, index: 2, total: 2 },
+  ])
+})
+
+it('observes current-session verification while capturing a rollback session for open', async () => {
+  const root = await packageWithoutCache()
+  await writeValidCache(root)
+  const controller = new WorkspaceController()
+  await controller.initialize(await mkdtemp(join(tmpdir(), 'redencut-current-progress-')))
+  const session = await controller.open(root)
+  const stages: string[] = []
+  const rollback = await controller.runTransition(session, (transaction) =>
+    transaction.describe((event) => stages.push(event.stage)),
+  )
+  expect(rollback).toEqual(session)
+  expect(stages).toEqual(['verifying-audio', 'checking-cache'])
+})

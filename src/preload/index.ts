@@ -1,3 +1,4 @@
+import type { ProjectOpenProgressEvent } from '../shared/AudioPreparationTypes'
 import type { MediaRecoverySnapshot } from '../shared/MediaRecoveryTypes'
 import type { SaveSpeakerIdentitiesRequest } from '../shared/SpeakerIdentityTypes'
 import type { SpeechBatchSummary } from '../shared/speechBatch.types'
@@ -181,6 +182,12 @@ const api = {
       invokeSafe<ExportCancellationResult>(invoke, 'render:cancel-export', request),
   },
   on: {
+    projectOpenProgress: (callback: (progress: ProjectOpenProgressEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, progress: ProjectOpenProgressEvent) =>
+        callback(progress)
+      ipcRenderer.on('project:open-progress', handler)
+      return () => ipcRenderer.off('project:open-progress', handler)
+    },
     mediaRecoveryChanged: (callback: (snapshot: MediaRecoverySnapshot) => void) => {
       const handler = (_event: IpcRendererEvent, snapshot: MediaRecoverySnapshot) =>
         callback(snapshot)

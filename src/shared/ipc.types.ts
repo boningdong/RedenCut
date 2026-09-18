@@ -1,3 +1,4 @@
+import type { ProjectOpenProgressEvent } from './AudioPreparationTypes'
 import type {
   MediaRecoverySnapshot,
   MediaRecoveryRequest,
@@ -197,6 +198,7 @@ export interface IElectronAPI {
     cancelExport(request: CancelSessionJobRequest<ExportJobId>): Promise<ExportCancellationResult>
   }
   on: {
+    projectOpenProgress(callback: (event: ProjectOpenProgressEvent) => void): () => void
     mediaRecoveryChanged(callback: (snapshot: MediaRecoverySnapshot) => void): () => void
 
     importProgress(callback: (progress: ImportProgressEvent) => void): () => void
