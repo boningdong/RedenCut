@@ -54,6 +54,58 @@ describe('WaveformView managed providers', () => {
     })
   })
 
+  it('keeps the time under the mouse fixed while zooming a scrolled timeline', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const { container } = render(
+      <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    const content = container.querySelector('#waveform-timeline')!.parentElement!
+    const viewport = content.parentElement!
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 800 },
+      scrollWidth: { get: () => Math.max(800, Number.parseFloat(content.style.width)) },
+    })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 190 } as DOMRect)
+    fireEvent.click(screen.getByTitle('Zoom in'))
+    viewport.scrollLeft = 200
+    // At 160 px/s, viewport x=300 points to 3.125 seconds.
+    fireEvent.wheel(viewport, { clientX: 490, deltaY: -100 })
+    expect(viewport.scrollLeft).toBeCloseTo(300)
+    fireEvent.wheel(viewport, { clientX: 490, deltaY: 100 })
+    expect(viewport.scrollLeft).toBeCloseTo(200)
+    expect(useTimelineStore.getState().undoStack).toHaveLength(0)
+    vi.restoreAllMocks()
+  })
+
+  it('keeps the audio tail anchored while zooming below fit and extends the ruler into trailing space', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const { container } = render(
+      <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    const ruler = container.querySelector('#waveform-timeline')!
+    const content = ruler.parentElement!
+    const viewport = content.parentElement!
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 800 },
+      scrollWidth: { get: () => Math.max(800, Number.parseFloat(content.style.width)) },
+    })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 190 } as DOMRect)
+    fireEvent.click(screen.getByTitle('Zoom out'))
+    // 9 seconds is at x=360 within the viewport at 50% fit.
+    fireEvent.wheel(viewport, { clientX: 550, deltaY: -100 })
+    expect(viewport.scrollLeft).toBeCloseTo(72)
+    expect(Number.parseFloat(content.style.width)).toBe(1280)
+    expect(ruler.textContent).toContain('20s')
+    // Two wheel events before React commits must accumulate against the padded extent.
+    act(() => {
+      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))
+      viewport.dispatchEvent(new WheelEvent('wheel', { clientX: 550, deltaY: -100 }))
+    })
+    expect(viewport.scrollLeft).toBeCloseTo(262.08)
+    expect(useTimelineStore.getState().undoStack).toHaveLength(0)
+    vi.restoreAllMocks()
+  })
+
   it('reuses the provider selected by each clip audioSourceId', () => {
     const clip = {
       id: 'clip-1',
