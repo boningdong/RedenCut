@@ -38,11 +38,13 @@ Focused trim handles use Left/Right for 10 ms adjustments and Shift+Left/Right f
 
 ## Audio Toolbar
 
-Drag directly on the time ruler to select an output-time range on the current track; a click without dragging still seeks.
+Drag directly on the time ruler to select an output-time range, even without an active track; a click without dragging still seeks.
 Hovering the ruler shows a subdued purple dashed guide through every track.
 The selected time range remains highlighted across the ruler and all tracks after release, with its owning track emphasized in its track color; Delete/Backspace or Redact applies clip-owned overlays to every intersecting clip on that track in one undoable edit, ignoring gaps and preserving clip positions.
 Starting a ruler selection clears clip, overlay and transcript selection; Escape cancels an active drag or clears the selection.
-Switching tracks, replacing the project or removing the target track clears the range.
+The time range is independent of its optional target track: switching tracks updates the emphasis, and removing or deactivating the target retains the time range without track emphasis.
+Click a track header to assign the existing range to that track; without a target, Redact/Delete are disabled and edit shortcuts do nothing.
+Replacing the project clears the range.
 Transcript selections show the same full-height time reference and emphasize their resolved acoustic range on the matching track; their occurrence-aware edit and boundary-confirmation rules remain unchanged.
 Clicking a waveform clip selects its whole output-time range.
 The audio toolbar exposes the same context-dependent split, mute/redact and delete actions as the corresponding keyboard shortcuts.

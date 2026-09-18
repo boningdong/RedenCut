@@ -10,7 +10,6 @@ interface Options {
 }
 interface RangeGesture {
   pointerId: number
-  trackId: string
   anchorTime: number
   startClientX: number
   scale: number
@@ -49,13 +48,15 @@ export function useRangeSelection({ pxPerSec, duration, focusTimeline }: Options
           (event.clientX - active.target.getBoundingClientRect().left) / active.scale,
         ),
       )
+      const timeline = useTimelineStore.getState()
+      const trackId = timeline.tracks.some((track) => track.id === timeline.selectedTrackId)
+        ? timeline.selectedTrackId
+        : null
       const start = Math.min(active.anchorTime, time)
       const end = Math.max(active.anchorTime, time)
       useEditorStore
         .getState()
-        .setSelection(
-          end > start ? { origin: 'timeline', trackId: active.trackId, start, end } : null,
-        )
+        .setSelection(end > start ? { origin: 'timeline', trackId, start, end } : null)
     }
     const finish = (event: PointerEvent) => {
       if (!gesture.current || event.pointerId !== gesture.current.pointerId) return
@@ -74,6 +75,17 @@ export function useRangeSelection({ pxPerSec, duration, focusTimeline }: Options
     }
     const unsubscribe = useTimelineStore.subscribe((state, previous) => {
       const selection = useEditorStore.getState().selection
+      if (
+        state.projectGeneration === previous.projectGeneration &&
+        selection?.origin === 'timeline'
+      ) {
+        const trackId = state.tracks.some((track) => track.id === state.selectedTrackId)
+          ? state.selectedTrackId
+          : null
+        if (selection.trackId !== trackId)
+          useEditorStore.getState().setSelection({ ...selection, trackId })
+        return
+      }
       if (
         state.projectGeneration !== previous.projectGeneration ||
         (state.selectedTrackId !== previous.selectedTrackId &&
@@ -107,9 +119,6 @@ export function useRangeSelection({ pxPerSec, duration, focusTimeline }: Options
     isActive,
     begin(event: ReactPointerEvent<HTMLElement>) {
       if (event.button !== 0 || gesture.current || duration <= 0) return
-      const timeline = useTimelineStore.getState()
-      const trackId = timeline.selectedTrackId
-      if (!trackId || !timeline.tracks.some((track) => track.id === trackId)) return
       event.preventDefault()
       event.stopPropagation()
       focusTimeline()
@@ -117,7 +126,6 @@ export function useRangeSelection({ pxPerSec, duration, focusTimeline }: Options
       suppressClick.current = false
       gesture.current = {
         pointerId: event.pointerId,
-        trackId,
         target,
         scale: pxPerSec,
         duration,

@@ -44,6 +44,7 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
   return (
     <div
       className="track-header"
+      onClickCapture={() => useTimelineStore.getState().setSelectedTrackId(track.id)}
       data-active-track={active}
       style={{
         borderLeftColor: color,

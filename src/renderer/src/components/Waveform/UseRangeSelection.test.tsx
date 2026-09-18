@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { WaveformView } from './WaveformView'
 import { useTimelineStore } from '../../stores/timeline.store'
+import { muteSelection, deleteSelection, unmuteSelection } from '../../actions/timelineActions'
 import { useEditorStore } from '../../stores/editor.store'
 import type { RendererAudioSource } from '@shared/session.types'
 
@@ -128,7 +129,7 @@ it('selects a ruler range immediately and redacts across clips without removing 
   expect(useTimelineStore.getState().tracks[0].clips.every((c) => !c.redactions?.length)).toBe(true)
 })
 
-it('normalizes reverse drags, cancels on Escape, and clears on track changes', () => {
+it('normalizes reverse drags, cancels on Escape, and preserves time on track changes', () => {
   const { container } = setup()
   act(() => useTimelineStore.getState().setSelectedTrackId('one'))
   const ruler = container.querySelector('#waveform-timeline')!
@@ -142,7 +143,7 @@ it('normalizes reverse drags, cancels on Escape, and clears on track changes', (
   fireEvent.pointerMove(window, { clientX: 120 })
   fireEvent.pointerUp(window, { clientX: 120 })
   act(() => useTimelineStore.getState().setSelectedTrackId('two'))
-  expect(useEditorStore.getState().selection).toBeNull()
+  expect(useEditorStore.getState().selection).toMatchObject({ start: 1, end: 3, trackId: 'two' })
   expect(useTimelineStore.getState().undoStack).toHaveLength(0)
 })
 
@@ -227,4 +228,59 @@ it('retains clip selection when a ruler gesture is only a click', () => {
   fireEvent.click(ruler, { clientX: 80 })
   expect(useTimelineStore.getState().selectedClipIds).toEqual(['a'])
   expect(useEditorStore.getState().selection).toBeNull()
+})
+
+it('selects time without an active track and only enables edits after assigning a target', () => {
+  const { container } = setup()
+  const ruler = container.querySelector('#waveform-timeline')!
+  fireEvent.pointerDown(ruler, { button: 0, clientX: 40 })
+  fireEvent.pointerMove(window, { clientX: 120 })
+  fireEvent.pointerUp(window, { clientX: 120 })
+  expect(useEditorStore.getState().selection).toEqual({
+    origin: 'timeline',
+    trackId: null,
+    start: 1,
+    end: 3,
+  })
+  expect(container.querySelector('[data-range-scope="timeline"]')).not.toBeNull()
+  expect(container.querySelector('[data-range-scope="track"]')).toBeNull()
+  expect(
+    (screen.getByRole('button', { name: 'Redact selection' }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+  expect(
+    (screen.getByRole('button', { name: 'Delete selection' }) as HTMLButtonElement).disabled,
+  ).toBe(true)
+  act(() => {
+    muteSelection()
+    deleteSelection()
+    unmuteSelection()
+  })
+  expect(useEditorStore.getState().selection).toMatchObject({ start: 1, end: 3, trackId: null })
+  expect(useTimelineStore.getState().undoStack).toHaveLength(0)
+  fireEvent.click(container.querySelector('.track-header')!)
+  expect(useEditorStore.getState().selection).toMatchObject({ start: 1, end: 3, trackId: 'one' })
+  expect(container.querySelector('[data-lane="one"] [data-range-scope="track"]')).not.toBeNull()
+  expect(
+    (screen.getByRole('button', { name: 'Redact selection' }) as HTMLButtonElement).disabled,
+  ).toBe(false)
+  act(() => useTimelineStore.getState().setSelectedTrackId(null))
+  expect(useEditorStore.getState().selection).toMatchObject({ start: 1, end: 3, trackId: null })
+  expect(container.querySelector('[data-range-scope="track"]')).toBeNull()
+  act(() => useTimelineStore.getState().setSelectedTrackId('one'))
+  fireEvent.click(screen.getByRole('button', { name: 'Redact selection' }))
+  expect(useTimelineStore.getState().tracks[0].clips[0].redactions).toMatchObject([
+    { sourceStart: 1, sourceEnd: 3 },
+  ])
+})
+
+it('preserves a timeline range when its target track is removed', () => {
+  const { container } = setup()
+  act(() => useTimelineStore.getState().setSelectedTrackId('one'))
+  const ruler = container.querySelector('#waveform-timeline')!
+  fireEvent.pointerDown(ruler, { button: 0, clientX: 40 })
+  fireEvent.pointerMove(window, { clientX: 120 })
+  fireEvent.pointerUp(window, { clientX: 120 })
+  act(() => useTimelineStore.getState().removeTrack('one'))
+  expect(useEditorStore.getState().selection).toMatchObject({ start: 1, end: 3, trackId: null })
+  expect(container.querySelector('[data-range-scope="track"]')).toBeNull()
 })

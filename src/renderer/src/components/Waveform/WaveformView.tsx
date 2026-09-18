@@ -113,6 +113,9 @@ export function WaveformView({
     audioPanel.current?.focus({ preventScroll: true })
   }, [])
   const selection = useEditorStore((s) => s.selection)
+  const hasTrackRange = Boolean(
+    selection?.trackId && tracks.some((track) => track.id === selection.trackId),
+  )
   const selectedClip = tracks
     .flatMap((track) => track.clips)
     .find((clip) => clip.id === selectedClipId)
@@ -318,7 +321,7 @@ export function WaveformView({
               ? transcriptEditHint
               : t(selectedClipId ? 'waveform.mute' : 'waveform.redactHint')
           }
-          disabled={hasTranscriptSelection || (!selection && !selectedClipId)}
+          disabled={hasTranscriptSelection || (!hasTrackRange && !selectedClipId)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={muteSelection}
         >
@@ -327,7 +330,9 @@ export function WaveformView({
         <button
           aria-label={t('waveform.delete')}
           title={hasTranscriptSelection ? transcriptEditHint : t('waveform.deleteHint')}
-          disabled={hasTranscriptSelection || (!timelineSelection && !selectedClipId && !selection)}
+          disabled={
+            hasTranscriptSelection || (!timelineSelection && !selectedClipId && !hasTrackRange)
+          }
           onMouseDown={(event) => event.preventDefault()}
           onClick={deleteSelection}
         >

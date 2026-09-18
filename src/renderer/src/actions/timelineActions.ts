@@ -23,7 +23,7 @@ export function muteSelection(): void {
     if (clip) timeline.setClipsMuted(selectedClipIds, !clip.muted)
     return
   }
-  if (!selection) return
+  if (!selection?.trackId) return
   const trackId = selection.trackId
   if (!trackId) return
   timeline.redactRange(trackId, selection.start, selection.end)
@@ -50,7 +50,7 @@ export function deleteSelection(): void {
     return
   }
   const { selection, setSelection } = useEditorStore.getState()
-  if (!selection) return
+  if (!selection?.trackId) return
   const trackId = selection.trackId
   if (!trackId) return
   const hits = (timeline.tracks.find((track) => track.id === trackId)?.clips ?? []).some(
@@ -75,7 +75,7 @@ export function unmuteSelection(): void {
   }
 
   const { selection, setSelection } = useEditorStore.getState()
-  if (!selection) return
+  if (!selection?.trackId) return
   const overlappingIds = timeline.tracks
     .filter((track) => track.id === selection.trackId)
     .flatMap((track) => track.clips)

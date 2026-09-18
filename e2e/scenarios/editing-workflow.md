@@ -29,7 +29,7 @@ For range-selection changes, exercise these additional checkpoints with the impo
 | --- | --- |
 | `ruler-select` | Select a track, then drag directly on the ruler in both directions; release retains a full-height time reference across the ruler and all tracks, with the owning track emphasized in its own color. A simple ruler click still seeks and preserves the clip selection needed for Split. |
 | `ruler-cross-clip` | Split and move a clip to create a gap, select a range spanning both pieces, then Delete or Redact. Only intersecting audio gains overlays; clip positions and the gap remain. One Undo restores both pieces. |
-| `ruler-scope` | With two tracks, the range highlights all tracks as a time reference, while editing affects only the current track; switching tracks clears the old range. |
+| `ruler-scope` | With two tracks, the range highlights all tracks as a time reference, while editing affects only the current track; switching tracks preserves the time range and changes the emphasized target. With no active track, dragging still selects time but shows no track-specific emphasis and cannot apply Redact; clicking a track header assigns the range target. |
 | `ruler-cancel` | Escape clears the range without an edit; zoomed/scrolled selections remain aligned with the ruler. |
 | `text-highlight` | Selecting multiple timed transcript characters shows the matching waveform range, and clearing text selection removes it. Existing transcript Delete and Undo still work. |
 

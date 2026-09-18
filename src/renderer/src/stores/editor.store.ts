@@ -3,7 +3,7 @@ import type { RendererSession } from '@shared/session.types'
 
 export interface EditorSelection {
   origin: 'timeline' | 'transcript' | 'clip'
-  trackId: string
+  trackId: string | null
   start: number
   end: number
 }
