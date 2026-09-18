@@ -44,7 +44,10 @@ export interface WorkspaceTransaction {
   saveAs(destination: string, draft: ProjectDraft): Promise<RendererSession>
   saveAsForOpen(destination: string, draft: ProjectDraft): Promise<RendererSession>
   releaseRetiredWorkspaces(): Promise<void>
-  prepareOpen(root: string): Promise<PreparedWorkspace>
+  prepareOpen(
+    root: string,
+    recover?: (workspace: ProjectWorkspace) => Promise<void>,
+  ): Promise<PreparedWorkspace>
   prepareStarter(kind: 'sample' | 'empty'): Promise<PreparedWorkspace>
   commitPreparedOpen(candidate: PreparedWorkspace): Promise<RendererSession>
   commitImport(authoritativeProject: ProjectFile): Promise<RendererSession>
@@ -110,11 +113,15 @@ export class WorkspaceController {
     )
   }
 
-  async prepareOpen(root: string): Promise<PreparedWorkspace> {
+  async prepareOpen(
+    root: string,
+    recover?: (workspace: ProjectWorkspace) => Promise<void>,
+  ): Promise<PreparedWorkspace> {
     const workspace = await ProjectWorkspace.open(root, {
       saveAsPolicy: this.saveAsPolicy,
       cleanupWarningSink: this.cleanupWarningSink,
     })
+    await recover?.(workspace)
     const descriptors = await this.descriptors(workspace)
     return { workspace, descriptors }
   }
@@ -333,7 +340,7 @@ export class WorkspaceController {
             this.retainedRetiredWorkspaces.add(retired)
           }),
         releaseRetiredWorkspaces: () => this.releaseRetiredWorkspaces(transactionRetiredWorkspaces),
-        prepareOpen: (root) => this.prepareOpenState(state, root),
+        prepareOpen: (root, recover) => this.prepareOpenState(state, root, recover),
         prepareStarter: async (kind) => {
           const workspace = await createStarterWorkspace(tmpdir(), kind)
           try {
@@ -486,8 +493,10 @@ export class WorkspaceController {
   private async prepareOpenState(
     state: TransactionState,
     root: string,
+    recover?: (workspace: ProjectWorkspace) => Promise<void>,
   ): Promise<PreparedWorkspace> {
-    const candidate = await this.prepareOpen(root)
+    await assertSafeSwitchRoot(state.workspace, root)
+    const candidate = await this.prepareOpen(root, recover)
     try {
       await assertSafeSwitchRoot(state.workspace, candidate.workspace.root)
       this.preparedAgainstWorkspace.set(candidate, state.workspace)

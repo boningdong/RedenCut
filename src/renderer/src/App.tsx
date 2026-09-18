@@ -1,3 +1,5 @@
+import { MissingMediaDialog } from './components/project/MissingMediaDialog'
+import { useMediaRecoveryStore } from './stores/MediaRecoveryStore'
 import type { SpeechTaskSelection } from '@shared/SpeechTaskPlanner'
 import { saveSpeakerIdentities } from './actions/SpeakerIdentityActions'
 import { useSpeechBatchStore } from './stores/speechBatch.store'
@@ -264,6 +266,11 @@ export default function App() {
       })
     },
     [invalidateImportJobForSession, invalidateTranscriptJobForSession],
+  )
+
+  useEffect(
+    () => window.electronAPI.on.mediaRecoveryChanged(useMediaRecoveryStore.getState().receive),
+    [],
   )
 
   useEffect(() => {
@@ -963,6 +970,7 @@ export default function App() {
           />
         )}
       />
+      <MissingMediaDialog />
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
       {showOnboarding && (
         <OnboardingDialog

@@ -1,3 +1,4 @@
+import type { MediaRecoverySnapshot } from '../shared/MediaRecoveryTypes'
 import type { SaveSpeakerIdentitiesRequest } from '../shared/SpeakerIdentityTypes'
 import type { SpeechBatchSummary } from '../shared/speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from '../shared/resources.types'
@@ -118,6 +119,11 @@ const api = {
     cancelImport: (request: CancelSessionJobRequest) =>
       invokeSafe<ImportCancellationResult>(invoke, 'audio:cancel-import', request),
   },
+  mediaRecovery: {
+    locate: (request) => invokeSafe<void>(invoke, 'media-recovery:locate', request),
+    continue: (request) => invokeSafe<void>(invoke, 'media-recovery:continue', request),
+    cancel: (request) => invokeSafe<void>(invoke, 'media-recovery:cancel', request),
+  },
   project: {
     openStarter: (request: OpenProjectRequest, kind: 'sample' | 'empty') =>
       invokeSafe<OpenProjectResult>(invoke, 'project:open-starter', request, kind),
@@ -175,6 +181,12 @@ const api = {
       invokeSafe<ExportCancellationResult>(invoke, 'render:cancel-export', request),
   },
   on: {
+    mediaRecoveryChanged: (callback: (snapshot: MediaRecoverySnapshot) => void) => {
+      const handler = (_event: IpcRendererEvent, snapshot: MediaRecoverySnapshot) =>
+        callback(snapshot)
+      ipcRenderer.on('media-recovery:changed', handler)
+      return () => ipcRenderer.off('media-recovery:changed', handler)
+    },
     importProgress: (callback: (progress: ImportProgressEvent) => void) => {
       const handler = (_event: IpcRendererEvent, progress: ImportProgressEvent) =>
         callback(progress)

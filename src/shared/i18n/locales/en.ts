@@ -1,4 +1,31 @@
 export const englishResources = {
+  mediaRecovery: {
+    title: 'Locate missing audio',
+    description: 'Find the original files on this computer to continue opening the project.',
+    count: 'Files to locate: {{count}}',
+    missing: 'Original file not found',
+    selecting: 'Choosing a file…',
+    restoring: 'Copying and verifying file…',
+    restored: 'Restored to project',
+    retry: 'Choose again…',
+    choose: 'Choose file…',
+    channels: '{{count}} ch',
+    note: 'We’ll verify each file matches the original and save a copy in this project.',
+    preserve: 'Your edits and transcript will stay unchanged.',
+    requestFailed: 'The operation could not be completed. Please try again.',
+    ready: 'Audio restored. Ready to open.',
+    summary: 'Files restored: {{complete}} / {{total}}',
+    cancel: 'Cancel opening',
+    open: 'Open project',
+    errors: {
+      'content-mismatch': 'This file does not match the original. Choose another file.',
+      'read-failed': 'Could not read this file. Check access and try again.',
+      'write-failed': 'Could not save the file to this project. Check access and try again.',
+      'insufficient-space': 'Not enough disk space. Free up space and try again.',
+      'destination-conflict':
+        'A file already exists at the destination. Check the project and reopen it.',
+    },
+  },
   speechTasks: {
     title: 'Generate',
     text: 'Generate text',
@@ -306,7 +333,7 @@ export const englishResources = {
     soloName: 'Solo {{name}}',
     volumeName: '{{name}} volume',
     volumePercent: 'Volume: {{percent}}%',
-    channelCount: '{{count}} channels',
+    channelCount: '{{count}} ch',
   },
   transcript: {
     partiallyRedactedHint:

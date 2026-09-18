@@ -1,3 +1,5 @@
+import { MediaRecoveryCancelled } from './MediaRecoveryCoordinator'
+import type { ProjectWorkspace } from './ProjectWorkspace'
 import type {
   OpenProjectRequest,
   OpenProjectResult,
@@ -20,6 +22,7 @@ import type { WorkspaceController } from './WorkspaceController'
 type DirtyAction = 'save' | 'discard' | 'cancel'
 
 interface ProjectTransitionDependencies {
+  recoverMedia?(sender: ProjectSwitchSender, workspace: ProjectWorkspace): Promise<boolean>
   controller: WorkspaceController
   jobs: SessionJobRegistry
   barrier: Pick<SessionSwitchBarrier, 'wait'>
@@ -120,16 +123,18 @@ export class ProjectTransitionCoordinator {
       try {
         candidate = starterKind
           ? await transaction.prepareStarter(starterKind)
-          : await transaction.prepareOpen(candidatePath!)
-      } catch {
+          : await transaction.prepareOpen(candidatePath!, async (workspace) => {
+              if (
+                this.dependencies.recoverMedia &&
+                !(await this.dependencies.recoverMedia(sender, workspace))
+              )
+                throw new MediaRecoveryCancelled()
+            })
+      } catch (error) {
+        const reason = error instanceof MediaRecoveryCancelled ? 'cancelled' : 'candidate-invalid'
         return retainedStartingWorkspace
-          ? await this.settleStartingAndStay(
-              transaction,
-              startingToken,
-              rollback,
-              'candidate-invalid',
-            )
-          : stayed(rollback, 'candidate-invalid')
+          ? await this.settleStartingAndStay(transaction, startingToken, rollback, reason)
+          : stayed(rollback, reason)
       }
 
       const closingTokens = uniqueTokens(startingToken, rollback.workspaceToken).filter(

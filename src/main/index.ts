@@ -1,3 +1,6 @@
+import { MediaRecoveryCoordinator } from './project/MediaRecoveryCoordinator'
+import { MediaRecoveryService } from './project/MediaRecoveryService'
+import { registerMediaRecoveryIpc } from './ipc/MediaRecoveryIpc'
 import { registerSpeakerIdentityIpc } from './ipc/SpeakerIdentityIpc'
 import appIcon from './assets/icons/macos/neon-dark-lavender.xcassets/AppIcon.appiconset/1024-mac.png?asset'
 import { LocalHuggingFaceLogin } from './speech/huggingface/LocalHuggingFaceLogin'
@@ -143,7 +146,21 @@ startApplicationLifecycle({
     const mutations = new ProjectMutationCoordinator(controller, jobs)
     const barrier = new SessionSwitchBarrier()
     const pendingOpens = new PendingProjectOpenRegistry()
+    const mediaRecovery = new MediaRecoveryCoordinator(
+      new MediaRecoveryService(),
+      (sender) => dialogs.importAudio(windowFor(sender), 'recovery'),
+      (senderId, snapshot) => {
+        const window = BrowserWindow.getAllWindows().find(
+          (window) => window.webContents.id === senderId,
+        )
+        if (window && !window.webContents.isDestroyed())
+          window.webContents.send('media-recovery:changed', snapshot)
+      },
+    )
+    registerMediaRecoveryIpc(mediaRecovery)
     const transitions = new ProjectTransitionCoordinator({
+      recoverMedia: (sender, workspace) =>
+        mediaRecovery.recover(sender, workspace.root, workspace.project.audioSources),
       controller,
       jobs,
       barrier,
@@ -229,6 +246,7 @@ startApplicationLifecycle({
       },
       shutdown: async () => {
         await resources.cancel()
+        await mediaRecovery.shutdown()
         await barrier.shutdown()
       },
     }

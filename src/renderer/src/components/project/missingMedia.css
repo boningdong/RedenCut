@@ -1,0 +1,208 @@
+.preferences-dialog.missing-media-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.missing-media-dialog::backdrop {
+  background: var(--color-scrim);
+}
+.missing-media-heading {
+  padding: 25px 26px 20px;
+  display: flex;
+  gap: 14px;
+}
+.missing-media-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.missing-media-heading p {
+  color: var(--secondary);
+  line-height: 1.7;
+  margin: 0;
+}
+.missing-media-badge {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-accent-button-border);
+  border-radius: 10px;
+  background: var(--wash);
+  color: var(--accent);
+}
+.missing-media-dialog svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.missing-media-content {
+  padding: 0 26px 24px;
+}
+.missing-media-project {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.missing-media-project span:first-child {
+  overflow-wrap: anywhere;
+}
+.missing-media-project span:last-child {
+  white-space: nowrap;
+}
+.missing-media-files {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.missing-media-file {
+  padding: 16px;
+  background: var(--bg);
+}
+.missing-media-file + .missing-media-file {
+  border-top: 1px solid var(--border);
+}
+.missing-media-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--secondary);
+}
+.missing-media-info {
+  flex: 1;
+  min-width: 0;
+}
+.missing-media-info strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.missing-media-info small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.missing-media-row button {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  background: var(--raised);
+  flex-shrink: 0;
+}
+.missing-media-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.missing-media-status i {
+  height: 5px;
+  width: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.missing-media-status[data-status='restored'],
+.missing-media-check {
+  color: var(--green);
+}
+.missing-media-status[data-status='failed'],
+.missing-media-dialog .missing-media-error {
+  color: var(--danger);
+}
+.missing-media-status[data-status='restoring'] {
+  color: var(--accent);
+}
+.missing-media-file progress {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 10px;
+  appearance: none;
+  border: 0;
+  accent-color: var(--accent);
+}
+.missing-media-file progress::-webkit-progress-bar {
+  background: var(--subtle);
+}
+.missing-media-file progress::-webkit-progress-value {
+  background: var(--accent);
+}
+.missing-media-dialog .missing-media-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 16px 0 0;
+}
+.missing-media-dialog .missing-media-error {
+  font-size: 12px;
+  margin-top: 12px;
+}
+.missing-media-footer {
+  padding: 16px 26px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+}
+.missing-media-footer > span {
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.missing-media-footer button {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  padding: 7px 13px;
+  background: var(--raised);
+}
+.missing-media-footer .missing-media-primary {
+  background: var(--fill);
+  border-color: var(--accent);
+  color: var(--color-text-on-accent);
+}
+.missing-media-footer .missing-media-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fill) 82%, white);
+}
+@media (max-width: 620px) {
+  .missing-media-heading {
+    padding: 20px;
+  }
+  .missing-media-content {
+    padding: 0 20px 20px;
+  }
+  .missing-media-footer {
+    padding: 14px 20px;
+    flex-wrap: wrap;
+  }
+  .missing-media-footer > span {
+    flex-basis: 100%;
+  }
+  .missing-media-row {
+    gap: 8px;
+  }
+}

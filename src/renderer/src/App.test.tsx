@@ -275,6 +275,11 @@ function installApi(initial: RendererSession) {
       })),
       set: vi.fn<IElectronAPI['workspaceLayout']['set']>(),
     },
+    mediaRecovery: {
+      locate: vi.fn(async () => {}),
+      continue: vi.fn(async () => {}),
+      cancel: vi.fn(async () => {}),
+    },
     project: {
       initialize: vi.fn(async () => initial),
       openStarter: vi.fn<IElectronAPI['project']['openStarter']>(async () => ({
@@ -316,6 +321,7 @@ function installApi(initial: RendererSession) {
       cancelExport: vi.fn(async () => 'not-found' as const),
     },
     on: {
+      mediaRecoveryChanged: vi.fn(() => vi.fn()),
       importProgress: vi.fn((callback) => {
         importProgress = callback
         return vi.fn()

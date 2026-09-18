@@ -1,5 +1,31 @@
 import type { TranslationResource } from './en'
 export const simplifiedChineseResources = {
+  mediaRecovery: {
+    title: '找不到工程的音频素材',
+    description: '请在此电脑上找到原始文件，以继续打开工程。',
+    count: '{{count}} 个素材需要定位',
+    missing: '未找到原始文件',
+    selecting: '正在选择文件…',
+    restoring: '正在复制并校验文件…',
+    restored: '已恢复到工程',
+    retry: '重新选择…',
+    choose: '选择文件…',
+    channels: '{{count}} 声道',
+    note: '我们会确认所选文件与原始素材一致，并将副本保存到此工程。',
+    preserve: '你的剪辑和文字稿会保持原样。',
+    requestFailed: '操作未能完成，请重试。',
+    ready: '素材已恢复，可以打开工程',
+    summary: '已恢复 {{complete}} / {{total}} 个素材',
+    cancel: '取消打开',
+    open: '打开工程',
+    errors: {
+      'content-mismatch': '文件与原始素材不一致，请重新选择。',
+      'read-failed': '无法读取此文件，请检查访问权限后重试。',
+      'write-failed': '无法将文件保存到工程，请检查访问权限后重试。',
+      'insufficient-space': '磁盘空间不足，请释放空间后重试。',
+      'destination-conflict': '目标位置已有文件，请检查工程后重新打开。',
+    },
+  },
   speechTasks: {
     title: '生成',
     text: '生成文字',

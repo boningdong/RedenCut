@@ -10,10 +10,10 @@ export function createNativeProjectDialogs(
   getTranslator: () => TFunction = () => englishTranslator,
 ): ProjectDialogs {
   return {
-    async importAudio(window) {
+    async importAudio(window, purpose) {
       const t = getTranslator()
       const result = await dialog.showOpenDialog(window, {
-        title: t('dialogs.importAudio'),
+        title: t(purpose === 'recovery' ? 'mediaRecovery.choose' : 'dialogs.importAudio'),
         filters: [
           {
             name: t('dialogs.audioFiles'),

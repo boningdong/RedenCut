@@ -565,3 +565,36 @@ describe('ProjectTransitionCoordinator', () => {
     expect(await readFile(join(savedRoot, 'project.json'), 'utf8')).toContain('"version": 2')
   })
 })
+
+it('waits for media recovery before closing the active workspace and treats cancellation as stayed', async () => {
+  const controller = new WorkspaceController()
+  const parent = await mkdtemp(join(tmpdir(), 'redencut-recovery-transition-'))
+  const current = await controller.initialize(parent)
+  const candidate = await packageRoot(parent, 'missing.redencut')
+  const decision = deferred<boolean>()
+  const recoverMedia = vi.fn(() => decision.promise)
+  const h = harness(controller, { recoverMedia })
+  const opening = h.coordinator.openPath(sender(), request(current), candidate)
+  await vi.waitFor(() => expect(recoverMedia).toHaveBeenCalledTimes(1))
+  expect(controller.workspace.descriptor.kind).toBe('temporary')
+  expect(h.jobs.beginClosing).not.toHaveBeenCalled()
+  decision.resolve(false)
+  await expect(opening).resolves.toEqual({
+    outcome: 'stayed',
+    reason: 'cancelled',
+    session: current,
+  })
+  expect(h.barrier.wait).not.toHaveBeenCalled()
+})
+
+it('continues through the existing switch barrier after recovery succeeds', async () => {
+  const controller = new WorkspaceController()
+  const parent = await mkdtemp(join(tmpdir(), 'redencut-recovery-transition-'))
+  const current = await controller.initialize(parent)
+  const candidate = await packageRoot(parent, 'recovered.redencut')
+  const h = harness(controller, { recoverMedia: vi.fn(async () => true) })
+  const result = await h.coordinator.openPath(sender(), request(current), candidate)
+  expect(result.outcome).toBe('switched')
+  expect(h.barrier.wait).toHaveBeenCalledTimes(1)
+  expect(controller.workspace.root).toBe(candidate)
+})

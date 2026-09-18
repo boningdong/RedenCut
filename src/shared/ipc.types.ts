@@ -1,3 +1,8 @@
+import type {
+  MediaRecoverySnapshot,
+  MediaRecoveryRequest,
+  LocateMediaRequest,
+} from './MediaRecoveryTypes'
 import type { SpeechTaskSelection } from './SpeechTaskPlanner'
 import type { SaveSpeakerIdentitiesRequest } from './SpeakerIdentityTypes'
 import type { SpeechBatchScope, SpeechBatchProgress, SpeechBatchSummary } from './speechBatch.types'
@@ -147,6 +152,11 @@ export interface IElectronAPI {
     startImport(request: ImportJobRequest): Promise<SessionJobResult<RendererSession>>
     cancelImport(request: CancelSessionJobRequest): Promise<ImportCancellationResult>
   }
+  mediaRecovery: {
+    locate(request: LocateMediaRequest): Promise<void>
+    continue(request: MediaRecoveryRequest): Promise<void>
+    cancel(request: MediaRecoveryRequest): Promise<void>
+  }
   project: {
     initialize(): Promise<RendererSession>
     openStarter(request: OpenProjectRequest, kind: 'sample' | 'empty'): Promise<OpenProjectResult>
@@ -187,6 +197,8 @@ export interface IElectronAPI {
     cancelExport(request: CancelSessionJobRequest<ExportJobId>): Promise<ExportCancellationResult>
   }
   on: {
+    mediaRecoveryChanged(callback: (snapshot: MediaRecoverySnapshot) => void): () => void
+
     importProgress(callback: (progress: ImportProgressEvent) => void): () => void
     transcriptProgress(callback: (progress: TranscriptProgressEvent) => void): () => void
     speechAnalysisProgress(callback: (progress: SpeechAnalysisProgressEvent) => void): () => void

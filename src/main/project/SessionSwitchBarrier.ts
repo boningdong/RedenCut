@@ -9,8 +9,11 @@ export interface ProjectSwitchSender {
   id: number
   send(channel: string, value: ProjectSwitchAcknowledgement): void
   isDestroyed(): boolean
-  once(event: 'destroyed', listener: () => void): void
-  removeListener(event: 'destroyed', listener: () => void): void
+  once(event: 'destroyed' | 'did-start-loading' | 'render-process-gone', listener: () => void): void
+  removeListener(
+    event: 'destroyed' | 'did-start-loading' | 'render-process-gone',
+    listener: () => void,
+  ): void
 }
 
 interface PendingBarrier extends ProjectSwitchAcknowledgement {
