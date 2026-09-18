@@ -232,6 +232,11 @@ it('a second ordinary click deselects a clip but retains its range for redaction
     fireEvent.click(clip)
   }
   expect(useTimelineStore.getState().selectedClipId).toBeNull()
-  expect(useEditorStore.getState().selection).toEqual({ start: 0, end: 5 })
+  expect(useEditorStore.getState().selection).toEqual({
+    origin: 'clip',
+    trackId: 'one',
+    start: 0,
+    end: 5,
+  })
   expect(useTimelineStore.getState().undoStack).toHaveLength(0)
 })

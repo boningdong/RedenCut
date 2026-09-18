@@ -1,3 +1,4 @@
+import { WaveformView } from '../Waveform/WaveformView'
 // @vitest-environment jsdom
 
 import React from 'react'
@@ -729,6 +730,34 @@ describe('canonical transcript editability', () => {
     expect(useTimelineStore.getState().tracks[0].clips.every((c) => !c.muted)).toBe(true)
     expect(screen.getByRole('status').textContent).toContain('changed')
   })
+  it('keeps native text selection while publishing a highlight to its waveform track', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    render(
+      <>
+        <TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />
+        <WaveformView duration={2} providersBySource={new Map()} onAddTrack={vi.fn()} />
+      </>,
+    )
+    const range = document.createRange()
+    range.selectNodeContents(document.querySelector('[data-unit-id="speech"]')!)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    fireEvent(document, new Event('selectionchange'))
+    expect(window.getSelection()?.isCollapsed).toBe(false)
+    expect(
+      document.querySelector('[data-lane="track"] [data-range-selection="transcript"]'),
+    ).not.toBeNull()
+    act(() => window.getSelection()?.removeAllRanges())
+    fireEvent(document, new Event('selectionchange'))
+    expect(document.querySelector('[data-range-selection]')).toBeNull()
+    vi.unstubAllGlobals()
+  })
   it('refreshes the waveform selection when selected text moves with its clip', () => {
     render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
     const range = document.createRange()
@@ -736,9 +765,19 @@ describe('canonical transcript editability', () => {
     window.getSelection()?.removeAllRanges()
     window.getSelection()?.addRange(range)
     fireEvent(document, new Event('selectionchange'))
-    expect(useEditorStore.getState().selection).toEqual({ start: 0.5, end: 1 })
+    expect(useEditorStore.getState().selection).toEqual({
+      origin: 'transcript',
+      trackId: 'track',
+      start: 0.5,
+      end: 1,
+    })
     act(() => useTimelineStore.getState().moveClip('clip', 8))
-    expect(useEditorStore.getState().selection).toEqual({ start: 8.5, end: 9 })
+    expect(useEditorStore.getState().selection).toEqual({
+      origin: 'transcript',
+      trackId: 'track',
+      start: 8.5,
+      end: 9,
+    })
   })
   it('confirms exact grouped text and limits a partial acoustic edit to its selected occurrence', () => {
     const track = useTimelineStore.getState().tracks[0]
@@ -862,9 +901,16 @@ describe('canonical transcript editability', () => {
     act(() => {
       window.getSelection()?.removeAllRanges()
       useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set())
-      useEditorStore.getState().setSelection({ start: 0.2, end: 0.4 })
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'timeline', trackId: 'track', start: 0.2, end: 0.4 })
     })
     fireEvent(document, new Event('selectionchange'))
-    expect(useEditorStore.getState().selection).toEqual({ start: 0.2, end: 0.4 })
+    expect(useEditorStore.getState().selection).toEqual({
+      origin: 'timeline',
+      trackId: 'track',
+      start: 0.2,
+      end: 0.4,
+    })
   })
 })

@@ -254,13 +254,16 @@ export function useClipInteraction({
         : [clip.id]
     timeline.setSelectedClipIds(next, clip.id)
     timeline.setSelectedTrackId(clip.trackId)
-    useEditorStore
-      .getState()
-      .setSelection(
-        next.length === 1
-          ? { start: clip.outputStart, end: clip.outputStart + clip.sourceEnd - clip.sourceStart }
-          : null,
-      )
+    useEditorStore.getState().setSelection(
+      next.length === 1
+        ? {
+            origin: 'clip',
+            trackId: clip.trackId,
+            start: clip.outputStart,
+            end: clip.outputStart + clip.sourceEnd - clip.sourceStart,
+          }
+        : null,
+    )
     return next
   }
   const begin = (event: ReactPointerEvent, clip?: Clip, edge?: 'start' | 'end') => {

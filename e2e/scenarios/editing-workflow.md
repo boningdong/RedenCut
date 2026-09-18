@@ -21,6 +21,20 @@ Choose useful split/seek positions and input methods based on the current UI; re
 Observe selection clarity, button feedback and usability throughout.
 Do not replace restart with reload, compare two screenshots of the same state, or infer pause stability from a single snapshot.
 
+## Ruler Range and Transcript Highlight Checks
+
+For range-selection changes, exercise these additional checkpoints with the imported audio and a disposable saved transcript fixture from [saved project setup](../fixtures/projects/README.md).
+
+| ID | Expected observable outcome |
+| --- | --- |
+| `ruler-select` | Select a track, then drag directly on the ruler in both directions; release retains a full-height time reference across the ruler and all tracks, with the owning track emphasized in its own color. A simple ruler click still seeks and preserves the clip selection needed for Split. |
+| `ruler-cross-clip` | Split and move a clip to create a gap, select a range spanning both pieces, then Delete or Redact. Only intersecting audio gains overlays; clip positions and the gap remain. One Undo restores both pieces. |
+| `ruler-scope` | With two tracks, the range highlights all tracks as a time reference, while editing affects only the current track; switching tracks clears the old range. |
+| `ruler-cancel` | Escape clears the range without an edit; zoomed/scrolled selections remain aligned with the ruler. |
+| `text-highlight` | Selecting multiple timed transcript characters shows the matching waveform range, and clearing text selection removes it. Existing transcript Delete and Undo still work. |
+
+Capture before/after screenshots and actual actions; use the same restart/save evidence as the baseline when applicable.
+
 ## Change-Focused Exploration
 
 After mandatory coverage, try one or two relevant variations, chosen before execution.

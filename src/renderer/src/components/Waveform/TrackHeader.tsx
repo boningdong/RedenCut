@@ -25,6 +25,8 @@ interface TrackHeaderProps {
 
 export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
   const { t } = useTranslation()
+  const active = useTimelineStore((s) => s.selectedTrackId === track.id)
+  const color = trackPresentationColor(track.color)
   const updateTrack = useTimelineStore((s) => s.updateTrack)
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState(track.name)
@@ -40,7 +42,17 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
   }, [nameInput, track.id, track.name, updateTrack])
 
   return (
-    <div className="track-header" style={{ borderLeftColor: trackPresentationColor(track.color) }}>
+    <div
+      className="track-header"
+      data-active-track={active}
+      style={{
+        borderLeftColor: color,
+        ...(active && {
+          background: `color-mix(in srgb, ${color} 12%, var(--color-bg-secondary))`,
+          boxShadow: `inset 2px 0 ${color}`,
+        }),
+      }}
+    >
       <div className="track-heading">
         <span className="track-color" style={{ background: trackPresentationColor(track.color) }} />
         {editing ? (

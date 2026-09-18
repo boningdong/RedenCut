@@ -124,7 +124,7 @@ describe('clip clipboard actions', () => {
   })
 
   it('cuts a batch in one undo step and leaves its clipboard available', () => {
-    useEditorStore.getState().setSelection({ start: 0, end: 5 })
+    useEditorStore.getState().setSelection({ origin: 'clip', trackId: 'one', start: 0, end: 5 })
 
     expect(cutClips()).toBe(true)
 

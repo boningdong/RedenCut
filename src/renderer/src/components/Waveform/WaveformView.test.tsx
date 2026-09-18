@@ -39,8 +39,12 @@ const source: RendererAudioSource = {
 }
 
 describe('WaveformView managed providers', () => {
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
   beforeEach(() => {
+    vi.stubGlobal('PointerEvent', MouseEvent)
     useEditorStore.getState().reset()
     useTranscriptStore.getState().reset()
     canvasSpy.mockClear()
@@ -52,6 +56,60 @@ describe('WaveformView managed providers', () => {
         disconnect() {}
       },
     })
+  })
+
+  it('shows a ruler hover guide across lanes and clears it on leave and blur', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const { container } = render(
+      <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    const ruler = container.querySelector('#waveform-timeline')!
+    vi.spyOn(ruler, 'getBoundingClientRect').mockReturnValue({
+      left: 190,
+      top: 20,
+      bottom: 48,
+      right: 1790,
+    } as DOMRect)
+    fireEvent.pointerMove(ruler, { clientX: 430, clientY: 30 })
+    const guide = container.querySelector('[data-ruler-hover]') as HTMLElement
+    expect(guide).not.toBeNull()
+    expect(guide.style.left).toBe('240px')
+    expect(guide.parentElement).toBe(ruler.parentElement)
+    expect(useEditorStore.getState().selection).toBeNull()
+    fireEvent.pointerLeave(ruler)
+    expect(container.querySelector('[data-ruler-hover]')).toBeNull()
+    fireEvent.pointerMove(ruler, { clientX: 450, clientY: 30 })
+    fireEvent(window, new Event('blur'))
+    expect(container.querySelector('[data-ruler-hover]')).toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('shows a shared time reference with emphasis only on the owning track', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({ tracks: [track, { ...track, id: 'other', clips: [] }] })
+    const { container } = render(
+      <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    act(() =>
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'timeline', trackId: track.id, start: 2, end: 4 }),
+    )
+    const ruler = container.querySelector('#waveform-timeline')!
+    const shared = container.querySelector('[data-range-scope="timeline"]') as HTMLElement
+    expect(shared).not.toBeNull()
+    expect(shared.parentElement).toBe(ruler.parentElement)
+    const active = container.querySelector('[data-range-scope="track"]') as HTMLElement
+    expect(active.closest('[data-lane]')?.getAttribute('data-lane')).toBe(track.id)
+    expect(active.style.width).toBe(shared.style.width)
+    expect(container.querySelectorAll('[data-range-scope="track"]')).toHaveLength(1)
+    act(() =>
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'clip', trackId: track.id, start: 2, end: 4 }),
+    )
+    expect(container.querySelector('[data-range-selection]')).toBeNull()
   })
 
   it('keeps the time under the mouse fixed while zooming a scrolled timeline', () => {
@@ -183,7 +241,9 @@ describe('WaveformView managed providers', () => {
       ],
     )
     useTimelineStore.getState().setSelectedClipId('clip')
-    useEditorStore.getState().setSelection({ start: 1, end: 2 })
+    useEditorStore
+      .getState()
+      .setSelection({ origin: 'timeline', trackId: 'track', start: 1, end: 2 })
     useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['canonical-unit']))
     render(<WaveformView duration={5} providersBySource={new Map()} onAddTrack={vi.fn()} />)
     const before = useTimelineStore.getState().tracks
@@ -203,7 +263,11 @@ describe('WaveformView managed providers', () => {
     expect(
       (screen.getByRole('button', { name: 'Redact selection' }) as HTMLButtonElement).disabled,
     ).toBe(true)
-    act(() => useEditorStore.getState().setSelection({ start: 1, end: 2 }))
+    act(() =>
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'timeline', trackId: 'track', start: 1, end: 2 }),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Redact selection' }))
     expect(
       useTimelineStore
@@ -239,7 +303,12 @@ describe('WaveformView managed providers', () => {
     expect(useTranscriptStore.getState().selectedTranscriptUnitIds.size).toBe(0)
     fireEvent.click(clip)
     fireEvent(document, new Event('selectionchange'))
-    expect(useEditorStore.getState().selection).toEqual({ start: 0, end: 10 })
+    expect(useEditorStore.getState().selection).toEqual({
+      origin: 'clip',
+      trackId: useTimelineStore.getState().tracks[0].id,
+      start: 0,
+      end: 10,
+    })
     transcript.remove()
   })
 })

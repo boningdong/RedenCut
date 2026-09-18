@@ -32,7 +32,7 @@ import { togglePlayback } from '../../actions/playbackActions'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
-import { useEditorStore } from '../../stores/editor.store'
+import { useEditorStore, type EditorSelection } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/timeline.store'
 import { getAudioPlayerInstance } from '@shared/player.types'
 import type { Word } from '@shared/project.types'
@@ -96,7 +96,7 @@ function LegacyTranscriptPanel({
   const currentWordRef = useRef<HTMLSpanElement | null>(null)
   /** Map from word.id → the rendered <span> element, for selection intersection. */
   const wordEls = useRef<Map<string, HTMLSpanElement>>(new Map())
-  const ownedSelection = useRef<{ start: number; end: number } | null>(null)
+  const ownedSelection = useRef<EditorSelection | null>(null)
 
   // ── Track color map — used for per-track underlines in "All" view ────────
   const trackColorMap = useMemo(() => {
@@ -163,7 +163,14 @@ function LegacyTranscriptPanel({
         setSelection(null)
         return
       }
-      const next = {
+      const trackId = selected[0].trackId ?? useTimelineStore.getState().selectedTrackId
+      if (!trackId || selected.some((word) => word.trackId && word.trackId !== trackId)) {
+        setSelection(null)
+        return
+      }
+      const next: EditorSelection = {
+        origin: 'transcript',
+        trackId,
         start: Math.min(...selected.map((w) => w.start)),
         end: Math.max(...selected.map((w) => w.end)),
       }

@@ -1,3 +1,6 @@
+import { trackPresentationColor } from '../../themes/trackColors'
+import { useRangeSelection } from './UseRangeSelection'
+import { TimelineSelectionOverlay } from './TimelineSelectionOverlay'
 import { useTranslation } from '../../i18n/useTranslation'
 // ─────────────────────────────────────────────────────────────────────────────
 // WaveformView — multi-track
@@ -121,11 +124,13 @@ export function WaveformView({
     currentTime < selectedClip.outputStart + selectedClip.sourceEnd - selectedClip.sourceStart,
   )
 
+  const [rulerHoverX, setRulerHoverX] = useState<number | null>(null)
   const [altPressed, setAltPressed] = useState(false)
   const [pointerOwner, setPointerOwner] = useState<'clip' | 'redaction' | null>(null)
   useEffect(() => {
     const key = (event: KeyboardEvent) => setAltPressed(event.altKey)
     const blur = () => {
+      setRulerHoverX(null)
       setAltPressed(false)
       setPointerOwner(null)
     }
@@ -199,7 +204,13 @@ export function WaveformView({
     pxPerSec,
     focusTimeline,
   })
-  const isInteracting = interaction.isActive
+  const rangeInteraction = useRangeSelection({ pxPerSec, duration, focusTimeline })
+  const isClipActive = interaction.isActive
+  const isRangeActive = rangeInteraction.isActive
+  const isInteracting = useCallback(
+    () => isClipActive() || isRangeActive(),
+    [isClipActive, isRangeActive],
+  )
 
   const handleZoomIn = useCallback(() => {
     if (!isInteracting()) zoomBy(2)
@@ -425,7 +436,11 @@ export function WaveformView({
           </div>
 
           {/* ── Scrollable timeline viewport ──────────────────────────────── */}
-          <div ref={scrollViewportRef} style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+          <div
+            ref={scrollViewportRef}
+            onScroll={() => setRulerHoverX(null)}
+            style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}
+          >
             {/* Audio extent plus one viewport of scrollable trailing time. */}
             <div
               style={{
@@ -437,7 +452,23 @@ export function WaveformView({
               {/* Ruler row */}
               <div
                 id="waveform-timeline"
-                onClick={handleLaneClick}
+                onPointerMove={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect()
+                  setRulerHoverX(
+                    event.clientY >= rect.top &&
+                      event.clientY < rect.bottom &&
+                      event.clientX >= rect.left &&
+                      event.clientX < rect.right
+                      ? event.clientX - rect.left
+                      : null,
+                  )
+                }}
+                onPointerLeave={() => setRulerHoverX(null)}
+                onPointerCancel={() => setRulerHoverX(null)}
+                onPointerDown={rangeInteraction.begin}
+                onClick={(event) => {
+                  if (!rangeInteraction.consumeClick()) handleLaneClick(event)
+                }}
                 style={{
                   height: RULER_HEIGHT,
                   width: '100%',
@@ -469,7 +500,6 @@ export function WaveformView({
                       cursor: 'crosshair',
                       overflow: 'hidden',
                       borderBottom: '1px solid var(--color-border)',
-                      borderLeft: '2px solid transparent',
                     }}
                     data-drop-target={interaction.preview?.targetTrackId === track.id}
                     data-drop-invalid={
@@ -514,6 +544,13 @@ export function WaveformView({
                       />
                     )}
 
+                    {selection && selection.trackId === track.id && (
+                      <TimelineSelectionOverlay
+                        selection={selection}
+                        pxPerSec={pxPerSec}
+                        trackColor={trackPresentationColor(track.color)}
+                      />
+                    )}
                     {/* Gap overlays — cover waveform between clips */}
                     {(() => {
                       const sorted = [...track.clips].sort((a, b) => a.outputStart - b.outputStart)
@@ -543,6 +580,24 @@ export function WaveformView({
                   </div>
                 )
               })}
+
+              {selection && <TimelineSelectionOverlay selection={selection} pxPerSec={pxPerSec} />}
+              {rulerHoverX !== null && (
+                <div
+                  aria-hidden="true"
+                  data-ruler-hover
+                  style={{
+                    position: 'absolute',
+                    left: rulerHoverX,
+                    top: 0,
+                    bottom: 0,
+                    borderLeft:
+                      '1px dashed color-mix(in srgb, var(--color-accent) 70%, transparent)',
+                    pointerEvents: 'none',
+                    zIndex: 28,
+                  }}
+                />
+              )}
 
               {/* Global playhead — inside scrollable content so it scrolls with clips */}
               <div

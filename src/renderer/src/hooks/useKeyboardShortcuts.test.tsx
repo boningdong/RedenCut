@@ -158,7 +158,9 @@ it.each(['KeyM', 'KeyS', 'KeyU', 'Delete'])(
     render(<Controls />)
     act(() => {
       useTranscriptStore.getState().setSelectedTranscriptUnitIds(new Set(['word']))
-      useEditorStore.getState().setSelection({ start: 1, end: 2 })
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'transcript', trackId: 'track', start: 1, end: 2 })
     })
     const before = useTimelineStore.getState().tracks
     fireEvent.keyDown(screen.getByText('Editor'), {

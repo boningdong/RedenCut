@@ -10,7 +10,7 @@ Update the implementation and this document together whenever a mapping or its c
 | Space | Play or pause | Requires an active player. In preview mode, playback skips redacted sections. |
 | S | Split at playhead | Requires an active player and exactly one selected clip; the playhead must be strictly inside that clip's output range. |
 | M | Mute clips or redact selection | Applies the inverse of the primary clip’s mute state to all selected clips in one edit. Otherwise redacts a waveform range on the selected track. In canonical transcript text, creates overlays in the exact occurrence, asking for confirmation when acoustic boundaries expand the selection. |
-| U | Unmute clips | Unmutes all selected clips in one edit, or muted clips overlapping the waveform selection; overlays are unchanged. |
+| U | Unmute clips | Unmutes all selected clips in one edit, or muted clips overlapping the waveform selection on its owning track; overlays are unchanged. |
 | Delete or Backspace | Remove selected object or redact selection | Removes a selected overlay to restore its audio; a selected clip is removed instead. With a range or transcript selection, creates clip-owned overlays. |
 | Escape | Cancel drag or clear selection | Cancels an active overlay move or resize without an edit; otherwise clears waveform and timeline selection. |
 | Left Arrow | Nudge backward | Seeks one second backward, clamped to zero. |
@@ -38,6 +38,12 @@ Focused trim handles use Left/Right for 10 ms adjustments and Shift+Left/Right f
 
 ## Audio Toolbar
 
+Drag directly on the time ruler to select an output-time range on the current track; a click without dragging still seeks.
+Hovering the ruler shows a subdued purple dashed guide through every track.
+The selected time range remains highlighted across the ruler and all tracks after release, with its owning track emphasized in its track color; Delete/Backspace or Redact applies clip-owned overlays to every intersecting clip on that track in one undoable edit, ignoring gaps and preserving clip positions.
+Starting a ruler selection clears clip, overlay and transcript selection; Escape cancels an active drag or clears the selection.
+Switching tracks, replacing the project or removing the target track clears the range.
+Transcript selections show the same full-height time reference and emphasize their resolved acoustic range on the matching track; their occurrence-aware edit and boundary-confirmation rules remain unchanged.
 Clicking a waveform clip selects its whole output-time range.
 The audio toolbar exposes the same context-dependent split, mute/redact and delete actions as the corresponding keyboard shortcuts.
 Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.

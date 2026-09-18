@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import type { RendererSession } from '@shared/session.types'
 
-interface TimeRange {
+export interface EditorSelection {
+  origin: 'timeline' | 'transcript' | 'clip'
+  trackId: string
   start: number
   end: number
 }
@@ -10,12 +12,12 @@ interface EditorState {
   session: RendererSession | null
   isDirty: boolean
   localEditRevision: number
-  selection: TimeRange | null
+  selection: EditorSelection | null
   previewMode: boolean
   loadSession: (session: RendererSession, preserveDirty?: boolean) => void
   markEdited: () => void
   acknowledgeSave: (session: RendererSession, capturedLocalEditRevision: number) => boolean
-  setSelection: (selection: TimeRange | null) => void
+  setSelection: (selection: EditorSelection | null) => void
   togglePreviewMode: () => void
   reset: () => void
 }
@@ -24,7 +26,7 @@ const initialState = {
   session: null as RendererSession | null,
   isDirty: false,
   localEditRevision: 0,
-  selection: null as TimeRange | null,
+  selection: null as EditorSelection | null,
   previewMode: false,
 }
 

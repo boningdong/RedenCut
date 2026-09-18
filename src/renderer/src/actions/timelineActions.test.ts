@@ -71,7 +71,9 @@ describe('batch timeline actions', () => {
   })
 
   it('deletes the complete clip selection in one undo step', () => {
-    useEditorStore.getState().setSelection({ start: 0, end: 4 })
+    useEditorStore
+      .getState()
+      .setSelection({ origin: 'timeline', trackId: 'track', start: 0, end: 4 })
 
     deleteSelection()
 
@@ -83,6 +85,32 @@ describe('batch timeline actions', () => {
     expect(useTimelineStore.getState().undoStack).toHaveLength(1)
   })
 
+  it('unmutes a time range only on its owning track', () => {
+    const timeline = useTimelineStore.getState()
+    const first = timeline.tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        { ...first, clips: first.clips.map((item) => ({ ...item, muted: true })) },
+        {
+          ...first,
+          id: 'other',
+          clips: first.clips.map((item) => ({
+            ...item,
+            id: `other-${item.id}`,
+            trackId: 'other',
+            muted: true,
+          })),
+        },
+      ],
+    })
+    timeline.setSelectedClipIds([])
+    useEditorStore
+      .getState()
+      .setSelection({ origin: 'timeline', trackId: 'track', start: 0, end: 5 })
+    unmuteSelection()
+    expect(clips().every((item) => !item.muted)).toBe(true)
+    expect(useTimelineStore.getState().tracks[1].clips.every((item) => item.muted)).toBe(true)
+  })
   it('does not split the primary clip while multiple clips are selected', () => {
     splitAtPlayhead()
 

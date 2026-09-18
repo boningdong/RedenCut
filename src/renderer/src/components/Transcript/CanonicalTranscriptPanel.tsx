@@ -97,12 +97,17 @@ export function CanonicalTranscriptPanel({
         .getState()
         .setSelectedTranscriptUnitIds(new Set(selected?.requestedUnitIds ?? []))
       if (!selected?.editable || !selected.sourceRanges.length) {
-        if (selected || ownedSelection) setSelection(null)
+        if (
+          (selected || ownedSelection) &&
+          useEditorStore.getState().selection?.origin === 'transcript'
+        )
+          setSelection(null)
         return
       }
       const { clip, track } = selected.occurrence
-      useTimelineStore.getState().setSelectedTrackId(track.id)
       setSelection({
+        origin: 'transcript',
+        trackId: track.id,
         start:
           clip.outputStart +
           Math.min(...selected.sourceRanges.map((r) => r.start)) -
@@ -112,6 +117,7 @@ export function CanonicalTranscriptPanel({
           Math.max(...selected.sourceRanges.map((r) => r.end)) -
           clip.sourceStart,
       })
+      useTimelineStore.getState().setSelectedTrackId(track.id)
     }
     change()
     document.addEventListener('selectionchange', change)
