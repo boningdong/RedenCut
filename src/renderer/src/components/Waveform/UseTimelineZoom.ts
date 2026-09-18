@@ -17,6 +17,7 @@ interface TimelineZoomOptions {
   viewportRef: RefObject<HTMLDivElement | null>
   basePxPerSec: number
   duration: number
+  audioDuration: number
   viewportWidth: number
   onScrollChange(scrollLeft: number): void
 }
@@ -25,15 +26,18 @@ export function useTimelineZoom({
   viewportRef,
   basePxPerSec,
   duration,
+  audioDuration,
   viewportWidth,
   onScrollChange,
 }: TimelineZoomOptions) {
   const [zoom, setZoom] = useState({ level: 1 })
   const maxScale = Math.min(MAX_PIXELS_PER_SECOND, MAX_AUDIO_WIDTH / Math.max(1, duration))
   const maxZoom = maxScale / basePxPerSec
+  // Derive blank time from source audio, so moving clips cannot grow the margin.
+  const overviewTail = audioDuration * (1 / OVERVIEW_CONTENT_FRACTION - 1)
   const overviewZoom =
     duration > 0 && viewportWidth > 0
-      ? (viewportWidth * OVERVIEW_CONTENT_FRACTION) / (duration * basePxPerSec)
+      ? viewportWidth / ((duration + overviewTail) * basePxPerSec)
       : 1
   const minZoom = Math.min(overviewZoom, maxZoom)
   const zoomLevel = Math.min(Math.max(zoom.level, minZoom), maxZoom)
@@ -64,7 +68,7 @@ export function useTimelineZoom({
         timeSeconds: (scrollLeft + viewportX) / (basePxPerSec * previousLevel),
         viewportX,
       }
-      // At the overview limit, show the whole extent from zero with 25% blank space.
+      // At the overview limit, show the whole extent from zero with the fixed overview tail.
       // Above the limit, preserve the pointer/center anchor and trailing scroll room.
       if (level === minZoom && factor < 1) {
         anchor.timeSeconds = 0

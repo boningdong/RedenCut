@@ -38,7 +38,9 @@ Focused trim handles use Left/Right for 10 ms adjustments and Shift+Left/Right f
 
 ## Audio Toolbar
 
-Zooming out stops when the full current timeline occupies 75% of the viewport, with 25% visible blank space on the right.
+Zooming out stops when the full current timeline plus a fixed trailing margin fits in the viewport.
+The margin is one third of the longest imported source duration: one hour of audio gets 20 minutes of blank time, initially 25% of the viewport.
+Moving clips changes the timeline extent but does not enlarge this margin; reopening a project derives the same margin from its source metadata.
 Reaching this overview returns the visible start to zero; additional trailing scroll space remains available for pointer-anchored zoom and dragging clips beyond the visible blank area.
 Timeline zoom reaches up to 1,000 pixels per second independently of recording duration; exceptionally long timelines lower this ceiling to keep their full extent within browser layout limits.
 Zoom keeps the pointer time anchored for wheel gestures and the viewport center anchored for toolbar buttons.

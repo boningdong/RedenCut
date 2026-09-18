@@ -166,6 +166,28 @@ describe('WaveformView managed providers', () => {
     vi.restoreAllMocks()
   })
 
+  it('derives overview blank time from source metadata when opening moved clips', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const tracks = useTimelineStore.getState().tracks.map((track) => ({
+      ...track,
+      clips: track.clips.map((clip) => ({ ...clip, outputStart: 10 })),
+    }))
+    useTimelineStore.setState({ tracks })
+    const { container } = render(
+      <WaveformView duration={20} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    const content = container.querySelector('#waveform-timeline')!.parentElement!
+    const viewport = content.parentElement!
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 800 },
+      scrollWidth: { get: () => Math.max(800, Number.parseFloat(content.style.width)) },
+    })
+    fireEvent.click(screen.getByTitle('Zoom out'))
+    // 20s timeline + 10/3s blank, while retaining a full viewport of scroll room.
+    expect(Number.parseFloat(content.style.width)).toBeCloseTo(800 + (800 * 20) / (20 + 10 / 3))
+    expect((screen.getByTitle('Zoom out') as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('reuses the provider selected by each clip audioSourceId', () => {
     const clip = {
       id: 'clip-1',

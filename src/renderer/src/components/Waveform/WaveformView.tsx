@@ -17,7 +17,7 @@ import { useTranslation } from '../../i18n/useTranslation'
 //
 // Zoom:
 //   At zoomLevel=1 the audio extent fills the viewport.
-//   Overview fits the current timeline into 75% of the viewport; trailing scroll space remains.
+//   Overview fits the current timeline plus a fixed source-based margin; trailing scroll space remains.
 //
 // Architecture:
 //   • One shared binary waveform provider for each AudioSourceId.
@@ -198,6 +198,10 @@ export function WaveformView({
     viewportRef: scrollViewportRef,
     basePxPerSec,
     duration,
+    audioDuration: audioSources.reduce(
+      (longest, source) => Math.max(longest, source.metadata.durationSeconds),
+      0,
+    ),
     viewportWidth: viewport.width,
     onScrollChange: handleZoomScroll,
   })

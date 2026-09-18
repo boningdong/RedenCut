@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { getTimelineContentWidth } from './TimelineViewportGeometry'
 import { useTimelineZoom } from './UseTimelineZoom'
 
-function setup(basePxPerSec = 80, duration = 10) {
+function setup(basePxPerSec = 80, duration = 10, audioDuration = duration) {
   let controls: ReturnType<typeof useTimelineZoom>
   function Timeline() {
     const viewportRef = useRef<HTMLDivElement>(null)
@@ -14,6 +14,7 @@ function setup(basePxPerSec = 80, duration = 10) {
       viewportRef,
       basePxPerSec,
       duration,
+      audioDuration,
       viewportWidth: 800,
       onScrollChange: setVisibleStart,
     })
@@ -195,17 +196,39 @@ it.each([3600, 5400])(
 it('recalculates overview after edits without changing scale during an extension', () => {
   const { controls, zoom, viewport, updateExtent } = setup()
   act(() => zoom(0.001))
-  expect(controls().zoomLevel).toBe(0.75)
+  expect(controls().zoomLevel).toBeCloseTo(0.75)
   updateExtent(20)
-  expect(controls().zoomLevel).toBe(0.75)
+  expect(controls().zoomLevel).toBeCloseTo(0.75)
   expect(controls().canZoomOut).toBe(true)
   act(() => zoom(0.001))
-  expect(controls().zoomLevel).toBe(0.375)
+  expect(controls().zoomLevel).toBeCloseTo(3 / 7)
   viewport.scrollLeft = 300
   updateExtent(5)
-  expect(controls().zoomLevel).toBe(1.5)
+  expect(controls().zoomLevel).toBeCloseTo(1.2)
   expect(viewport.scrollLeft).toBe(0)
   updateExtent(10)
-  expect(controls().zoomLevel).toBe(1.5)
+  expect(controls().zoomLevel).toBeCloseTo(1.2)
   expect(controls().canZoomOut).toBe(true)
+})
+
+it('keeps a twenty-minute overview tail after repeatedly moving one-hour audio right', () => {
+  const base = 800 / 3600
+  const { controls, zoom, updateExtent, viewport } = setup(base, 3600)
+  for (const end of [3600, 5400, 7200, 10800, 3600]) {
+    updateExtent(end)
+    act(() => zoom(0.00001))
+    const scale = base * controls().zoomLevel
+    expect(800 / scale - end).toBeCloseTo(1200)
+    expect(controls().canZoomOut).toBe(false)
+    const tailX = end * scale
+    act(() => zoom(2, 190 + tailX))
+    expect(end * base * controls().zoomLevel - viewport.scrollLeft).toBeCloseTo(tailX)
+  }
+})
+
+it('uses the same fixed tail when reopening audio that has already been moved', () => {
+  const base = 800 / 7200
+  const { controls, zoom } = setup(base, 7200, 3600)
+  act(() => zoom(0.00001))
+  expect(800 / (base * controls().zoomLevel)).toBeCloseTo(8400)
 })
