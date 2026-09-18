@@ -276,15 +276,10 @@ export function CanonicalTranscriptPanel({
         status={generatingStatus}
         textReady={allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart !== null)}
         onCancel={onCancel}
+        needsTimingReview={allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart === null)}
       >
         {!isGenerating && analyses.some((analysis) => analysis.diarizationStatus === 'pending') && (
           <div role="status">{t('transcript.pendingSpeakers')}</div>
-        )}
-
-        {allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart === null) && (
-          <div className="transcript-review-notice" role="note">
-            {t('transcript.needsReview')} · {t('transcript.reviewHint')}
-          </div>
         )}
       </TranscriptStatusFooter>
       {scopeMessage && (

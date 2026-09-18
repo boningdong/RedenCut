@@ -9,11 +9,13 @@ export function SpeechBatchProgress({
   isGenerating,
   status,
   textReady,
+  needsTimingReview = false,
   onCancel,
 }: {
   isGenerating: boolean
   status: SpeechProgress | TranscriptionProgress | null
   textReady?: boolean
+  needsTimingReview?: boolean
   onCancel?: () => void
 }) {
   const { t } = useTranslation()
@@ -62,6 +64,11 @@ export function SpeechBatchProgress({
               failed: summary.failures.length,
             })}
           </p>
+          {needsTimingReview && !summary.cancelled && !cancelled && !summary.failures.length && (
+            <div className="transcript-review-notice" role="note">
+              {t('transcript.needsReview')} · {t('transcript.reviewHint')}
+            </div>
+          )}
           {summary.failures.map((failure) => (
             <div key={`${failure.audioSourceId}:${failure.phase}`}>
               {failure.displayName}: {publicMessage(t, failure.error)}

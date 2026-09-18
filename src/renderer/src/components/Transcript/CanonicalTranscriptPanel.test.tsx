@@ -11,6 +11,7 @@ import { useTranscriptStore } from '../../stores/transcript.store'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { setAudioPlayerInstance } from '@shared/player.types'
 import { TranscriptPanel } from './TranscriptPanel'
+import { useSpeechBatchStore } from '../../stores/speechBatch.store'
 import { useLocaleStore } from '../../stores/locale.store'
 
 const sourceId = '550e8400-e29b-41d4-a716-446655440000'
@@ -18,6 +19,7 @@ const sourceId = '550e8400-e29b-41d4-a716-446655440000'
 describe('canonical transcript editability', () => {
   beforeEach(() => {
     useLocaleStore.setState({ resolvedLocale: 'en' })
+    useSpeechBatchStore.getState().reset()
     usePlaybackStore.getState().reset()
     useEditorStore.getState().reset()
     useTimelineStore.getState().reset()
@@ -93,6 +95,48 @@ describe('canonical transcript editability', () => {
       } as never,
     ])
   })
+
+  it.each(['idle', 'running', 'cancelled', 'failed', 'complete'] as const)(
+    'shows timing review only inside successful completion details: %s',
+    (state) => {
+      if (state !== 'idle' && state !== 'running') {
+        useSpeechBatchStore.getState().finish({
+          sourceCount: 1,
+          completedCount: state === 'complete' ? 1 : 0,
+          reusedCount: 0,
+          cancelled: state === 'cancelled',
+          failures:
+            state === 'failed'
+              ? [
+                  {
+                    audioSourceId: sourceId as never,
+                    displayName: 'Voice.wav',
+                    phase: 'text',
+                    error: { reason: 'operation-failed' },
+                  },
+                ]
+              : [],
+        })
+      }
+      render(
+        <TranscriptPanel
+          onGenerate={vi.fn()}
+          isGenerating={state === 'running'}
+          generatingStatus={null}
+        />,
+      )
+      if (state !== 'complete') {
+        expect(screen.queryByText(/Needs review/)).toBeNull()
+        return
+      }
+      expect(screen.getByText('Analysis complete')).toBeTruthy()
+      expect(screen.queryByRole('note')).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+      expect(screen.getByRole('note').textContent).toContain('Needs review')
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss analysis status' }))
+      expect(screen.queryByText(/Needs review/)).toBeNull()
+    },
+  )
 
   it('offers transient follow and jump feedback without seeking or changing modes', () => {
     vi.useFakeTimers()
