@@ -170,7 +170,7 @@ it('shows development instructions, blocks model downloads, and unlocks after va
 })
 it('omits the development card for snapshots from bundled builds', () => {
   render(<SpeechResourcesPanel />)
-  expect(screen.queryByText('Development environment')).toBeNull()
+  expect(screen.queryByText('Runtime')).toBeNull()
 })
 it('points runtime failures to development setup instead of app update advice', () => {
   const snapshot = useResourcesStore.getState().snapshot!
@@ -195,9 +195,7 @@ it('points runtime failures to development setup instead of app update advice', 
     },
   })
   render(<SpeechResourcesPanel />)
-  expect(
-    screen.getAllByText(/Complete the Development environment setup above/).length,
-  ).toBeGreaterThan(0)
+  expect(screen.getAllByText(/Complete the Runtime setup above/).length).toBeGreaterThan(0)
   expect(screen.queryByText(/Reopen the app and check for an app update/)).toBeNull()
 })
 

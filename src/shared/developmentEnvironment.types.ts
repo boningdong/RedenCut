@@ -2,6 +2,8 @@ export type DevelopmentCheck = 'ffmpeg' | 'ffprobe' | 'whisper' | 'uv' | 'python
 export interface DevelopmentEnvironment {
   checking?: DevelopmentCheck[]
   platform: string
+  runtimePath?: string
+  paths?: Partial<Record<DevelopmentCheck, string>>
   ffmpeg: boolean
   ffprobe: boolean
   whisper: boolean

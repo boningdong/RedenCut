@@ -14,7 +14,15 @@ export function DevelopmentEnvironmentPanel() {
   const open = expanded ?? !dev.ready
   const row = (label: string, ready: boolean, key: DevelopmentCheck) => (
     <div className="dev-item">
-      <span>{label}</span>
+      <span className="dev-item-label">
+        <span>{label}</span>
+        {key === 'libraries' && (
+          <span className="dev-library-names">
+            WhisperX · PyTorch · pyannote.audio · PyAV · TorchCodec
+          </span>
+        )}
+        {dev.paths?.[key] && <code className="dev-path">{dev.paths[key]}</code>}
+      </span>
       <span
         className={
           dev.checking?.includes(key) ? 'download-status' : `status ${ready ? 'ready' : 'pending'}`
@@ -84,9 +92,9 @@ export function DevelopmentEnvironmentPanel() {
           )}
         </span>
       </button>
+      {dev.runtimePath && <p className="dev-intro dev-path">{dev.runtimePath}</p>}
       {open && (
         <>
-          <p className="dev-intro">{t('settings.devIntro')}</p>
           <div className="dev-grid">
             <section className="dev-block">
               <h3>{t('settings.devTools')}</h3>
@@ -94,7 +102,6 @@ export function DevelopmentEnvironmentPanel() {
               {row('FFmpeg', dev.ffmpeg, 'ffmpeg')}
               {row('FFprobe', dev.ffprobe, 'ffprobe')}
               {row('whisper-cli', dev.whisper, 'whisper')}
-              <p className="dev-note">{t('settings.devToolLocations')}</p>
               {actions('tools')}
               {guide === 'tools' && (
                 <div className="dev-guide">
@@ -109,8 +116,6 @@ export function DevelopmentEnvironmentPanel() {
               <p>{t('settings.devPythonHelp')}</p>
               {row('Python 3.11', dev.python, 'python')}
               {row(t('settings.devLibraries'), dev.libraries, 'libraries')}
-              <p className="dev-note">WhisperX · PyTorch · pyannote.audio</p>
-              <p className="dev-note">.runtime</p>
               {actions('python')}
               {guide === 'python' && (
                 <div className="dev-guide">

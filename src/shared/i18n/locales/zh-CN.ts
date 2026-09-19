@@ -128,14 +128,12 @@ export const simplifiedChineseResources = {
     enterToken: '输入 Hugging Face Token',
     tokenSafety: '输入仅有模型读取权限的 token。提交后清空输入框；保存时加密，不写入项目或日志。',
 
-    devTitle: '开发环境',
+    devTitle: '运行环境',
     devOnly: '仅开发版',
     devRequired: '需要配置',
     devMissing: '待准备',
-    devIntro: '验证为当前项目准备的受管工具和 Python 运行环境。',
     devTools: '本地工具',
     devToolsHelp: '音频处理与文字识别所需的程序。',
-    devToolLocations: '仅使用指定的项目运行环境',
     devGuide: '安装指引',
     devValidate: '验证',
     devChecking: '验证中…',
@@ -149,7 +147,7 @@ export const simplifiedChineseResources = {
     devReturn: '完成后点击“验证”。模型在下方单独下载。',
     devModelsBlocked: '先配置各模型所需的工具，再点击上方“验证”。',
     devRuntimeError:
-      '语音运行环境不可用。请先完成上方“开发环境”中的配置并重新验证，再重试模型下载。',
+      '语音运行环境不可用。请先完成上方“运行环境”中的配置并重新验证，再重试模型下载。',
 
     runtimeUnavailable: '暂不可用',
     runtimeUnavailableHelp:

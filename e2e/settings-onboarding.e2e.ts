@@ -109,7 +109,7 @@ test('development setup explains missing runtime and validates without starting 
     await ui.start({ keepOnboarding: true, missingRuntime: true })
     await ui.call('browser_click', { target: 'button:text-is("Continue")' })
     await expect
-      .poll(() => ui.page.getByText('Development environment', { exact: true }).count(), {
+      .poll(() => ui.page.getByText('Runtime', { exact: true }).count(), {
         timeout: 70000,
       })
       .toBe(1)
@@ -175,7 +175,7 @@ test('development setup explains missing runtime and validates without starting 
     await ui.call('browser_click', { target: 'button:text-is("Skip for now")' })
     await ui.call('browser_click', { target: 'button[aria-label="Settings"]' })
     await ui.call('browser_click', { target: 'button[data-value="resources"]' })
-    expect(await ui.page.getByText('Development environment', { exact: true }).count()).toBe(1)
+    expect(await ui.page.getByText('Runtime', { exact: true }).count()).toBe(1)
   } finally {
     await ui.close()
   }

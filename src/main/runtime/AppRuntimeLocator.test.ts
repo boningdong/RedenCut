@@ -110,3 +110,19 @@ it('accepts a validated replacement manifest without restarting the application'
   f.save()
   expect(locator.getFfmpegPath()).toBe(join(f.root, 'bin/ffmpeg'))
 })
+
+it('describes the selected root without requiring an installed runtime', () => {
+  const appPath = join(tmpdir(), 'runtime-display-project')
+  const runtime = new AppRuntimeLocator({ packaged: false, resourcesPath: '', appPath, env: {} })
+  expect(runtime.getLocation()).toEqual({
+    root: join(appPath, '.runtime', `${process.platform}-${process.arch}`),
+    displayPath: `.runtime/${process.platform}-${process.arch}`,
+  })
+  const overridden = new AppRuntimeLocator({
+    packaged: false,
+    resourcesPath: '',
+    appPath,
+    env: { REDENCUT_RUNTIME_ROOT: '/opt/custom-runtime' },
+  })
+  expect(overridden.getLocation().displayPath).toBe('/opt/custom-runtime')
+})

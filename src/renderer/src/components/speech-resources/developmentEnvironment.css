@@ -219,3 +219,25 @@
 .dev-block-footer > .outline {
   margin-left: auto;
 }
+
+.dev-item-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px 0;
+}
+.dev-path {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.dev-library-names {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.7;
+}
+.dev-item > [role='status'] {
+  flex-shrink: 0;
+}

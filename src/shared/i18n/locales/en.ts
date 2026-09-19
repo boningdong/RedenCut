@@ -136,14 +136,12 @@ export const englishResources = {
     tokenSafety:
       'Enter a token limited to reading the model. The field clears on submission; saved tokens are encrypted and kept out of project files and logs.',
 
-    devTitle: 'Development environment',
+    devTitle: 'Runtime',
     devOnly: 'Development only',
     devRequired: 'Setup required',
     devMissing: 'Not ready',
-    devIntro: 'Validate the managed tools and Python environment prepared for this project.',
     devTools: 'Local tools',
     devToolsHelp: 'Programs for audio processing and transcription.',
-    devToolLocations: 'Uses only the selected project runtime',
     devGuide: 'Install guide',
     devValidate: 'Validate',
     devChecking: 'Validating…',
@@ -159,7 +157,7 @@ export const englishResources = {
     devReturn: 'Then click Validate. Models are downloaded separately below.',
     devModelsBlocked: 'Prepare the tools needed by each model above, then click Validate.',
     devRuntimeError:
-      'The speech runtime is unavailable. Complete the Development environment setup above and validate it before retrying the model download.',
+      'The speech runtime is unavailable. Complete the Runtime setup above and validate it before retrying the model download.',
 
     runtimeUnavailable: 'Unavailable',
     runtimeUnavailableHelp:

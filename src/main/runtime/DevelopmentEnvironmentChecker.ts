@@ -1,3 +1,4 @@
+import { dirname, join, relative } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type {
@@ -37,7 +38,11 @@ export class DevelopmentEnvironmentChecker {
   private async inspect(
     onProgress?: (state: DevelopmentEnvironment) => void,
   ): Promise<DevelopmentEnvironment> {
+    const location = this.runtime.getLocation()
+    const paths: Partial<Record<DevelopmentCheck, string>> = {}
     const state: DevelopmentEnvironment = {
+      runtimePath: location.displayPath,
+      paths,
       platform: process.platform,
       ffmpeg: false,
       ffprobe: false,
@@ -50,13 +55,24 @@ export class DevelopmentEnvironmentChecker {
     }
     const signal = this.lifetime.signal
     const emit = () => {
-      if (!signal.aborted) onProgress?.({ ...state, checking: [...state.checking!] })
+      if (!signal.aborted)
+        onProgress?.({ ...state, paths: { ...paths }, checking: [...state.checking!] })
     }
     emit()
     const check = async (key: DevelopmentCheck, resolve: () => string, args: string[]) => {
       try {
         signal.throwIfAborted()
-        await this.probe(resolve(), args, signal)
+        const executable = resolve()
+        paths[key] = relative(location.root, executable).split('\\').join('/')
+        if (key === 'libraries') {
+          paths[key] = relative(
+            location.root,
+            join(dirname(executable), '..', 'lib', 'python3.11', 'site-packages'),
+          )
+            .split('\\')
+            .join('/')
+        }
+        await this.probe(executable, args, signal)
         signal.throwIfAborted()
         state[key] = true
         return true
@@ -86,6 +102,8 @@ export class DevelopmentEnvironmentChecker {
       ]))
     // uv is a setup tool, not an inference dependency once Python is ready.
     return {
+      runtimePath: location.displayPath,
+      paths,
       checking: [],
       platform: process.platform,
       ffmpeg,

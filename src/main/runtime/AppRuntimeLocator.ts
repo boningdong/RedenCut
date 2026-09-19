@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path'
+import { join, resolve, relative, isAbsolute } from 'node:path'
 import { RuntimeValidator } from './RuntimeValidator'
 
 export interface RuntimeLocationOptions {
@@ -11,12 +11,28 @@ export interface RuntimeLocationOptions {
 /** All application consumers use one managed root; system discovery is intentionally absent. */
 export class AppRuntimeLocator {
   private readonly validator: RuntimeValidator
+  private readonly location: { root: string; displayPath: string }
   constructor(options: RuntimeLocationOptions) {
     const root = options.packaged
       ? join(options.resourcesPath, 'runtime')
       : (options.env ?? process.env).REDENCUT_RUNTIME_ROOT ||
         join(options.appPath, '.runtime', `${process.platform}-${process.arch}`)
-    this.validator = new RuntimeValidator(resolve(root))
+    const absoluteRoot = resolve(root)
+    const fromProject = relative(resolve(options.appPath), absoluteRoot)
+    this.location = {
+      root: absoluteRoot,
+      displayPath:
+        !options.packaged &&
+        fromProject &&
+        !fromProject.startsWith('..') &&
+        !isAbsolute(fromProject)
+          ? fromProject.split('\\').join('/')
+          : absoluteRoot,
+    }
+    this.validator = new RuntimeValidator(absoluteRoot)
+  }
+  getLocation(): { root: string; displayPath: string } {
+    return { ...this.location }
   }
   getFfmpegPath(): string {
     return this.validator.resolve('ffmpeg')
