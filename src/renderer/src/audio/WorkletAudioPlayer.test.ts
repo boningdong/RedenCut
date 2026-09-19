@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AudioSampleChunk, AudioSampleProvider } from '@shared/PlayerTypes'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import { WorkletAudioPlayer } from './WorkletAudioPlayer'
+import { PlaybackTimelineAdapter } from './PlaybackTimelineAdapter'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 
@@ -880,6 +881,107 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     expect(player.isPlaying()).toBe(true)
     expect(player.getCurrentTime()).toBe(2)
     await player.destroy()
+  })
+
+  it('preserves timeline position through adapter mode and crossfade changes during delayed prefill', async () => {
+    FakePort.autoAcknowledge = false
+    const raw = new WorkletAudioPlayer()
+    const player = new PlaybackTimelineAdapter(raw)
+    const samples = provider()
+    const pending: { signal: AbortSignal; release: () => void; startFrame: number }[] = []
+    let holdReads = true
+    samples.readFrames = vi.fn((startFrame, frameCount, signal) => {
+      const chunk = { startFrame, frameCount, channels: [new Float32Array(frameCount).fill(0.375)] }
+      if (!holdReads) return Promise.resolve(chunk)
+      return new Promise<AudioSampleChunk>((resolve, reject) => {
+        pending.push({ signal, startFrame, release: () => resolve(chunk) })
+        signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), {
+          once: true,
+        })
+      })
+    })
+    const withDuration = (durationMs: number): Track => {
+      const value = track('fade')
+      value.clips[0].redactions = [
+        {
+          id: 'r',
+          sourceStart: 0.8,
+          sourceEnd: 1.04,
+          crossfade: { enabled: true, durationMs, curve: 'linear' },
+        },
+      ]
+      return value
+    }
+    await player.registerAudioSource(SOURCE_ID, samples)
+    player.setTracks([withDuration(30)])
+    player.setPlaybackMode('edited')
+    player.seekTo(1.5)
+    const initialPlay = player.play()
+    try {
+      await vi.waitFor(() => expect(pending).toHaveLength(1))
+      expect(raw.getCurrentTime()).toBeCloseTo(1.23, 8)
+      player.setPlaybackMode('timeline')
+      await vi.waitFor(() => expect(pending).toHaveLength(2))
+      expect(pending[0].signal.aborted).toBe(true)
+      expect(player.getCurrentTime()).toBe(1.5)
+      player.setTracks([withDuration(80)])
+      player.setPlaybackMode('edited')
+      player.setPlaybackMode('timeline')
+      player.setTracks([withDuration(60)])
+      player.setPlaybackMode('edited')
+      await vi.waitFor(() => expect(pending).toHaveLength(3))
+      const newestRead = pending[pending.length - 1]
+      expect(pending.slice(0, -1).every(({ signal }) => signal.aborted)).toBe(true)
+      expect(newestRead.signal.aborted).toBe(false)
+      expect(newestRead.startFrame).toBe(72000)
+      expect(player.getCurrentTime()).toBe(1.5)
+      expect(raw.getCurrentTime()).toBeCloseTo(1.2, 8)
+      expect(player.getOutputDuration()).toBe(4.7)
+      expect(player.getDuration()).toBe(5)
+      const latest = FakeNode.instances[FakeNode.instances.length - 1]
+      const staleNodes = FakeNode.instances.slice(0, -1)
+      holdReads = false
+      for (const read of pending) read.release()
+      await expect(initialPlay).resolves.toBeUndefined()
+      await vi.waitFor(() => expect(sentPcmFrames(latest)).toBe(96000))
+      for (const stale of staleNodes) {
+        const generation = stale.port.messages.find(({ message }) => message.type === 'flush')!
+          .message.generation
+        stale.port.onmessage?.({
+          data: { type: 'depth', generation, queuedFrames: 96000, acceptedFrames: 96000 },
+        } as MessageEvent)
+        expect(sentPcmFrames(stale)).toBe(0)
+        expect(stale.disconnect).toHaveBeenCalledOnce()
+      }
+      expect(
+        FakeNode.instances.every(
+          (node) => !node.port.messages.some(({ message }) => message.type === 'play'),
+        ),
+      ).toBe(true)
+      acknowledgePrefill(latest)
+      await vi.waitFor(() =>
+        expect(latest.port.messages.filter(({ message }) => message.type === 'play')).toHaveLength(
+          1,
+        ),
+      )
+      expect(
+        staleNodes.every(
+          (node) => !node.port.messages.some(({ message }) => message.type === 'play'),
+        ),
+      ).toBe(true)
+      expect(player.isPlaying()).toBe(true)
+      expect(player.getCurrentTime()).toBe(1.5)
+      const generation = latest.port.messages.find(({ message }) => message.type === 'flush')!
+        .message.generation
+      expect(
+        latest.port.messages
+          .filter(({ message }) => message.type === 'pcm')
+          .every(({ message }) => message.generation === generation),
+      ).toBe(true)
+    } finally {
+      await player.destroy()
+      await initialPlay
+    }
   })
 
   it('discards delayed provider work across a rapid seek stress run', async () => {
