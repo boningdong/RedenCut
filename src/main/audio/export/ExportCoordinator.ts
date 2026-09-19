@@ -1,6 +1,6 @@
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
-import { redactedTimelineDuration } from '../../../shared/RedactionTimeline'
+import { buildAudioRenderPlan } from '../../../shared/audio/AudioRenderPlanBuilder'
 import { randomUUID } from 'crypto'
 import type { EventEmitter } from 'events'
 import { link, rename, rm, stat } from 'fs/promises'
@@ -394,7 +394,8 @@ async function waitForSuccessfulClose(
     killOnce()
   }
   const abort = () => recordFailure(new DOMException('Export cancelled', 'AbortError'))
-  const totalSeconds = redactedTimelineDuration(project.tracks)
+  const plan = buildAudioRenderPlan(project.tracks, 'edited')
+  const totalSeconds = plan.durationFrames / plan.sampleRate
   const reportProgress = (text: string) => {
     const matches = [...text.matchAll(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/g)]
     const match = matches.at(-1)

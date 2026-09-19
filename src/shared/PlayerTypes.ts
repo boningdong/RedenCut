@@ -33,7 +33,17 @@ export interface AudioSampleProvider {
   readFrames(startFrame: number, frameCount: number, signal: AbortSignal): Promise<AudioSampleChunk>
 }
 
+export type PlaybackMode = 'timeline' | 'edited'
+
+/** Raw engine methods use current-mode output seconds. */
+export interface RenderAudioPlayer extends IAudioPlayer {
+  setPlaybackMode(mode: PlaybackMode): void
+}
+
+/** The UI-facing adapter uses editing timeline seconds; optional output readings serve transport. */
 export interface IAudioPlayer {
+  getOutputCurrentTime?(): number
+  getOutputDuration?(): number
   // ── Playback control ───────────────────────────────────────────────────────
 
   play(): Promise<void>
@@ -42,19 +52,15 @@ export interface IAudioPlayer {
   /** Convenience: toggle between play and pause. */
   playPause(): Promise<void>
 
-  /**
-   * Seek to a position in the OUTPUT timeline (seconds).
-   * In the single-file case, output time === source time.
-   * When clips are moved, output time maps into the rearranged sequence.
-   */
-  seekTo(outputTime: number): void
+  /** Seek in the player's coordinate space: editing time for UI, output time for the raw engine. */
+  seekTo(time: number): void
 
   // ── State queries ──────────────────────────────────────────────────────────
 
-  /** Current position in the output timeline (seconds). */
+  /** Current position in this player’s coordinate space (seconds). */
   getCurrentTime(): number
 
-  /** Total duration of the output timeline (seconds). */
+  /** Total duration in this player’s coordinate space (seconds). */
   getDuration(): number
 
   isPlaying(): boolean
@@ -90,7 +96,7 @@ export interface IAudioPlayer {
   /** Fires when isPlaying changes. */
   onPlayStateChange(callback: (playing: boolean) => void): () => void
 
-  /** Fires whenever the output timeline duration changes. */
+  /** Fires whenever this player’s duration changes. */
   onDurationChange(callback: (duration: number) => void): () => void
 
   /** Fires when playback reaches the end of the output timeline. */

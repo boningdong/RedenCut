@@ -15,7 +15,7 @@
   // Shared schemas and branded types are the deliberate domain/API surface even when a
   // particular member is only consumed by validation or external project files today.
   "ignoreIssues": {
-    "src/shared/project.types.ts": ["exports", "types"],
+    "src/shared/ProjectTypes.ts": ["exports", "types"],
     "src/shared/speech.types.ts": ["exports", "types"],
     "src/shared/speechWorker.types.ts": ["exports", "types"],
     "src/shared/transcriber.types.ts": ["types"],

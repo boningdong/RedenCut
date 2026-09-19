@@ -73,6 +73,25 @@ const paths = new Map([
 ])
 
 describe('buildRenderArgs', () => {
+  it('compiles the shared 83040-frame crossfade plan using sample-domain envelopes', () => {
+    const project = makeProject([{ source: 0, sourceStart: 0, sourceEnd: 2, outputStart: 0 }])
+    project.tracks[0].clips[0].redactions = [
+      {
+        id: 'fade',
+        sourceStart: 0.88,
+        sourceEnd: 1.12,
+        crossfade: { enabled: true, durationMs: 30, curve: 'equal-power' },
+      },
+    ]
+    const graph = buildRenderArgs(project, paths, '/tmp/out.wav').join(' ')
+    expect(graph).toContain('atrim=end_sample=83040')
+    expect(graph).toContain('aresample=48000,atrim=start_sample=')
+    expect(graph).toContain('sin(')
+    expect(graph).toContain('cos(')
+    expect(graph).toContain('/1439')
+    expect(graph).not.toContain('acrossfade')
+  })
+
   it('maps managed source identities to main-resolved inputs', () => {
     const project = makeProject([
       { source: 0, sourceStart: 0, sourceEnd: 5, outputStart: 0 },
@@ -95,7 +114,7 @@ describe('buildRenderArgs', () => {
     ])
     const args = buildRenderArgs(project, paths, '/tmp/out.mp3')
     const graph = args[args.indexOf('-filter_complex') + 1]
-    expect(graph).not.toContain('atrim=start=5:end=10')
+    expect(graph).not.toContain('atrim=start_sample=240000:end_sample=480000')
     expect(graph).toContain('adelay=240000S:all=1')
     expect(graph).toContain('amix=inputs=2')
   })
@@ -127,6 +146,21 @@ describe('buildRenderArgs', () => {
     project.tracks.push(mutedTrack)
     const args = buildRenderArgs(project, paths, '/tmp/out.mp3')
     expect(args[args.indexOf('-filter_complex') + 1]).not.toContain('amix=inputs=2')
+  })
+
+  it('preserves natural gaps and muted tails without creating contributions', () => {
+    const project = makeProject([
+      { source: 0, sourceStart: 0, sourceEnd: 1, outputStart: 2 },
+      { source: 1, sourceStart: 0, sourceEnd: 1, outputStart: 7, muted: true },
+    ])
+    const graph = buildRenderArgs(project, paths, '/tmp/out.wav').join(' ')
+    expect(graph).toContain('adelay=96000S:all=1')
+    expect(graph).toContain('apad=whole_len=384000,atrim=end_sample=384000')
+    expect(graph).not.toContain('[1:a]')
+    project.tracks[0].muted = true
+    const silent = buildRenderArgs(project, paths, '/tmp/out.wav').join(' ')
+    expect(silent).toContain('anullsrc=r=48000:cl=stereo')
+    expect(silent).toContain('atrim=end_sample=384000')
   })
 
   it('throws when the whole timeline is redacted', () => {

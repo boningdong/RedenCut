@@ -19,5 +19,11 @@
       "@main/*": ["src/main/*"]
     }
   },
-  "include": ["*.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"]
+  "include": [
+    "*.config.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "src/renderer/src/audio/TrackBlockRenderer.ts"
+  ]
 }

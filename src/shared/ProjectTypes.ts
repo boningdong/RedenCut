@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CrossfadeSettingsSchema } from './audio/CrossfadeTypes'
 import { SpeakerIdentityCatalogSchema } from './SpeakerIdentityTypes'
 import {
   AudioSourceFingerprintSchema,
@@ -122,6 +123,7 @@ export const ClipRedactionSchema = z
     id: z.string().min(1),
     sourceStart: z.number().finite().nonnegative(),
     sourceEnd: z.number().finite().nonnegative(),
+    crossfade: CrossfadeSettingsSchema.optional(),
   })
   .strict()
   .refine((range) => range.sourceEnd > range.sourceStart, 'Redaction must have positive duration')

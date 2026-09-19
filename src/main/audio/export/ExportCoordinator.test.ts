@@ -218,6 +218,53 @@ describe('ExportCoordinator', () => {
     })
   })
 
+  it('measures crossfade progress from the shared output duration and admitted identity', async () => {
+    const root = await temporaryRoot()
+    const destination = join(root, 'episode.mp3')
+    const child = new FakeChild()
+    const progress = vi.fn()
+    const snapshot = project()
+    snapshot.tracks[0].clips[0].sourceEnd = 2
+    snapshot.tracks[0].clips[0].redactions = [
+      {
+        id: 'fade',
+        sourceStart: 0.88,
+        sourceEnd: 1.12,
+        crossfade: { enabled: true, durationMs: 30, curve: 'linear' },
+      },
+    ]
+    const coordinator = new ExportCoordinator({
+      spawn: (_command, arguments_) => {
+        const temporaryOutput = arguments_.at(-1)!
+        queueMicrotask(() => {
+          child.stderr.write(`ignored=${'x'.repeat(600)} time=00:00:00.865\r`)
+          void writeFile(temporaryOutput, 'audio').then(() => child.emit('close', 0, null))
+        })
+        return child
+      },
+      createId: () => 'unique-a',
+    })
+
+    const execution = coordinator.start({
+      identity: identity(),
+      project: snapshot,
+      selectDestination: async () => destination,
+      resolveOriginal: async () => '/outside/voice.mp3',
+      revalidate: vi.fn(),
+      onProgress: progress,
+    })
+
+    await execution.settled
+    expect(progress).toHaveBeenCalledWith({
+      jobId: 'export-a',
+      workspaceToken: TOKEN,
+      revision: 7,
+      percent: 0.5,
+      currentSeconds: 0.865,
+      totalSeconds: 1.73,
+    })
+  })
+
   it('cancellation kills once, waits for close, removes its partial output, and preserves the destination', async () => {
     const root = await temporaryRoot()
     const destination = join(root, 'episode.mp3')

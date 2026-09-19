@@ -45,20 +45,3 @@ export function redactionSkipRanges(tracks: Track[]): RedactionRange[] {
   }
   return ranges
 }
-
-export function timeAfterRedactions(time: number, ranges: RedactionRange[]): number {
-  return (
-    time -
-    ranges.reduce(
-      (removed, range) => removed + Math.max(0, Math.min(time, range.end) - range.start),
-      0,
-    )
-  )
-}
-
-export function redactedTimelineDuration(tracks: Track[]): number {
-  const duration = tracks
-    .flatMap((track) => track.clips)
-    .reduce((end, clip) => Math.max(end, clip.outputStart + clip.sourceEnd - clip.sourceStart), 0)
-  return timeAfterRedactions(duration, redactionSkipRanges(tracks))
-}

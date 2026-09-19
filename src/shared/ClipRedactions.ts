@@ -34,17 +34,6 @@ export function clipRetainedRanges(clip: Clip): SourceInterval[] {
   return retained
 }
 
-/** Ephemeral render segments; never persist these as timeline clips. */
-export function retainedClipSegments(clip: Clip): Clip[] {
-  return clipRetainedRanges(clip).map((range) => ({
-    ...clip,
-    sourceStart: range.start,
-    sourceEnd: range.end,
-    outputStart: clip.outputStart + range.start - clip.sourceStart,
-    redactions: [],
-  }))
-}
-
 export function redactionCoverage(
   clip: Clip,
   start: number,
