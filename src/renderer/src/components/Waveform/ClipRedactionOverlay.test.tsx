@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import { ClipRedactionOverlay } from './ClipRedactionOverlay'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 
 const clip: Clip = {
   id: 'c',

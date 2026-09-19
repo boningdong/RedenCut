@@ -1,6 +1,6 @@
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
-import { redactedTimelineDuration } from '../../../shared/redactionTimeline'
+import { redactedTimelineDuration } from '../../../shared/RedactionTimeline'
 import { randomUUID } from 'crypto'
 import type { EventEmitter } from 'events'
 import { link, rename, rm, stat } from 'fs/promises'
@@ -11,7 +11,7 @@ import type {
   RenderProgressEvent,
   SessionJobResult,
 } from '../../../shared/ipc.types'
-import type { AudioSourceId, ProjectFile } from '../../../shared/project.types'
+import type { AudioSourceId, ProjectFile } from '../../../shared/ProjectTypes'
 import type { SessionPrecondition } from '../../../shared/session.types'
 import {
   discardCleanupWarnings,
@@ -19,7 +19,7 @@ import {
   type CleanupWarningSink,
 } from '../../project/CleanupWarningSink'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
-import { buildRenderArgs } from '../renderer'
+import { buildRenderArgs } from '../Renderer'
 
 export interface ExportChild extends EventEmitter {
   stderr: NodeJS.ReadableStream | null

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { AudioSourceIdSchema, ProjectRelativePathSchema } from '../../../shared/project.types'
+import { AudioSourceIdSchema, ProjectRelativePathSchema } from '../../../shared/ProjectTypes'
 
 export const CACHE_GENERATOR_VERSION = 'redencut-cache-v1'
 export const WAVEFORM_LEVELS = [256, 4096, 65536] as const

@@ -14,7 +14,7 @@ const player = vi.hoisted(() => ({
   getDuration: () => 10,
   playPause: vi.fn(),
 }))
-vi.mock('@shared/player.types', () => ({ getAudioPlayerInstance: () => player }))
+vi.mock('@shared/PlayerTypes', () => ({ getAudioPlayerInstance: () => player }))
 const onSave = vi.fn()
 function Controls() {
   useKeyboardShortcuts({ onSave })

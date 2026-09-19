@@ -1,5 +1,5 @@
 import type { AudioSourceCacheDescriptor } from '@shared/import.types'
-import type { AudioSampleChunk, AudioSampleProvider } from '@shared/player.types'
+import type { AudioSampleChunk, AudioSampleProvider } from '@shared/PlayerTypes'
 
 export class ContinuousPcmSampleProvider implements AudioSampleProvider {
   readonly format = 'f32-planar' as const

@@ -1,5 +1,5 @@
 import { usePlaybackStore } from '../../stores/playback.store'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'

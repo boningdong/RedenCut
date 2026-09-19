@@ -1,6 +1,6 @@
-import { getAudioPlayerInstance } from '@shared/player.types'
+import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 
 export function splitAtPlayhead(): void {
   const player = getAudioPlayerInstance()

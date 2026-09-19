@@ -4,7 +4,7 @@ import type {
   TranscriptProgressEvent,
   TranscriptionJobRequest,
 } from '../../../shared/ipc.types'
-import type { AudioSourceId, Transcript } from '../../../shared/project.types'
+import type { AudioSourceId, Transcript } from '../../../shared/ProjectTypes'
 import type { TranscriptionJobId } from '../../../shared/transcriber.types'
 import type { SessionJobExecution } from '../../project/SessionJobRegistry'
 

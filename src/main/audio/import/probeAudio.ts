@@ -3,7 +3,7 @@ import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
 import type { EventEmitter } from 'events'
 import type { Readable } from 'stream'
-import type { AudioMetadata } from '../../../shared/project.types'
+import type { AudioMetadata } from '../../../shared/ProjectTypes'
 import { getFfprobePath } from '../../runtime/AppRuntimeLocator'
 
 interface FFprobeStream {

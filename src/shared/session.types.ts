@@ -1,6 +1,6 @@
 import type { SpeakerIdentityCatalog } from './SpeakerIdentityTypes'
 import type { AudioSourceCacheDescriptor, WorkspaceDescriptor } from './import.types'
-import type { AudioMetadata, AudioSourceId, ProjectFile, Track } from './project.types'
+import type { AudioMetadata, AudioSourceId, ProjectFile, Track } from './ProjectTypes'
 import type { RendererSpeechAnalysis } from './speech.types'
 
 export type WorkspaceToken = string & { readonly __brand: 'WorkspaceToken' }

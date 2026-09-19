@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import { useEditorStore } from '../../stores/editor.store'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 import { useTranscriptStore } from '../../stores/transcript.store'
 
 interface Options {

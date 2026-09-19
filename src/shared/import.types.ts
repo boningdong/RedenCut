@@ -1,4 +1,4 @@
-import type { AudioSource, AudioSourceId, ProjectFile } from './project.types'
+import type { AudioSource, AudioSourceId, ProjectFile } from './ProjectTypes'
 
 export type ImportMode = 'copy' | 'reference'
 export type ImportJobState = 'preparing' | 'committing' | 'committed' | 'cancelled' | 'failed'

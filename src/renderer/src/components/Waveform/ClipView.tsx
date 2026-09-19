@@ -1,5 +1,5 @@
 import React from 'react'
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useTranslation } from '../../i18n/useTranslation'
 import { CanvasWaveform } from './CanvasWaveform'

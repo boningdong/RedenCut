@@ -1,4 +1,4 @@
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 
 const clipEnd = (clip: Clip) => clip.outputStart + clip.sourceEnd - clip.sourceStart
 const MINIMUM_CLIP_DURATION = 1 / 48_000

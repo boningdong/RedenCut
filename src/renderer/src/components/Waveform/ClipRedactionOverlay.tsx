@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import type { Clip, ClipRedaction } from '@shared/project.types'
-import { useTimelineStore } from '../../stores/timeline.store'
+import type { Clip, ClipRedaction } from '@shared/ProjectTypes'
+import { useTimelineStore } from '../../stores/TimelineStore'
 import { useTranslation } from '../../i18n/useTranslation'
 
 interface Props {

@@ -12,11 +12,11 @@ import { useTranslation } from '../../i18n/useTranslation'
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useCallback } from 'react'
-import { togglePlayback } from '../../actions/playbackActions'
+import { togglePlayback } from '../../actions/PlaybackActions'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useEditorStore } from '../../stores/editor.store'
-import { getAudioPlayerInstance } from '@shared/player.types'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { getAudioPlayerInstance } from '@shared/PlayerTypes'
+import { useTimelineStore } from '../../stores/TimelineStore'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 

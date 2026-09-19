@@ -1,5 +1,5 @@
 import { useTranslation } from '../i18n/useTranslation'
-import type { AudioMetadata } from '@shared/project.types'
+import type { AudioMetadata } from '@shared/ProjectTypes'
 import { Icon } from './ui/Icon'
 
 export function FileInfoPanel({

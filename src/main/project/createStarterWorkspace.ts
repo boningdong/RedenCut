@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ProjectWorkspace } from './ProjectWorkspace'
-import { ProjectFileSchema } from '../../shared/project.types'
+import { ProjectFileSchema } from '../../shared/ProjectTypes'
 import { fingerprintAudioFile } from '../audio/import/audioFingerprint'
 
 /** Original synthesized tones provide a distributable, deterministic editing sample. */

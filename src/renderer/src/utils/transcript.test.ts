@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mergeTrackWords } from './transcript'
-import type { Word } from '@shared/project.types'
+import type { Word } from '@shared/ProjectTypes'
 
 // Minimal word factory
 const w = (id: string, start: number, trackId?: string, audioSourceId?: string): Word => ({

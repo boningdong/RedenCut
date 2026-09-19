@@ -1,7 +1,7 @@
 import { beforeEach, expect, it } from 'vitest'
-import { useTimelineStore } from './timeline.store'
-import { ProjectFileSchema } from '@shared/project.types'
-import { redactionSkipRanges } from '@shared/redactionTimeline'
+import { useTimelineStore } from './TimelineStore'
+import { ProjectFileSchema } from '@shared/ProjectTypes'
+import { redactionSkipRanges } from '@shared/RedactionTimeline'
 import { redactionCoverage, clipRedactionRanges } from '@shared/ClipRedactions'
 import { deleteSelection } from '../actions/timelineActions'
 

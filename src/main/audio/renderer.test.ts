@@ -4,8 +4,8 @@ import {
   createEmptyProject,
   type ProjectFile,
   type Track,
-} from '@shared/project.types'
-import { buildRenderArgs } from './renderer'
+} from '@shared/ProjectTypes'
+import { buildRenderArgs } from './Renderer'
 
 const SOURCE_A = AudioSourceSchema.parse({
   id: '00000000-0000-4000-8000-000000000001',

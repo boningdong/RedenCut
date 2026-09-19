@@ -1,4 +1,4 @@
-import type { Word, Track } from '@shared/project.types'
+import type { Word, Track } from '@shared/ProjectTypes'
 
 /**
  * Returns the output-timeline position (seconds) at which this word will be heard.

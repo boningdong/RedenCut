@@ -1,4 +1,4 @@
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 
 export interface ClipPlacement {
   tracks: Track[]

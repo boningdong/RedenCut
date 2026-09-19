@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { AudioSourceSchema, type ProjectRelativePath } from '../../../shared/project.types'
+import { AudioSourceSchema, type ProjectRelativePath } from '../../../shared/ProjectTypes'
 import { AudioSourceCacheStore } from './AudioSourceCacheStore'
 
 const source = AudioSourceSchema.parse({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import { trimClip } from './TimelineEdits'
 
 const original: Clip = {

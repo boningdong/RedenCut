@@ -1,4 +1,4 @@
-import type { AudioMetadata, AudioSourceId } from './project.types'
+import type { AudioMetadata, AudioSourceId } from './ProjectTypes'
 
 export type MediaRecoveryFailure =
   | 'content-mismatch'

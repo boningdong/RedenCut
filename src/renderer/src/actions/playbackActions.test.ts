@@ -1,9 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
-import type { Track } from '@shared/project.types'
-import { attachRedactionPreview, togglePlayback } from './playbackActions'
+import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/PlayerTypes'
+import type { Track } from '@shared/ProjectTypes'
+import { attachRedactionPreview, togglePlayback } from './PlaybackActions'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 
 function fixture() {
   const listeners = new Set<(time: number) => void>()

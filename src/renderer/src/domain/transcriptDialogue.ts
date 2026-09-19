@@ -1,4 +1,4 @@
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import {
   findTranscriptOverlaps,
   type TranscriptOccurrence,

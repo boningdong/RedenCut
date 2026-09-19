@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { useTimelineStore } from './timeline.store'
+import { useTimelineStore } from './TimelineStore'
 
 export interface DomainHistoryEdit {
   id: string

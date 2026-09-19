@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createEmptyProject, type ProjectFile } from '../../shared/project.types'
+import { createEmptyProject, type ProjectFile } from '../../shared/ProjectTypes'
 import type { ProjectDraft, RendererSession, WorkspaceToken } from '../../shared/session.types'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
 

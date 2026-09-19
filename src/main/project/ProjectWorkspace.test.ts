@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'fs/promi
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import { ProjectFileSchema } from '../../shared/project.types'
+import { ProjectFileSchema } from '../../shared/ProjectTypes'
 import { ProjectWorkspace } from './ProjectWorkspace'
 
 describe('ProjectWorkspace', () => {

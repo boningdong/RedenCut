@@ -1,4 +1,4 @@
-import type { Word } from '@shared/project.types'
+import type { Word } from '@shared/ProjectTypes'
 
 /**
  * Merge incoming words for a track into the existing word list.

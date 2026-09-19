@@ -1,7 +1,7 @@
-import type { AudioSourceId, Track } from '@shared/project.types'
-import type { AudioSampleProvider, IAudioPlayer, PlaybackDiagnostics } from '@shared/player.types'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
+import type { AudioSampleProvider, IAudioPlayer, PlaybackDiagnostics } from '@shared/PlayerTypes'
 import { WORKLET_CODE, sendPcmChunk } from './AudioPlayerWorklet'
-import { buildTrackPlaybackPlan, type PlaybackSegment } from './playbackPlan'
+import { buildTrackPlaybackPlan, type PlaybackSegment } from './PlaybackPlan'
 
 const SAMPLE_RATE = 48_000
 const TARGET_FRAMES = SAMPLE_RATE * 2

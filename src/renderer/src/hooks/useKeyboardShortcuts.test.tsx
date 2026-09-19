@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { useTranscriptStore } from '../stores/transcript.store'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 
@@ -19,7 +19,7 @@ const player = vi.hoisted(() => ({
   getCurrentTime: () => 2,
   playPause: vi.fn(async () => {}),
 }))
-vi.mock('@shared/player.types', () => ({ getAudioPlayerInstance: () => player }))
+vi.mock('@shared/PlayerTypes', () => ({ getAudioPlayerInstance: () => player }))
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()

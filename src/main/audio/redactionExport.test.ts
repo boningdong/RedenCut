@@ -9,9 +9,9 @@ import {
   type AudioSourceId,
   type Clip,
   type Track,
-} from '@shared/project.types'
+} from '@shared/ProjectTypes'
 import { getFfmpegPath } from '../runtime/AppRuntimeLocator'
-import { buildRenderArgs } from './renderer'
+import { buildRenderArgs } from './Renderer'
 
 const rate = 48_000
 const root = mkdtempSync(join(tmpdir(), 'redencut-redaction-export-'))

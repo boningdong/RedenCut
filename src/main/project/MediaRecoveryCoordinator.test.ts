@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import { describe, it, expect, vi } from 'vitest'
-import type { AudioSource } from '../../shared/project.types'
+import type { AudioSource } from '../../shared/ProjectTypes'
 import type { MediaRecoverySnapshot } from '../../shared/MediaRecoveryTypes'
 import { MediaRecoveryCoordinator } from './MediaRecoveryCoordinator'
 const source = {

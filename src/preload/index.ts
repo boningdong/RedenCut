@@ -35,7 +35,7 @@ import type {
 } from '../shared/ipc.types'
 import type { ImportSelection } from '../shared/import.types'
 import type { ImportCancellationResult } from '../shared/import.types'
-import type { Transcript } from '../shared/project.types'
+import type { Transcript } from '../shared/ProjectTypes'
 import type { RenameSpeakerRequest } from '../shared/speakerLabel.types'
 import type {
   TranscriptionCancellationResult,

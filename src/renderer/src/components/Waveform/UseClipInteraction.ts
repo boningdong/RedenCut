@@ -8,11 +8,11 @@ import {
   type MouseEvent as ReactMouseEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import { planClipPlacement } from '../../domain/TimelinePlacement'
 import { trimClip } from '../../domain/TimelineEdits'
 import { useEditorStore } from '../../stores/editor.store'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 
 interface Options {
   containerRef: RefObject<HTMLDivElement | null>

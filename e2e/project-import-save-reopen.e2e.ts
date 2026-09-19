@@ -10,7 +10,7 @@ import { HarnessRuntime } from '../harness/runtime/HarnessRuntime'
 import { RuntimeToolBackend } from '../harness/mcp/RuntimeToolBackend'
 import { createMcpFacade } from '../harness/mcp/createMcpFacade'
 import type { ApplicationDiagnostics, RuntimeStatus } from '../harness/runtime/runtime.types'
-import { ProjectFileSchema } from '../src/shared/project.types'
+import { ProjectFileSchema } from '../src/shared/ProjectTypes'
 
 test('imported short audio survives project save and a full application restart', async () => {
   // Establish independent expectations from the input file, not application state.

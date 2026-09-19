@@ -8,7 +8,7 @@ import type {
   ExportJobRequest,
   SessionJobResult,
 } from '../../shared/ipc.types'
-import { ProjectFileSchema } from '../../shared/project.types'
+import { ProjectFileSchema } from '../../shared/ProjectTypes'
 import { ExportCoordinator } from '../audio/export/ExportCoordinator'
 import type { SessionJobRegistry } from '../project/SessionJobRegistry'
 import { mergeProjectDraft } from '../project/sessionProjection'

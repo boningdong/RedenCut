@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useTimelineStore } from './timeline.store'
+import { useTimelineStore } from './TimelineStore'
 import { useTranscriptStore } from './transcript.store'
 import type { RendererAudioSource } from '@shared/session.types'
 

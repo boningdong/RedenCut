@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto'
 import { realpath, stat } from 'fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import type { AudioSourceCacheDescriptor } from '../../shared/import.types'
-import { ProjectFileSchema, type AudioSourceId, type ProjectFile } from '../../shared/project.types'
+import { ProjectFileSchema, type AudioSourceId, type ProjectFile } from '../../shared/ProjectTypes'
 import type {
   ProjectDraft,
   ProjectMutationRequest,

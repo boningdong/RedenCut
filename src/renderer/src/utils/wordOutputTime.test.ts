@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getWordOutputTime } from './wordOutputTime'
-import type { Word, Track } from '@shared/project.types'
+import type { Word, Track } from '@shared/ProjectTypes'
 
 const mkWord = (overrides: Partial<Word> = {}): Word => ({
   id: 'w0',

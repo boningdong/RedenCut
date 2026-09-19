@@ -5,7 +5,7 @@ import {
   ProjectFileSchema,
   type AudioSourceId,
   type ProjectFile,
-} from '../../shared/project.types'
+} from '../../shared/ProjectTypes'
 import type { ProjectDraft, WorkspaceToken } from '../../shared/session.types'
 import { mergeProjectDraft, toRendererSession } from './sessionProjection'
 

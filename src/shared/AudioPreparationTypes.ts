@@ -1,4 +1,4 @@
-import type { AudioSourceId } from './project.types'
+import type { AudioSourceId } from './ProjectTypes'
 
 export type StageProgress = { kind: 'indeterminate' } | { kind: 'determinate'; fraction: number }
 

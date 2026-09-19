@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import type { SpeechBatchScope } from '@shared/speechBatch.types'
 import { planSpeechTasks, type SpeechTaskSelection } from '@shared/SpeechTaskPlanner'

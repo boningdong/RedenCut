@@ -1,6 +1,6 @@
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis, SpeakerId } from '@shared/speech.types'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import { TRACK_COLORS, trackPresentationColor } from '@shared/trackColors'
 
 /** Unassigned is a visibility category, never a synthetic speaker identity. */

@@ -1,4 +1,4 @@
-import type { Clip } from './project.types'
+import type { Clip } from './ProjectTypes'
 
 export interface SourceInterval {
   start: number

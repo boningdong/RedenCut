@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AudioSourceId, Track } from '@shared/project.types'
-import { buildTrackPlaybackPlan } from './playbackPlan'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
+import { buildTrackPlaybackPlan } from './PlaybackPlan'
 
 const SOURCE = '550e8400-e29b-41d4-a716-446655440000' as AudioSourceId
 

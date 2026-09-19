@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import { associateSpeakers } from '@shared/SpeakerAssociations'
 import { isPersonEditable } from '@shared/SpeakerIdentityReconciler'
 import { useTranslation } from '../../i18n/useTranslation'

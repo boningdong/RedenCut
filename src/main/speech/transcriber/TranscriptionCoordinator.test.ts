@@ -1,6 +1,6 @@
 import type { TranscriptionProgress } from '../../../shared/publicMessages'
 import { describe, expect, it, vi } from 'vitest'
-import type { AudioSourceId, Transcript } from '../../../shared/project.types'
+import type { AudioSourceId, Transcript } from '../../../shared/ProjectTypes'
 import type { WorkspaceToken } from '../../../shared/session.types'
 import type { TranscriptionJobId } from '../../../shared/transcriber.types'
 import { TranscriptionCoordinator } from './TranscriptionCoordinator'

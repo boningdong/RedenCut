@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
-import { AudioSourceIdSchema } from '../../shared/project.types'
+import { AudioSourceIdSchema } from '../../shared/ProjectTypes'
 import type { MediaRecoveryCoordinator } from '../project/MediaRecoveryCoordinator'
 import { PublicIpcError, toIpcResult } from './ipcResult'
 const requestSchema = z.object({ recoveryId: z.string().uuid() })

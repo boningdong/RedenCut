@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import type { Track } from './project.types'
-import { redactionSkipRanges } from './redactionTimeline'
+import type { Track } from './ProjectTypes'
+import { redactionSkipRanges } from './RedactionTimeline'
 
 function track(
   id: string,

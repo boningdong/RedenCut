@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Clip, Track } from '@shared/project.types'
-import { useTimelineStore } from './timeline.store'
+import type { Clip, Track } from '@shared/ProjectTypes'
+import { useTimelineStore } from './TimelineStore'
 
 const clip = (id: string, trackId = 'track', outputStart = 0): Clip => ({
   id,

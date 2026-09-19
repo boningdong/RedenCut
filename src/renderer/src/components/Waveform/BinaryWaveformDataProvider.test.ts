@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AudioSourceCacheDescriptor } from '@shared/import.types'
-import type { AudioSourceId } from '@shared/project.types'
+import type { AudioSourceId } from '@shared/ProjectTypes'
 import { BinaryWaveformDataProvider } from './BinaryWaveformDataProvider'
 
 const descriptor: AudioSourceCacheDescriptor = {

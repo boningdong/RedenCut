@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } fro
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { AudioSourceSchema, type AudioSource } from '../../shared/project.types'
+import { AudioSourceSchema, type AudioSource } from '../../shared/ProjectTypes'
 import { MediaRecoveryService } from './MediaRecoveryService'
 
 describe('MediaRecoveryService', () => {

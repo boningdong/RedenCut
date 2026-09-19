@@ -11,7 +11,7 @@
 ## State and Persisted Data
 
 - Use Zustand stores in [`src/renderer/src/stores/`](../src/renderer/src/stores/) for renderer application state; do not introduce React context as a parallel application-state system.
-- Treat [`ProjectFileSchema`](../src/shared/project.types.ts) as the source of truth for persisted project data and derive TypeScript types from its Zod schemas.
+- Treat [`ProjectFileSchema`](../src/shared/ProjectTypes.ts) as the source of truth for persisted project data and derive TypeScript types from its Zod schemas.
 - Keep editing non-destructive: store timeline decisions as project metadata and never modify source audio.
 - Persist source-relative redaction objects on their owning clip; never split a clip merely to redact text.
 - Retain overlay identities independently of their effective union; clamp effects to visible clip bounds while preserving hidden trim metadata.
@@ -70,7 +70,7 @@
 
 ## Playback
 
-- UI components depend on [`IAudioPlayer`](../src/shared/player.types.ts), not a concrete playback implementation.
+- UI components depend on [`IAudioPlayer`](../src/shared/PlayerTypes.ts), not a concrete playback implementation.
 - Waveform UI depends on `WaveformDataProvider`; playback remains owned by the preview player through `IAudioPlayer`; storage and decoding must not leak into the renderer.
 - Use [`WorkletAudioPlayer`](../src/renderer/src/audio/WorkletAudioPlayer.ts) with managed PCM providers; compressed WebCodecs chunking and media-element fallbacks are not supported playback paths.
 - Push current track and clip state through `IAudioPlayer.setTracks` after timeline changes rather than reading renderer stores from shared playback contracts.
@@ -82,7 +82,7 @@
 ## Export
 
 - Export removes Redact intervals by default, independently of the interactive Preview toggle.
-- Share interval eligibility and retained-overlap protection through [`redactionTimeline.ts`](../src/shared/redactionTimeline.ts); do not maintain a second export-specific skip policy.
+- Share interval eligibility and retained-overlap protection through [`redactionTimeline.ts`](../src/shared/RedactionTimeline.ts); do not maintain a second export-specific skip policy.
 - Contract retained clip positions and export progress by those intervals, preserving natural gaps and ordinary clip/track-mute duration.
 - Share overlay union/complement through `ClipRedactions.ts`; rendering subranges are ephemeral, never persisted clips.
 - Export remains non-destructive; source audio and project clip positions do not change.

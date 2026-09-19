@@ -9,7 +9,7 @@ import {
   AudioSourceSchema,
   createEmptyProject,
   type AudioSourceId,
-} from '../../shared/project.types'
+} from '../../shared/ProjectTypes'
 import type { WorkspaceToken } from '../../shared/session.types'
 import { ExportCoordinator, type ExportChild } from '../audio/export/ExportCoordinator'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'

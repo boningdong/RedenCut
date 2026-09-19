@@ -16,7 +16,7 @@ import {
   type AudioSource,
   type ProjectFile,
   type ProjectRelativePath,
-} from '../../../shared/project.types'
+} from '../../../shared/ProjectTypes'
 import type { ProjectWorkspace } from '../../project/ProjectWorkspace'
 import { probeAudio } from './probeAudio'
 import { AudioSourceCacheStore } from '../cache/AudioSourceCacheStore'

@@ -4,7 +4,7 @@ import type {
   SessionJobResult,
   TranscriptionJobRequest,
 } from '../../shared/ipc.types'
-import type { Transcript } from '../../shared/project.types'
+import type { Transcript } from '../../shared/ProjectTypes'
 import type {
   TranscriptionCancellationResult,
   TranscriptionJobId,

@@ -2,7 +2,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import { SpeechTaskPopover } from './SpeechTaskPopover'
 import { useLocaleStore } from '../../stores/locale.store'

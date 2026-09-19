@@ -4,7 +4,7 @@ import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { ProjectWorkspace } from '../../project/ProjectWorkspace'
 import { AudioSourceCacheManifestSchema } from '../cache/cacheManifest'
-import type { ProjectFile } from '../../../shared/project.types'
+import type { ProjectFile } from '../../../shared/ProjectTypes'
 import type { CacheBuildRequest } from './FfmpegAudioSourceCacheBuilder'
 import { ImportCoordinator } from './ImportCoordinator'
 

@@ -15,7 +15,7 @@ import {
 } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import type { WorkspaceDescriptor } from '../../shared/import.types'
-import { createEmptyProject, ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
+import { createEmptyProject, ProjectFileSchema, type ProjectFile } from '../../shared/ProjectTypes'
 import type { SpeechArtifact } from '../../shared/speechArtifact.schema'
 import { SpeechArtifactStore } from '../speech/SpeechArtifactStore'
 import {

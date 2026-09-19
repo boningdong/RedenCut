@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import type { Clip } from '@shared/project.types'
+import type { Clip } from '@shared/ProjectTypes'
 import type { WorkspaceToken } from '@shared/session.types'
-import { useTimelineStore } from './timeline.store'
+import { useTimelineStore } from './TimelineStore'
 
 export interface TimelineClipboardClip {
   clip: Clip

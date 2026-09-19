@@ -10,7 +10,7 @@ import type {
   RenderProgressEvent,
   SessionJobResult,
 } from '@shared/ipc.types'
-import { createEmptyProject } from '@shared/project.types'
+import { createEmptyProject } from '@shared/ProjectTypes'
 import type { RendererSession, WorkspaceToken } from '@shared/session.types'
 import { ExportModal } from './ExportModal'
 import { useLocaleStore } from '../../stores/locale.store'

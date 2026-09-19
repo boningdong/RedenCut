@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { create } from 'zustand'
-import type { Word } from '@shared/project.types'
+import type { Word } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 
 interface TranscriptState {

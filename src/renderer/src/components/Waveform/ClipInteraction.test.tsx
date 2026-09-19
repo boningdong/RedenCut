@@ -3,7 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { WaveformView } from './WaveformView'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 import { useEditorStore } from '../../stores/editor.store'
 import type { RendererAudioSource } from '@shared/session.types'
 

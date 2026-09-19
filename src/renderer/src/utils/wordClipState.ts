@@ -1,4 +1,4 @@
-import type { Word, Track } from '@shared/project.types'
+import type { Word, Track } from '@shared/ProjectTypes'
 import { redactionCoverage } from '@shared/ClipRedactions'
 
 /**

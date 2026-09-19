@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import type { AudioSourceId, Track } from '@shared/project.types'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import { TransportBar } from './TransportBar'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 
 beforeEach(() => useTimelineStore.getState().reset())
 afterEach(cleanup)

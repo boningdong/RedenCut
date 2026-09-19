@@ -1,4 +1,4 @@
-import type { Track } from '../../shared/project.types'
+import type { Track } from '../../shared/ProjectTypes'
 import type { SpeechBatchScope } from '../../shared/speechBatch.types'
 import type { AudioSourceId } from '../../shared/source.types'
 

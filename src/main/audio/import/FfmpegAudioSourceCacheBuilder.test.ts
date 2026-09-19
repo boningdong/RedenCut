@@ -7,7 +7,7 @@ import type { createWriteStream } from 'fs'
 import { PassThrough } from 'stream'
 import { promisify } from 'util'
 import { describe, expect, it, vi } from 'vitest'
-import type { AudioSourceId } from '../../../shared/project.types'
+import type { AudioSourceId } from '../../../shared/ProjectTypes'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
 import { FfmpegAudioSourceCacheBuilder } from './FfmpegAudioSourceCacheBuilder'
 

@@ -2,7 +2,7 @@ import type { AppPreferencesSnapshot } from './appPreferences.types'
 import type { LocalePreference } from './i18n/locale.types'
 import { expectTypeOf, test } from 'vitest'
 import type { ImportCancellationResult, ImportMode, ImportSelection } from './import.types'
-import type { AudioSourceId, ProjectFile, Transcript } from './project.types'
+import type { AudioSourceId, ProjectFile, Transcript } from './ProjectTypes'
 import type {
   OpenProjectRequest,
   OpenProjectResult,

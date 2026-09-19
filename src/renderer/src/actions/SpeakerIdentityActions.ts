@@ -3,7 +3,7 @@ import type { RendererSession } from '@shared/session.types'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import { reconcileSpeakerIdentities } from '@shared/SpeakerIdentityReconciler'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { useEditorHistoryStore } from '../stores/EditorHistoryStore'
 export type PublishSpeakerSession = (session: RendererSession) => Promise<void>
 /** Restore only entities touched by this edit; unrelated new analyses/people survive. */

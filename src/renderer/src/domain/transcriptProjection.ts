@@ -1,6 +1,6 @@
 import { hasValidatedTiming } from './transcriptReliability'
 import { redactionCoverage } from '@shared/ClipRedactions'
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis, TranscriptUnit, SpeakerId } from '@shared/speech.types'
 
 /** An occurrence is the unit as heard through one current timeline clip. */

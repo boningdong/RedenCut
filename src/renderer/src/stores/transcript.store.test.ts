@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useTranscriptStore } from './transcript.store'
-import type { Word } from '@shared/project.types'
+import type { Word } from '@shared/ProjectTypes'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -10,7 +10,7 @@ import type {
   AudioSourceId,
   AudioMetadata,
   ProjectRelativePath,
-} from '../../../shared/project.types'
+} from '../../../shared/ProjectTypes'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
 import {
   AudioSourceCacheManifestSchema,

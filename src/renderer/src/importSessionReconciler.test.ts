@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { AudioSourceId, Track } from '@shared/project.types'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import type {
   ProjectDraft,
   RendererAudioSource,
@@ -8,7 +8,7 @@ import type {
 } from '@shared/session.types'
 import { reconcileImportedSession } from './importSessionReconciler'
 import { useEditorStore } from './stores/editor.store'
-import { useTimelineStore } from './stores/timeline.store'
+import { useTimelineStore } from './stores/TimelineStore'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 

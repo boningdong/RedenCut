@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import { continuousTranscriptGroups } from '../../domain/ContinuousTranscriptGroups'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 

@@ -4,9 +4,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { SpeakerLabels } from './SpeakerLabels'
 import { useTranscriptStore } from '../../stores/transcript.store'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 import { useEditorStore } from '../../stores/editor.store'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 
 const analysis = {

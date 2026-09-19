@@ -1,4 +1,4 @@
-import type { AudioSourceId, ProjectFile } from '../../shared/project.types'
+import type { AudioSourceId, ProjectFile } from '../../shared/ProjectTypes'
 import type { AudioSourceFingerprint } from '../../shared/source.types'
 import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
 

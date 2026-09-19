@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Clip, Track } from '@shared/project.types'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import { planClipPlacement } from './TimelinePlacement'
 
 const clip = (id: string, trackId: string, outputStart: number, duration = 2): Clip => ({

@@ -1,7 +1,7 @@
 import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
 import { selectWhisperDefinition } from '../resources/WhisperModelSelection'
 import { createSpeechBatchHandler } from './speechBatch.ipc'
-import { ProjectFileSchema } from '../../shared/project.types'
+import { ProjectFileSchema } from '../../shared/ProjectTypes'
 import type { ResourceManager } from '../resources/ResourceManager'
 import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
 import { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'

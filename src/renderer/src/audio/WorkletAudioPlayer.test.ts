@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AudioSampleChunk, AudioSampleProvider } from '@shared/player.types'
-import type { AudioSourceId, Track } from '@shared/project.types'
+import type { AudioSampleChunk, AudioSampleProvider } from '@shared/PlayerTypes'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import { WorkletAudioPlayer } from './WorkletAudioPlayer'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId

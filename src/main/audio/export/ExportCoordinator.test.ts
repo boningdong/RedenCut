@@ -10,7 +10,7 @@ import {
   createEmptyProject,
   type AudioSourceId,
   type ProjectFile,
-} from '../../../shared/project.types'
+} from '../../../shared/ProjectTypes'
 import type { WorkspaceToken } from '../../../shared/session.types'
 import { ExportCoordinator, type ExportChild } from './ExportCoordinator'
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { useTranscriptStore } from '../stores/transcript.store'
 import { useEditorStore } from '../stores/editor.store'
 import { buildSpeakerColors, linkedSpeakerPresentation } from '../domain/speakerPresentation'

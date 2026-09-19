@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import { TRACK_COLORS } from '@shared/trackColors'
 import { buildSpeakerColors, speakerKey } from './speakerPresentation'
 

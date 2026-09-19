@@ -1,5 +1,5 @@
 import React, { memo, type RefObject } from 'react'
-import { seekFromTranscript } from '../../actions/playbackActions'
+import { seekFromTranscript } from '../../actions/PlaybackActions'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 import { hasValidatedTiming } from '../../domain/transcriptReliability'
 import { usePlaybackStore } from '../../stores/playback.store'

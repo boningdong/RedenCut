@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { createReadStream } from 'fs'
 import { stat } from 'fs/promises'
-import type { AudioSource } from '../../../shared/project.types'
+import type { AudioSource } from '../../../shared/ProjectTypes'
 
 export type AudioFingerprint = AudioSource['fingerprint']
 

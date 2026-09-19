@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import { projectTranscript, findTranscriptOverlaps } from './transcriptProjection'
 

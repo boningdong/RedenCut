@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import type { RendererSession } from '@shared/session.types'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { useEditorHistoryStore } from '../stores/EditorHistoryStore'
 import { saveSpeakerIdentities } from './SpeakerIdentityActions'
 const before: SpeakerIdentityCatalog = {

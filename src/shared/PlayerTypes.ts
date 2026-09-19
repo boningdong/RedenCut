@@ -13,7 +13,7 @@
 //   5. Destroy: player.destroy()          — called when file is closed
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { AudioSourceId, Track } from './project.types'
+import type { AudioSourceId, Track } from './ProjectTypes'
 
 type AudioSampleFormat = 'f32-planar'
 

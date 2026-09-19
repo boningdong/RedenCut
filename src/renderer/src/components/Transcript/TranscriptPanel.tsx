@@ -28,14 +28,14 @@ import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 //   Transcript selection → waveform   selectionchange → setSelection({ start, end })
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { togglePlayback } from '../../actions/playbackActions'
+import { togglePlayback } from '../../actions/PlaybackActions'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { usePlaybackStore } from '../../stores/playback.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorStore, type EditorSelection } from '../../stores/editor.store'
-import { useTimelineStore } from '../../stores/timeline.store'
-import { seekFromTranscript } from '../../actions/playbackActions'
-import type { Word } from '@shared/project.types'
+import { useTimelineStore } from '../../stores/TimelineStore'
+import { seekFromTranscript } from '../../actions/PlaybackActions'
+import type { Word } from '@shared/ProjectTypes'
 import { getWordClipState, type WordClipState } from '../../utils/wordClipState'
 import { getWordOutputTime } from '../../utils/wordOutputTime'
 import { trackPresentationColor } from '../../themes/trackColors'

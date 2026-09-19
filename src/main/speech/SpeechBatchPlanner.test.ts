@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Track } from '../../shared/project.types'
+import type { Track } from '../../shared/ProjectTypes'
 import { planSpeechSources } from './SpeechBatchPlanner'
 const tracks = [
   { id: 'empty', clips: [] },

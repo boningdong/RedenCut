@@ -28,7 +28,7 @@
 
 import { create } from 'zustand'
 import { useEditorHistoryStore, type DomainHistoryEdit } from './EditorHistoryStore'
-import type { AudioSourceId, Clip, ClipRedaction, Track } from '@shared/project.types'
+import type { AudioSourceId, Clip, ClipRedaction, Track } from '@shared/ProjectTypes'
 import type { RendererAudioSource } from '@shared/session.types'
 import { useEditorStore } from './editor.store'
 import { redactionCoverage } from '@shared/ClipRedactions'

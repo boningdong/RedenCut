@@ -1,8 +1,8 @@
-import { getAudioPlayerInstance, type IAudioPlayer } from '@shared/player.types'
+import { getAudioPlayerInstance, type IAudioPlayer } from '@shared/PlayerTypes'
 import { usePlaybackStore } from '../stores/playback.store'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
-import { redactionSkipRanges } from '@shared/redactionTimeline'
+import { useTimelineStore } from '../stores/TimelineStore'
+import { redactionSkipRanges } from '@shared/RedactionTimeline'
 
 /** Explicit transcript navigation reveals the destination without changing zoom or playback mode. */
 export function seekFromTranscript(time: number): void {

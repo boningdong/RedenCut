@@ -1,6 +1,6 @@
 import { access, realpath } from 'fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
-import { ProjectRelativePathSchema, type ProjectRelativePath } from '../../shared/project.types'
+import { ProjectRelativePathSchema, type ProjectRelativePath } from '../../shared/ProjectTypes'
 
 function isContained(root: string, candidate: string): boolean {
   const pathFromRoot = relative(root, candidate)

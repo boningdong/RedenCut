@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { AudioSourceId, Clip, Track } from '@shared/project.types'
+import type { AudioSourceId, Clip, Track } from '@shared/ProjectTypes'
 import { useEditorStore } from '../stores/editor.store'
 import { usePlaybackStore } from '../stores/playback.store'
 import { useTimelineClipboardStore } from '../stores/TimelineClipboardStore'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { copyClips, cutClips, duplicateClips, pasteClips } from './ClipClipboardActions'
 
 const sourceId = '00000000-0000-4000-8000-000000000001' as AudioSourceId

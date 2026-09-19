@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { Clip } from '@shared/project.types'
+import type { Clip } from '@shared/ProjectTypes'
 import type { RendererSession, WorkspaceToken } from '@shared/session.types'
 import { useEditorStore } from './editor.store'
 import { useTimelineClipboardStore } from './TimelineClipboardStore'
-import { useTimelineStore } from './timeline.store'
+import { useTimelineStore } from './TimelineStore'
 
 const clipboardClip: Clip = {
   id: 'clip-a',

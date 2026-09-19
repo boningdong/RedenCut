@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AudioSourceId, Clip, Track } from '@shared/project.types'
+import type { AudioSourceId, Clip, Track } from '@shared/ProjectTypes'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { deleteSelection, muteSelection, unmuteSelection } from './timelineActions'
 import { splitAtPlayhead } from './timelineActions'
 
 const player = vi.hoisted(() => ({ getCurrentTime: () => 1 }))
-vi.mock('@shared/player.types', () => ({ getAudioPlayerInstance: () => player }))
+vi.mock('@shared/PlayerTypes', () => ({ getAudioPlayerInstance: () => player }))
 
 const sourceId = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 

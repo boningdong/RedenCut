@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testi
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { SpeakerIdentityControls } from './SpeakerIdentityControls'
 import { useLocaleStore } from '../../stores/locale.store'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 const catalog = {

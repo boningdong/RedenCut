@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto'
 import { link, mkdir, readFile, rm, writeFile } from 'fs/promises'
 import { dirname, resolve, sep } from 'path'
-import { SpeechArtifactRefSchema, type SpeechArtifactRef } from '../../shared/project.types'
+import { SpeechArtifactRefSchema, type SpeechArtifactRef } from '../../shared/ProjectTypes'
 import {
   SpeechArtifactSchema,
   validateSpeechArtifactReference,

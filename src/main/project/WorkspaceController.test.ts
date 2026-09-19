@@ -19,7 +19,7 @@ import {
   createEmptyProject,
   ProjectFileSchema,
   type AudioSourceId,
-} from '../../shared/project.types'
+} from '../../shared/ProjectTypes'
 import type {
   ProjectDraft,
   ProjectMutationRequest,

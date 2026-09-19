@@ -1,7 +1,7 @@
 import { readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import type { AudioSourceCacheDescriptor } from '../../../shared/import.types'
-import type { AudioSource, AudioSourceId } from '../../../shared/project.types'
+import type { AudioSource, AudioSourceId } from '../../../shared/ProjectTypes'
 import { ProjectPathResolver } from '../../project/ProjectPathResolver'
 import { AudioSourceCacheManifestSchema, type AudioSourceCacheManifest } from './cacheManifest'
 

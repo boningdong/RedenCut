@@ -1,4 +1,4 @@
-import type { AudioSourceId, Track } from '@shared/project.types'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import { retainedClipSegments } from '@shared/ClipRedactions'
 
 export type PlaybackSegment =

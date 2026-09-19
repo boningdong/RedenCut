@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { expect, test } from 'vitest'
-import { ProjectFileSchema } from '../../src/shared/project.types'
+import { ProjectFileSchema } from '../../src/shared/ProjectTypes'
 import { SpeechArtifactSchema } from '../../src/shared/speechArtifact.schema'
 
 test.each(['transcript-editing-high-precision.redencut', 'transcript-editing.redencut'])(

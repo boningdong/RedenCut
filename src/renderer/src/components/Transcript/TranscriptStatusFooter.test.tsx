@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TranscriptPanel } from './TranscriptPanel'
 import { useTranscriptStore } from '../../stores/transcript.store'
-import { useTimelineStore } from '../../stores/timeline.store'
+import { useTimelineStore } from '../../stores/TimelineStore'
 import { useSpeechBatchStore } from '../../stores/speechBatch.store'
 import { useLocaleStore } from '../../stores/locale.store'
 afterEach(cleanup)

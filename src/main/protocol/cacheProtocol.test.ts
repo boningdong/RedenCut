@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import { AudioSourceSchema, createEmptyProject } from '../../shared/project.types'
+import { AudioSourceSchema, createEmptyProject } from '../../shared/ProjectTypes'
 import { createCacheProtocolHandler } from './cacheProtocol'
 import { createFileRangeResponse } from './fileRangeResponse'
 

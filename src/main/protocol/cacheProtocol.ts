@@ -1,4 +1,4 @@
-import { AudioSourceIdSchema, type ProjectFile } from '../../shared/project.types'
+import { AudioSourceIdSchema, type ProjectFile } from '../../shared/ProjectTypes'
 import { AudioSourceCacheStore } from '../audio/cache/AudioSourceCacheStore'
 
 export type CacheResourceFetcher = (

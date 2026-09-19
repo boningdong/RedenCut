@@ -14,8 +14,8 @@ import { useTranslation } from '../../i18n/useTranslation'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { Icon } from '../ui/Icon'
 import React, { useState, useCallback } from 'react'
-import type { Track } from '@shared/project.types'
-import { useTimelineStore } from '../../stores/timeline.store'
+import type { Track } from '@shared/ProjectTypes'
+import { useTimelineStore } from '../../stores/TimelineStore'
 
 interface TrackHeaderProps {
   track: Track

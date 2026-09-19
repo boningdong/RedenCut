@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
-import type { Track } from '@shared/project.types'
-import { redactionSkipRanges } from '@shared/redactionTimeline'
-import { buildTrackPlaybackPlan } from './playbackPlan'
+import type { Track } from '@shared/ProjectTypes'
+import { redactionSkipRanges } from '@shared/RedactionTimeline'
+import { buildTrackPlaybackPlan } from './PlaybackPlan'
 
 const clip = {
   id: 'c',

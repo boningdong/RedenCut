@@ -1,5 +1,5 @@
-import { getAudioPlayerInstance } from '@shared/player.types'
-import type { Clip, Track } from '@shared/project.types'
+import { getAudioPlayerInstance } from '@shared/PlayerTypes'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import { planClipPlacement } from '../domain/TimelinePlacement'
 import { useEditorStore } from '../stores/editor.store'
 import { usePlaybackStore } from '../stores/playback.store'
@@ -8,7 +8,7 @@ import {
   type TimelineClipboardClip,
   type TimelineClipboardContents,
 } from '../stores/TimelineClipboardStore'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 
 function cloneClipMetadata(clip: Clip): Clip {
   return {

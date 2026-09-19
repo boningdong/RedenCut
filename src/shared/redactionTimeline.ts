@@ -1,4 +1,4 @@
-import type { Track } from './project.types'
+import type { Track } from './ProjectTypes'
 import { clipRedactionRanges, clipRetainedRanges } from './ClipRedactions'
 
 export interface RedactionRange {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { basename } from 'path'
-import type { AudioSource } from '../../shared/project.types'
+import type { AudioSource } from '../../shared/ProjectTypes'
 import type { MediaRecoverySnapshot } from '../../shared/MediaRecoveryTypes'
 import type { ProjectSwitchSender } from './SessionSwitchBarrier'
 import { MediaRecoveryError, type MediaRecoveryService } from './MediaRecoveryService'

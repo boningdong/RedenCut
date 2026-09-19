@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { useTimelineStore } from './timeline.store'
+import { useTimelineStore } from './TimelineStore'
 import { useEditorHistoryStore } from './EditorHistoryStore'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 
 const tracks: Track[] = [
   {

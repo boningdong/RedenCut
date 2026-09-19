@@ -1,7 +1,7 @@
 import { createReadStream, createWriteStream } from 'fs'
 import { link, lstat, mkdir, mkdtemp, realpath, rm, stat } from 'fs/promises'
 import { dirname, join, relative, sep } from 'path'
-import type { AudioSource } from '../../shared/project.types'
+import type { AudioSource } from '../../shared/ProjectTypes'
 import { copyWithHash } from '../audio/import/copyWithHash'
 import { ProjectPathResolver } from './ProjectPathResolver'
 

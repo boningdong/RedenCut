@@ -24,7 +24,7 @@ import type {
   ImportProgress,
   ImportSelection,
 } from './import.types'
-import type { AudioSourceId, Transcript } from './project.types'
+import type { AudioSourceId, Transcript } from './ProjectTypes'
 import type { TranscriptionCancellationResult, TranscriptionJobId } from './transcriber.types'
 import type {
   OpenProjectRequest,

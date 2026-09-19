@@ -19,9 +19,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react'
-import { togglePlayback } from '../actions/playbackActions'
+import { togglePlayback } from '../actions/PlaybackActions'
 import { useEditorStore } from '../stores/editor.store'
-import { useTimelineStore } from '../stores/timeline.store'
+import { useTimelineStore } from '../stores/TimelineStore'
 import { useTranscriptStore } from '../stores/transcript.store'
 import {
   splitAtPlayhead,
@@ -30,7 +30,7 @@ import {
   unmuteSelection,
 } from '../actions/timelineActions'
 import { copyClips, cutClips, duplicateClips, pasteClips } from '../actions/ClipClipboardActions'
-import { getAudioPlayerInstance } from '@shared/player.types'
+import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 
 interface Options {
   /** Called when Cmd+S / Ctrl+S is pressed. */

@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
-import type { Track } from '@shared/project.types'
+import type { Track } from '@shared/ProjectTypes'
 export type IdentityTarget = { kind: 'person' | 'association'; id: string }
 export type Person = SpeakerIdentityCatalog['people'][number]
 export function personIsOnTimeline(person: Person, tracks: Track[]): boolean {

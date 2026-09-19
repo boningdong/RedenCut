@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
-import { ProjectFileSchema } from '../src/shared/project.types'
+import { ProjectFileSchema } from '../src/shared/ProjectTypes'
 import { SpeechArtifactSchema } from '../src/shared/speechArtifact.schema'
 import { McpTestSession } from './support/McpTestSession'
 

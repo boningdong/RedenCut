@@ -1,10 +1,10 @@
-import type { ProjectFile } from '@shared/project.types'
+import type { ProjectFile } from '@shared/ProjectTypes'
 import { retainedClipSegments } from '@shared/ClipRedactions'
 import {
   redactionSkipRanges,
   redactedTimelineDuration,
   timeAfterRedactions,
-} from '@shared/redactionTimeline'
+} from '@shared/RedactionTimeline'
 
 // NOTE: No import of `binaries.ts` here — this module is a pure function so it
 // can be unit-tested in the Vitest node environment without Homebrew being present.

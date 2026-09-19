@@ -1,6 +1,6 @@
 import { reconcileSpeakerIdentities } from '../../shared/SpeakerIdentityReconciler'
 import type { AudioSourceCacheDescriptor } from '../../shared/import.types'
-import { ProjectFileSchema, type ProjectFile } from '../../shared/project.types'
+import { ProjectFileSchema, type ProjectFile } from '../../shared/ProjectTypes'
 import type { ProjectDraft, RendererSession, WorkspaceToken } from '../../shared/session.types'
 import type { RendererSpeechAnalysis } from '../../shared/speech.types'
 import type { ProjectWorkspace } from './ProjectWorkspace'

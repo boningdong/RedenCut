@@ -1,4 +1,4 @@
-import type { Track } from './project.types'
+import type { Track } from './ProjectTypes'
 import type { RendererSpeechAnalysis } from './speech.types'
 import type { SpeakerIdentityCatalog, SpeakerPerson } from './SpeakerIdentityTypes'
 import { TRACK_COLORS, trackPresentationColor } from './trackColors'
