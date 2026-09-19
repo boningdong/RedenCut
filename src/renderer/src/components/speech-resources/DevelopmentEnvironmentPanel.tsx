@@ -74,12 +74,17 @@ export function DevelopmentEnvironmentPanel() {
             <path d="m7 9 3 3-3 3m6 0h4" />
           </svg>
         </span>
-        <b>{t('settings.devTitle')}</b>
-        <span className="pill">{t('settings.devOnly')}</span>
-        <span aria-hidden="true" className={`section-chevron ${open ? 'expanded' : ''}`}>
-          <svg viewBox="0 0 16 16">
-            <path d="m6 4 4 4-4 4" />
-          </svg>
+        <span className="dev-summary-copy">
+          <span className="dev-summary-title">
+            <b>{t('settings.devTitle')}</b>
+            <span className="pill">{t('settings.devOnly')}</span>
+            <span aria-hidden="true" className={`section-chevron ${open ? 'expanded' : ''}`}>
+              <svg viewBox="0 0 16 16">
+                <path d="m6 4 4 4-4 4" />
+              </svg>
+            </span>
+          </span>
+          {dev.runtimePath && <span className="dev-summary-path dev-path">{dev.runtimePath}</span>}
         </span>
         <span className={`status ${dev.ready ? 'ready' : 'pending'}`}>
           <i className={dev.checking?.length ? 'loading-spinner' : 'status-dot'} />
@@ -92,7 +97,6 @@ export function DevelopmentEnvironmentPanel() {
           )}
         </span>
       </button>
-      {dev.runtimePath && <p className="dev-intro dev-path">{dev.runtimePath}</p>}
       {open && (
         <>
           <div className="dev-grid">
