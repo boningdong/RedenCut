@@ -191,6 +191,10 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
           e.preventDefault()
           e.stopPropagation()
           cancel()
+        } else if (e.key === 'Escape' && editing) {
+          e.preventDefault()
+          e.stopPropagation()
+          closeEditor()
         }
       }}
       style={{

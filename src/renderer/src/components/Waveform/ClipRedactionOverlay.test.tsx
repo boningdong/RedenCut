@@ -496,3 +496,38 @@ it('shows only effective hatch wings while idle and selected, with fade controls
   expect(screen.queryAllByRole('slider')).toHaveLength(0)
   vi.restoreAllMocks()
 })
+
+it('closes crossfade editing back to redaction selection when Escape is pressed on its body', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  render(<View />)
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  const body = screen.getByRole('button', { name: 'Redaction 12.00–15.00 s' })
+  fireEvent.click(body)
+  expect(document.activeElement).toBe(body)
+  const escapedToDocument = vi.fn()
+  document.addEventListener('keydown', escapedToDocument)
+  try {
+    fireEvent.keyDown(body, { key: 'Escape', code: 'Escape' })
+    expect(escapedToDocument).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(state().timelineSelection).toMatchObject({
+      kind: 'redaction',
+      clipId: 'c',
+      redactionId: 'r',
+      editingCrossfade: false,
+    })
+  } finally {
+    document.removeEventListener('keydown', escapedToDocument)
+    vi.restoreAllMocks()
+  }
+})
