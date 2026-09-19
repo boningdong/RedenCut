@@ -613,25 +613,27 @@ summary:focus-visible,
   cursor: pointer;
 }
 
-/* One rail layer spans the seam and both effective wings, at exactly one CSS pixel. */
+/* Plain redactions retain their original rounded, broad-stripe appearance. */
 .clip-redaction {
-  --redaction-ink: color-mix(in srgb, var(--color-text-primary) 30%, #9a72bb);
-  border: 0;
-  border-radius: 0;
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--redaction-ink) 25%, transparent) 0 4px,
-    color-mix(in srgb, var(--redaction-ink) 42%, transparent) 4px 5px
-  );
+  --redaction-ink: #a997bf;
+  --redaction-stripes: repeating-linear-gradient(135deg, #2b233be0 0 5px, #40324ee0 5px 10px);
+  border: 1px solid var(--redaction-ink);
+  border-radius: 4px;
+  background: var(--redaction-stripes);
 }
 .clip-redaction:hover,
 .clip-redaction[data-selected='true'],
 .clip-redaction:has(> button:not(.redaction-cycle):focus-visible) {
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--redaction-ink) 30%, transparent) 0 4px,
-    color-mix(in srgb, var(--redaction-ink) 50%, transparent) 4px 5px
-  );
+  --redaction-ink: #ddc3ff;
+  --redaction-stripes: repeating-linear-gradient(135deg, #382947df 0 5px, #574066df 5px 10px);
+}
+.clip-redaction:not(:has(.redaction-frame)):hover .redaction-edge::after {
+  opacity: 1;
+}
+/* A single rail layer joins the square frame and fading extensions without doubled borders. */
+.clip-redaction:has(.redaction-frame) {
+  border: 0;
+  border-radius: 0;
 }
 .redaction-frame {
   position: absolute;
@@ -666,11 +668,7 @@ summary:focus-visible,
   position: absolute;
   inset-block: 1px;
   pointer-events: none;
-  background: repeating-linear-gradient(
-    135deg,
-    transparent 0 4px,
-    color-mix(in srgb, var(--redaction-ink) 50%, transparent) 4px 5px
-  );
+  background: var(--redaction-stripes);
 }
 .crossfade-wing-left {
   mask-image: linear-gradient(to right, transparent, black);
@@ -705,7 +703,7 @@ summary:focus-visible,
   cursor: ew-resize;
   touch-action: none;
 }
-.clip-redaction:not([data-selected='true']) .redaction-edge::after {
+.clip-redaction:has(.redaction-frame):not([data-selected='true']) .redaction-edge::after {
   opacity: 0;
 }
 .crossfade-popover,

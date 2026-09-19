@@ -118,14 +118,20 @@ export function RedactionCrossfadeOverlay({
       )
   return (
     <>
-      <div className="redaction-frame" aria-hidden="true" />
-      <div
-        className="crossfade-rails"
-        aria-hidden="true"
-        style={
-          { left, width: right + width - left, '--fade-width': `${width}px` } as React.CSSProperties
-        }
-      />
+      {settings.enabled && <div className="redaction-frame" aria-hidden="true" />}
+      {settings.enabled && (
+        <div
+          className="crossfade-rails"
+          aria-hidden="true"
+          style={
+            {
+              left,
+              width: right + width - left,
+              '--fade-width': `${width}px`,
+            } as React.CSSProperties
+          }
+        />
+      )}
       {showWings && (
         <>
           <div

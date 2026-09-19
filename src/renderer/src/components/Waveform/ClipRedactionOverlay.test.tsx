@@ -544,3 +544,16 @@ it('reuses crossfade geometry while track volume changes, but recomputes after a
   expect(resolve.mock.calls.length).toBeGreaterThan(0)
   resolve.mockRestore()
 })
+
+it('adds crossfade framing only while crossfade is enabled', () => {
+  render(<View />)
+  expect(document.querySelector('.crossfade-rails')).toBeNull()
+  act(() =>
+    state().updateRedactionCrossfade('c', 'r', { enabled: true, durationMs: 30, curve: 'linear' }),
+  )
+  expect(document.querySelector('.crossfade-rails')).not.toBeNull()
+  act(() =>
+    state().updateRedactionCrossfade('c', 'r', { enabled: false, durationMs: 30, curve: 'linear' }),
+  )
+  expect(document.querySelector('.crossfade-rails')).toBeNull()
+})
