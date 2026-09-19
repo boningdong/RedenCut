@@ -1,3 +1,4 @@
+import * as transitions from '@shared/audio/RedactionTransitionResolver'
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -530,4 +531,16 @@ it('closes crossfade editing back to redaction selection when Escape is pressed 
     document.removeEventListener('keydown', escapedToDocument)
     vi.restoreAllMocks()
   }
+})
+
+it('reuses crossfade geometry while track volume changes, but recomputes after a redact edit', () => {
+  render(<View />)
+  const resolve = vi.spyOn(transitions, 'resolveRedactionTransitions')
+  act(() => state().updateTrack('t', { volume: 0.25 }))
+  expect(resolve.mock.calls.length).toBe(0)
+  act(() =>
+    state().updateRedactionCrossfade('c', 'r', { enabled: true, durationMs: 30, curve: 'linear' }),
+  )
+  expect(resolve.mock.calls.length).toBeGreaterThan(0)
+  resolve.mockRestore()
 })

@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 export type IdentityTarget = { kind: 'person' | 'association'; id: string }
 export type Person = SpeakerIdentityCatalog['people'][number]
-export function personIsOnTimeline(person: Person, tracks: Track[]): boolean {
+export function personIsOnTimeline(person: Person, tracks: TrackContent[]): boolean {
   return tracks.some((track) =>
     track.clips.some((clip) => clip.audioSourceId === person.binding.audioSourceId),
   )
@@ -29,7 +29,7 @@ export function SourceBadges({
   collapsible = false,
 }: {
   people: Person[]
-  tracks: Track[]
+  tracks: TrackContent[]
   collapsible?: boolean
 }) {
   return (

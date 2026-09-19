@@ -1,3 +1,4 @@
+import { hasSamePlaybackStructure } from '../../audio/PlaybackStructure'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Clip, ClipRedaction, Track } from '@shared/ProjectTypes'
 import { DEFAULT_CROSSFADE_SETTINGS, type CrossfadeSettings } from '@shared/audio/CrossfadeTypes'
@@ -7,12 +8,18 @@ import { useTranslation } from '../../i18n/useTranslation'
 import { CrossfadePopover } from './CrossfadePopover'
 
 const resolutionCache = new WeakMap<Track[], ReturnType<typeof resolveRedactionTransitions>>()
+let latestResolution:
+  { tracks: Track[]; result: ReturnType<typeof resolveRedactionTransitions> } | undefined
 function transitionsFor(tracks: Track[]) {
   let result = resolutionCache.get(tracks)
   if (!result) {
-    result = resolveRedactionTransitions(tracks)
+    result =
+      latestResolution && hasSamePlaybackStructure(latestResolution.tracks, tracks)
+        ? latestResolution.result
+        : resolveRedactionTransitions(tracks)
     resolutionCache.set(tracks, result)
   }
+  latestResolution = { tracks, result }
   return result
 }
 

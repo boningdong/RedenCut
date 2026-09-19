@@ -1,3 +1,4 @@
+import { hasSamePlaybackStructure } from './PlaybackStructure'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import type {
   AudioSampleProvider,
@@ -90,18 +91,20 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
     if (this.context && !volumeOnlyChange) this.suspendForRebuild()
     this.planMode = this.mode
     this.tracks = tracks
+    if (volumeOnlyChange) {
+      for (const track of tracks) {
+        const queue = this.queues.get(track.id)
+        if (queue) queue.gain.gain.value = track.volume
+      }
+      return
+    }
     this.renderPlan = buildAudioRenderPlan(tracks, this.mode)
     const nextDuration = this.renderPlan.durationFrames / SAMPLE_RATE
     if (nextDuration !== this.duration) {
       this.duration = nextDuration
       this.durationCallbacks.forEach((callback) => callback(nextDuration))
     }
-    if (this.context && volumeOnlyChange) {
-      for (const track of tracks) {
-        const queue = this.queues.get(track.id)
-        if (queue) queue.gain.gain.value = track.volume
-      }
-    } else if (this.context) {
+    if (this.context) {
       this.currentTime = Math.min(this.currentTime, this.duration)
       void this.rebuildQueues(this.currentTime).catch((error) => this.emitError(error))
     }
@@ -560,31 +563,4 @@ function createAbortError(): Error {
   const error = new Error('AudioWorklet prefill was cancelled')
   error.name = 'AbortError'
   return error
-}
-
-function hasSamePlaybackStructure(previous: Track[], next: Track[]): boolean {
-  if (previous.length !== next.length) return false
-  return previous.every((track, index) => {
-    const candidate = next[index]
-    if (
-      track.id !== candidate.id ||
-      track.muted !== candidate.muted ||
-      track.solo !== candidate.solo ||
-      track.clips.length !== candidate.clips.length
-    )
-      return false
-    return track.clips.every((clip, clipIndex) => {
-      const other = candidate.clips[clipIndex]
-      return (
-        clip.id === other.id &&
-        clip.audioSourceId === other.audioSourceId &&
-        clip.sourceStart === other.sourceStart &&
-        clip.sourceEnd === other.sourceEnd &&
-        clip.outputStart === other.outputStart &&
-        clip.gain === other.gain &&
-        clip.muted === other.muted &&
-        JSON.stringify(clip.redactions ?? []) === JSON.stringify(other.redactions ?? [])
-      )
-    })
-  })
 }

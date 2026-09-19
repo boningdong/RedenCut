@@ -1,6 +1,6 @@
 import { hasValidatedTiming } from './transcriptReliability'
 import { redactionCoverage } from '@shared/ClipRedactions'
-import type { Clip, Track } from '@shared/ProjectTypes'
+import type { Clip, TrackContent } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis, TranscriptUnit, SpeakerId } from '@shared/speech.types'
 
 /** An occurrence is the unit as heard through one current timeline clip. */
@@ -8,7 +8,7 @@ export interface TranscriptOccurrence {
   id: string
   scopeId: string
   analysis: RendererSpeechAnalysis
-  track: Track
+  track: TrackContent
   clip: Clip
   unit: TranscriptUnit
   sourceStart: number | null
@@ -34,7 +34,7 @@ export interface TranscriptOverlap {
 
 export function projectTranscript(
   analyses: RendererSpeechAnalysis[],
-  tracks: Track[],
+  tracks: TrackContent[],
 ): TranscriptOccurrence[] {
   const result: TranscriptOccurrence[] = []
   const solo = tracks.some((track) => track.solo)

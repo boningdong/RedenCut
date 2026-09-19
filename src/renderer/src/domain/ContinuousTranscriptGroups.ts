@@ -1,9 +1,9 @@
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import type { TranscriptOccurrence } from './transcriptProjection'
 import { dialogueScopes } from './transcriptDialogue'
 
 /** Keep overlapping tracks readable; speaker attribution never determines these boundaries. */
-export function continuousTranscriptGroups(units: TranscriptOccurrence[], tracks?: Track[]) {
+export function continuousTranscriptGroups(units: TranscriptOccurrence[], tracks?: TrackContent[]) {
   const scopes = dialogueScopes(units, tracks)
   const byScope = new Map<string, TranscriptOccurrence[]>()
   for (const unit of units) {

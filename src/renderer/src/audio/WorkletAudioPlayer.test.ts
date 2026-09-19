@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AudioSampleChunk, AudioSampleProvider } from '@shared/PlayerTypes'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
+import * as renderPlans from '@shared/audio/AudioRenderPlanBuilder'
 import { WorkletAudioPlayer } from './WorkletAudioPlayer'
 import { PlaybackTimelineAdapter } from './PlaybackTimelineAdapter'
 
@@ -735,13 +736,24 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     const player = new WorkletAudioPlayer()
     await player.registerAudioSource(SOURCE_ID, provider())
     const original = track('one')
+    const createGain = vi.spyOn(FakeContext.prototype, 'createGain')
     player.setTracks([original])
+    player.setTracks([{ ...original, volume: 0.7 }])
     await player.play()
+    expect(createGain.mock.results[0].value.gain.value).toBe(0.7)
     const node = FakeNode.instances[0]
+    const build = vi.spyOn(renderPlans, 'buildAudioRenderPlan')
     player.setTracks([{ ...original, volume: 0.25 }])
+    expect(build).not.toHaveBeenCalled()
+    build.mockRestore()
     await Promise.resolve()
     expect(FakeNode.instances).toHaveLength(1)
     expect(node.connect).toHaveBeenCalledTimes(1)
+    expect(createGain.mock.results[0].value.gain.value).toBe(0.25)
+    player.seekTo(1)
+    await vi.waitFor(() => expect(createGain).toHaveBeenCalledTimes(2))
+    expect(createGain.mock.results[1].value.gain.value).toBe(0.25)
+    createGain.mockRestore()
     await player.destroy()
   })
 

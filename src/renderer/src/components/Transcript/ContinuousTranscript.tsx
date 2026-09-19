@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import { continuousTranscriptGroups } from '../../domain/ContinuousTranscriptGroups'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 
@@ -9,7 +9,7 @@ export function ContinuousTranscript({
   tracks,
   renderUnit,
 }: {
-  tracks: Track[]
+  tracks: TrackContent[]
   units: TranscriptOccurrence[]
   renderUnit: (unit: TranscriptOccurrence) => ReactNode
 }) {

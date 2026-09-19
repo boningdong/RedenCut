@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import { setPersonAssociations, setAssociationMembers } from '@shared/SpeakerAssociations'
 import { isPersonEditable } from '@shared/SpeakerIdentityReconciler'
 import { useTranslation } from '../../i18n/useTranslation'
@@ -30,7 +30,7 @@ export function SpeakerIdentityEditor({
   target: IdentityTarget
   anchor: HTMLElement
   analyses: RendererSpeechAnalysis[]
-  tracks: Track[]
+  tracks: TrackContent[]
   onSave: (next: SpeakerIdentityCatalog) => Promise<void>
   onClose: () => void
 }) {

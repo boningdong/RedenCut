@@ -1,4 +1,4 @@
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import {
   findTranscriptOverlaps,
   type TranscriptOccurrence,
@@ -24,7 +24,7 @@ export interface AlignmentLine {
 /** Reading continuity is separate from the exact clip identity required for safe edits. */
 export function dialogueScopes(
   units: TranscriptOccurrence[],
-  tracks?: Track[],
+  tracks?: TrackContent[],
 ): Map<string, string> {
   const scopes = new Map<string, string>()
   const records = [...new Map(units.map((unit) => [unit.scopeId, unit])).values()]
@@ -72,7 +72,7 @@ export function dialogueScopes(
 
 export function buildDialogueBlocks(
   units: TranscriptOccurrence[],
-  tracks?: Track[],
+  tracks?: TrackContent[],
 ): DialogueBlock[] {
   const scopes = dialogueScopes(units, tracks)
   const overlaps = findTranscriptOverlaps(units)
@@ -223,7 +223,7 @@ export function layoutOverlapColumns(
   block: DialogueBlock,
   availableWidth: number,
   measure: (text: string) => number,
-  tracks?: Track[],
+  tracks?: TrackContent[],
 ): AlignmentLine[] {
   const scopes = dialogueScopes(block.units, tracks)
   const width = Math.max(40, availableWidth),

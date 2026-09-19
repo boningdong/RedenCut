@@ -96,6 +96,49 @@ describe('canonical transcript editability', () => {
     ])
   })
 
+  it.each([3, 6000])('does not re-render %i transcript units for track-volume changes', (count) => {
+    if (count > 3) {
+      const track = useTimelineStore.getState().tracks[0]
+      useTimelineStore.setState({
+        tracks: [{ ...track, clips: [{ ...track.clips[0], sourceEnd: 3600 }] }],
+      })
+      const analysis = useTranscriptStore.getState().analyses[0]
+      const units = Array.from({ length: count }, (_, i) => ({
+        ...analysis.transcript.units[0],
+        id: `unit-${i}` as TranscriptUnitId,
+      }))
+      useTranscriptStore.getState().loadAnalyses([
+        {
+          ...analysis,
+          transcript: { ...analysis.transcript, units },
+          alignment: {
+            ...analysis.alignment,
+            acousticEditUnits: units.map((u, i) => ({
+              ...analysis.alignment.acousticEditUnits[0],
+              id: `acoustic-${i}` as AcousticEditUnitId,
+              transcriptUnitIds: [u.id],
+              sourceStart: i * 0.6,
+              sourceEnd: i * 0.6 + 0.4,
+            })),
+          },
+        },
+      ])
+    }
+    const committed = vi.fn()
+    render(
+      <React.Profiler id="transcript" onRender={committed}>
+        <TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />
+      </React.Profiler>,
+    )
+    committed.mockClear()
+    for (let i = 0; i < 20; i++)
+      act(() => useTimelineStore.getState().updateTrack('track', { volume: i / 20 }))
+    expect(committed.mock.calls.length).toBe(0)
+    act(() => useTimelineStore.getState().updateTrack('track', { muted: true }))
+    expect(committed.mock.calls.length).toBeGreaterThan(0)
+    expect(useTimelineStore.getState().tracks[0].volume).toBe(0.95)
+  })
+
   it.each(['idle', 'running', 'cancelled', 'failed', 'complete'] as const)(
     'shows timing review only inside successful completion details: %s',
     (state) => {

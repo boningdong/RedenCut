@@ -1,3 +1,4 @@
+import * as renderPlans from '@shared/audio/AudioRenderPlanBuilder'
 import { expect, it, vi } from 'vitest'
 import type { Track } from '@shared/ProjectTypes'
 import { PlaybackTimelineAdapter } from './PlaybackTimelineAdapter'
@@ -87,4 +88,19 @@ it('maps time notifications and releases the raw subscriptions', async () => {
   expect(update).not.toHaveBeenCalled()
   await player.destroy()
   expect(raw.destroy).toHaveBeenCalledOnce()
+})
+
+it('updates volume on an hour-long track without rebuilding its time map or notifying duration', () => {
+  const { raw, player } = fixture()
+  const hour = tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, sourceEnd: 3600 })) }))
+  player.setTracks(hour)
+  const build = vi.spyOn(renderPlans, 'buildAudioRenderPlan')
+  const duration = vi.fn()
+  player.onDurationChange(duration)
+  for (let i = 0; i < 100; i++) player.setTracks(hour.map((t) => ({ ...t, volume: i / 100 })))
+  expect(build).not.toHaveBeenCalled()
+  expect(duration).not.toHaveBeenCalled()
+  expect(raw.setTracks).toHaveBeenLastCalledWith([{ ...hour[0], volume: 0.99 }])
+  expect(player.getDuration()).toBe(3600)
+  build.mockRestore()
 })

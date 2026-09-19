@@ -154,6 +154,8 @@ const TrackSchema = z.object({
   effects: z.array(EffectSchema).default([]),
 })
 export type Track = z.infer<typeof TrackSchema>
+/** Content and presentation consumers do not depend on the live mixer level. */
+export type TrackContent = Omit<Track, 'volume'>
 
 export const SpeechArtifactRefSchema = z
   .object({

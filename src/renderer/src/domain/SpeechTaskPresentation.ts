@@ -1,11 +1,11 @@
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import type { SpeechBatchScope } from '@shared/speechBatch.types'
 import type { AudioSourceId } from '@shared/source.types'
 import type { SpeechSourceState } from '@shared/SpeechTaskPlanner'
 
 export function speechSourceStates(
-  tracks: Track[],
+  tracks: TrackContent[],
   analyses: RendererSpeechAnalysis[],
   scope: SpeechBatchScope,
 ): SpeechSourceState[] {
@@ -24,7 +24,7 @@ export function speechSourceStates(
 }
 
 /** Include other occurrences of shared sources: analysis is source-scoped, not track-scoped. */
-export function speechTargetTracks(tracks: Track[], sourceIds: AudioSourceId[]) {
+export function speechTargetTracks(tracks: TrackContent[], sourceIds: AudioSourceId[]) {
   return tracks.flatMap((track, index) =>
     track.clips.some((clip) => sourceIds.includes(clip.audioSourceId))
       ? [{ id: track.id, label: `T${index + 1}`, name: track.name }]

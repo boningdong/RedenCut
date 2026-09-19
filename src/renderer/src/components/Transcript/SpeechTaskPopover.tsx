@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import type { SpeechBatchScope } from '@shared/speechBatch.types'
 import { planSpeechTasks, type SpeechTaskSelection } from '@shared/SpeechTaskPlanner'
@@ -11,7 +11,7 @@ import { Icon } from '../ui/Icon'
 import './SpeechTasks.css'
 
 interface Props {
-  tracks: Track[]
+  tracks: TrackContent[]
   analyses: RendererSpeechAnalysis[]
   isGenerating: boolean
   onRun: (scope: SpeechBatchScope, tasks: SpeechTaskSelection) => void

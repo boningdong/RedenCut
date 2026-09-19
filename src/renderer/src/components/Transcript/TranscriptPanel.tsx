@@ -1,3 +1,4 @@
+import { useTrackContent } from '../../hooks/UseTrackContent'
 import type { SpeechBatchScope } from '@shared/speechBatch.types'
 import type { SpeechTaskSelection } from '@shared/SpeechTaskPlanner'
 import { SpeechTaskPopover } from './SpeechTaskPopover'
@@ -86,7 +87,7 @@ function LegacyTranscriptPanel({
   const visibleTrackIds = useTranscriptStore((s) => s.visibleTrackIds)
   const toggleTrackVisibility = useTranscriptStore((s) => s.toggleTrackVisibility)
 
-  const tracks = useTimelineStore((s) => s.tracks)
+  const tracks = useTrackContent()
 
   const setSelection = useEditorStore((s) => s.setSelection)
   const markEdited = useEditorStore((s) => s.markEdited)

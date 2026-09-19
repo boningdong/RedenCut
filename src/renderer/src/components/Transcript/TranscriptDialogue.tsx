@@ -1,5 +1,5 @@
 import { usePlaybackStore } from '../../stores/PlaybackStore'
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
@@ -24,7 +24,7 @@ function timestamp(time: number): string {
     .padStart(2, '0')}:${(time % 60).toFixed(2).padStart(5, '0')}`
 }
 type RenderUnit = (unit: TranscriptOccurrence) => ReactNode
-function lanes(units: TranscriptOccurrence[], tracks?: Track[]) {
+function lanes(units: TranscriptOccurrence[], tracks?: TrackContent[]) {
   const scopes = dialogueScopes(units, tracks)
   const rows = new Map<string, TranscriptOccurrence[]>()
   for (const unit of units) {
@@ -78,7 +78,7 @@ function ReadRows({
   renderUnit,
 }: {
   units: TranscriptOccurrence[]
-  tracks?: Track[]
+  tracks?: TrackContent[]
   renderUnit: RenderUnit
 }) {
   return (
@@ -99,7 +99,7 @@ function OverlapCard({
   renderUnit,
 }: {
   block: DialogueBlock
-  tracks?: Track[]
+  tracks?: TrackContent[]
   renderUnit: RenderUnit
 }) {
   const { t } = useTranslation()
@@ -244,7 +244,7 @@ export function TranscriptDialogue({
   renderUnit,
 }: {
   units: TranscriptOccurrence[]
-  tracks?: Track[]
+  tracks?: TrackContent[]
   renderUnit: RenderUnit
 }) {
   const blocks = useMemo(() => buildDialogueBlocks(units, tracks), [units, tracks])

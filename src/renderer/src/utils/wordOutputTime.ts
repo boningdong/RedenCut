@@ -1,4 +1,4 @@
-import type { Word, Track } from '@shared/ProjectTypes'
+import type { Word, TrackContent } from '@shared/ProjectTypes'
 
 /**
  * Returns the output-timeline position (seconds) at which this word will be heard.
@@ -8,7 +8,7 @@ import type { Word, Track } from '@shared/ProjectTypes'
  * Falls back to word.start for legacy words with no trackId (they are assumed
  * to be positioned at their source-file timestamp).
  */
-export function getWordOutputTime(word: Word, tracks: Track[]): number {
+export function getWordOutputTime(word: Word, tracks: TrackContent[]): number {
   if (!word.trackId) return word.start // legacy fallback
 
   const track = tracks.find((t) => t.id === word.trackId)

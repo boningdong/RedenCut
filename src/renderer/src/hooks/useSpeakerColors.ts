@@ -1,12 +1,12 @@
+import { useTrackContent } from '../hooks/UseTrackContent'
 import { useMemo } from 'react'
-import { useTimelineStore } from '../stores/TimelineStore'
 import { useTranscriptStore } from '../stores/transcript.store'
 import { useEditorStore } from '../stores/editor.store'
 import { buildSpeakerColors, linkedSpeakerPresentation } from '../domain/speakerPresentation'
 
 export function useSpeakerColors() {
   const analyses = useTranscriptStore((s) => s.analyses)
-  const tracks = useTimelineStore((s) => s.tracks)
+  const tracks = useTrackContent()
   const catalog = useEditorStore((s) => s.session?.speakerIdentities)
   return useMemo(() => {
     const colors = buildSpeakerColors(analyses, tracks)

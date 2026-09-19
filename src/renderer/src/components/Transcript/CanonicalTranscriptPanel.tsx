@@ -1,3 +1,4 @@
+import { useTrackContent } from '../../hooks/UseTrackContent'
 import { TranscriptPlaybackControls } from './TranscriptPlaybackControls'
 import { useTranscriptPlaybackFollow } from './UseTranscriptPlaybackFollow'
 import { SpeechTaskPopover } from './SpeechTaskPopover'
@@ -37,7 +38,7 @@ export function CanonicalTranscriptPanel({
   analyses,
 }: TranscriptPanelProps & { analyses: RendererSpeechAnalysis[] }) {
   const { t } = useTranslation()
-  const tracks = useTimelineStore((s) => s.tracks)
+  const tracks = useTrackContent()
   const setSelection = useEditorStore((s) => s.setSelection)
   const colors = useSpeakerColors()
   const displayMode = useTranscriptStore((s) => s.displayMode)

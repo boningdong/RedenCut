@@ -416,6 +416,28 @@ describe('App transcription job identity', () => {
     expect(header.querySelector('.project-brand')).toBeNull()
   })
 
+  it('does not re-render the workspace for repeated volume updates but forwards every gain to playback', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    installApi(initial)
+    const committed = vi.fn()
+    render(
+      <React.Profiler id="app" onRender={committed}>
+        <App />
+      </React.Profiler>,
+    )
+    await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_A))
+    const id = useTimelineStore.getState().tracks[0].id
+    act(() => useTimelineStore.getState().updateTrack(id, { volume: 0.5 }))
+    committed.mockClear()
+    const forward = vi.spyOn(getAudioPlayerInstance()!, 'setTracks')
+    for (let i = 0; i < 20; i++)
+      act(() => useTimelineStore.getState().updateTrack(id, { volume: i / 20 }))
+    expect(committed.mock.calls.length).toBe(0)
+    expect(forward).toHaveBeenCalledTimes(20)
+    expect(forward.mock.calls[forward.mock.calls.length - 1][0][0].volume).toBe(0.95)
+    forward.mockRestore()
+  })
+
   it('changes header language without resetting playback, project edits, or timeline history', async () => {
     const { api, requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
     fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))

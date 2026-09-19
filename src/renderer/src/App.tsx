@@ -1,3 +1,4 @@
+import { useTrackContent } from './hooks/UseTrackContent'
 import { AudioPreparationProgress } from './components/audio-preparation/AudioPreparationProgress'
 import { usePreparationProgressStore } from './stores/PreparationProgressStore'
 import { MissingMediaDialog } from './components/project/MissingMediaDialog'
@@ -133,7 +134,7 @@ export default function App() {
   const isDirty = useEditorStore((state) => state.isDirty)
   const loadEditorSession = useEditorStore((state) => state.loadSession)
   const acknowledgeSave = useEditorStore((state) => state.acknowledgeSave)
-  const tracks = useTimelineStore((state) => state.tracks)
+  const tracks = useTrackContent()
   const isGenerating = useSpeechBatchStore((state) => state.isGenerating)
   const generatingStatus = useSpeechBatchStore((state) => state.generatingStatus)
 
@@ -589,8 +590,11 @@ export default function App() {
   }, [drainOpenQueue, session])
 
   useEffect(() => {
-    playerRef.current?.setTracks(tracks)
-  }, [tracks])
+    playerRef.current?.setTracks(useTimelineStore.getState().tracks)
+    return useTimelineStore.subscribe((state, previous) => {
+      if (state.tracks !== previous.tracks) playerRef.current?.setTracks(state.tracks)
+    })
+  }, [])
 
   const snapshot = useCallback(snapshotDraft, [])
 

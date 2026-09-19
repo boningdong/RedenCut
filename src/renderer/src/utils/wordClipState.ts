@@ -1,4 +1,4 @@
-import type { Word, Track } from '@shared/ProjectTypes'
+import type { Word, TrackContent } from '@shared/ProjectTypes'
 import { redactionCoverage } from '@shared/ClipRedactions'
 
 /**
@@ -18,7 +18,7 @@ export type WordClipState = 'normal' | 'clip-muted' | 'no-clip' | 'redacted' | '
  * Falls back to 'normal' for legacy words that have no trackId, so old projects
  * don't show every word as grayed-out.
  */
-export function getWordClipState(word: Word, tracks: Track[]): WordClipState {
+export function getWordClipState(word: Word, tracks: TrackContent[]): WordClipState {
   // Legacy words pre-date trackId — assume normal so they remain fully visible.
   if (!word.trackId) return 'normal'
 

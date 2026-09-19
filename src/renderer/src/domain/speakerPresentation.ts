@@ -1,6 +1,6 @@
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis, SpeakerId } from '@shared/speech.types'
-import type { Track } from '@shared/ProjectTypes'
+import type { TrackContent } from '@shared/ProjectTypes'
 import { TRACK_COLORS, trackPresentationColor } from '@shared/trackColors'
 
 /** Unassigned is a visibility category, never a synthetic speaker identity. */
@@ -31,7 +31,7 @@ export function speakerName(
  * Reserve all track colors before allocating secondary speakers, including tracks added later. */
 export function buildSpeakerColors(
   analyses: RendererSpeechAnalysis[],
-  tracks: Track[],
+  tracks: TrackContent[],
 ): Map<string, string> {
   const colors = new Map<string, string>()
   const used = new Set(

@@ -1,4 +1,4 @@
-import type { Track } from './ProjectTypes'
+import type { TrackContent } from './ProjectTypes'
 import type { RendererSpeechAnalysis } from './speech.types'
 import type { SpeakerIdentityCatalog, SpeakerPerson } from './SpeakerIdentityTypes'
 import { TRACK_COLORS, trackPresentationColor } from './trackColors'
@@ -23,7 +23,7 @@ export function isPersonEditable(
 export function reconcileSpeakerIdentities(
   existing: SpeakerIdentityCatalog | undefined,
   analyses: RendererSpeechAnalysis[],
-  tracks: Track[] = [],
+  tracks: TrackContent[] = [],
 ): SpeakerIdentityCatalog {
   const people = [...(existing?.people ?? [])]
   const used = new Set(

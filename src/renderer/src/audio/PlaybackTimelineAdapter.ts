@@ -1,3 +1,4 @@
+import { hasSamePlaybackStructure } from './PlaybackStructure'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import type {
   AudioSampleProvider,
@@ -34,6 +35,11 @@ export class PlaybackTimelineAdapter implements IAudioPlayer {
     this.durationListeners.forEach((listener) => listener(this.getDuration()))
   }
   setTracks(tracks: Track[]): void {
+    if (hasSamePlaybackStructure(this.tracks, tracks)) {
+      this.tracks = tracks
+      this.raw.setTracks(tracks)
+      return
+    }
     const previous = this.plan
     const position = this.getCurrentTime()
     this.tracks = tracks

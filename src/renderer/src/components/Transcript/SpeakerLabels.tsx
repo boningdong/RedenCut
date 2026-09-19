@@ -3,7 +3,7 @@ import { reconcileSpeakerIdentities } from '@shared/SpeakerIdentityReconciler'
 import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
 import type { RendererSpeechAnalysis } from '@shared/speech.types'
 import { useTranslation } from '../../i18n/useTranslation'
-import { useTimelineStore } from '../../stores/TimelineStore'
+import { useTrackContent } from '../../hooks/UseTrackContent'
 import { useEditorStore } from '../../stores/editor.store'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorHistoryStore } from '../../stores/EditorHistoryStore'
@@ -18,7 +18,7 @@ function UnassignedTag({
   showSource: boolean
 }) {
   const { t } = useTranslation()
-  const tracks = useTimelineStore((state) => state.tracks)
+  const tracks = useTrackContent()
   const sourceName = tracks.find((track) =>
     track.clips.some((clip) => clip.audioSourceId === analysis.audioSourceId),
   )?.name
@@ -62,7 +62,7 @@ export function SpeakerLabels({
   onSave?: (expected: SpeakerIdentityCatalog, next: SpeakerIdentityCatalog) => Promise<void>
 }) {
   const { t } = useTranslation()
-  const tracks = useTimelineStore((s) => s.tracks)
+  const tracks = useTrackContent()
   const stored = useEditorStore((s) => s.session?.speakerIdentities)
   const hidden = useTranscriptStore((s) => s.hiddenSpeakerKeys)
   const historyError = useEditorHistoryStore((s) => s.error)

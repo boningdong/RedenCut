@@ -1,4 +1,4 @@
-import type { Clip, Track } from '@shared/ProjectTypes'
+import type { Clip, TrackContent } from '@shared/ProjectTypes'
 import {
   AcousticSelectionResolver,
   type ResolvedAcousticSelection,
@@ -15,7 +15,7 @@ export interface OccurrenceSelection extends ResolvedAcousticSelection {
 
 export function resolveTranscriptSelection(
   units: TranscriptOccurrence[],
-  tracks?: Track[],
+  tracks?: TrackContent[],
 ): OccurrenceSelection | null {
   const occurrence = units[0]
   if (!occurrence) return null
