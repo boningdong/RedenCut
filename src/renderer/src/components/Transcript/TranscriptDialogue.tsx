@@ -1,4 +1,4 @@
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import type { Track } from '@shared/ProjectTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { TranscriptDialogue } from './TranscriptDialogue'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 function occurrence(

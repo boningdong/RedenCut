@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { RedactionCrossfadeOverlay } from './RedactionCrossfadeOverlay'
+import { RedactionContextMenu } from './RedactionContextMenu'
 import type { Clip, ClipRedaction } from '@shared/ProjectTypes'
 import { useTimelineStore } from '../../stores/TimelineStore'
 import { useTranslation } from '../../i18n/useTranslation'
@@ -17,6 +19,35 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
     selection?.kind === 'redaction' &&
     selection.clipId === clip.id &&
     selection.redactionId === redaction.id
+  const anchor = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLButtonElement>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const editing = selected && selection?.kind === 'redaction' && !!selection.editingCrossfade
+  const closeEditor = useCallback(() => {
+    useTimelineStore.getState().setCrossfadeEditing(clip.id, redaction.id, false)
+    if (body.current?.isConnected) body.current.focus({ preventScroll: true })
+    else onFocusTimeline()
+  }, [clip.id, redaction.id, onFocusTimeline])
+  const closeMenu = useCallback(() => {
+    setMenu(null)
+    body.current?.focus({ preventScroll: true })
+  }, [])
+  useEffect(() => {
+    if (!selected) setMenu(null)
+  }, [selected])
+  useEffect(() => {
+    if (!editing) return
+    return () => {
+      const exists = useTimelineStore
+        .getState()
+        .tracks.some((track) =>
+          track.clips.some(
+            (c) => c.id === clip.id && c.redactions?.some((r) => r.id === redaction.id),
+          ),
+        )
+      if (!exists) onFocusTimeline()
+    }
+  }, [editing, clip.id, redaction.id, onFocusTimeline])
   const [preview, setPreview] = useState<ClipRedaction | null>(null)
   const drag = useRef<{
     edge: 'sourceStart' | 'sourceEnd' | 'move'
@@ -78,7 +109,17 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
   const label = t('waveform.redaction', { start: start.toFixed(2), end: end.toFixed(2) })
   return (
     <div
+      ref={anchor}
       className="clip-redaction"
+      data-crossfade-editing={editing}
+      onContextMenu={(e) => {
+        if (e.altKey) return
+        e.preventDefault()
+        e.stopPropagation()
+        cancel()
+        select()
+        setMenu({ x: e.clientX, y: e.clientY })
+      }}
       data-redaction-id={redaction.id}
       data-selected={selected}
       data-source-start={start}
@@ -139,6 +180,13 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
       onPointerCancel={cancel}
       onLostPointerCapture={cancel}
       onKeyDown={(e) => {
+        if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+          e.preventDefault()
+          e.stopPropagation()
+          select()
+          const rect = anchor.current!.getBoundingClientRect()
+          setMenu({ x: Math.max(8, rect.left), y: Math.max(8, rect.top) })
+        }
         if (e.key === 'Escape' && drag.current) {
           e.preventDefault()
           e.stopPropagation()
@@ -153,16 +201,36 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
         width: `${((end - start) / (clip.sourceEnd - clip.sourceStart)) * 100}%`,
         boxSizing: 'border-box',
         zIndex: selected ? 12 : 10,
-        minWidth: 2,
       }}
     >
+      <RedactionCrossfadeOverlay
+        key={editing ? 'editing' : 'idle'}
+        clip={clip}
+        redaction={range}
+        pxPerSec={pxPerSec}
+        editing={editing}
+        anchor={anchor}
+        onClose={closeEditor}
+      />
+      {menu && selected && (
+        <RedactionContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          onEdit={() => {
+            setMenu(null)
+            useTimelineStore.getState().setCrossfadeEditing(clip.id, redaction.id, true)
+          }}
+        />
+      )}
       <button
+        ref={body}
         type="button"
         aria-label={label}
         aria-pressed={selected}
         title={label}
         onPointerDown={(e) => {
-          if (e.button !== 0 || e.altKey) return
+          if (e.button !== 0 || e.altKey || editing) return
           e.preventDefault()
           e.stopPropagation()
           ownsClick.current = true
@@ -175,7 +243,7 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
           if (e.altKey && !ownsClick.current) return
           ownsClick.current = false
           e.stopPropagation()
-          select()
+          if (!editing) select()
           e.currentTarget.focus({ preventScroll: true })
         }}
         style={{
@@ -190,58 +258,59 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
           touchAction: 'none',
         }}
       />
-      {(['sourceStart', 'sourceEnd'] as const).map((edge) => (
-        <button
-          key={edge}
-          className="redaction-edge"
-          type="button"
-          aria-label={t(
-            edge === 'sourceStart' ? 'waveform.redactionStart' : 'waveform.redactionEnd',
-          )}
-          title={t(edge === 'sourceStart' ? 'waveform.redactionStart' : 'waveform.redactionEnd')}
-          onPointerDown={(e) => {
-            if (e.button !== 0 || e.altKey) return
-            e.preventDefault()
-            e.stopPropagation()
-            ownsClick.current = true
-            select()
-            e.currentTarget.focus({ preventScroll: true })
-            e.currentTarget.setPointerCapture(e.pointerId)
-            drag.current = { edge, x: e.clientX, clip, original: redaction, value: redaction }
-          }}
-          onKeyDown={(e) => {
-            if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return
-            e.preventDefault()
-            e.stopPropagation()
-            select()
-            e.currentTarget.focus({ preventScroll: true })
-            const delta = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 0.1 : 0.01)
-            const value =
-              edge === 'sourceStart'
-                ? Math.max(clip.sourceStart, Math.min(end - 1 / 48000, start + delta))
-                : Math.min(clip.sourceEnd, Math.max(start + 1 / 48000, end + delta))
-            useTimelineStore.getState().updateRedaction(clip.id, redaction.id, {
-              sourceStart: redaction.sourceStart,
-              sourceEnd: redaction.sourceEnd,
-              [edge]: value,
-            })
-          }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            [edge === 'sourceStart' ? 'left' : 'right']: -3,
-            width: 7,
-            padding: 0,
-            minWidth: 0,
-            border: 0,
-            borderRadius: 2,
-            background: 'transparent',
-            cursor: 'ew-resize',
-            touchAction: 'none',
-          }}
-        />
-      ))}
+      {!editing &&
+        (['sourceStart', 'sourceEnd'] as const).map((edge) => (
+          <button
+            key={edge}
+            className="redaction-edge"
+            type="button"
+            aria-label={t(
+              edge === 'sourceStart' ? 'waveform.redactionStart' : 'waveform.redactionEnd',
+            )}
+            title={t(edge === 'sourceStart' ? 'waveform.redactionStart' : 'waveform.redactionEnd')}
+            onPointerDown={(e) => {
+              if (e.button !== 0 || e.altKey || editing) return
+              e.preventDefault()
+              e.stopPropagation()
+              ownsClick.current = true
+              select()
+              e.currentTarget.focus({ preventScroll: true })
+              e.currentTarget.setPointerCapture(e.pointerId)
+              drag.current = { edge, x: e.clientX, clip, original: redaction, value: redaction }
+            }}
+            onKeyDown={(e) => {
+              if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return
+              e.preventDefault()
+              e.stopPropagation()
+              select()
+              e.currentTarget.focus({ preventScroll: true })
+              const delta = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 0.1 : 0.01)
+              const value =
+                edge === 'sourceStart'
+                  ? Math.max(clip.sourceStart, Math.min(end - 1 / 48000, start + delta))
+                  : Math.min(clip.sourceEnd, Math.max(start + 1 / 48000, end + delta))
+              useTimelineStore.getState().updateRedaction(clip.id, redaction.id, {
+                sourceStart: redaction.sourceStart,
+                sourceEnd: redaction.sourceEnd,
+                [edge]: value,
+              })
+            }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              [edge === 'sourceStart' ? 'left' : 'right']: -3,
+              width: 7,
+              padding: 0,
+              minWidth: 0,
+              border: 0,
+              borderRadius: 2,
+              background: 'transparent',
+              cursor: 'ew-resize',
+              touchAction: 'none',
+            }}
+          />
+        ))}
       {overlapping.length > 1 && (
         <button
           className="redaction-cycle"

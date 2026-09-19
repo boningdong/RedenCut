@@ -27,6 +27,7 @@ import type {
 import type { SpeechAnalysisJobId } from '@shared/ipc.types'
 import { setAudioPlayerInstance, type IAudioPlayer } from '@shared/PlayerTypes'
 import { WorkletAudioPlayer } from './audio/WorkletAudioPlayer'
+import { PlaybackTimelineAdapter } from './audio/PlaybackTimelineAdapter'
 import { ContinuousPcmSampleProvider } from './audio/samples/ContinuousPcmSampleProvider'
 import { BinaryWaveformDataProvider } from './components/Waveform/BinaryWaveformDataProvider'
 import type { WaveformDataProvider } from './components/Waveform/WaveformDataProvider'
@@ -39,7 +40,7 @@ import { ExportModal } from './components/Export/ExportModal'
 import { Icon } from './components/ui/Icon'
 import { Button } from './components/ui/Button'
 import { useEditorStore } from './stores/editor.store'
-import { usePlaybackStore } from './stores/playback.store'
+import { usePlaybackStore } from './stores/PlaybackStore'
 import { useTimelineStore } from './stores/TimelineStore'
 import { useTranscriptStore } from './stores/transcript.store'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -149,7 +150,7 @@ export default function App() {
   if (!loadCoordinator.current) {
     loadCoordinator.current = createSessionLoadCoordinator(
       async ({ session: result }: RendererSessionLoad): Promise<PreparedRendererSession> => {
-        const player = new WorkletAudioPlayer()
+        const player = new PlaybackTimelineAdapter(new WorkletAudioPlayer())
         try {
           const waveformProviders = new Map<AudioSourceId, WaveformDataProvider>()
           for (const source of result.sources) {
@@ -164,9 +165,16 @@ export default function App() {
             player,
             waveforms: waveformProviders,
             subscriptions: [
-              player.onTimeUpdate(usePlaybackStore.getState().setCurrentTime),
+              player.onTimeUpdate((time) =>
+                usePlaybackStore.getState().setCurrentTime(time, player.getOutputCurrentTime()),
+              ),
               player.onPlayStateChange(usePlaybackStore.getState().setPlaying),
-              player.onDurationChange(usePlaybackStore.getState().setDuration),
+              player.onDurationChange((duration) => {
+                usePlaybackStore.getState().setDuration(duration, player.getOutputDuration())
+                usePlaybackStore
+                  .getState()
+                  .setCurrentTime(player.getCurrentTime(), player.getOutputCurrentTime())
+              }),
               player.onEnded(() => usePlaybackStore.getState().setPlaying(false)),
               player.onError((playbackError) => setError(normalizePublicError(playbackError))),
               attachRedactionPreview(player),
@@ -204,7 +212,9 @@ export default function App() {
         }
         useTranscriptStore.getState().loadAnalyses(result.speechAnalyses)
         playerSubscriptions.current = prepared.subscriptions
-        usePlaybackStore.getState().setDuration(prepared.player.getDuration())
+        usePlaybackStore
+          .getState()
+          .setDuration(prepared.player.getDuration(), prepared.player.getOutputDuration?.())
         playerRef.current = prepared.player
         setAudioPlayerInstance(prepared.player)
         loadEditorSession(result, request.retainVisibleEditorState || preserveDirty)

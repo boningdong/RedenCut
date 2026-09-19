@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { useTranscriptStore } from '../../stores/transcript.store'
 
 /** Owns viewport movement only; playback and transcript selection remain independent. */

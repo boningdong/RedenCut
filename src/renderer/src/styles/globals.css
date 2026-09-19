@@ -570,17 +570,6 @@ summary:focus-visible,
 }
 
 /* Redactions own hover independently from their containing clip. */
-.clip-redaction {
-  border: 1px solid #a997bf;
-  border-radius: 4px;
-  background: repeating-linear-gradient(135deg, #2b233be0 0 5px, #40324ee0 5px 10px);
-}
-.clip-redaction:hover,
-.clip-redaction[data-selected='true'],
-.clip-redaction:has(> button:not(.redaction-cycle):focus-visible) {
-  border-color: #ddc3ff;
-  background: repeating-linear-gradient(135deg, #382947df 0 5px, #574066df 5px 10px);
-}
 /* Mask and grip carry focus without duplicate outlines around the edge buttons. */
 .clip-redaction > button:not(.redaction-cycle):focus-visible {
   outline: none;
@@ -596,7 +585,6 @@ summary:focus-visible,
   background: var(--color-accent);
   opacity: 0;
 }
-.clip-redaction:hover .redaction-edge::after,
 .clip-redaction[data-selected='true'] .redaction-edge::after {
   opacity: 1;
 }
@@ -623,4 +611,154 @@ summary:focus-visible,
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   cursor: pointer;
+}
+
+/* One rail layer spans the seam and both effective wings, at exactly one CSS pixel. */
+.clip-redaction {
+  --redaction-ink: color-mix(in srgb, var(--color-text-primary) 30%, #9a72bb);
+  border: 0;
+  border-radius: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--redaction-ink) 25%, transparent) 0 4px,
+    color-mix(in srgb, var(--redaction-ink) 42%, transparent) 4px 5px
+  );
+}
+.clip-redaction:hover,
+.clip-redaction[data-selected='true'],
+.clip-redaction:has(> button:not(.redaction-cycle):focus-visible) {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--redaction-ink) 30%, transparent) 0 4px,
+    color-mix(in srgb, var(--redaction-ink) 50%, transparent) 4px 5px
+  );
+}
+.redaction-frame {
+  position: absolute;
+  inset: 0;
+  border-left: 1px solid var(--redaction-ink);
+  border-right: 1px solid var(--redaction-ink);
+  pointer-events: none;
+}
+.crossfade-rails {
+  position: absolute;
+  inset-block: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+        to right,
+        transparent,
+        var(--redaction-ink) var(--fade-width),
+        var(--redaction-ink) calc(100% - var(--fade-width)),
+        transparent
+      )
+      top / 100% 1px no-repeat,
+    linear-gradient(
+        to right,
+        transparent,
+        var(--redaction-ink) var(--fade-width),
+        var(--redaction-ink) calc(100% - var(--fade-width)),
+        transparent
+      )
+      bottom / 100% 1px no-repeat;
+}
+.crossfade-wing {
+  position: absolute;
+  inset-block: 1px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--redaction-ink) 50%, transparent) 4px 5px
+  );
+}
+.crossfade-wing-left {
+  mask-image: linear-gradient(to right, transparent, black);
+}
+.crossfade-wing-right {
+  mask-image: linear-gradient(to right, black, transparent);
+}
+.crossfade-envelope {
+  position: absolute;
+  top: 1px;
+  height: calc(100% - 2px);
+  pointer-events: none;
+  overflow: visible;
+}
+.crossfade-envelope path {
+  fill: none;
+  stroke: var(--redaction-ink);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.crossfade-handle {
+  position: absolute;
+  z-index: 3;
+  top: 35%;
+  height: 30%;
+  width: 7px;
+  min-width: 0;
+  padding: 0;
+  transform: translateX(-50%);
+  background: var(--redaction-ink);
+  border: 1px solid var(--color-bg-primary);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.clip-redaction:not([data-selected='true']) .redaction-edge::after {
+  opacity: 0;
+}
+.crossfade-popover,
+.redaction-context-menu {
+  z-index: 10000;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 5px 24px #0003;
+  font-size: var(--text-sm);
+}
+.crossfade-popover {
+  width: 310px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.crossfade-popover label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.crossfade-popover input[type='number'] {
+  width: 72px;
+}
+.crossfade-popover input,
+.crossfade-popover select {
+  color: inherit;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  padding: 4px;
+}
+.crossfade-popover input:disabled,
+.crossfade-popover select:disabled {
+  opacity: 0.5;
+}
+.crossfade-popover p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.crossfade-popover button,
+.redaction-context-menu button {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.crossfade-popover button {
+  align-self: flex-end;
 }

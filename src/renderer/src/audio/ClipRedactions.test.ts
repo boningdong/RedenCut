@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import type { Track } from '@shared/ProjectTypes'
 import { redactionSkipRanges } from '@shared/RedactionTimeline'
-import { buildTrackPlaybackPlan } from './PlaybackPlan'
+import { buildAudioRenderPlan } from '@shared/audio/AudioRenderPlanBuilder'
 
 const clip = {
   id: 'c',
@@ -48,23 +48,22 @@ it('retained overlapping audio protects time but the redacted track supplies sil
       { ...track, id: 'other', clips: [{ ...clip, redactions: [] }] } as unknown as Track,
     ]),
   ).toEqual([])
-  expect(buildTrackPlaybackPlan(track, 0, 10, 10, false)).toEqual([
+  const plan = buildAudioRenderPlan([track], 'timeline')
+  expect(plan.durationFrames).toBe(480000)
+  expect(plan.tracks[0].contributions).toEqual([
     {
-      kind: 'samples',
-      audioSourceId: 's',
-      sourceFrame: 100,
-      outputFrame: 0,
-      frameCount: 20,
+      clipId: 'c',
+      source: { audioSourceId: 's', sourceStartFrame: 480000, frameCount: 96000 },
+      outputStartFrame: 0,
       gain: 1,
+      envelope: { kind: 'constant' },
     },
-    { kind: 'silence', outputFrame: 20, frameCount: 40 },
     {
-      kind: 'samples',
-      audioSourceId: 's',
-      sourceFrame: 160,
-      outputFrame: 60,
-      frameCount: 40,
+      clipId: 'c',
+      source: { audioSourceId: 's', sourceStartFrame: 768000, frameCount: 192000 },
+      outputStartFrame: 288000,
       gain: 1,
+      envelope: { kind: 'constant' },
     },
   ])
 })

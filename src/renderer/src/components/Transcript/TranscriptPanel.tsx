@@ -30,7 +30,7 @@ import { TranscriptStatusFooter } from './TranscriptStatusFooter'
 
 import { togglePlayback } from '../../actions/PlaybackActions'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useEditorStore, type EditorSelection } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/TimelineStore'

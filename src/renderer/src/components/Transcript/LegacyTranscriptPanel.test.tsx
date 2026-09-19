@@ -5,7 +5,7 @@ import type { Track } from '@shared/ProjectTypes'
 import { TranscriptPanel } from './TranscriptPanel'
 import { useTimelineStore } from '../../stores/TimelineStore'
 import { useTranscriptStore } from '../../stores/transcript.store'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { togglePlayback } from '../../actions/PlaybackActions'
 vi.mock('../../actions/PlaybackActions', () => ({ togglePlayback: vi.fn(async () => {}) }))
 const track: Track = {

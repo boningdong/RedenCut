@@ -2,7 +2,7 @@ import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 import type { Clip, Track } from '@shared/ProjectTypes'
 import { planClipPlacement } from '../domain/TimelinePlacement'
 import { useEditorStore } from '../stores/editor.store'
-import { usePlaybackStore } from '../stores/playback.store'
+import { usePlaybackStore } from '../stores/PlaybackStore'
 import {
   useTimelineClipboardStore,
   type TimelineClipboardClip,
@@ -14,7 +14,10 @@ function cloneClipMetadata(clip: Clip): Clip {
   return {
     ...clip,
     effects: clip.effects.map((effect) => ({ ...effect, params: { ...effect.params } })),
-    redactions: clip.redactions?.map((redaction) => ({ ...redaction })),
+    redactions: clip.redactions?.map((redaction) => ({
+      ...redaction,
+      crossfade: redaction.crossfade ? { ...redaction.crossfade } : undefined,
+    })),
   }
 }
 
@@ -30,6 +33,7 @@ function cloneClipForPaste(clip: Clip, trackId: string): Clip {
     })),
     redactions: clip.redactions?.map((redaction) => ({
       ...redaction,
+      crossfade: redaction.crossfade ? { ...redaction.crossfade } : undefined,
       id: crypto.randomUUID(),
     })),
   }

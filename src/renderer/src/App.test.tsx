@@ -15,7 +15,7 @@ import type { RendererSession, WorkspaceToken } from '@shared/session.types'
 import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 import { useEditorStore } from './stores/editor.store'
 import { useTimelineStore } from './stores/TimelineStore'
-import { usePlaybackStore } from './stores/playback.store'
+import { usePlaybackStore } from './stores/PlaybackStore'
 import { useTranscriptStore } from './stores/transcript.store'
 
 const mocks = vi.hoisted(() => ({
@@ -43,8 +43,19 @@ vi.mock('./audio/WorkletAudioPlayer', () => ({
         )
       this.durationCallbacks.forEach((callback) => callback(this.duration))
     })
+    currentTime = 0
+    timeCallbacks = new Set<(time: number) => void>()
+    getCurrentTime = vi.fn(() => this.currentTime)
+    seekTo = vi.fn((time: number) => {
+      this.currentTime = time
+      this.timeCallbacks.forEach((callback) => callback(time))
+    })
+    setPlaybackMode = vi.fn()
     getDuration = vi.fn(() => this.duration)
-    onTimeUpdate = vi.fn(() => vi.fn())
+    onTimeUpdate = vi.fn((callback: (time: number) => void) => {
+      this.timeCallbacks.add(callback)
+      return () => this.timeCallbacks.delete(callback)
+    })
     onPlayStateChange = vi.fn(() => vi.fn())
     onDurationChange = vi.fn((callback: (duration: number) => void) => {
       this.durationCallbacks.push(callback)
@@ -412,7 +423,7 @@ describe('App transcription job identity', () => {
     act(() => {
       useTimelineStore.getState().setSelectedClipId('clip-A')
       useTimelineStore.getState().splitAt(5)
-      usePlaybackStore.getState().setCurrentTime(4)
+      getAudioPlayerInstance()!.seekTo(4)
       usePlaybackStore.getState().setPlaying(true)
     })
     const player = getAudioPlayerInstance()
@@ -679,7 +690,7 @@ describe('App transcription job identity', () => {
       useTimelineStore.getState().splitAt(5)
       const second = useTimelineStore.getState().tracks[0].clips[1]
       useTimelineStore.getState().moveClip(second.id, 7)
-      usePlaybackStore.getState().setCurrentTime(4)
+      getAudioPlayerInstance()!.seekTo(4)
       usePlaybackStore.getState().setPlaying(true)
     })
     const tracks = useTimelineStore.getState().tracks
@@ -696,7 +707,7 @@ describe('App transcription job identity', () => {
     expect(mocks.players).toHaveLength(1)
     expect(mocks.players[0].pause).not.toHaveBeenCalled()
     expect(mocks.destroyPlayer).not.toHaveBeenCalled()
-    expect(player.setTracks).toHaveBeenLastCalledWith(tracks)
+    expect(useTimelineStore.getState().tracks).toEqual(tracks)
     expect(player.getDuration()).toBe(15)
     expect(usePlaybackStore.getState()).toMatchObject({
       currentTime: 4,

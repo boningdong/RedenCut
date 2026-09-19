@@ -1,7 +1,14 @@
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
-import type { AudioSampleProvider, IAudioPlayer, PlaybackDiagnostics } from '@shared/PlayerTypes'
+import type {
+  AudioSampleProvider,
+  RenderAudioPlayer,
+  PlaybackMode,
+  PlaybackDiagnostics,
+} from '@shared/PlayerTypes'
 import { WORKLET_CODE, sendPcmChunk } from './AudioPlayerWorklet'
-import { buildTrackPlaybackPlan, type PlaybackSegment } from './PlaybackPlan'
+import { buildAudioRenderPlan } from '@shared/audio/AudioRenderPlanBuilder'
+import type { TrackRenderPlan } from '@shared/audio/AudioRenderPlan'
+import { renderTrackBlock } from './TrackBlockRenderer'
 
 const SAMPLE_RATE = 48_000
 const TARGET_FRAMES = SAMPLE_RATE * 2
@@ -17,9 +24,9 @@ interface TrackQueue {
   acknowledgedFrames: number
   queuedFrames: number
   plannedFrames: number
-  plan: PlaybackSegment[]
-  segmentIndex: number
-  segmentOffset: number
+  plan: TrackRenderPlan
+  outputFrame: number
+  endFrame: number
   controller: AbortController
   filling: boolean
   prefillWaiter: PrefillWaiter | null
@@ -31,7 +38,7 @@ interface PrefillWaiter {
   reject: (error: Error) => void
 }
 
-export class WorkletAudioPlayer implements IAudioPlayer {
+export class WorkletAudioPlayer implements RenderAudioPlayer {
   private context: AudioContext | null = null
   private contextInitialization: Promise<void> | null = null
   private contextLifecycle = 0
@@ -39,6 +46,9 @@ export class WorkletAudioPlayer implements IAudioPlayer {
   private destruction: Promise<void> | null = null
   private providers = new Map<AudioSourceId, AudioSampleProvider>()
   private tracks: Track[] = []
+  private mode: PlaybackMode = 'timeline'
+  private planMode: PlaybackMode = 'timeline'
+  private renderPlan = buildAudioRenderPlan([], 'timeline')
   private queues = new Map<string, TrackQueue>()
   private playing = false
   private currentTime = 0
@@ -75,11 +85,13 @@ export class WorkletAudioPlayer implements IAudioPlayer {
 
   setTracks(tracks: Track[]): void {
     if (this.destroyed) return
-    const volumeOnlyChange = hasSamePlaybackStructure(this.tracks, tracks)
+    const volumeOnlyChange =
+      this.planMode === this.mode && hasSamePlaybackStructure(this.tracks, tracks)
+    if (this.context && !volumeOnlyChange) this.suspendForRebuild()
+    this.planMode = this.mode
     this.tracks = tracks
-    const nextDuration = tracks
-      .flatMap((track) => track.clips)
-      .reduce((max, clip) => Math.max(max, clip.outputStart + clip.sourceEnd - clip.sourceStart), 0)
+    this.renderPlan = buildAudioRenderPlan(tracks, this.mode)
+    const nextDuration = this.renderPlan.durationFrames / SAMPLE_RATE
     if (nextDuration !== this.duration) {
       this.duration = nextDuration
       this.durationCallbacks.forEach((callback) => callback(nextDuration))
@@ -90,9 +102,15 @@ export class WorkletAudioPlayer implements IAudioPlayer {
         if (queue) queue.gain.gain.value = track.volume
       }
     } else if (this.context) {
-      this.suspendForRebuild()
+      this.currentTime = Math.min(this.currentTime, this.duration)
       void this.rebuildQueues(this.currentTime).catch((error) => this.emitError(error))
     }
+  }
+
+  setPlaybackMode(mode: PlaybackMode): void {
+    if (mode === this.mode) return
+    this.mode = mode
+    this.setTracks(this.tracks)
   }
 
   async play(): Promise<void> {
@@ -281,7 +299,6 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       queue.gain.disconnect()
     }
     this.queues.clear()
-    const anySolo = this.tracks.some((track) => track.solo)
     for (const track of this.tracks) {
       const channelCount = Math.max(
         1,
@@ -300,7 +317,11 @@ export class WorkletAudioPlayer implements IAudioPlayer {
       gain.gain.value = track.volume
       node.connect(gain)
       gain.connect(this.context!.destination)
-      const plan = buildTrackPlaybackPlan(track, fromTime, this.duration, SAMPLE_RATE, anySolo)
+      const plan = this.renderPlan.tracks.find((candidate) => candidate.trackId === track.id) ?? {
+        trackId: track.id,
+        volume: track.volume,
+        contributions: [],
+      }
       const queue: TrackQueue = {
         node,
         gain,
@@ -308,10 +329,13 @@ export class WorkletAudioPlayer implements IAudioPlayer {
         sentFrames: 0,
         acknowledgedFrames: 0,
         queuedFrames: 0,
-        plannedFrames: plan.reduce((total, segment) => total + segment.frameCount, 0),
+        plannedFrames: Math.max(
+          0,
+          this.renderPlan.durationFrames - Math.round(fromTime * SAMPLE_RATE),
+        ),
         plan,
-        segmentIndex: 0,
-        segmentOffset: 0,
+        outputFrame: Math.round(fromTime * SAMPLE_RATE),
+        endFrame: this.renderPlan.durationFrames,
         controller: new AbortController(),
         filling: false,
         prefillWaiter: null,
@@ -384,10 +408,9 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     try {
       while (
         queue.queuedFrames + this.inFlightFrames(queue) < TARGET_FRAMES &&
-        queue.segmentIndex < queue.plan.length
+        queue.outputFrame < queue.endFrame
       ) {
-        const segment = queue.plan[queue.segmentIndex]
-        const remaining = segment.frameCount - queue.segmentOffset
+        const remaining = queue.endFrame - queue.outputFrame
         const count = Math.min(
           READ_FRAMES,
           remaining,
@@ -395,50 +418,20 @@ export class WorkletAudioPlayer implements IAudioPlayer {
           MAX_FRAMES - queue.queuedFrames - this.inFlightFrames(queue),
         )
         if (count <= 0) break
-        let channels: Float32Array[]
-        let gain = 1
-        if (segment.kind === 'silence') {
-          channels = [new Float32Array(count)]
-        } else {
-          const provider = this.providers.get(segment.audioSourceId)
-          if (!provider) throw new Error(`Missing PCM provider for ${segment.audioSourceId}`)
-          const chunk = await provider.readFrames(
-            segment.sourceFrame + queue.segmentOffset,
-            count,
-            queue.controller.signal,
-          )
-          if (generation !== queue.generation) return
-          if (
-            !Number.isInteger(chunk.frameCount) ||
-            chunk.frameCount < 0 ||
-            chunk.frameCount > count
-          )
-            throw new Error('PCM provider returned an invalid frame count')
-          if (
-            chunk.channels.length !== provider.channels ||
-            chunk.channels.some((channel) => channel.length !== chunk.frameCount)
-          )
-            throw new Error('PCM provider returned an invalid channel layout')
-          channels = Array.from({ length: provider.channels }, (_, channelIndex) => {
-            const source = chunk.channels[channelIndex]
-            if (chunk.frameCount === count && source?.length === count) return source
-            const padded = new Float32Array(count)
-            if (source)
-              padded.set(source.subarray(0, Math.min(source.length, chunk.frameCount, count)))
-            return padded
-          })
-          gain = segment.gain
-          this.diagnostics.maximumReadFrames = Math.max(this.diagnostics.maximumReadFrames, count)
-        }
-        sendPcmChunk(queue.node.port, { type: 'pcm', generation, channels, gain })
+        const channels = await renderTrackBlock(
+          queue.plan,
+          queue.outputFrame,
+          count,
+          this.providers,
+          queue.controller.signal,
+        )
+        if (generation !== queue.generation) return
+        this.diagnostics.maximumReadFrames = Math.max(this.diagnostics.maximumReadFrames, count)
+        sendPcmChunk(queue.node.port, { type: 'pcm', generation, channels, gain: 1 })
         queue.sentFrames += count
-        queue.segmentOffset += count
-        if (queue.segmentOffset === segment.frameCount) {
-          queue.segmentIndex++
-          queue.segmentOffset = 0
-        }
+        queue.outputFrame += count
       }
-      if (queue.segmentIndex === queue.plan.length) {
+      if (queue.outputFrame >= queue.endFrame) {
         queue.node.port.postMessage({ type: 'end', generation })
       }
     } catch (error) {
@@ -521,7 +514,7 @@ export class WorkletAudioPlayer implements IAudioPlayer {
     if (
       !queue.prefillWaiter ||
       queue.filling ||
-      queue.segmentIndex === queue.plan.length ||
+      queue.outputFrame >= queue.endFrame ||
       queue.queuedFrames + this.inFlightFrames(queue) >= TARGET_FRAMES
     )
       return

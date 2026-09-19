@@ -1,3 +1,8 @@
+import {
+  DEFAULT_CROSSFADE_SETTINGS,
+  CrossfadeSettingsSchema,
+  type CrossfadeSettings,
+} from '@shared/audio/CrossfadeTypes'
 // ─────────────────────────────────────────────────────────────────────────────
 // Timeline Store (Zustand)
 //
@@ -48,7 +53,10 @@ function cloneTracks(tracks: Track[]): Track[] {
     clips: t.clips.map((c) => ({
       ...c,
       effects: [...c.effects],
-      redactions: c.redactions?.map((r) => ({ ...r })),
+      redactions: c.redactions?.map((r) => ({
+        ...r,
+        crossfade: r.crossfade ? { ...r.crossfade } : undefined,
+      })),
     })),
     effects: [...t.effects],
   }))
@@ -185,9 +193,11 @@ interface TimelineState {
   selectedClipIds: string[]
   timelineSelection:
     | { kind: 'clip'; clipId: string }
-    | { kind: 'redaction'; clipId: string; redactionId: string }
+    | { kind: 'redaction'; clipId: string; redactionId: string; editingCrossfade?: boolean }
     | null
   selectRedaction(clipId: string, redactionId: string): void
+  setCrossfadeEditing(clipId: string, redactionId: string, editing: boolean): void
+  updateRedactionCrossfade(clipId: string, redactionId: string, settings: CrossfadeSettings): void
   updateRedaction(
     clipId: string,
     redactionId: string,
@@ -619,6 +629,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         .filter((r) => r.sourceStart < targetClip.sourceStart + offset)
         .map((r) => ({
           ...r,
+          crossfade: r.crossfade ? { ...r.crossfade } : undefined,
           id: nextId('redaction'),
           sourceEnd: Math.min(r.sourceEnd, targetClip.sourceStart + offset),
         })),
@@ -633,6 +644,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         .filter((r) => r.sourceEnd > targetClip.sourceStart + offset)
         .map((r) => ({
           ...r,
+          crossfade: r.crossfade ? { ...r.crossfade } : undefined,
           id: nextId('redaction'),
           sourceStart: Math.max(r.sourceStart, targetClip.sourceStart + offset),
         })),
@@ -708,6 +720,55 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       selectedTrackId: track.id,
       timelineSelection: { kind: 'redaction', clipId, redactionId },
     })
+  },
+
+  setCrossfadeEditing(clipId, redactionId, editing) {
+    const selection = get().timelineSelection
+    if (
+      !editing &&
+      (selection?.kind !== 'redaction' ||
+        selection.clipId !== clipId ||
+        selection.redactionId !== redactionId)
+    )
+      return
+    if (editing) get().selectRedaction(clipId, redactionId)
+    const current = get().timelineSelection
+    if (
+      current?.kind === 'redaction' &&
+      current.clipId === clipId &&
+      current.redactionId === redactionId
+    ) {
+      set({ timelineSelection: { ...current, editingCrossfade: editing } })
+    }
+  },
+
+  updateRedactionCrossfade(clipId, redactionId, settings) {
+    const parsed = CrossfadeSettingsSchema.safeParse(settings)
+    if (!parsed.success) return
+    const { tracks } = get()
+    const redaction = tracks
+      .flatMap((t) => t.clips)
+      .find((c) => c.id === clipId)
+      ?.redactions?.find((r) => r.id === redactionId)
+    if (!redaction || JSON.stringify(redaction.crossfade) === JSON.stringify(parsed.data)) return
+    set((s) => ({
+      tracks: tracks.map((t) => ({
+        ...t,
+        clips: t.clips.map((c) =>
+          c.id === clipId
+            ? {
+                ...c,
+                redactions: c.redactions?.map((r) =>
+                  r.id === redactionId ? { ...r, crossfade: { ...parsed.data } } : r,
+                ),
+              }
+            : c,
+        ),
+      })),
+      undoStack: [...s.undoStack, { before: cloneTracks(tracks), label: 'Edit crossfade' }],
+      redoStack: [],
+    }))
+    markTimelineEdited()
   },
 
   updateRedaction(clipId, redactionId, range, mode = 'resize') {
@@ -934,7 +995,12 @@ function addRedactions(clips: Clip[], startTime: number, endTime: number, trackI
       trackId,
       redactions: [
         ...(clip.redactions ?? []),
-        { id: nextId('redaction'), sourceStart: effectiveMuteStart, sourceEnd: effectiveMuteEnd },
+        {
+          id: nextId('redaction'),
+          sourceStart: effectiveMuteStart,
+          sourceEnd: effectiveMuteEnd,
+          crossfade: { ...DEFAULT_CROSSFADE_SETTINGS },
+        },
       ],
     })
   }

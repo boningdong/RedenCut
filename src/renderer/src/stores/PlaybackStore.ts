@@ -20,16 +20,18 @@ import { create } from 'zustand'
 
 interface PlaybackState {
   isPlaying: boolean
-  currentTime: number // seconds — updated on every animation tick
-  duration: number // seconds — set once when audio is loaded
+  currentTime: number // editing timeline seconds
+  duration: number // editing timeline seconds
+  outputCurrentTime: number
+  outputDuration: number
 
   timelineRevealRequest: { time: number } | null
   revealTimelineTime: (time: number) => void
 
   // ── Actions ──────────────────────────────────────────────────────────────
   setPlaying: (playing: boolean) => void
-  setCurrentTime: (time: number) => void
-  setDuration: (duration: number) => void
+  setCurrentTime: (time: number, outputTime?: number) => void
+  setDuration: (duration: number, outputDuration?: number) => void
   reset: () => void
 }
 
@@ -37,6 +39,8 @@ const initialState = {
   isPlaying: false,
   currentTime: 0,
   duration: 0,
+  outputCurrentTime: 0,
+  outputDuration: 0,
   timelineRevealRequest: null,
 }
 
@@ -44,8 +48,9 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
   ...initialState,
 
   setPlaying: (playing) => set({ isPlaying: playing }),
-  setCurrentTime: (time) => set({ currentTime: time }),
-  setDuration: (duration) => set({ duration }),
+  setCurrentTime: (time, outputTime = time) =>
+    set({ currentTime: time, outputCurrentTime: outputTime }),
+  setDuration: (duration, outputDuration = duration) => set({ duration, outputDuration }),
 
   // A fresh request also handles clicking the same word after manually scrolling away.
   revealTimelineTime: (time) => set({ timelineRevealRequest: { time } }),

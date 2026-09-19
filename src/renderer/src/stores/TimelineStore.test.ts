@@ -823,3 +823,53 @@ it('atomically redacts continuous sibling clips, retains other occurrences and u
   )
   expect(tl().tracks).toEqual([track])
 })
+
+describe('redaction crossfade settings', () => {
+  beforeEach(() => {
+    resetAll()
+    const source = managedSource(1, 10)
+    tl().addAudioSource(source)
+    tl().addTrack('Voice', source.id)
+    tl().redactRange(tl().tracks[0].id, 2, 3)
+  })
+  it('enables new redactions at 30 ms equal power', () => {
+    expect(primaryClips()[0].redactions![0].crossfade).toEqual({
+      enabled: true,
+      durationMs: 30,
+      curve: 'equal-power',
+    })
+  })
+  it('updates settings atomically and preserves disabled parameters through undo', async () => {
+    const clip = primaryClips()[0]
+    const r = clip.redactions![0]
+    tl().updateRedactionCrossfade(clip.id, r.id, {
+      enabled: false,
+      durationMs: 55,
+      curve: 'linear',
+    })
+    expect(primaryClips()[0].redactions![0].crossfade).toEqual({
+      enabled: false,
+      durationMs: 55,
+      curve: 'linear',
+    })
+    await tl().undo()
+    expect(primaryClips()[0].redactions![0].crossfade?.durationMs).toBe(30)
+    await tl().redo()
+    expect(primaryClips()[0].redactions![0].crossfade?.durationMs).toBe(55)
+  })
+  it('ignores invalid settings and isolates split settings', () => {
+    const clip = primaryClips()[0]
+    const r = clip.redactions![0]
+    const count = tl().undoStack.length
+    tl().updateRedactionCrossfade(clip.id, r.id, {
+      enabled: true,
+      durationMs: NaN,
+      curve: 'linear',
+    })
+    expect(tl().undoStack).toHaveLength(count)
+    tl().setSelectedClipId(clip.id)
+    tl().splitAt(2.5)
+    const [left, right] = primaryClips()
+    expect(left.redactions![0].crossfade).not.toBe(right.redactions![0].crossfade)
+  })
+})

@@ -59,8 +59,10 @@ The audio toolbar exposes the same context-dependent split, mute/redact and dele
 Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.
 
 Clip Mute, Track Mute and Solo control audibility only; muted speech dims and leaves simultaneous-speech presentation without a redaction strike-through.
-The Preview edits toggle skips redacted sections during playback.
-Export always removes those same intervals by default, even when Preview is off; retained overlapping audio, ordinary track mute, and natural gaps follow the same timeline rules.
+The Preview edits toggle renders the edited output, removing eligible redacted sections and overlapping their enabled crossfade regions.
+The waveform, clip positions, transcript seeks and editing shortcuts retain editing-time coordinates; the transport counter and total duration show the current playback mode’s output time.
+Export uses the same edited render plan regardless of Preview; retained overlapping audio, ordinary track mute, and natural gaps follow the same eligibility rules.
+An enabled crossfade with equal 30 ms adjacent source regions shortens output by an additional 30 ms while keeping clip positions unchanged.
 `clip.redactions` stores independent source-relative overlays; `clip.muted` and `track.muted` are ordinary mute controls.
 Click an overlay to select it, then Delete to restore its coverage; hold Option/Alt to select or drag the underlying clip through an overlay.
 Drag the overlay body to move its range without changing duration, or either edge to preview its bounds, release to commit one undoable edit, or Escape to cancel.
@@ -70,6 +72,16 @@ Overlays fill the clip height; hover highlights the overlay independently from i
 Overlapping overlays keep separate identities; the count button selects the next overlapping object and raises it above its peers.
 Option/Alt bypass is decided when the pointer gesture starts; pressing or releasing it during a drag does not change the target.
 Moving a trimmed overlay translates its full stored range, preserving hidden metadata while constraining its visible portion to the clip.
+
+New redactions start with a 30 ms equal-power crossfade; existing redactions without settings keep their previous behavior.
+Right-click an overlay, or use Shift+F10/the context-menu key while it is focused, then choose Edit crossfade to open its floating editor.
+The single menu entry leads to an editor containing enable, duration and curve controls; disabling preserves the chosen settings.
+The editor appears above the visible overlay when space permits, flips below or clamps inside the viewport, and closes when the anchor leaves view.
+Idle and ordinarily selected overlays hide crossfade envelopes and handles; only crossfade editing exposes those controls.
+Drag either crossfade handle to change both adjacent region widths together; release commits one undoable edit, and Escape cancels the active gesture.
+Escape without an active gesture, Done, or an outside click returns to ordinary overlay selection.
+Keyboard input inside the floating editor stays local, so Space, arrows and Delete cannot trigger background audio edits.
+
 
 ## Native Menu Routing
 

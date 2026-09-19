@@ -306,3 +306,193 @@ it('finishes pointer edge resizing without leaving selection or handle focus', (
   expect(document.activeElement).not.toBe(handle)
   expect(state().undoStack).toHaveLength(1)
 })
+
+it('opens a single crossfade menu entry and a portal editor with a preserved enable toggle', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  const { container } = render(<View />)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByLabelText('Crossfade duration')).toBeNull()
+  fireEvent.contextMenu(screen.getByRole('button', { name: 'Redaction 12.00–15.00 s' }), {
+    clientX: 150,
+    clientY: 320,
+  })
+  expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit crossfade…' }))
+  const panel = screen.getByRole('dialog', { name: 'Edit crossfade' })
+  expect(container.contains(panel)).toBe(false)
+  const toggle = screen.getByRole('checkbox', { name: 'Enable crossfade' })
+  expect((toggle as HTMLInputElement).checked).toBe(false)
+  fireEvent.click(toggle)
+  fireEvent.change(screen.getByLabelText('Crossfade duration'), { target: { value: '45' } })
+  fireEvent.click(toggle)
+  expect(state().tracks[0].clips[0].redactions![0].crossfade).toEqual({
+    enabled: false,
+    durationMs: 45,
+    curve: 'equal-power',
+  })
+  fireEvent.keyDown(panel, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(state().timelineSelection).toMatchObject({ kind: 'redaction', editingCrossfade: false })
+  expect(document.activeElement).toBe(
+    screen.getByRole('button', { name: 'Redaction 12.00–15.00 s' }),
+  )
+  vi.restoreAllMocks()
+})
+
+it('previews equal crossfade widths and cancels or commits a handle gesture as one edit', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  render(<View />)
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Redaction 12.00–15.00 s' }), {
+    key: 'F10',
+    shiftKey: true,
+  })
+  fireEvent.click(screen.getByRole('menuitem'))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Enable crossfade' }))
+  const count = state().undoStack.length
+  const handle = screen.getByRole('slider', { name: 'Adjust right crossfade' })
+  fireEvent.pointerDown(handle, { button: 0, clientX: 100 })
+  fireEvent.pointerMove(handle, { clientX: 100.3 })
+  expect(state().undoStack).toHaveLength(count)
+  expect(
+    screen.getByRole('slider', { name: 'Adjust left crossfade' }).getAttribute('aria-valuenow'),
+  ).toBe(handle.getAttribute('aria-valuenow'))
+  fireEvent.keyDown(handle, { key: 'Escape' })
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBe(30)
+  fireEvent.pointerDown(handle, { button: 0, clientX: 100 })
+  fireEvent.pointerMove(handle, { clientX: 100.3 })
+  fireEvent.pointerUp(handle)
+  expect(state().undoStack).toHaveLength(count + 1)
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBeCloseTo(60)
+  vi.restoreAllMocks()
+})
+
+it('cancels an unfinished crossfade drag when another object is selected', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  render(<View />)
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Enable crossfade' }))
+  const handle = screen.getByRole('slider', { name: 'Adjust right crossfade' })
+  fireEvent.pointerDown(handle, { button: 0, clientX: 100 })
+  fireEvent.pointerMove(handle, { clientX: 100.5 })
+  act(() => state().setSelectedClipId('c'))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  expect((screen.getByLabelText('Crossfade duration') as HTMLInputElement).value).toBe('30')
+  vi.restoreAllMocks()
+})
+
+it('dismisses an offscreen editor and cancels its draft on scrolling', () => {
+  const rect = {
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  }
+  const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect)
+  render(<View />)
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Enable crossfade' }))
+  const count = state().undoStack.length
+  const handle = screen.getByRole('slider', { name: 'Adjust right crossfade' })
+  fireEvent.pointerDown(handle, { button: 0, clientX: 100 })
+  fireEvent.pointerMove(handle, { clientX: 100.5 })
+  bounds.mockReturnValue({ ...rect, left: -300, right: -100 })
+  fireEvent.scroll(window)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(state().undoStack).toHaveLength(count)
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBe(30)
+  vi.restoreAllMocks()
+})
+
+it('keeps local input shortcuts away from the timeline and closes on outside click', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  const background = vi.fn()
+  window.addEventListener('keydown', background)
+  render(<View />)
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  fireEvent.keyDown(screen.getByRole('checkbox'), { key: 'Delete' })
+  expect(background).not.toHaveBeenCalled()
+  fireEvent.pointerDown(document.body)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  window.removeEventListener('keydown', background)
+  vi.restoreAllMocks()
+})
+
+it('shows only effective hatch wings while idle and selected, with fade controls only in edit mode', () => {
+  state().updateRedactionCrossfade('c', 'r', {
+    enabled: true,
+    durationMs: 30,
+    curve: 'equal-power',
+  })
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  render(<View />)
+  expect(document.querySelectorAll('.crossfade-wing')).toHaveLength(2)
+  expect(document.querySelectorAll('.crossfade-envelope')).toHaveLength(0)
+  expect(screen.queryAllByRole('slider')).toHaveLength(0)
+  act(() => state().selectRedaction('c', 'r'))
+  expect(screen.queryAllByRole('slider')).toHaveLength(0)
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  expect(screen.getAllByRole('slider')).toHaveLength(2)
+  expect(screen.queryByRole('button', { name: 'Adjust redaction start' })).toBeNull()
+  expect(document.querySelectorAll('.crossfade-envelope')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('checkbox'))
+  expect(document.querySelectorAll('.crossfade-wing')).toHaveLength(0)
+  expect(screen.queryAllByRole('slider')).toHaveLength(0)
+  vi.restoreAllMocks()
+})

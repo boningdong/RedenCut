@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { AudioSourceId, Clip, Track } from '@shared/ProjectTypes'
 import { useEditorStore } from '../stores/editor.store'
-import { usePlaybackStore } from '../stores/playback.store'
+import { usePlaybackStore } from '../stores/PlaybackStore'
 import { useTimelineClipboardStore } from '../stores/TimelineClipboardStore'
 import { useTimelineStore } from '../stores/TimelineStore'
 import { copyClips, cutClips, duplicateClips, pasteClips } from './ClipClipboardActions'
@@ -179,4 +179,27 @@ describe('clip clipboard actions', () => {
     expect(useTimelineStore.getState().tracks).toBe(before)
     expect(useTimelineStore.getState().undoStack).toHaveLength(0)
   })
+})
+
+it('copies crossfade settings independently from the original and clipboard', () => {
+  useTimelineStore.getState().reset()
+  useEditorStore.getState().reset()
+  useTimelineClipboardStore.getState().clear()
+  const original = clip('a', 'track-a', 0)
+  original.redactions![0].crossfade = { enabled: true, durationMs: 40, curve: 'linear' }
+  useTimelineStore.setState({
+    tracks: [track('track-a', [original])],
+    selectedClipIds: ['a'],
+    selectedClipId: 'a',
+    selectedTrackId: 'track-a',
+  })
+  usePlaybackStore.getState().setCurrentTime(4)
+  expect(copyClips()).toBe(true)
+  const copied = useTimelineClipboardStore.getState().contents!.clips[0].clip
+  expect(copied.redactions![0].crossfade).toEqual(original.redactions![0].crossfade)
+  expect(copied.redactions![0].crossfade).not.toBe(original.redactions![0].crossfade)
+  expect(pasteClips()).toBe(true)
+  const pasted = allClips().find((item) => item.id !== 'a')!
+  expect(pasted.redactions![0].crossfade).toEqual(copied.redactions![0].crossfade)
+  expect(pasted.redactions![0].crossfade).not.toBe(copied.redactions![0].crossfade)
 })

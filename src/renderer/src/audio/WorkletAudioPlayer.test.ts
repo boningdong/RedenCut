@@ -744,6 +744,53 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     await player.destroy()
   })
 
+  it('renders edited overlap with unity worklet gain and keeps timeline mode silence', async () => {
+    const player = new WorkletAudioPlayer()
+    const samples = provider()
+    samples.readFrames = vi.fn(async (startFrame, frameCount) => ({
+      startFrame,
+      frameCount,
+      channels: [new Float32Array(frameCount).fill(0.5)],
+    }))
+    await player.registerAudioSource(SOURCE_ID, samples)
+    const original = track('fade', 0, 2)
+    original.clips[0].gain = 0.5
+    original.clips[0].redactions = [
+      {
+        id: 'r',
+        sourceStart: 0.8,
+        sourceEnd: 1.04,
+        crossfade: { enabled: true, durationMs: 30, curve: 'linear' },
+      },
+    ]
+    player.setTracks([original])
+    player.setPlaybackMode('edited')
+    expect(player.getDuration()).toBe(1.73)
+    await player.play()
+    const messages = FakeNode.instances[0].port.messages.filter(
+      ({ message }) => message.type === 'pcm',
+    )
+    const rendered = messages.flatMap(({ message }) =>
+      Array.from((message.channels as Float32Array[])[0]),
+    )
+    expect(rendered).toHaveLength(83040)
+    expect(messages.every(({ message }) => message.gain === 1)).toBe(true)
+    // A constant source under linear overlap must remain constant, including clip gain exactly once.
+    expect(Math.max(...rendered.slice(36960, 38400))).toBeCloseTo(0.25, 6)
+    expect(Math.min(...rendered.slice(36960, 38400))).toBeCloseTo(0.25, 6)
+    player.setPlaybackMode('timeline')
+    await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(2))
+    await vi.waitFor(() => expect(sentPcmFrames(FakeNode.instances[1])).toBe(96000))
+    const timeline = FakeNode.instances[1].port.messages
+      .filter(({ message }) => message.type === 'pcm')
+      .flatMap(({ message }) => Array.from((message.channels as Float32Array[])[0]))
+    expect(player.getDuration()).toBe(2)
+    expect(timeline[40000]).toBe(0)
+    expect(timeline[50000]).toBe(0.25)
+    expect(FakeNode.instances[0].disconnect).toHaveBeenCalledOnce()
+    await player.destroy()
+  })
+
   it('rejects caches that are not the 48 kHz processing format', async () => {
     const player = new WorkletAudioPlayer()
     await expect(

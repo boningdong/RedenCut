@@ -13,7 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation'
 
 import React, { useCallback } from 'react'
 import { togglePlayback } from '../../actions/PlaybackActions'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { useEditorStore } from '../../stores/editor.store'
 import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 import { useTimelineStore } from '../../stores/TimelineStore'
@@ -46,8 +46,8 @@ export function TransportBar({
   const redo = useTimelineStore((s) => s.redo)
   const hasAudio = useTimelineStore((s) => s.tracks.some((track) => track.clips.length > 0))
   const isPlaying = usePlaybackStore((s) => s.isPlaying)
-  const currentTime = usePlaybackStore((s) => s.currentTime)
-  const duration = usePlaybackStore((s) => s.duration)
+  const outputTime = usePlaybackStore((s) => s.outputCurrentTime)
+  const outputDuration = usePlaybackStore((s) => s.outputDuration)
 
   const previewMode = useEditorStore((s) => s.previewMode)
   const togglePreviewMode = useEditorStore((s) => s.togglePreviewMode)
@@ -92,8 +92,8 @@ export function TransportBar({
       </div>
       <div className="transport-playback">
         <div className="transport-time">
-          <span>{formatTime(currentTime)}</span>
-          <small>/ {formatTime(duration)}</small>
+          <span>{formatTime(outputTime)}</span>
+          <small>/ {formatTime(outputDuration)}</small>
         </div>
         {/* Skip to start */}
         <Button

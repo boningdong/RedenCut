@@ -2,7 +2,7 @@ import React, { memo, type RefObject } from 'react'
 import { seekFromTranscript } from '../../actions/PlaybackActions'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 import { hasValidatedTiming } from '../../domain/transcriptReliability'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { useTranslation } from '../../i18n/useTranslation'
 
 export const CanonicalTranscriptUnit = memo(function CanonicalTranscriptUnit({

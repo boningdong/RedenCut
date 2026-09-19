@@ -1,0 +1,104 @@
+import { useEffect, useRef, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
+import type { CrossfadeSettings } from '@shared/audio/CrossfadeTypes'
+import { useTranslation } from '../../i18n/useTranslation'
+import { useAnchoredPopover } from './UseAnchoredPopover'
+
+export function CrossfadePopover({
+  anchor,
+  settings,
+  status,
+  grouped,
+  onChange,
+  onClose,
+  onEscape,
+}: {
+  anchor: RefObject<HTMLElement | null>
+  settings: CrossfadeSettings
+  status: string
+  grouped: boolean
+  onChange(settings: CrossfadeSettings): void
+  onClose(): void
+  onEscape(): void
+}) {
+  const { t } = useTranslation()
+  const ref = useRef<HTMLDivElement>(null)
+  const position = useAnchoredPopover(anchor, ref, onClose)
+  useEffect(() => {
+    ref.current?.querySelector('input')?.focus({ preventScroll: true })
+  }, [])
+  useEffect(() => {
+    const outside = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node) && !anchor.current?.contains(e.target as Node))
+        onClose()
+    }
+    window.addEventListener('pointerdown', outside)
+    return () => window.removeEventListener('pointerdown', outside)
+  }, [anchor, onClose])
+  return createPortal(
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={t('waveform.editCrossfade')}
+      className="crossfade-popover"
+      style={{ position: 'fixed', ...position }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          onEscape()
+        }
+      }}
+    >
+      <strong>{t('waveform.editCrossfade')}</strong>
+      <label>
+        <input
+          type="checkbox"
+          checked={settings.enabled}
+          onChange={(e) => onChange({ ...settings, enabled: e.target.checked })}
+        />
+        {t('waveform.enableCrossfade')}
+      </label>
+      <label>
+        {t('waveform.crossfadeDuration')}
+        <input
+          aria-label={t('waveform.crossfadeDuration')}
+          type="number"
+          min={1}
+          max={100}
+          step={1}
+          value={settings.durationMs}
+          disabled={!settings.enabled}
+          onChange={(e) => {
+            const durationMs = e.currentTarget.valueAsNumber
+            if (Number.isFinite(durationMs) && durationMs >= 1 && durationMs <= 100)
+              onChange({ ...settings, durationMs })
+          }}
+        />
+        <span>ms</span>
+      </label>
+      <label>
+        {t('waveform.crossfadeCurve')}
+        <select
+          aria-label={t('waveform.crossfadeCurve')}
+          value={settings.curve}
+          disabled={!settings.enabled}
+          onChange={(e) =>
+            onChange({ ...settings, curve: e.target.value as CrossfadeSettings['curve'] })
+          }
+        >
+          <option value="equal-power">{t('waveform.crossfadeEqualPower')}</option>
+          <option value="linear">{t('waveform.crossfadeLinear')}</option>
+        </select>
+      </label>
+      <p role="status">{status}</p>
+      {grouped && <p>{t('waveform.crossfadeGrouped')}</p>}
+      <button type="button" onClick={onClose}>
+        {t('waveform.crossfadeDone')}
+      </button>
+    </div>,
+    document.body,
+  )
+}

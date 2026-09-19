@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
-import { usePlaybackStore } from '../../stores/playback.store'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
 import { useTranscriptStore } from '../../stores/transcript.store'
 import { useTranscriptPlaybackFollow } from './UseTranscriptPlaybackFollow'
 
