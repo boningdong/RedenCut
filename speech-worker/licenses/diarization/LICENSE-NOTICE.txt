@@ -1,0 +1,6 @@
+pyannote/speaker-diarization-community-1 is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+
+License summary and legal code: https://creativecommons.org/licenses/by/4.0/
+Attribution: pyannote community-1 speaker diarization pipeline and its component authors.
+
+The upstream model card cites Alexis Plaquet and Hervé Bredin for speaker segmentation; Hongji Wang, Chengdong Liang, Shuai Wang, Zhengyang Chen, Binbin Zhang, Xu Xiang, Yanlei Deng, and Yanmin Qian for the WeSpeaker embedding model; and Federico Landini, Ján Profant, Mireia Diez, and Lukáš Burget for VBx speaker clustering. Full citations and acknowledgments are preserved in UPSTREAM-README.md.

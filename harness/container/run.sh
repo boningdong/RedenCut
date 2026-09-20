@@ -18,6 +18,12 @@ else
   set -- "${REDENCUT_HARNESS_IMAGE:-redencut-harness:local}" "$@"
 fi
 
+# Managed diarization is independent of app-downloaded Whisper/alignment fixtures.
+managed_models=${REDENCUT_TEST_MANAGED_MODEL_FIXTURE:-$repository/.runtime/models}
+if [ -d "$managed_models" ]; then
+  set -- --mount "type=bind,source=$managed_models,target=/managed-models,readonly" "$@"
+fi
+
 # Docker's current context selects OrbStack or another compatible engine.
 # No TTY, host display/socket sharing, network ports, or privileged mode.
 exec docker run --rm -i --stop-timeout 20 --shm-size 1g \
@@ -33,5 +39,6 @@ exec docker run --rm -i --stop-timeout 20 --shm-size 1g \
   --env REDENCUT_SPEECH_WORKER_ROOT=/opt/redencut-speech-worker \
   --env REDENCUT_SPEECH_MANIFEST=/opt/redencut-speech-worker/models.json \
   --env REDENCUT_SPEECH_MODEL_CACHE=/models \
+  --env REDENCUT_MODELS_ROOT=/managed-models \
   --env REDENCUT_WHISPER_MODEL_DIR=/models/transcription-smoke-multilingual-tiny/5359861c739e955e79d9a303bcbc70fb988958b1 \
   "$@"

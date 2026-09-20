@@ -250,3 +250,7 @@
 .dev-summary > .status {
   flex-shrink: 0;
 }
+
+.dev-block-footer > .recheck-action:only-child {
+  margin-left: auto;
+}

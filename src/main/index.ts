@@ -3,19 +3,15 @@ import { MediaRecoveryService } from './project/MediaRecoveryService'
 import { registerMediaRecoveryIpc } from './ipc/MediaRecoveryIpc'
 import { registerSpeakerIdentityIpc } from './ipc/SpeakerIdentityIpc'
 import appIcon from './assets/icons/macos/neon-dark-lavender.xcassets/AppIcon.appiconset/1024-mac.png?asset'
-import { LocalHuggingFaceLogin } from './speech/huggingface/LocalHuggingFaceLogin'
 import { DevelopmentEnvironmentChecker } from './runtime/DevelopmentEnvironmentChecker'
 import { createModelLoadValidator } from './resources/validateModelLoad'
-import { readFile } from 'node:fs/promises'
-import { safeStorage } from 'electron'
+import { readFile, rm } from 'node:fs/promises'
 import { ModelManifestSchema } from '../shared/modelManifest.schema'
 import { ResourceManager } from './resources/ResourceManager'
+import { managedModelLocation } from './resources/ManagedModelLocation'
 import { ModelRegistry } from './resources/ModelRegistry'
 import { ModelDownloader } from './resources/ModelDownloader'
-import { HuggingFaceTokenStore } from './speech/huggingface/HuggingFaceTokenStore'
-import { HuggingFaceAccessService } from './speech/huggingface/HuggingFaceAccessService'
 import { registerResourcesIpc } from './ipc/resources.ipc'
-import { registerModelAccessIpc } from './ipc/modelAccess.ipc'
 import { AppRuntimeLocator, configureAppRuntime } from './runtime/AppRuntimeLocator'
 import { createTranslator } from '../shared/i18n/createTranslator'
 import { AppPreferencesStore } from './preferences/AppPreferencesStore'
@@ -106,29 +102,31 @@ startApplicationLifecycle({
       ? join(process.resourcesPath, 'speech-worker', 'models.json')
       : join(__dirname, '../../speech-worker/models.json')
     const manifest = ModelManifestSchema.parse(JSON.parse(await readFile(manifestPath, 'utf8')))
-    const access = new HuggingFaceAccessService(
-      new HuggingFaceTokenStore(
-        join(app.getPath('userData'), 'secrets', 'huggingface.token'),
-        safeStorage,
-      ),
-      manifest.models.find((model) => model.capability === 'diarization')!,
-      undefined,
-      app.isPackaged ? undefined : new LocalHuggingFaceLogin(),
+    // Retire only the app-owned credential. The developer's HF CLI login is untouched.
+    await rm(join(app.getPath('userData'), 'secrets', 'huggingface.token'), { force: true }).catch(
+      () => {
+        console.warn('Could not remove the retired application credential file.')
+      },
     )
     const developmentEnvironment = app.isPackaged
       ? undefined
       : new DevelopmentEnvironmentChecker(runtime)
     const resources = new ResourceManager(
       manifest.models,
-      new ModelRegistry(app.getPath('userData')),
+      new ModelRegistry(
+        app.getPath('userData'),
+        managedModelLocation({
+          packaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          appPath: app.isPackaged ? app.getAppPath() : join(__dirname, '../..'),
+        }),
+      ),
       new ModelDownloader(),
-      access,
       createModelLoadValidator(runtime, manifestPath),
       developmentEnvironment,
       appPreferences,
     )
     registerResourcesIpc(resources)
-    registerModelAccessIpc(access)
     const translators = {
       en: createTranslator('en').getFixedT('en'),
       'zh-CN': createTranslator('zh-CN').getFixedT('zh-CN'),
@@ -248,8 +246,7 @@ startApplicationLifecycle({
         window.webContents.send('project:pending-open', pending)
       },
       shutdown: async () => {
-        await developmentEnvironment?.shutdown()
-        await resources.cancel()
+        await Promise.all([developmentEnvironment?.shutdown(), resources.shutdown()])
         await mediaRecovery.shutdown()
         await barrier.shutdown()
       },

@@ -1,0 +1,44 @@
+{
+  "source": "https://huggingface.co/api/models/pyannote/speaker-diarization-community-1/revision/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee?blobs=true",
+  "repository": "pyannote/speaker-diarization-community-1",
+  "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+  "retrievedAt": "2026-09-19",
+  "modelCard": {
+    "path": "README.md",
+    "size": 9978,
+    "gitBlobSha1": "8356d6634d7b1074581dd36e2225887ec809326e"
+  },
+  "files": [
+    {
+      "path": "config.yaml",
+      "size": 444,
+      "gitBlobSha1": "4022db43960736338378fdb6b5a85cfdae198910",
+      "sha256": "5ce2bfa9a938dc132cec1172592d65173cbb8f444ea1e4133f10f9391de155be",
+      "sha256Provenance": "Calculated from the authenticated pinned upstream file and cross-checked by explicit legacy import."
+    },
+    {
+      "path": "embedding/pytorch_model.bin",
+      "size": 26646242,
+      "gitBlobSha1": "6347697826a1958253dd195fa296d8d97b8f6280",
+      "sha256": "6f10ff60898a1d185fa22e1d11e0bfa8a92efec811f11bca48cb8cafebefd929"
+    },
+    {
+      "path": "plda/plda.npz",
+      "size": 133852,
+      "gitBlobSha1": "e61936ef2108eccdff801c440d5e3f6c6995aba4",
+      "sha256": "9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255"
+    },
+    {
+      "path": "plda/xvec_transform.npz",
+      "size": 134376,
+      "gitBlobSha1": "b8079f30a35a68fe7d996bd7abc2170338ba6767",
+      "sha256": "325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f"
+    },
+    {
+      "path": "segmentation/pytorch_model.bin",
+      "size": 5906507,
+      "gitBlobSha1": "e3b91de5a5374fc40b556f9cc51317d280b4ea79",
+      "sha256": "7ad24338d844fb95985486eb1a464e32d229f6d7a03c9abe60f978bacf3f816e"
+    }
+  ]
+}

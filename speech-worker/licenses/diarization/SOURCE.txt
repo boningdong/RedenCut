@@ -1,0 +1,6 @@
+Model: pyannote/speaker-diarization-community-1
+Source: https://huggingface.co/pyannote/speaker-diarization-community-1
+Revision: 3533c8cf8e369892e6b79ff1bf80f7b0286a54ee
+License: CC-BY-4.0
+
+The committed file sizes, Git blob identity for config.yaml, and LFS SHA-256 values were obtained from the pinned Hugging Face revision metadata.

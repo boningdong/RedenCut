@@ -2,7 +2,7 @@ import { mkdir, open, readFile, stat, writeFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { ModelDefinition } from '../../shared/modelManifest.schema'
 import { verifyModelFile, stagedModelFile } from './ModelRegistry'
-export function modelFileUrl(model: ModelDefinition, path: string): string {
+function modelFileUrl(model: ModelDefinition, path: string): string {
   return `https://huggingface.co/${model.repository}/resolve/${model.revision}/${path.split('/').map(encodeURIComponent).join('/')}`
 }
 /** Redirects never forward the bearer credential to storage/CDN hosts. */

@@ -1,0 +1,3 @@
+RedenCut redistributes the upstream files without modifying their contents.
+
+RedenCut adds an installation manifest and places the files in a revisioned offline resource directory. These packaging files are not part of the upstream model.

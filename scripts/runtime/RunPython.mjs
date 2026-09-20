@@ -29,16 +29,22 @@ export async function runManagedPython({
   pythonPath,
   pythonArguments = [],
   stdio = 'inherit',
+  cwd = process.cwd(),
+  environment: environmentOverrides = {},
 } = {}) {
   const root = resolve(runtimeRoot)
   const manifest = await validateRuntimeDirectory(root)
   if (!manifest.executables.python) throw new Error('Managed runtime does not provide Python')
   const python = resolveRuntimePath(root, manifest.executables.python)
   const environment = createManagedPythonEnvironment(root)
+  for (const [key, value] of Object.entries(environmentOverrides)) {
+    if (value === undefined) delete environment[key]
+    else environment[key] = value
+  }
   if (pythonPath) environment.PYTHONPATH = resolve(pythonPath)
 
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(python, pythonArguments, { cwd: process.cwd(), env: environment, stdio })
+    const child = spawn(python, pythonArguments, { cwd: resolve(cwd), env: environment, stdio })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       if (signal) reject(new Error(`Managed Python terminated by ${signal}`))

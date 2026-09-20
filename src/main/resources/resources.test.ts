@@ -197,7 +197,6 @@ it('load validation failures prevent publication and ready state', async () => {
     [model],
     new ModelRegistry(dir),
     new ModelDownloader(remote().fetcher),
-    undefined,
     async () => {
       throw new Error('invalid model structure')
     },
@@ -257,13 +256,7 @@ it('keeps verified diarization usable without tokens or a runtime recheck', asyn
       throw new Error('runtime is not needed for installed resources')
     },
   })
-  const manager = new ResourceManager(
-    [model, speaker],
-    registry,
-    new ModelDownloader(),
-    undefined,
-    validate,
-  )
+  const manager = new ResourceManager([model, speaker], registry, new ModelDownloader(), validate)
   expect((await manager.prepare('diarization')).resources.every((r) => r.status === 'ready')).toBe(
     true,
   )
@@ -338,7 +331,6 @@ it('blocks downloads before environment setup and allows preparation after valid
     [model, { ...model, id: 'alignment', capability: 'alignment' }],
     registry,
     new ModelDownloader(fetcher),
-    undefined,
     async () => {},
     {
       check: async () => ({
@@ -421,7 +413,6 @@ it('hydrates a saved selection, rejects non-Whisper downloads and preserves sele
     undefined,
     undefined,
     undefined,
-    undefined,
     preferences,
   )
   expect((await manager.read()).selectedWhisperModelId).toBe('medium')
@@ -431,7 +422,6 @@ it('hydrates a saved selection, rejects non-Whisper downloads and preserves sele
   const failed = new ResourceManager(
     models,
     new ModelRegistry(dir),
-    undefined,
     undefined,
     undefined,
     undefined,
@@ -460,7 +450,6 @@ it('rejects selection while a download is active and keeps its target fixed', as
     models,
     new ModelRegistry(dir),
     new ModelDownloader(remote().fetcher),
-    undefined,
     async () => waiting,
   )
   await manager.prepare({ kind: 'model', modelId: 'medium' })
@@ -477,7 +466,6 @@ it('downloads a standalone Whisper model without the unrelated Python runtime', 
     [model],
     registry,
     new ModelDownloader(fetcher),
-    undefined,
     async () => {},
     {
       check: async () => ({
@@ -520,7 +508,6 @@ it('reuses environment validation for model actions and refreshes only on explic
     [model],
     new ModelRegistry(await root()),
     new ModelDownloader(remote().fetcher),
-    undefined,
     async () => {},
     { check },
   )
@@ -547,7 +534,6 @@ it('switches hydrated models without hashing installed files and still verifies 
   const manager = new ResourceManager(
     [installedModel, alternative],
     registry,
-    undefined,
     undefined,
     undefined,
     undefined,

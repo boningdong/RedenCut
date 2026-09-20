@@ -85,7 +85,6 @@ it('fails runtime preflight before requesting model bytes', async () => {
     [model],
     new ModelRegistry(dir),
     new ModelDownloader(fetcher),
-    undefined,
     validate,
   )
   registerResourcesIpc(manager)

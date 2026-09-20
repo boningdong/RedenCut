@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { ModelAccessDialog } from './ModelAccessDialog'
 import { SpeechResourcesPanel } from './SpeechResourcesPanel'
 import { useResourcesStore } from '../../stores/resources.store'
 import { useLocaleStore } from '../../stores/locale.store'
@@ -25,7 +24,6 @@ beforeEach(() => {
     hydrate: vi.fn(async () => {}),
     prepare: vi.fn(async () => {}),
     cancel: vi.fn(async () => {}),
-    verify: vi.fn(async () => {}),
     snapshot: {
       revision: 1,
       baseReady: false,
@@ -67,7 +65,7 @@ afterEach(() => {
   useResourcesStore.setState(originalResources)
   useLocaleStore.setState(originalPreferences)
 })
-it('downloads alignment independently and keeps optional authorization locked first', () => {
+it('downloads alignment independently without offering application authentication', () => {
   render(<SpeechResourcesPanel />)
   expect(screen.queryByRole('button', { name: /Authorize access/ })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Download' }))
@@ -98,26 +96,6 @@ it('keeps cancellation in the download action position and offers explicit resum
     modelId: 'whisper',
   })
 })
-it('submits a token only on explicit verification and does not start a download', async () => {
-  const snapshot = useResourcesStore.getState().snapshot!
-  snapshot.baseReady = true
-  snapshot.resources.forEach((r) => {
-    if (r.capability !== 'diarization') r.status = 'ready'
-  })
-  render(<SpeechResourcesPanel />)
-  fireEvent.click(screen.getByRole('button', { name: /Authorize access/ }))
-  fireEvent.change(screen.getByLabelText('Hugging Face access token'), {
-    target: { value: 'hf_private' },
-  })
-  expect(useResourcesStore.getState().verify).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Verify access' }))
-  await waitFor(() =>
-    expect(useResourcesStore.getState().verify).toHaveBeenCalledWith('hf_private'),
-  )
-  expect((screen.getByLabelText('Hugging Face access token') as HTMLInputElement).value).toBe('')
-  expect(useResourcesStore.getState().prepare).not.toHaveBeenCalled()
-})
-
 it.each([
   ['runtime-unavailable', 'Unavailable', 'The local speech engine is unavailable.'],
   ['integrity-failed', 'Verification failed', 'The model files could not be verified.'],
@@ -237,101 +215,6 @@ it('collapses text-editing details without changing the feature or canceling wor
   fireEvent.click(screen.getByRole('button', { name: 'Text editing' }))
   expect(screen.getByRole('button', { name: 'Download' })).toBeTruthy()
 })
-it('detects local credentials in development but only verifies after explicit use', async () => {
-  const previous = window.electronAPI
-  const detect = vi.fn(async () => ({ status: 'found' as const }))
-  window.electronAPI = { ...previous, modelAccessLocal: detect }
-  const snapshot = useResourcesStore.getState().snapshot!
-  const verifyLocal = vi.fn(async () => {})
-  useResourcesStore.setState({
-    verifyLocal,
-    snapshot: {
-      ...snapshot,
-      baseReady: true,
-      development: {
-        platform: 'darwin',
-        ffmpeg: true,
-        ffprobe: true,
-        whisper: true,
-        uv: true,
-        python: true,
-        libraries: true,
-        ready: true,
-      },
-      resources: snapshot.resources.map((r) =>
-        r.capability === 'diarization' ? r : { ...r, status: 'ready' },
-      ),
-    },
-  })
-  try {
-    render(<SpeechResourcesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /Authorize access/ }))
-    await waitFor(() => expect(screen.getByText(/Credentials found/)).toBeTruthy())
-    expect(verifyLocal).not.toHaveBeenCalled()
-    expect((screen.getByLabelText('Hugging Face access token') as HTMLInputElement).value).toBe('')
-    fireEvent.click(screen.getByRole('button', { name: 'Use local login and verify' }))
-    expect(verifyLocal).toHaveBeenCalledOnce()
-    expect(useResourcesStore.getState().prepare).not.toHaveBeenCalled()
-  } finally {
-    window.electronAPI = previous
-  }
-})
-
-it('keeps model downloads in the resource panel after authorization', () => {
-  const snapshot = useResourcesStore.getState().snapshot!
-  useResourcesStore.setState({
-    access: { status: 'granted', hasToken: true },
-    snapshot: { ...snapshot, baseReady: true },
-  })
-  render(<SpeechResourcesPanel />)
-  fireEvent.click(screen.getByRole('button', { name: /Authorized/ }))
-  expect(useResourcesStore.getState().prepare).not.toHaveBeenCalled()
-  expect(screen.queryByRole('button', { name: 'Download speaker model' })).toBeNull()
-  expect(screen.getByRole('heading', { name: 'Authorize access' })).toBeTruthy()
-})
-
-it.each([true, false])(
-  'shows peer credential sections only in development (%s)',
-  async (development) => {
-    const previous = window.electronAPI
-    const detect = vi.fn(async () => ({ status: 'missing' as const }))
-    window.electronAPI = { ...previous, modelAccessLocal: detect }
-    const snapshot = useResourcesStore.getState().snapshot!
-    useResourcesStore.setState({
-      snapshot: {
-        ...snapshot,
-        development: development
-          ? {
-              platform: 'darwin',
-              ffmpeg: true,
-              ffprobe: true,
-              whisper: true,
-              uv: true,
-              python: true,
-              libraries: true,
-              ready: true,
-            }
-          : undefined,
-      },
-    })
-    try {
-      render(<ModelAccessDialog onClose={() => {}} />)
-      expect(screen.getByRole('region', { name: 'Enter Hugging Face token' })).toBeTruthy()
-      expect(screen.queryByRole('region', { name: 'Local Hugging Face login' }) !== null).toBe(
-        development,
-      )
-      expect(screen.queryByRole('separator') !== null).toBe(development)
-      if (development)
-        await waitFor(() =>
-          expect(screen.getByText('No local login credentials found')).toBeTruthy(),
-        )
-      else expect(detect).not.toHaveBeenCalled()
-    } finally {
-      window.electronAPI = previous
-    }
-  },
-)
-
 it('offers Whisper alternatives in a floating menu and downloads only the selected model', async () => {
   const snapshot = useResourcesStore.getState().snapshot!
   snapshot.selectedWhisperModelId = 'whisper'
@@ -463,3 +346,58 @@ it.each([true, false])(
     ).toBeTruthy()
   },
 )
+
+it('shows only a speaker toggle in bundled builds and no authentication or model download', () => {
+  const snapshot = useResourcesStore.getState().snapshot!
+  snapshot.baseReady = true
+  snapshot.resources.forEach((r) => {
+    r.status = 'ready'
+  })
+  render(<SpeechResourcesPanel />)
+  expect(screen.getByRole('switch', { name: 'Speaker recognition' })).toBeTruthy()
+  expect(screen.queryByText('Hugging Face')).toBeNull()
+  expect(screen.queryByRole('button', { name: /Authorize/ })).toBeNull()
+  expect(screen.getByText('The included model is ready to identify speakers.')).toBeTruthy()
+})
+it('shows missing managed models in Runtime and refreshes after CLI setup', async () => {
+  const snapshot = useResourcesStore.getState().snapshot!
+  const development = {
+    platform: 'darwin',
+    ffmpeg: true,
+    ffprobe: true,
+    whisper: true,
+    uv: false,
+    python: true,
+    libraries: true,
+    ready: true,
+    diarization: {
+      id: 'speaker',
+      revision: 'a'.repeat(40),
+      path: '.runtime/models/diarization/pinned',
+      status: 'missing' as const,
+    },
+  }
+  const refresh = vi.fn(async () => {
+    useResourcesStore.setState({
+      snapshot: {
+        ...snapshot,
+        development: {
+          ...development,
+          diarization: { ...development.diarization, status: 'ready' },
+        },
+      },
+    })
+  })
+  useResourcesStore.setState({ snapshot: { ...snapshot, development }, refresh })
+  render(<SpeechResourcesPanel />)
+  expect(screen.getByText('.runtime/models/diarization/pinned')).toBeTruthy()
+  expect(screen.getByText('npm run runtime:setup')).toBeTruthy()
+  expect(screen.queryByText('Hugging Face')).toBeNull()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Validate' })[2])
+  await waitFor(() =>
+    expect(screen.getByRole('status', { name: 'Speaker recognition model' }).textContent).toContain(
+      'Ready',
+    ),
+  )
+  expect(useResourcesStore.getState().prepare).not.toHaveBeenCalled()
+})

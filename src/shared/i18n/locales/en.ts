@@ -105,6 +105,18 @@ export const englishResources = {
     person: 'Person',
   },
   settings: {
+    devModelAssets: 'Development model assets',
+    devModelHelp:
+      'Prepared by the runtime setup command. The app verifies and loads these files locally.',
+    devModelSetup:
+      'Run this command at the project root to prepare or repair the model, then validate again. The CLI guides Hugging Face access when needed.',
+    devModelInvalid: 'Invalid',
+    speakerSetupRequired:
+      'The speaker model is unavailable. Prepare it using the command shown in Runtime, then validate again.',
+    speakerRepairRequired:
+      'The included speaker model is unavailable. Repair or reinstall the application.',
+    speakerManagedReady: 'The included model is ready to identify speakers.',
+
     whisperRuntimeRequired:
       'Set up Whisper and FFmpeg above, then click Validate to enable download.',
     changeWhisper: 'Change Whisper model',
@@ -120,21 +132,6 @@ export const englishResources = {
       medium: 'More capacity',
       'large-v3': 'Highest memory use',
     },
-
-    localLogin: 'Local Hugging Face login',
-    localLoginHelp:
-      'Use existing local credentials to verify model access. After verification, an encrypted copy is saved in this app; your CLI login is unchanged.',
-    'localLogin-checking': 'Checking local credentials…',
-    'localLogin-found': 'Credentials found · Model access still needs verification',
-    'localLogin-missing': 'No local login credentials found',
-    'localLogin-unavailable': 'Local credentials could not be read. Sign in again and retry.',
-    'localLogin-unsupported': 'Local login is unavailable in this build',
-    localLoginCommand: 'Sign in from Terminal, then check again:',
-    localLoginDetect: 'Check local login again',
-    localLoginUse: 'Use local login and verify',
-    enterToken: 'Enter Hugging Face token',
-    tokenSafety:
-      'Enter a token limited to reading the model. The field clears on submission; saved tokens are encrypted and kept out of project files and logs.',
 
     devTitle: 'Runtime',
     devOnly: 'Development only',
@@ -154,7 +151,8 @@ export const englishResources = {
     devRunAtRoot: 'Open Terminal at the current RedenCut project root and run:',
     devSetupHelp:
       'Installs the pinned Python runtime and speech dependencies under .runtime. No separate uv installation is needed.',
-    devReturn: 'Then click Validate. Models are downloaded separately below.',
+    devReturn:
+      'Then click Validate. Transcription and alignment models are downloaded separately below.',
     devModelsBlocked: 'Prepare the tools needed by each model above, then click Validate.',
     devRuntimeError:
       'The speech runtime is unavailable. Complete the Runtime setup above and validate it before retrying the model download.',
@@ -169,8 +167,7 @@ export const englishResources = {
     downloadFailedHelp:
       'The download could not finish. Check your connection and available storage, then continue the download.',
     resourceAccessDenied: 'Access denied',
-    resourceAccessDeniedHelp:
-      'Model access was denied. Open Authorize access to check the model conditions and verify your token again.',
+    resourceAccessDeniedHelp: 'Model access was denied. Check the model source and try again.',
 
     title: 'Settings',
     general: 'General',
@@ -194,14 +191,9 @@ export const englishResources = {
     speaker: 'Speaker recognition',
     speakerModel: 'Speaker recognition model',
     optional: 'Optional',
-    lockedHelp: 'Unlocks after both models above are ready. Authorize access, then download.',
-    speakerHelp: 'Authorize access, then download the model to identify speakers.',
     speakerDisabled: 'Skipped. Text editing works without speaker labels.',
     textDisabled: 'Enable text editing to set up this feature.',
-    authorize: 'Authorize access',
-    authorized: 'Authorized',
     locked: 'Locked',
-    authorizeFirst: 'Authorize before downloading',
     download: 'Download',
     resume: 'Continue download',
     recheck: 'Check resources again',
@@ -213,20 +205,11 @@ export const englishResources = {
     failed: 'Interrupted',
     resourceError: 'Could not complete the operation. Please try again.',
     loading: 'Checking resources…',
-    authorizedDownloadHelp:
-      'Access verified. Close this window to download the speaker model from Text editing.',
-    accessHelp:
-      'Accept the model conditions on Hugging Face, then verify access below. Verification does not start a download.',
-    conditions: 'Open model conditions',
-    token: 'Hugging Face access token',
-    verify: 'Verify access',
-    checking: 'Verifying access…',
     'invalid-token': 'The token is invalid. Enter a valid token and try again.',
     'access-denied':
       'This token cannot access the model. Accept its conditions and check token permissions.',
     'network-error': 'Could not reach Hugging Face. Check your connection and try again.',
     'storage-unavailable': 'Secure credential storage is unavailable. Your token was not saved.',
-    forgetToken: 'Remove saved token',
     welcome: 'Welcome to RedenCut',
     welcomeLead: 'Complete the initial setup to get ready for editing.',
     art1: 'Editing starts with a good conversation.',

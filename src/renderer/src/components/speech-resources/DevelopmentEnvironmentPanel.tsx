@@ -11,7 +11,8 @@ export function DevelopmentEnvironmentPanel() {
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const [guide, setGuide] = useState<'tools' | 'python' | null>(null)
   if (!dev) return null
-  const open = expanded ?? !dev.ready
+  const model = dev.diarization
+  const open = expanded ?? (!dev.ready || (!!model && model.status !== 'ready'))
   const row = (label: string, ready: boolean, key: DevelopmentCheck) => (
     <div className="dev-item">
       <span className="dev-item-label">
@@ -131,6 +132,61 @@ export function DevelopmentEnvironmentPanel() {
                 </div>
               )}
             </section>
+            {model && (
+              <section className="dev-block">
+                <h3>{t('settings.devModelAssets')}</h3>
+                <p>{t('settings.devModelHelp')}</p>
+                <div className="dev-item">
+                  <span className="dev-item-label">
+                    <span>{t('settings.speakerModel')}</span>
+                    <code className="dev-path">{model.path}</code>
+                  </span>
+                  <span
+                    className={`status ${model.status === 'ready' ? 'ready' : 'pending'}`}
+                    role="status"
+                    aria-label={t('settings.speakerModel')}
+                  >
+                    <i className={model.status === 'checking' ? 'loading-spinner' : 'status-dot'} />
+                    {t(
+                      model.status === 'ready'
+                        ? 'settings.ready'
+                        : model.status === 'checking'
+                          ? 'settings.devChecking'
+                          : model.status === 'invalid'
+                            ? 'settings.devModelInvalid'
+                            : 'settings.devMissing',
+                    )}
+                  </span>
+                </div>
+                {model.status !== 'ready' && model.status !== 'checking' && (
+                  <div className="dev-guide">
+                    <p>{t('settings.devModelSetup')}</p>
+                    <code>npm run runtime:setup</code>
+                  </div>
+                )}
+                <div className="dev-block-footer">
+                  <button
+                    className="recheck-action"
+                    aria-disabled={pending}
+                    onClick={() => {
+                      if (!pending) {
+                        setExpanded(true)
+                        void refresh()
+                      }
+                    }}
+                  >
+                    {model.status === 'checking' ? (
+                      <i className="loading-spinner" />
+                    ) : (
+                      <Icon name="refresh" />
+                    )}
+                    {t(
+                      model.status === 'checking' ? 'settings.devChecking' : 'settings.devValidate',
+                    )}
+                  </button>
+                </div>
+              </section>
+            )}
           </div>
         </>
       )}

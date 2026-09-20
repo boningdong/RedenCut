@@ -120,14 +120,19 @@ test('development setup explains missing runtime and validates without starting 
     await ui.call('browser_click', {
       target: '.dev-block:nth-child(2) button:text-is("Install guide")',
     })
-    expect(await ui.page.getByText('npm run runtime:setup', { exact: true }).count()).toBe(1)
+    expect(
+      await ui.page
+        .locator('.dev-block:nth-child(2)')
+        .getByText('npm run runtime:setup', { exact: true })
+        .count(),
+    ).toBe(1)
     await ui.screenshot('development-install-guide')
     await ui.call('browser_click', { target: '.dev-block:nth-child(2) button:text-is("Validate")' })
     await expect
       .poll(() => ui.page.getByRole('button', { name: 'Validate', exact: true }).count(), {
         timeout: 70000,
       })
-      .toBe(2)
+      .toBe(3)
     expect(await ui.page.getByRole('button', { name: 'Download', exact: true }).isDisabled()).toBe(
       true,
     )
