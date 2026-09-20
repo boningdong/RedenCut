@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { AudioSourceId } from '@shared/ProjectTypes'
+import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import type { AudioRenderPlan } from '@shared/audio/AudioRenderPlan'
 import { getFfmpegPath, getFfprobePath } from '../../runtime/AppRuntimeLocator'
 // Cross-backend integration test intentionally compares the actual playback executor.
@@ -288,3 +288,131 @@ describe('managed FFmpeg sample parity', () => {
     },
   )
 })
+
+it.each(['linear', 'equal-power'] as const)(
+  'renders a one-second %s join against independent PCM math',
+  async (curve) => {
+    const tracks: Track[] = [
+      {
+        id: 't',
+        name: 't',
+        volume: 1,
+        muted: false,
+        solo: false,
+        color: '',
+        effects: [],
+        clips: [
+          {
+            id: 'c',
+            trackId: 't',
+            audioSourceId: sourceId,
+            sourceStart: 0,
+            sourceEnd: 5,
+            outputStart: 0,
+            gain: 1,
+            muted: false,
+            effects: [],
+            redactions: [
+              {
+                id: 'r',
+                sourceStart: 2,
+                sourceEnd: 3,
+                crossfade: { enabled: true, durationMs: 1000, curve },
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    const root = mkdtempSync(join(tmpdir(), 'crossfade-one-second-'))
+    try {
+      const frames = 5 * 48000
+      const input = Buffer.alloc(frames * 4)
+      for (let i = 0; i < frames; i++)
+        input.writeFloatLE(
+          0.2 * Math.sin((2 * Math.PI * (i < 3 * 48000 ? 440 : 880) * i) / 48000),
+          i * 4,
+        )
+      const path = join(root, 'input.f32')
+      writeFileSync(path, input)
+      const plan = buildAudioRenderPlan(tracks)
+      const output = execFileSync(
+        getFfmpegPath(),
+        [
+          '-v',
+          'error',
+          '-f',
+          'f32le',
+          '-ar',
+          '48000',
+          '-ac',
+          '1',
+          '-i',
+          path,
+          '-filter_complex',
+          compileFfmpegPlan(plan, new Map([[sourceId, 0]])),
+          '-map',
+          '[export]',
+          '-f',
+          'f32le',
+          'pipe:1',
+        ],
+        { maxBuffer: 4 * 1024 * 1024 },
+      )
+      expect(output.length).toBe(3 * 48000 * 4)
+      const provider: AudioSampleProvider = {
+        audioSourceId: sourceId,
+        format: 'f32-planar',
+        sampleRate: 48000,
+        channels: 1,
+        frameCount: frames,
+        readFrames: async (startFrame, frameCount) => ({
+          startFrame,
+          frameCount,
+          channels: [
+            Float32Array.from({ length: frameCount }, (_, i) =>
+              input.readFloatLE((startFrame + i) * 4),
+            ),
+          ],
+        }),
+      }
+      let exportError = 0,
+        playbackError = 0,
+        hardCutDifference = 0
+      for (let start = 0; start < 144000; start += 4096) {
+        const count = Math.min(4096, 144000 - start)
+        const block = await renderTrackBlock(
+          plan.tracks[0],
+          start,
+          count,
+          new Map([[sourceId, provider]]),
+          new AbortController().signal,
+        )
+        for (let j = 0; j < count; j++) {
+          const i = start + j
+          let expected: number
+          if (i < 48000) expected = input.readFloatLE(i * 4)
+          else if (i >= 96000) expected = input.readFloatLE((i + 96000) * 4)
+          else {
+            const u = (i - 48000) / 47999
+            const left = input.readFloatLE(i * 4),
+              right = input.readFloatLE((i + 96000) * 4)
+            expected =
+              left * (curve === 'linear' ? 1 - u : Math.cos((Math.PI * u) / 2)) +
+              right * (curve === 'linear' ? u : Math.sin((Math.PI * u) / 2))
+            hardCutDifference = Math.max(hardCutDifference, Math.abs(expected - left))
+          }
+          for (let channel = 0; channel < block.length; channel++) {
+            exportError = Math.max(exportError, Math.abs(output.readFloatLE(i * 4) - expected))
+            playbackError = Math.max(playbackError, Math.abs(block[channel][j] - expected))
+          }
+        }
+      }
+      expect(exportError).toBeLessThan(1e-5)
+      expect(playbackError).toBeLessThan(1e-5)
+      expect(hardCutDifference).toBeGreaterThan(0.1)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  },
+)

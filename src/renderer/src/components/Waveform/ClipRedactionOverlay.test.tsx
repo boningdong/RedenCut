@@ -557,3 +557,36 @@ it('adds crossfade framing only while crossfade is enabled', () => {
   )
   expect(document.querySelector('.crossfade-rails')).toBeNull()
 })
+
+it('supports one second through the input, keyboard and pointer without exceeding the limit', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    right: 300,
+    top: 300,
+    bottom: 350,
+    width: 200,
+    height: 50,
+    x: 100,
+    y: 300,
+    toJSON() {},
+  })
+  render(<View />)
+  act(() => state().setCrossfadeEditing('c', 'r', true))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Enable crossfade' }))
+  const input = screen.getByLabelText('Crossfade duration')
+  fireEvent.change(input, { target: { value: '1000' } })
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBe(1000)
+  fireEvent.change(input, { target: { value: '1001' } })
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBe(1000)
+  const handle = screen.getByRole('slider', { name: 'Adjust right crossfade' })
+  fireEvent.keyDown(handle, { key: 'Home' })
+  fireEvent.keyDown(handle, { key: 'End' })
+  expect(handle.getAttribute('aria-valuemax')).toBe('1000')
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBe(1000)
+  fireEvent.keyDown(handle, { key: 'ArrowRight' })
+  fireEvent.pointerDown(handle, { button: 0, clientX: 100 })
+  fireEvent.pointerMove(handle, { clientX: 200 })
+  fireEvent.pointerUp(handle)
+  expect(state().tracks[0].clips[0].redactions![0].crossfade?.durationMs).toBe(1000)
+  vi.restoreAllMocks()
+})

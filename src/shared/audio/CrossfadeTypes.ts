@@ -1,9 +1,11 @@
 import { z } from 'zod'
 import type { AudioSourceId } from '../source.types'
+export const MAX_CROSSFADE_DURATION_MS = 1000
+
 export const CrossfadeSettingsSchema = z
   .object({
     enabled: z.boolean(),
-    durationMs: z.number().finite().min(1).max(100),
+    durationMs: z.number().finite().min(1).max(MAX_CROSSFADE_DURATION_MS),
     curve: z.enum(['linear', 'equal-power']),
   })
   .strict()

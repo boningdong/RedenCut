@@ -11,7 +11,7 @@
 
 - 48 kHz processing, integer frames, half-open ranges.
 - New Redact defaults: enabled, 30 ms, equal-power; old missing fields remain disabled.
-- Crossfade duration is finite, 1–100 ms; both sides always have equal effective widths.
+- Crossfade duration is finite, 1–1000 ms; both sides always have equal effective widths.
 - Keep original audio, clip positions and Redact boundaries unchanged.
 - B design: square central frame, continuous 1px rails and outward-fading fine hatch wings.
 - Single context-menu entry; enable control inside portal floating editor with viewport collision handling.

@@ -46,7 +46,7 @@ describe('shared render plan', () => {
     expect(
       ClipRedactionSchema.parse({ id: 'r', sourceStart: 0, sourceEnd: 1 }).crossfade,
     ).toBeUndefined()
-    for (const durationMs of [NaN, Infinity, 0, 101])
+    for (const durationMs of [NaN, Infinity, 0, 1001])
       expect(
         ClipRedactionSchema.safeParse({
           id: 'r',
@@ -63,6 +63,28 @@ describe('shared render plan', () => {
         crossfade: { ...DEFAULT_CROSSFADE_SETTINGS, curve: 'other' },
       }).success,
     ).toBe(false)
+  })
+  it('accepts a one-second request and contracts by exactly one second', () => {
+    const tracks = fixture()
+    const clip = tracks[0].clips[0]
+    clip.sourceEnd = 5
+    const redact = clip.redactions![0]
+    redact.sourceStart = 2
+    redact.sourceEnd = 3
+    redact.crossfade!.durationMs = 1000
+    expect(ClipRedactionSchema.safeParse(redact).success).toBe(true)
+    const plan = buildAudioRenderPlan(tracks)
+    expect(plan.durationFrames).toBe(3 * 48000)
+    expect(plan.resolutions[0]).toMatchObject({
+      status: 'active',
+      transition: { frameCount: 48000 },
+    })
+    redact.sourceStart = 0.25
+    expect(buildAudioRenderPlan(tracks).resolutions[0]).toMatchObject({
+      status: 'active',
+      limitedBy: 'short-content',
+      transition: { frameCount: 12000 },
+    })
   })
   it('contracts equal 1440 frame wings and maps both sources', () => {
     const p = buildAudioRenderPlan(fixture())

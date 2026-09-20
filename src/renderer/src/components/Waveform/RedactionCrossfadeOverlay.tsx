@@ -1,7 +1,11 @@
 import { hasSamePlaybackStructure } from '../../audio/PlaybackStructure'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { Clip, ClipRedaction, Track } from '@shared/ProjectTypes'
-import { DEFAULT_CROSSFADE_SETTINGS, type CrossfadeSettings } from '@shared/audio/CrossfadeTypes'
+import {
+  DEFAULT_CROSSFADE_SETTINGS,
+  MAX_CROSSFADE_DURATION_MS,
+  type CrossfadeSettings,
+} from '@shared/audio/CrossfadeTypes'
 import { resolveRedactionTransitions } from '@shared/audio/RedactionTransitionResolver'
 import { useTimelineStore } from '../../stores/TimelineStore'
 import { useTranslation } from '../../i18n/useTranslation'
@@ -186,7 +190,7 @@ export function RedactionCrossfadeOverlay({
                   side === 'left' ? 'waveform.crossfadeLeft' : 'waveform.crossfadeRight',
                 )}
                 aria-valuemin={1}
-                aria-valuemax={100}
+                aria-valuemax={MAX_CROSSFADE_DURATION_MS}
                 aria-valuenow={settings.durationMs}
                 style={{ left: side === 'left' ? left : right + width }}
                 onPointerDown={(e) => {
@@ -212,7 +216,7 @@ export function RedactionCrossfadeOverlay({
                     durationMs: Math.max(
                       1,
                       Math.min(
-                        100,
+                        MAX_CROSSFADE_DURATION_MS,
                         current.original.durationMs +
                           ((current.direction * (e.clientX - current.x)) / pxPerSec) * 1000,
                       ),
@@ -249,11 +253,11 @@ export function RedactionCrossfadeOverlay({
                       e.key === 'Home'
                         ? 1
                         : e.key === 'End'
-                          ? 100
+                          ? MAX_CROSSFADE_DURATION_MS
                           : Math.max(
                               1,
                               Math.min(
-                                100,
+                                MAX_CROSSFADE_DURATION_MS,
                                 settings.durationMs +
                                   (['ArrowLeft', 'ArrowDown'].includes(e.key) ? -1 : 1) *
                                     (e.shiftKey ? 10 : 1),

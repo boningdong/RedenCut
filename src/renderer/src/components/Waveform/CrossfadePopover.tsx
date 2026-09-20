@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import type { CrossfadeSettings } from '@shared/audio/CrossfadeTypes'
+import { MAX_CROSSFADE_DURATION_MS, type CrossfadeSettings } from '@shared/audio/CrossfadeTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useAnchoredPopover } from './UseAnchoredPopover'
 
@@ -67,13 +67,17 @@ export function CrossfadePopover({
           aria-label={t('waveform.crossfadeDuration')}
           type="number"
           min={1}
-          max={100}
+          max={MAX_CROSSFADE_DURATION_MS}
           step={1}
           value={settings.durationMs}
           disabled={!settings.enabled}
           onChange={(e) => {
             const durationMs = e.currentTarget.valueAsNumber
-            if (Number.isFinite(durationMs) && durationMs >= 1 && durationMs <= 100)
+            if (
+              Number.isFinite(durationMs) &&
+              durationMs >= 1 &&
+              durationMs <= MAX_CROSSFADE_DURATION_MS
+            )
               onChange({ ...settings, durationMs })
           }}
         />
