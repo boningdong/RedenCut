@@ -221,6 +221,7 @@ export function ClipRedactionOverlay({ clip, redaction, pxPerSec, onFocusTimelin
           x={menu.x}
           y={menu.y}
           onClose={closeMenu}
+          onRemove={() => useTimelineStore.getState().removeRedaction(clip.id, redaction.id)}
           onEdit={() => {
             setMenu(null)
             useTimelineStore.getState().setCrossfadeEditing(clip.id, redaction.id, true)

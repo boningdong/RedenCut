@@ -1,3 +1,4 @@
+import { useTimelineContextMenu } from './UseTimelineContextMenu'
 import { TimelineRuler } from './TimelineRuler'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useRangeSelection } from './UseRangeSelection'
@@ -113,6 +114,7 @@ export function WaveformView({
     useEditorStore.getState().setSelection(null)
     audioPanel.current?.focus({ preventScroll: true })
   }, [])
+  const contextMenu = useTimelineContextMenu(focusTimeline, () => setActionFailed(true))
   const selection = useEditorStore((s) => s.selection)
   const hasTrackRange = Boolean(
     selection?.trackId && tracks.some((track) => track.id === selection.trackId),
@@ -331,6 +333,7 @@ export function WaveformView({
       onPointerCancelCapture={() => setPointerOwner(null)}
       onLostPointerCapture={() => setPointerOwner(null)}
     >
+      {contextMenu.menu}
       <div className="feature-toolbar">
         {workspaceControls}
         <span className="feature-title">{t('waveform.audio')}</span>
@@ -545,6 +548,7 @@ export function WaveformView({
                     onClick={(e) => {
                       if (!interaction.consumeClick()) handleLaneClick(e, track.id)
                     }}
+                    onContextMenu={(event) => contextMenu.open(event, track.id)}
                     onPointerDown={(e) => interaction.begin(e)}
                   >
                     {track.clips.map((clip) => {

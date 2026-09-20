@@ -96,6 +96,48 @@ describe('canonical transcript editability', () => {
     ])
   })
 
+  it('redacts selected text from its context menu and restores that overlay from the text', () => {
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    const word = document.querySelector('[data-unit-id="speech"]')!
+    const range = document.createRange()
+    range.selectNodeContents(word)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    fireEvent.contextMenu(word)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Redact selection' }))
+    expect(useTimelineStore.getState().tracks[0].clips[0].redactions).toMatchObject([
+      { sourceStart: 0.5, sourceEnd: 1 },
+    ])
+    fireEvent.contextMenu(word)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove redact' }))
+    expect(useTimelineStore.getState().tracks[0].clips[0].redactions ?? []).toHaveLength(0)
+  })
+
+  it('lists overlapping redactions and removes only the chosen overlay in that occurrence', () => {
+    const track = useTimelineStore.getState().tracks[0]
+    const clip = {
+      ...track.clips[0],
+      redactions: [
+        { id: 'first', sourceStart: 0.5, sourceEnd: 0.8 },
+        { id: 'second', sourceStart: 0.7, sourceEnd: 1 },
+      ],
+    }
+    useTimelineStore.setState({
+      tracks: [{ ...track, clips: [clip, { ...clip, id: 'duplicate', outputStart: 5 }] }],
+    })
+    render(<TranscriptPanel onGenerate={vi.fn()} isGenerating={false} generatingStatus={null} />)
+    fireEvent.contextMenu(
+      document.querySelector('[data-clip-id="duplicate"][data-unit-id="speech"]')!,
+    )
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove redact 5.50–5.80 s' }))
+    expect(useTimelineStore.getState().tracks[0].clips[0].redactions).toHaveLength(2)
+    expect(useTimelineStore.getState().tracks[0].clips[1].redactions).toEqual([
+      { id: 'second', sourceStart: 0.7, sourceEnd: 1 },
+    ])
+    void act(() => useTimelineStore.getState().undo())
+    expect(useTimelineStore.getState().tracks[0].clips[1].redactions).toHaveLength(2)
+  })
+
   it.each([3, 6000])('does not re-render %i transcript units for track-volume changes', (count) => {
     if (count > 3) {
       const track = useTimelineStore.getState().tracks[0]

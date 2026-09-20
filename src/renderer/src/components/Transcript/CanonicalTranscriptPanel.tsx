@@ -1,3 +1,4 @@
+import { useTranscriptContextMenu } from './UseTranscriptContextMenu'
 import { useTrackContent } from '../../hooks/UseTrackContent'
 import { TranscriptPlaybackControls } from './TranscriptPlaybackControls'
 import { useTranscriptPlaybackFollow } from './UseTranscriptPlaybackFollow'
@@ -179,6 +180,15 @@ export function CanonicalTranscriptPanel({
     },
     [setSelection],
   )
+  const contextMenu = useTranscriptContextMenu(units, () => {
+    const selected = resolveNative()
+    return selected
+      ? () => {
+          if (selected.expanded || !selected.editable) setPending(selected)
+          else apply(selected)
+        }
+      : null
+  })
   const keyDown = (event: React.KeyboardEvent) => {
     if (event.nativeEvent.isComposing) return
     if ((event.target as HTMLElement).closest('button, input, select, textarea')) return
@@ -257,6 +267,7 @@ export function CanonicalTranscriptPanel({
           onPaste={(e) => e.preventDefault()}
           onDrop={(e) => e.preventDefault()}
           onKeyDown={keyDown}
+          onContextMenu={contextMenu.open}
           className="transcript-document"
         >
           {displayMode === 'continuous' ? (
@@ -283,6 +294,8 @@ export function CanonicalTranscriptPanel({
           <div role="status">{t('transcript.pendingSpeakers')}</div>
         )}
       </TranscriptStatusFooter>
+      {contextMenu.menu}
+      {contextMenu.error}
       {scopeMessage && (
         <div role="status" className="transcript-confirmation">
           {t(`transcript.${scopeMessage}`)}
