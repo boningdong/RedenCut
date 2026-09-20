@@ -75,7 +75,8 @@ Moving a trimmed overlay translates its full stored range, preserving hidden met
 
 New redactions start with a 30 ms equal-power crossfade; existing redactions without settings keep their previous behavior.
 Right-click an overlay, or use Shift+F10/the context-menu key while it is focused, then choose Edit crossfade to open its floating editor.
-The single menu entry leads to an editor containing enable, duration and curve controls; disabling preserves the chosen settings.
+The Edit crossfade entry leads to an editor containing enable, duration and curve controls; disabling preserves the chosen settings.
+Remove redact restores that overlay’s audio coverage as one undoable edit.
 The editor appears above the visible overlay when space permits, flips below or clamps inside the viewport, and closes when the anchor leaves view.
 Idle and ordinarily selected overlays hide crossfade envelopes and handles; only crossfade editing exposes those controls.
 Drag either crossfade handle to change both adjacent region widths together; release commits one undoable edit, and Escape cancels the active gesture.
@@ -127,3 +128,20 @@ Keyboard input inside the editor stays local, including native text undo; saved 
 
 While a settings or onboarding dialog is open, keyboard input stays within the dialog and does not trigger background editor shortcuts.
 Escape closes settings or explicitly skips onboarding; dialog closure leaves active resource downloads running.
+
+## Context Menus
+
+Right-click selected transcript text for Redact selection or Copy text; redaction keeps the existing occurrence and acoustic-boundary confirmation rules.
+Right-click redacted speech to remove its owning overlay; overlapping overlays are listed by their visible timeline intervals so the user can choose one explicitly.
+Removing an overlay restores its entire coverage, which can extend beyond the clicked word; it does not change ordinary clip mute.
+
+Right-click a clip for Split at playhead, Mute/Unmute, Copy, Cut, Duplicate, Paste at playhead and Delete.
+A timeline range also exposes Redact selected range on an intersecting clip in its target track; it applies to the range across that track’s intersecting clips, preserving gaps.
+Right-clicking an already selected clip retains multi-selection; other clips become the selection.
+Right-clicking a blank lane offers Paste at playhead without discarding the existing selection; choosing Paste targets that lane.
+Opening a context menu never seeks the playhead.
+Split requires one selected clip and a playhead strictly inside its bounds.
+
+Context menus omit shortcut labels.
+Arrow keys move between enabled commands, Home/End select the first/last enabled command, Enter or Space activates it, and Escape dismisses and restores focus.
+Menus close on outside pointer interaction, viewport scrolling or resizing; keyboard input inside them cannot trigger background editor commands.

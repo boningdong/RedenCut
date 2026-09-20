@@ -308,7 +308,7 @@ it('finishes pointer edge resizing without leaving selection or handle focus', (
   expect(state().undoStack).toHaveLength(1)
 })
 
-it('opens a single crossfade menu entry and a portal editor with a preserved enable toggle', () => {
+it('opens crossfade and removal menu entries and a portal editor with a preserved enable toggle', () => {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
     left: 100,
     right: 300,
@@ -327,7 +327,7 @@ it('opens a single crossfade menu entry and a portal editor with a preserved ena
     clientX: 150,
     clientY: 320,
   })
-  expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+  expect(screen.getByRole('menuitem', { name: 'Remove redact' })).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitem', { name: 'Edit crossfade…' }))
   const panel = screen.getByRole('dialog', { name: 'Edit crossfade' })
   expect(container.contains(panel)).toBe(false)
@@ -367,7 +367,7 @@ it('previews equal crossfade widths and cancels or commits a handle gesture as o
     key: 'F10',
     shiftKey: true,
   })
-  fireEvent.click(screen.getByRole('menuitem'))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit crossfade…' }))
   fireEvent.click(screen.getByRole('checkbox', { name: 'Enable crossfade' }))
   const count = state().undoStack.length
   const handle = screen.getByRole('slider', { name: 'Adjust right crossfade' })
