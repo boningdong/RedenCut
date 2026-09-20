@@ -58,7 +58,7 @@ describe('ProjectFileSchema', () => {
   it('parses the first published managed-package schema and applies defaults', () => {
     const project = ProjectFileSchema.parse(managedProject())
 
-    expect(project.version).toBe(2)
+    expect(project.version).toBe(3)
     expect(project.audioSettings.processingSampleRate).toBe(48_000)
     expect(project.tracks[0].clips.map((clip) => clip.audioSourceId)).toEqual([
       SOURCE_ID,
@@ -152,5 +152,90 @@ describe('ProjectFileSchema', () => {
     const outside = managedProject()
     outside.tracks[0].clips[0].sourceEnd = 61
     expect(() => ProjectFileSchema.parse(outside)).toThrow('source range')
+  })
+})
+
+describe('Mix source relationships', () => {
+  const linked = () => {
+    const project = managedProject()
+    project.version = 3
+    project.tracks.push({
+      ...project.tracks[0],
+      id: 'stem',
+      clips: [{ ...project.tracks[0].clips[0], id: 'stem-clip', trackId: 'stem' }],
+    })
+    project.tracks[0].mixLink = { stemTrackIds: ['stem'] }
+    project.tracks[0].clips[0].sourceOverrides = [
+      { id: 'override', sourceStart: 2, sourceEnd: 4, stemTrackIds: ['stem'] },
+    ]
+    return project
+  }
+  it('retains source relationships in version 3', () => {
+    expect(ProjectFileSchema.parse(linked()).tracks[0].mixLink).toEqual({ stemTrackIds: ['stem'] })
+  })
+  it.each([
+    'missing',
+    'self',
+    'nested',
+    'overlap',
+    'empty',
+    'duplicate-track',
+    'duplicate-clip',
+    'unlinked',
+    'duplicate-owner',
+    'duplicate-override',
+    'outside-source',
+  ])('rejects invalid relationship %s', (kind) => {
+    const p = linked()
+    if (kind === 'outside-source') p.tracks[0].clips[0].sourceOverrides[0].sourceEnd = 61
+    if (kind === 'missing') p.tracks[0].mixLink.stemTrackIds = ['missing']
+    if (kind === 'self') p.tracks[0].mixLink.stemTrackIds = ['track-1']
+    if (kind === 'nested') p.tracks[1].mixLink = { stemTrackIds: ['track-1'] }
+    if (kind === 'overlap')
+      p.tracks[0].clips[0].sourceOverrides.push({
+        id: 'overlap',
+        sourceStart: 3,
+        sourceEnd: 5,
+        stemTrackIds: ['stem'],
+      })
+    if (kind === 'empty') p.tracks[0].clips[0].sourceOverrides[0].stemTrackIds = []
+    if (kind === 'duplicate-track') p.tracks.push({ ...p.tracks[1], clips: [] })
+    if (kind === 'duplicate-clip') p.tracks[1].clips[0].id = 'clip-1'
+    if (kind === 'unlinked') delete p.tracks[0].mixLink
+    if (kind === 'duplicate-owner') p.tracks.push({ ...p.tracks[0], id: 'another', clips: [] })
+    if (kind === 'duplicate-override')
+      p.tracks[0].clips[0].sourceOverrides.push({
+        id: 'override',
+        sourceStart: 5,
+        sourceEnd: 6,
+        stemTrackIds: ['stem'],
+      })
+    expect(ProjectFileSchema.safeParse(p).success).toBe(false)
+  })
+  it('round-trips hidden child topology and rejects stale parent and child ownership', () => {
+    const project = linked()
+    project.tracks[0].clips[0].sourceEnd = 4
+    const segment = {
+      masterClipId: 'clip-1',
+      masterSourceStart: 4,
+      clip: { ...project.tracks[1].clips[0], sourceStart: 4, sourceEnd: 10, outputStart: 4 },
+    }
+    project.tracks[0].mixLink.hiddenSegments = [segment]
+    const restored = ProjectFileSchema.parse(JSON.parse(JSON.stringify(project)))
+    expect(restored.tracks[0].mixLink?.hiddenSegments?.[0].clip.sourceEnd).toBe(10)
+    for (const change of [
+      { masterClipId: 'missing' },
+      { clip: { ...segment.clip, trackId: 'missing' } },
+      { clip: { ...segment.clip, sourceEnd: 61 } },
+      { masterSourceStart: 2 },
+    ]) {
+      project.tracks[0].mixLink.hiddenSegments = [{ ...segment, ...change }]
+      expect(ProjectFileSchema.safeParse(project).success).toBe(false)
+    }
+  })
+  it('does not silently accept new relationships advertised as version 2', () => {
+    const p = linked()
+    p.version = 2
+    expect(ProjectFileSchema.safeParse(p).success).toBe(false)
   })
 })

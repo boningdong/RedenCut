@@ -58,6 +58,83 @@ describe('WaveformView managed providers', () => {
     })
   })
 
+  it('shows linked recordings read-only and collapses their lanes', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const mix = useTimelineStore.getState().tracks[0]
+    const child = {
+      ...mix,
+      id: 'child',
+      name: 'Linked microphone',
+      clips: mix.clips.map((clip) => ({
+        ...clip,
+        id: 'child-clip',
+        trackId: 'child',
+        redactions: [{ id: 'child-redaction', sourceStart: 1, sourceEnd: 2 }],
+      })),
+    }
+    useTimelineStore.setState({
+      tracks: [{ ...mix, mixLink: { stemTrackIds: [child.id] } }, child],
+    })
+    const { container } = render(
+      <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    const childLane = container.querySelector('[data-lane="child"]')!
+    expect(childLane.querySelector('.clip-trim-handle')).toBeNull()
+    expect(childLane.querySelector('[data-redaction-id]')).toBeNull()
+    expect(screen.queryByLabelText('Mute Linked microphone')).toBeNull()
+    const before = useTimelineStore.getState().selectedTrackId
+    fireEvent.click(childLane)
+    expect(useTimelineStore.getState().selectedTrackId).toBe(before)
+    const linkButton = screen.getByLabelText('Linked recordings')
+    expect(linkButton.getAttribute('aria-pressed')).toBe('true')
+    expect(linkButton.querySelector('path')?.getAttribute('d')).toBe('M3 4h18M6 4v16h15M6 12h15')
+    fireEvent.click(screen.getByLabelText('Hide linked recordings'))
+    expect(container.querySelector('[data-lane="child"]')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Show linked recordings'))
+    expect(container.querySelector('[data-lane="child"]')).not.toBeNull()
+  })
+
+  it('offers replacement for the existing ruler range and draws selected child sources', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const mix = useTimelineStore.getState().tracks[0]
+    const child = {
+      ...mix,
+      id: 'child',
+      name: 'Independent source',
+      clips: mix.clips.map((clip) => ({ ...clip, id: 'child-clip', trackId: 'child' })),
+    }
+    const master = {
+      ...mix,
+      mixLink: { stemTrackIds: [child.id] },
+      clips: mix.clips.map((clip) => ({
+        ...clip,
+        sourceOverrides: [
+          { id: 'override', sourceStart: 2, sourceEnd: 4, stemTrackIds: [child.id] },
+        ],
+      })),
+    }
+    useTimelineStore.setState({ tracks: [master, child] })
+    useEditorStore
+      .getState()
+      .setSelection({ origin: 'timeline', trackId: mix.id, start: 2, end: 4 })
+    const provider = {} as WaveformDataProvider
+    const { container } = render(
+      <WaveformView
+        duration={10}
+        providersBySource={new Map([[source.id, provider]])}
+        onAddTrack={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Replace audio…')).not.toBeNull()
+    const sourceWaveform = container.querySelector(
+      `[data-lane="${mix.id}"] [data-source-override="override"]`,
+    )
+    expect(sourceWaveform?.getAttribute('data-waveform-track')).toBe('child')
+    expect(sourceWaveform?.querySelector('[data-testid="waveform"]')).not.toBeNull()
+    act(() => useEditorStore.getState().setSelection(null))
+    expect(screen.getByTitle('Sources: Independent source')).not.toBeNull()
+  })
+
   it('shows a ruler hover guide across lanes and clears it on leave and blur', () => {
     useTimelineStore.getState().initFromAudioSource(source)
     const { container } = render(

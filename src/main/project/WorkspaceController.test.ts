@@ -295,7 +295,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(second.revision).toBe(3)
     expect(second.workspaceToken).not.toBe(first.workspaceToken)
-    expect(await readFile(join(firstRoot, 'project.json'), 'utf8')).toContain('"version": 2')
+    expect(await readFile(join(firstRoot, 'project.json'), 'utf8')).toContain('"version": 3')
   })
 
   it('rejects Open through a symlink to the same temporary root without changing the session', async () => {
@@ -313,7 +313,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(controller.workspace.root).toBe(temporaryRoot)
     expect(() => controller.assertCurrent(session)).not.toThrow()
-    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 2')
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 3')
   })
 
   it('rejects an Open alias lexically below the temporary root even when it targets an external project', async () => {
@@ -375,7 +375,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(controller.workspace.root).toBe(temporaryRoot)
     expect(() => controller.assertCurrent(session)).not.toThrow()
-    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 2')
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 3')
   })
 
   it('rejects Save As through a symlink to the same temporary root before publication', async () => {
@@ -392,7 +392,7 @@ describe('WorkspaceController session authority', () => {
 
     expect(controller.workspace.root).toBe(temporaryRoot)
     expect(() => controller.assertCurrent(session)).not.toThrow()
-    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 2')
+    expect(await readFile(join(temporaryRoot, 'project.json'), 'utf8')).toContain('"version": 3')
   })
 
   it('rejects Save As below the temporary root before publication', async () => {

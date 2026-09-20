@@ -1,3 +1,4 @@
+import { getIndependentTracks } from './SourceRouting'
 import type { Track } from './ProjectTypes'
 import { clipRedactionRanges, clipRetainedRanges } from './ClipRedactions'
 
@@ -8,6 +9,7 @@ export interface RedactionRange {
 
 /** Only overlays contract time; ordinary mute never creates a deletion interval. */
 export function redactionSkipRanges(tracks: Track[]): RedactionRange[] {
+  tracks = getIndependentTracks(tracks)
   const solo = tracks.some((track) => track.solo)
   const events = tracks
     .filter((track) => !track.muted && (!solo || track.solo))

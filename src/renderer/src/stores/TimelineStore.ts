@@ -37,6 +37,14 @@ import type { AudioSourceId, Clip, ClipRedaction, Track } from '@shared/ProjectT
 import type { RendererAudioSource } from '@shared/session.types'
 import { useEditorStore } from './editor.store'
 import { redactionCoverage } from '@shared/ClipRedactions'
+import {
+  changeMixLink,
+  changeMixSources,
+  isLinkedClip,
+  linkedMasterForTrack,
+  synchronizeMixEdits,
+  sliceLinkedClip,
+} from '../domain/MixLinkEdits'
 import { planClipPlacement } from '../domain/TimelinePlacement'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -50,8 +58,25 @@ function nextId(prefix: string): string {
 function cloneTracks(tracks: Track[]): Track[] {
   return tracks.map((t) => ({
     ...t,
+    mixLink: t.mixLink
+      ? {
+          stemTrackIds: [...t.mixLink.stemTrackIds],
+          hiddenSegments: t.mixLink.hiddenSegments?.map((segment) => ({
+            ...segment,
+            clip: sliceLinkedClip(
+              segment.clip,
+              segment.clip.outputStart,
+              segment.clip.outputStart + segment.clip.sourceEnd - segment.clip.sourceStart,
+            ),
+          })),
+        }
+      : undefined,
     clips: t.clips.map((c) => ({
       ...c,
+      sourceOverrides: c.sourceOverrides?.map((override) => ({
+        ...override,
+        stemTrackIds: [...override.stemTrackIds],
+      })),
       effects: [...c.effects],
       redactions: c.redactions?.map((r) => ({
         ...r,
@@ -134,6 +159,10 @@ interface TimelineState {
 
   // ── Track operations ───────────────────────────────────────────────────────
 
+  setMixLink(mixTrackId: string, stemTrackIds: string[]): boolean
+  replaceMixSources(mixTrackId: string, start: number, end: number, stemTrackIds: string[]): boolean
+  restoreMixSources(mixTrackId: string, start: number, end: number): boolean
+
   addTrack(name?: string, audioSourceId?: AudioSourceId): string
   removeTrack(trackId: string): void
   updateTrack(trackId: string, patch: Partial<Omit<Track, 'id' | 'clips'>>): void
@@ -184,7 +213,13 @@ interface TimelineState {
    * Clips on the same track after the moved clip are reflowed.
    */
   moveClip(clipId: string, newOutputStart: number, newTrackId?: string): void
-  commitTracks(expected: Track[], next: Track[], label: string, selectedIds?: string[]): boolean
+  commitTracks(
+    expected: Track[],
+    next: Track[],
+    label: string,
+    selectedIds?: string[],
+    synchronized?: boolean,
+  ): boolean
 
   // ── Selection ──────────────────────────────────────────────────────────────
 
@@ -391,22 +426,43 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     return trackId
   },
 
-  // ── removeTrack ─────────────────────────────────────────────────────────────
+  setMixLink(mixTrackId, stemTrackIds) {
+    const tracks = get().tracks
+    const next = changeMixLink(tracks, mixTrackId, stemTrackIds)
+    return next ? get().commitTracks(tracks, next, 'Change Mix sources') : false
+  },
+  replaceMixSources(mixTrackId, start, end, stemTrackIds) {
+    const tracks = get().tracks
+    const next = changeMixSources(tracks, mixTrackId, start, end, stemTrackIds)
+    return next ? get().commitTracks(tracks, next, 'Replace Mix audio') : false
+  },
+  restoreMixSources(mixTrackId, start, end) {
+    const tracks = get().tracks
+    const next = changeMixSources(tracks, mixTrackId, start, end)
+    return next ? get().commitTracks(tracks, next, 'Restore Mix audio') : false
+  },
   removeTrack(trackId) {
-    if (!get().tracks.some((track) => track.id === trackId)) return
-    set((s) => {
-      const tracks = s.tracks.filter((t) => t.id !== trackId)
-      return {
-        tracks,
-        ...normalizedSelection(tracks, s.selectedClipIds, s.selectedClipId ?? undefined),
-        selectedTrackId: s.selectedTrackId === trackId ? null : s.selectedTrackId,
-      }
-    })
-    markTimelineEdited()
+    const tracks = get().tracks
+    const removed = tracks.find((track) => track.id === trackId)
+    if (!removed) return
+    let next = tracks
+    const master = linkedMasterForTrack(tracks, trackId)
+    if (master)
+      next = changeMixLink(
+        next,
+        master.id,
+        master.mixLink!.stemTrackIds.filter((id) => id !== trackId),
+      )!
+    if (removed.mixLink) next = changeMixLink(next, trackId, [])!
+    next = next.filter((track) => track.id !== trackId)
+    get().commitTracks(tracks, next, 'Remove track')
+    if (get().selectedTrackId === trackId) set({ selectedTrackId: null })
   },
 
   // ── updateTrack ─────────────────────────────────────────────────────────────
   updateTrack(trackId, patch) {
+    if (linkedMasterForTrack(get().tracks, trackId)) return
+    if (patch.mixLink !== undefined) return
     if (!get().tracks.some((track) => track.id === trackId)) return
     set((s) => ({
       tracks: s.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)),
@@ -416,6 +472,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   // ── redactRange ───────────────────────────────────────────────────────────────
   redactRange(trackId, startTime, endTime) {
+    if (linkedMasterForTrack(get().tracks, trackId)) return
     const { tracks } = get()
     const track = tracks.find((t) => t.id === trackId)
     if (!track) {
@@ -446,6 +503,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   redactClipRanges(trackId, clipId, ranges) {
+    if (linkedMasterForTrack(get().tracks, trackId)) return
     const { tracks } = get()
     const track = tracks.find((item) => item.id === trackId)
     const clip = track?.clips.find((item) => item.id === clipId)
@@ -500,6 +558,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   redactTranscriptRange(trackId, expectedClips, range) {
+    if (linkedMasterForTrack(get().tracks, trackId)) return false
     const { tracks } = get()
     const track = tracks.find((t) => t.id === trackId)
     const clips = [...expectedClips].sort((a, b) => a.outputStart - b.outputStart)
@@ -576,7 +635,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   removeClips(ids) {
     const { tracks, selectedClipIds } = get()
-    const removed = new Set(ids)
+    const removed = new Set(ids.filter((id) => !isLinkedClip(tracks, id)))
     if (!tracks.some((track) => track.clips.some((clip) => removed.has(clip.id)))) return
     const next = tracks.map((track) => {
       const clips = track.clips.filter((clip) => !removed.has(clip.id))
@@ -599,7 +658,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   splitAt(time) {
     const { tracks, selectedClipId } = get()
 
-    if (!selectedClipId) return
+    if (!selectedClipId || isLinkedClip(tracks, selectedClipId)) return
 
     let targetTrackId: string | null = null
     let targetClip: Clip | null = null
@@ -619,7 +678,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const clipOutputEnd = targetClip.outputStart + (targetClip.sourceEnd - targetClip.sourceStart)
     if (time <= targetClip.outputStart || time >= clipOutputEnd) return
 
-    const before = cloneTracks(tracks)
     const offset = time - targetClip.outputStart
     const left: Clip = {
       ...targetClip,
@@ -650,19 +708,31 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         })),
     }
 
-    set((s) => ({
-      tracks: s.tracks.map((t) =>
-        t.id === targetTrackId
-          ? { ...t, clips: t.clips.flatMap((c) => (c.id === targetClip!.id ? [left, right] : [c])) }
-          : t,
-      ),
-      undoStack: [...s.undoStack, { before, label: `split at ${time.toFixed(1)}` }],
-      redoStack: [], // new mutation invalidates the redo future
-      selectedClipId: null,
-      selectedClipIds: [],
-      timelineSelection: null,
-    }))
-    markTimelineEdited()
+    for (const piece of [left, right]) {
+      piece.sourceOverrides = targetClip.sourceOverrides
+        ?.filter((override) =>
+          piece === left
+            ? override.sourceStart < right.sourceStart
+            : override.sourceEnd > right.sourceStart,
+        )
+        .map((override) => ({
+          ...override,
+          id: nextId('override'),
+          sourceStart:
+            piece === right
+              ? Math.max(override.sourceStart, right.sourceStart)
+              : override.sourceStart,
+          sourceEnd:
+            piece === left ? Math.min(override.sourceEnd, right.sourceStart) : override.sourceEnd,
+          stemTrackIds: [...override.stemTrackIds],
+        }))
+    }
+    const next = tracks.map((t) =>
+      t.id === targetTrackId
+        ? { ...t, clips: t.clips.flatMap((c) => (c.id === targetClip!.id ? [left, right] : [c])) }
+        : t,
+    )
+    get().commitTracks(tracks, next, `split at ${time.toFixed(1)}`, [])
   },
 
   // ── moveClip ────────────────────────────────────────────────────────────────
@@ -678,9 +748,48 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (placement) get().commitTracks(tracks, placement.tracks, `move clip ${clipId}`, [clipId])
   },
 
-  commitTracks(expected, next, label, selectedIds) {
+  commitTracks(expected, next, label, selectedIds, synchronized = false) {
     const state = get()
     if (state.tracks !== expected || tracksEqual(expected, next)) return false
+    if (!synchronized) {
+      if (
+        expected.some(
+          (track) =>
+            linkedMasterForTrack(next, track.id) &&
+            linkedMasterForTrack(expected, track.id) &&
+            JSON.stringify(track) !== JSON.stringify(next.find((item) => item.id === track.id)),
+        )
+      )
+        return false
+      next = synchronizeMixEdits(expected, next)
+    }
+    // Active substitutions cannot become ambiguous or lose their raw source coverage.
+    for (const track of next)
+      for (const clip of track.clips)
+        for (const override of clip.sourceOverrides ?? []) {
+          const start = Math.max(clip.sourceStart, override.sourceStart)
+          const end = Math.min(clip.sourceEnd, override.sourceEnd)
+          if (
+            end > start &&
+            !changeMixSources(
+              next,
+              track.id,
+              clip.outputStart + start - clip.sourceStart,
+              clip.outputStart + end - clip.sourceStart,
+              override.stemTrackIds,
+            )
+          )
+            return false
+        }
+    for (const track of next.filter((track) => linkedMasterForTrack(next, track.id)))
+      for (const clip of track.clips) {
+        const source = state.audioSources.find((source) => source.id === clip.audioSourceId)
+        if (
+          clip.sourceStart < 0 ||
+          (source && clip.sourceEnd > source.metadata.durationSeconds + 1e-8)
+        )
+          return false
+      }
     const ids = selectedIds ?? state.selectedClipIds
     const primary =
       selectedIds === undefined && state.selectedClipId ? state.selectedClipId : selectedIds?.[0]
@@ -743,6 +852,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   updateRedactionCrossfade(clipId, redactionId, settings) {
+    if (isLinkedClip(get().tracks, clipId)) return
     const parsed = CrossfadeSettingsSchema.safeParse(settings)
     if (!parsed.success) return
     const { tracks } = get()
@@ -772,6 +882,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   updateRedaction(clipId, redactionId, range, mode = 'resize') {
+    if (isLinkedClip(get().tracks, clipId)) return
     const { tracks } = get()
     const clip = tracks.flatMap((t) => t.clips).find((c) => c.id === clipId)
     const redaction = clip?.redactions?.find((r) => r.id === redactionId)
@@ -822,6 +933,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   },
 
   removeRedaction(clipId, redactionId) {
+    if (isLinkedClip(get().tracks, clipId)) return
     const { tracks } = get()
     if (
       !tracks.some((t) =>
@@ -854,7 +966,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   setClipsMuted(ids, muted) {
     const { tracks } = get()
-    const selected = new Set(ids)
+    const selected = new Set(ids.filter((id) => !isLinkedClip(tracks, id)))
     if (
       !tracks.some((track) =>
         track.clips.some((clip) => selected.has(clip.id) && clip.muted !== muted),

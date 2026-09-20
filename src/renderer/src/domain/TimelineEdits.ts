@@ -1,3 +1,4 @@
+import { linkedMasterForTrack } from './MixLinkEdits'
 import type { Clip, Track } from '@shared/ProjectTypes'
 
 const clipEnd = (clip: Clip) => clip.outputStart + clip.sourceEnd - clip.sourceStart
@@ -19,6 +20,7 @@ export function trimClip(
   const trackIndex = tracks.findIndex((track) => track.clips.some((clip) => clip.id === clipId))
   if (trackIndex < 0) return null
   const track = tracks[trackIndex]
+  if (linkedMasterForTrack(tracks, track.id)) return null
   const clipIndex = track.clips.findIndex((clip) => clip.id === clipId)
   const clip = track.clips[clipIndex]
   const otherClips = track.clips.filter((item) => item.id !== clipId)

@@ -1,3 +1,7 @@
+import { LinkedClipWaveform } from './LinkedClipWaveform'
+import { MixLinkDialog } from './MixLinkDialog'
+import { SourceOverridePopover } from './SourceOverridePopover'
+import { MixClipWaveform } from './MixClipWaveform'
 import { TimelineRuler } from './TimelineRuler'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useRangeSelection } from './UseRangeSelection'
@@ -75,6 +79,21 @@ export function WaveformView({
   const clipboardAvailable = useTimelineClipboardStore((state) => state.contents !== null)
   const [actionFailed, setActionFailed] = useState(false)
   const tracks = useTimelineStore((s) => s.tracks)
+  const [mixDialogId, setMixDialogId] = useState<string | null>(null)
+  const [collapsedMixes, setCollapsedMixes] = useState<string[]>([])
+  const [replacementOpen, setReplacementOpen] = useState(false)
+  const replacementAnchor = useRef<HTMLButtonElement>(null)
+  const closeReplacement = useCallback(() => setReplacementOpen(false), [])
+  const childIds = new Set(tracks.flatMap((track) => track.mixLink?.stemTrackIds ?? []))
+  const visibleTracks = tracks
+    .filter((track) => !childIds.has(track.id))
+    .flatMap((track) => [
+      track,
+      ...(collapsedMixes.includes(track.id)
+        ? []
+        : tracks.filter((child) => track.mixLink?.stemTrackIds.includes(child.id))),
+    ])
+  const mixDialogTrack = tracks.find((track) => track.id === mixDialogId)
   const projectGeneration = useTimelineStore((s) => s.projectGeneration)
   const audioSources = useTimelineStore((s) => s.audioSources)
   const removeTrack = useTimelineStore((s) => s.removeTrack)
@@ -114,6 +133,10 @@ export function WaveformView({
     audioPanel.current?.focus({ preventScroll: true })
   }, [])
   const selection = useEditorStore((s) => s.selection)
+  const replacementTrack =
+    selection?.origin === 'timeline'
+      ? tracks.find((track) => track.id === selection.trackId && track.mixLink)
+      : undefined
   const hasTrackRange = Boolean(
     selection?.trackId && tracks.some((track) => track.id === selection.trackId),
   )
@@ -291,10 +314,16 @@ export function WaveformView({
   // ── Remove track ─────────────────────────────────────────────────────────
   const handleRemoveTrack = useCallback(
     (trackId: string) => {
+      const affected = tracks.some((track) =>
+        track.clips.some((clip) =>
+          clip.sourceOverrides?.some((override) => override.stemTrackIds.includes(trackId)),
+        ),
+      )
+      if (affected && !window.confirm(t('waveform.mixRemoveWarning'))) return
       removeTrack(trackId)
       useTranscriptStore.getState().removeWordsForTrack(trackId)
     },
-    [removeTrack],
+    [removeTrack, tracks, t],
   )
 
   const previewClips = new Map(
@@ -460,12 +489,29 @@ export function WaveformView({
             </div>
 
             {/* Track headers */}
-            {tracks.map((track) => (
+            {visibleTracks.map((track) => (
               <div
                 key={track.id}
-                style={{ height: LANE_HEIGHT, display: 'flex', alignItems: 'stretch' }}
+                style={{
+                  height: childIds.has(track.id) ? 44 : LANE_HEIGHT,
+                  display: 'flex',
+                  alignItems: 'stretch',
+                }}
               >
-                <TrackHeader track={track} onRemove={handleRemoveTrack} />
+                <TrackHeader
+                  track={track}
+                  onRemove={handleRemoveTrack}
+                  readOnly={childIds.has(track.id)}
+                  onMixSources={() => setMixDialogId(track.id)}
+                  collapsed={collapsedMixes.includes(track.id)}
+                  onToggleChildren={() =>
+                    setCollapsedMixes((ids) =>
+                      ids.includes(track.id)
+                        ? ids.filter((id) => id !== track.id)
+                        : [...ids, track.id],
+                    )
+                  }
+                />
               </div>
             ))}
           </div>
@@ -524,15 +570,16 @@ export function WaveformView({
               </div>
 
               {/* Track lanes */}
-              {tracks.map((track) => {
+              {visibleTracks.map((track) => {
                 return (
                   <div
                     key={track.id}
                     data-lane={track.id}
                     data-trackid={track.id}
                     data-track-name={track.name}
+                    data-linked-child={childIds.has(track.id)}
                     style={{
-                      height: LANE_HEIGHT,
+                      height: childIds.has(track.id) ? 44 : LANE_HEIGHT,
                       position: 'relative',
                       cursor: 'crosshair',
                       overflow: 'hidden',
@@ -543,9 +590,12 @@ export function WaveformView({
                       interaction.preview?.targetTrackId === track.id && interaction.preview.invalid
                     }
                     onClick={(e) => {
-                      if (!interaction.consumeClick()) handleLaneClick(e, track.id)
+                      if (!childIds.has(track.id) && !interaction.consumeClick())
+                        handleLaneClick(e, track.id)
                     }}
-                    onPointerDown={(e) => interaction.begin(e)}
+                    onPointerDown={(e) => {
+                      if (!childIds.has(track.id)) interaction.begin(e)
+                    }}
                   >
                     {track.clips.map((clip) => {
                       const proposed = previewClips.get(clip.id)
@@ -558,6 +608,27 @@ export function WaveformView({
                           key={clip.id}
                           clip={clip}
                           track={track}
+                          readOnly={childIds.has(track.id)}
+                          waveform={
+                            childIds.has(track.id) ? (
+                              <LinkedClipWaveform
+                                clip={clip}
+                                track={track}
+                                tracks={tracks}
+                                provider={providersBySource.get(clip.audioSourceId)}
+                                pxPerSec={pxPerSec}
+                                viewport={viewport}
+                              />
+                            ) : clip.sourceOverrides?.length ? (
+                              <MixClipWaveform
+                                clip={clip}
+                                tracks={tracks}
+                                providers={providersBySource}
+                                pxPerSec={pxPerSec}
+                                viewport={viewport}
+                              />
+                            ) : undefined
+                          }
                           provider={providersBySource.get(clip.audioSourceId)}
                           pxPerSec={pxPerSec}
                           viewport={viewport}
@@ -587,6 +658,28 @@ export function WaveformView({
                         pxPerSec={pxPerSec}
                         trackColor={trackPresentationColor(track.color)}
                       />
+                    )}
+                    {replacementTrack?.id === track.id && selection && (
+                      <button
+                        ref={replacementAnchor}
+                        className="mix-replace-trigger"
+                        style={{
+                          left: Math.max(
+                            viewport.scrollLeft + 4,
+                            Math.min(
+                              ((selection.start + selection.end) / 2) * pxPerSec - 60,
+                              viewport.scrollLeft + viewport.width - 132,
+                            ),
+                          ),
+                        }}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setReplacementOpen(true)
+                        }}
+                      >
+                        {t('waveform.replaceAudio')}
+                      </button>
                     )}
                     {/* Gap overlays — cover waveform between clips */}
                     {(() => {
@@ -656,6 +749,36 @@ export function WaveformView({
           {t('waveform.addTrack')}
         </button>
       </div>
+      {mixDialogTrack && (
+        <MixLinkDialog
+          key={mixDialogTrack.id}
+          track={mixDialogTrack}
+          tracks={tracks}
+          onApply={(ids) => useTimelineStore.getState().setMixLink(mixDialogTrack.id, ids)}
+          onClose={() => setMixDialogId(null)}
+        />
+      )}
+      {replacementOpen && replacementTrack && selection && (
+        <SourceOverridePopover
+          key={`${replacementTrack.id}:${selection.start}:${selection.end}`}
+          anchor={replacementAnchor}
+          track={replacementTrack}
+          tracks={tracks}
+          start={selection.start}
+          end={selection.end}
+          onApply={(ids) =>
+            useTimelineStore
+              .getState()
+              .replaceMixSources(replacementTrack.id, selection.start, selection.end, ids)
+          }
+          onRestore={() =>
+            useTimelineStore
+              .getState()
+              .restoreMixSources(replacementTrack.id, selection.start, selection.end)
+          }
+          onClose={closeReplacement}
+        />
+      )}
       {interaction.marquee && <div className="clip-marquee" style={interaction.marquee} />}
       <div className="audio-footer">
         <span>

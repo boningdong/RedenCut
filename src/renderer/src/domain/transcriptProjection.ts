@@ -1,3 +1,4 @@
+import { getIndependentTracks, resolveSourceSpans } from '@shared/SourceRouting'
 import { hasValidatedTiming } from './transcriptReliability'
 import { redactionCoverage } from '@shared/ClipRedactions'
 import type { Clip, TrackContent } from '@shared/ProjectTypes'
@@ -5,6 +6,8 @@ import type { RendererSpeechAnalysis, TranscriptUnit, SpeakerId } from '@shared/
 
 /** An occurrence is the unit as heard through one current timeline clip. */
 export interface TranscriptOccurrence {
+  projectionBounds?: { sourceStart: number; sourceEnd: number }
+  replacement?: { track: TrackContent; clip: Clip; sourceOffset: number }
   id: string
   scopeId: string
   analysis: RendererSpeechAnalysis
@@ -32,7 +35,7 @@ export interface TranscriptOverlap {
   trackIds: string[]
 }
 
-export function projectTranscript(
+function projectRawTranscript(
   analyses: RendererSpeechAnalysis[],
   tracks: TrackContent[],
 ): TranscriptOccurrence[] {
@@ -145,6 +148,79 @@ export function projectTranscript(
         })
       }
     }
+  return result.sort((a, b) => a.orderTime - b.orderTime)
+}
+
+/** Substitute source occurrences while retaining the actual master as the edit owner. */
+export function projectTranscript(
+  analyses: RendererSpeechAnalysis[],
+  tracks: TrackContent[],
+): TranscriptOccurrence[] {
+  if (!tracks.some((track) => track.mixLink)) return projectRawTranscript(analyses, tracks)
+  const independent = getIndependentTracks(tracks)
+  const solo = independent.some((track) => track.solo)
+  const result: TranscriptOccurrence[] = []
+  for (const master of independent) {
+    if (!master.mixLink) {
+      result.push(
+        ...projectRawTranscript(analyses, [
+          { ...master, muted: master.muted || (solo && !master.solo) },
+        ]),
+      )
+      continue
+    }
+    for (const masterClip of master.clips) {
+      const spans = resolveSourceSpans(
+        tracks,
+        masterClip,
+        masterClip.sourceStart,
+        masterClip.sourceEnd,
+      )
+      for (const span of spans) {
+        const sourceTrack = tracks.find((track) => track.id === span.trackId)!
+        const sourceClip = sourceTrack.clips.find((clip) => clip.id === span.clipId)!
+        const sourceOffset = span.masterSourceStart - span.sourceStart
+        const replacement = span.trackId !== master.id
+        const virtualClip: Clip = {
+          ...sourceClip,
+          sourceStart: span.sourceStart,
+          sourceEnd: span.sourceEnd,
+          outputStart: masterClip.outputStart + span.masterSourceStart - masterClip.sourceStart,
+          muted: masterClip.muted,
+          redactions: masterClip.redactions?.map((redaction) => ({
+            ...redaction,
+            sourceStart: redaction.sourceStart - sourceOffset,
+            sourceEnd: redaction.sourceEnd - sourceOffset,
+          })),
+        }
+        const virtualTrack: TrackContent = {
+          ...sourceTrack,
+          clips: [virtualClip],
+          muted: master.muted || (solo && !master.solo),
+          solo: master.solo,
+        }
+        for (const unit of projectRawTranscript(analyses, [virtualTrack])) {
+          const scopeId = JSON.stringify([
+            unit.scopeId,
+            master.id,
+            masterClip.id,
+            span.masterSourceStart,
+            span.masterSourceEnd,
+          ])
+          result.push({
+            ...unit,
+            scopeId,
+            id: JSON.stringify([scopeId, unit.unit.id]),
+            clip: replacement ? virtualClip : masterClip,
+            projectionBounds: { sourceStart: span.sourceStart, sourceEnd: span.sourceEnd },
+            ...(replacement
+              ? { replacement: { track: master, clip: masterClip, sourceOffset } }
+              : {}),
+          })
+        }
+      }
+    }
+  }
   return result.sort((a, b) => a.orderTime - b.orderTime)
 }
 

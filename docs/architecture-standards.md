@@ -128,3 +128,12 @@
 - Selection does not download. Model-specific preparation accepts only manifest-listed transcription IDs; alignment and diarization retain their fixed models.
 - Started analysis jobs retain their snapshotted model path. Subsequent jobs resolve the selected model; an uninstalled selected model does not silently use a different installed model.
 - Whisper preparation checks its native CLI and FFmpeg independently of Python-based alignment/diarization; missing unrelated Python dependencies must not block a selected Whisper download. Runtime-blocked requests publish an actionable failure rather than silently returning unchanged state.
+
+## Mix Source Replacement
+
+- A Mix track owns optional `mixLink.stemTrackIds`; its clips own source-relative `sourceOverrides`, all inside the existing atomic tracks snapshot.
+- Linked children are read-only backup recordings: their redactions and controls remain saved but do not affect routed audio; master controls, redactions and transitions apply to the effective composite.
+- Shared source routing substitutes contributions within the existing frame render plan, preserving envelopes and editing/output time mapping. Child tracks never independently protect redactions or schedule audible contributions.
+- Structural master edits synchronize child source coverage; unsupported or ambiguous edits fail atomically instead of breaking alignment. Association retains current timing and warns for previously edited recordings.
+- Transcript source identity remains independent from master edit ownership. Replacement text uses source-track background color, while its redaction target is the exact master occurrence.
+- Version 3 project writes retain links and overrides; version 2 input migrates explicitly, with no back-writing to older apps.

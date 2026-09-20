@@ -157,6 +157,7 @@ export function CanonicalTranscriptPanel({
         current.sourceStart !== clip.sourceStart ||
         current.sourceEnd !== clip.sourceEnd ||
         current.outputStart !== clip.outputStart ||
+        JSON.stringify(current.sourceOverrides) !== JSON.stringify(clip.sourceOverrides) ||
         revision !== analysis.analysisRevisionId
       ) {
         setPending(null)
@@ -209,8 +210,8 @@ export function CanonicalTranscriptPanel({
             : undefined
         }
         highlighted={Boolean(
-          pending?.occurrence.track.id === u.track.id &&
-          pending.clips.some((c) => c.id === u.clip.id) &&
+          pending?.occurrence.track.id === (u.replacement?.track.id ?? u.track.id) &&
+          pending.clips.some((c) => c.id === (u.replacement?.clip.id ?? u.clip.id)) &&
           pending.resolvedUnitIds.includes(u.unit.id),
         )}
       />

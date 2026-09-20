@@ -127,3 +127,14 @@ Keyboard input inside the editor stays local, including native text undo; saved 
 
 While a settings or onboarding dialog is open, keyboard input stays within the dialog and does not trigger background editor shortcuts.
 Escape closes settings or explicitly skips onboarding; dialog closure leaves active resource downloads running.
+
+## Mix Source Replacement
+
+The monochrome hierarchy button after a track's volume selects independent recordings to lock to that Mix.
+Its connected branch lines represent the master and indented children; active background indicates an established link.
+Linked child tracks are compact and read-only; their stored redactions and track controls are ignored while supplying replacement source audio.
+Use the existing ruler range and target Mix, then Replace audio to open the anchored floating selector.
+Choose one or more children and Apply, or restore original Mix audio; closing or Escape discards the draft.
+Replacement is not Redact and never shortens time by itself; master Redact and crossfade continue to apply to the effective sound.
+Time edits originate on Mix and synchronize child material; child redactions survive unlink, which returns affected replacement ranges to Mix after a warning.
+The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.

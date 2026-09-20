@@ -203,3 +203,85 @@ it('copies crossfade settings independently from the original and clipboard', ()
   expect(pasted.redactions![0].crossfade).toEqual(copied.redactions![0].crossfade)
   expect(pasted.redactions![0].crossfade).not.toBe(copied.redactions![0].crossfade)
 })
+
+it('cuts and pastes a Mix with captured child fragments and independent metadata', async () => {
+  useEditorStore.getState().reset()
+  useTimelineStore.getState().reset()
+  const master = track('mix', [clip('master', 'mix', 0, 4)])
+  const child = track('stem', [clip('child', 'stem', 0, 8)])
+  useTimelineStore.setState({ tracks: [master, child] })
+  const state = () => useTimelineStore.getState()
+  state().setMixLink('mix', ['stem'])
+  state().replaceMixSources('mix', 1, 3, ['stem'])
+  state().setSelectedClipId('master')
+  expect(cutClips()).toBe(true)
+  usePlaybackStore.getState().setCurrentTime(10)
+  state().setSelectedTrackId('mix')
+  expect(pasteClips()).toBe(true)
+  expect(state().tracks[0].clips[0].outputStart).toBe(10)
+  expect(state().tracks[1].clips.map((c) => [c.outputStart, c.sourceStart, c.sourceEnd])).toEqual([
+    [4, 5, 9],
+    [10, 1, 5],
+  ])
+  expect(state().tracks[1].clips[1].redactions?.[0].id).not.toBe('redaction-child')
+  await state().undo()
+  expect(state().tracks[0].clips).toHaveLength(0)
+})
+it('duplicates linked material with replacement metadata in the same group', () => {
+  useEditorStore.getState().reset()
+  useTimelineStore.getState().reset()
+  useTimelineStore.setState({
+    tracks: [
+      track('mix', [clip('master', 'mix', 0, 4)]),
+      track('stem', [clip('child', 'stem', 0, 4)]),
+    ],
+  })
+  const state = () => useTimelineStore.getState()
+  state().setMixLink('mix', ['stem'])
+  state().replaceMixSources('mix', 1, 3, ['stem'])
+  state().setSelectedClipId('master')
+  expect(duplicateClips()).toBe(true)
+  expect(state().tracks.map((t) => t.clips.map((c) => c.outputStart))).toEqual([
+    [0, 4],
+    [0, 4],
+  ])
+  expect(state().tracks[0].clips[1].sourceOverrides?.[0].id).not.toBe(
+    state().tracks[0].clips[0].sourceOverrides?.[0].id,
+  )
+})
+it('copies hidden linked topology so pasted Mix can reveal the original sources', () => {
+  useEditorStore.getState().reset()
+  useTimelineStore.getState().reset()
+  const a = clip('a', 'stem', 0, 5),
+    b = clip('b', 'stem', 5, 5)
+  b.audioSourceId = '00000000-0000-4000-8000-000000000002' as Clip['audioSourceId']
+  useTimelineStore.setState({
+    tracks: [track('mix', [clip('master', 'mix', 0, 10)]), track('stem', [a, b])],
+  })
+  const state = () => useTimelineStore.getState()
+  state().setMixLink('mix', ['stem'])
+  const before = state().tracks
+  state().commitTracks(
+    before,
+    before.map((t) => (t.id === 'mix' ? { ...t, clips: [{ ...t.clips[0], sourceEnd: 5 }] } : t)),
+    'trim',
+  )
+  state().setSelectedClipId('master')
+  expect(cutClips()).toBe(true)
+  usePlaybackStore.getState().setCurrentTime(20)
+  state().setSelectedTrackId('mix')
+  expect(pasteClips()).toBe(true)
+  const pasted = state().tracks
+  expect(
+    state().commitTracks(
+      pasted,
+      pasted.map((t) => (t.id === 'mix' ? { ...t, clips: [{ ...t.clips[0], sourceEnd: 11 }] } : t)),
+      'reveal',
+    ),
+  ).toBe(true)
+  expect(
+    state().tracks[1].clips.some(
+      (c) => c.audioSourceId === b.audioSourceId && c.outputStart === 25,
+    ),
+  ).toBe(true)
+})

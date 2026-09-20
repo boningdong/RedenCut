@@ -1,7 +1,8 @@
+import { z } from 'zod'
 import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
 import { selectWhisperDefinition } from '../resources/WhisperModelSelection'
 import { createSpeechBatchHandler } from './speechBatch.ipc'
-import { ProjectFileSchema } from '../../shared/ProjectTypes'
+import { TrackSchema } from '../../shared/ProjectTypes'
 import type { ResourceManager } from '../resources/ResourceManager'
 import type { AppPreferencesStore } from '../preferences/AppPreferencesStore'
 import { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
@@ -360,7 +361,7 @@ function parseStartRequest(input: unknown): SpeechAnalysisJobRequest {
       throw new PublicIpcError('invalid-request')
     const tasks =
       candidate.tasks === undefined ? undefined : SpeechTaskSelectionSchema.parse(candidate.tasks)
-    const tracks = ProjectFileSchema.shape.tracks.parse(candidate.draft.tracks)
+    const tracks = z.array(TrackSchema).parse(candidate.draft.tracks)
     return {
       ...precondition,
       jobId: requireJobId(candidate.jobId) as SpeechAnalysisJobId,

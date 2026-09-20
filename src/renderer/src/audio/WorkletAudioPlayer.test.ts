@@ -5,6 +5,7 @@ import type { AudioSampleChunk, AudioSampleProvider } from '@shared/PlayerTypes'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import * as renderPlans from '@shared/audio/AudioRenderPlanBuilder'
 import { WorkletAudioPlayer } from './WorkletAudioPlayer'
+import { renderTrackBlock } from './TrackBlockRenderer'
 import { PlaybackTimelineAdapter } from './PlaybackTimelineAdapter'
 
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
@@ -729,6 +730,77 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     for (const node of FakeNode.instances.slice(1)) {
       expect(node.port.messages.some(({ message }) => message.type === 'play')).toBe(true)
     }
+    await player.destroy()
+  })
+
+  it('renders multi-source PCM through the real block renderer with raw child controls', async () => {
+    const childId = '00000000-0000-4000-8000-000000000002' as AudioSourceId
+    const master = track('master', 0, 1),
+      child = track('child', 0, 1)
+    master.mixLink = { stemTrackIds: ['child'] }
+    master.clips[0].sourceOverrides = [
+      { id: 'o', sourceStart: 0.25, sourceEnd: 0.75, stemTrackIds: ['child'] },
+    ]
+    master.clips[0].gain = 0.5
+    child.muted = true
+    child.solo = true
+    child.volume = 0
+    child.clips[0].audioSourceId = childId
+    child.clips[0].muted = true
+    child.clips[0].gain = 0
+    child.clips[0].redactions = [{ id: 'r', sourceStart: 0, sourceEnd: 1 }]
+    const sources = new Map<AudioSourceId, AudioSampleProvider>(
+      [SOURCE_ID, childId].map((id) => [
+        id,
+        {
+          ...provider(),
+          audioSourceId: id,
+          readFrames: async (startFrame: number, frameCount: number) => ({
+            startFrame,
+            frameCount,
+            channels: [new Float32Array(frameCount).fill(id === SOURCE_ID ? 0.2 : 0.8)],
+          }),
+        },
+      ]),
+    )
+    const plan = renderPlans.buildAudioRenderPlan([master, child], 'timeline')
+    const [pcm] = await renderTrackBlock(
+      plan.tracks[0],
+      0,
+      48000,
+      sources,
+      new AbortController().signal,
+    )
+    for (const frame of [0, 11999, 36000, 47999]) expect(pcm[frame]).toBeCloseTo(0.1)
+    for (const frame of [12000, 24000, 35999]) expect(pcm[frame]).toBeCloseTo(0.4)
+  })
+
+  it('rebuilds when a Mix link changes without changing clip arrays and schedules only the parent', async () => {
+    const player = new WorkletAudioPlayer()
+    await player.registerAudioSource(SOURCE_ID, provider())
+    const master = track('master'),
+      child = track('child')
+    player.setTracks([master, child])
+    await player.play()
+    expect(FakeNode.instances).toHaveLength(2)
+    player.setTracks([{ ...master, mixLink: { stemTrackIds: ['child'] } }, child])
+    await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(3))
+    player.setTracks([
+      {
+        ...master,
+        mixLink: { stemTrackIds: ['child'] },
+        clips: [
+          {
+            ...master.clips[0],
+            sourceOverrides: [
+              { id: 'override', sourceStart: 0, sourceEnd: 1, stemTrackIds: ['child'] },
+            ],
+          },
+        ],
+      },
+      child,
+    ])
+    await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(4))
     await player.destroy()
   })
 

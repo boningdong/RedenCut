@@ -1,3 +1,4 @@
+import { getIndependentTracks } from '../SourceRouting'
 import type { Track, Clip, ClipRedaction } from '../ProjectTypes'
 import type { CrossfadeResolution } from './CrossfadeTypes'
 const SAMPLE_RATE = 48000
@@ -19,6 +20,7 @@ export interface FrameClip {
   retained: FrameRange[]
 }
 export function quantizedClips(tracks: Track[]): FrameClip[] {
+  tracks = getIndependentTracks(tracks)
   const solo = tracks.some((t) => t.solo)
   return tracks
     .filter((t) => !t.muted && (!solo || t.solo))

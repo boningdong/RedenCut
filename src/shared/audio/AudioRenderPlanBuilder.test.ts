@@ -3,6 +3,7 @@ import type { Track } from '../ProjectTypes'
 import { ClipRedactionSchema } from '../ProjectTypes'
 import { buildAudioRenderPlan } from './AudioRenderPlanBuilder'
 import { DEFAULT_CROSSFADE_SETTINGS } from './CrossfadeTypes'
+import { redactionSkipRanges } from '../RedactionTimeline'
 import { gainAtFrame } from './GainEnvelope'
 import {
   timelineToOutputFrame,
@@ -256,5 +257,93 @@ describe('reverse mapping input normalization', () => {
     const { timeMap } = buildAudioRenderPlan(tracks)
     expect(outputToTimelineFrame(timeMap, -1)).toBe(0)
     expect(outputToTimelineFrame(timeMap, -0.75)).toBe(0)
+  })
+})
+
+describe('Mix source replacement', () => {
+  const linked = (): Track[] => {
+    const master = fixture()[0]
+    master.mixLink = { stemTrackIds: ['b', 'c'] }
+    master.clips[0].sourceOverrides = [
+      { id: 'o', sourceStart: 0.78, sourceEnd: 1.06, stemTrackIds: ['b', 'c'] },
+    ]
+    return [
+      master,
+      ...['b', 'c'].map((id) => ({
+        ...master,
+        id,
+        mixLink: undefined,
+        muted: true,
+        solo: true,
+        volume: 0,
+        clips: [
+          {
+            ...master.clips[0],
+            id: id + '-clip',
+            trackId: id,
+            audioSourceId: id as never,
+            sourceOverrides: undefined,
+            gain: 0,
+            muted: true,
+            redactions: [{ id: 'child-redact', sourceStart: 0, sourceEnd: 2 }],
+          },
+        ],
+      })),
+    ]
+  }
+  it('omits linked child output and ignores child solo/redactions for master transitions', () => {
+    const plan = buildAudioRenderPlan(linked())
+    expect(plan.tracks.map((t) => t.trackId)).toEqual(['t'])
+    expect(plan.durationFrames).toBe(83040)
+    expect(redactionSkipRanges(linked())).toEqual([{ start: 0.8, end: 1.04 }])
+    expect(plan.resolutions[0].status).toBe('active')
+    expect(plan.tracks[0].contributions.filter((c) => c.source.audioSourceId === 'b')).toHaveLength(
+      2,
+    )
+  })
+  it('preserves envelope phase and master gain across both wing replacements', () => {
+    const tracks = linked()
+    tracks[0].clips[0].gain = 0.5
+    tracks[0].volume = 0.25
+    const plan = buildAudioRenderPlan(tracks)
+    const pcm = new Float64Array(plan.durationFrames)
+    for (const contribution of plan.tracks[0].contributions) {
+      const value =
+        contribution.source.audioSourceId === 's'
+          ? 1
+          : contribution.source.audioSourceId === 'b'
+            ? 2
+            : 3
+      for (let i = 0; i < contribution.source.frameCount; i++) {
+        const frame = contribution.outputStartFrame + i
+        pcm[frame] +=
+          value *
+          contribution.gain *
+          plan.tracks[0].volume *
+          gainAtFrame(contribution.envelope, frame)
+      }
+    }
+    for (const offset of [0, 479, 480, 959, 960, 1439]) {
+      const incoming = Math.sin(((offset / 1439) * Math.PI) / 2)
+      const outgoing = Math.cos(((offset / 1439) * Math.PI) / 2)
+      expect(pcm[36960 + offset]).toBeCloseTo(
+        0.125 * ((offset < 480 ? 1 : 5) * outgoing + (offset < 960 ? 5 : 1) * incoming),
+        10,
+      )
+    }
+  })
+  it('rejects gaps and ambiguous overlapping child coverage', () => {
+    const tracks = linked()
+    tracks[1].clips[0].sourceEnd = 0.79
+    expect(() => buildAudioRenderPlan(tracks)).toThrow(/coverage/)
+    tracks[1].clips[0].sourceEnd = 2
+    tracks[1].clips.push({ ...tracks[1].clips[0], id: 'duplicate' })
+    expect(() => buildAudioRenderPlan(tracks)).toThrow(/coverage/)
+  })
+  it('replaces in timeline mode without contracting redactions', () => {
+    const plan = buildAudioRenderPlan(linked(), 'timeline')
+    expect(plan.durationFrames).toBe(96000)
+    expect(plan.tracks).toHaveLength(1)
+    expect(plan.tracks[0].contributions.some((c) => c.source.audioSourceId === 'b')).toBe(true)
   })
 })

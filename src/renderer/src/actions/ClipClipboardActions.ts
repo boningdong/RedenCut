@@ -1,3 +1,4 @@
+import { linkedMasterForTrack, sliceLinkedClip, synchronizeMixEdits } from '../domain/MixLinkEdits'
 import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 import type { Clip, Track } from '@shared/ProjectTypes'
 import { planClipPlacement } from '../domain/TimelinePlacement'
@@ -13,6 +14,10 @@ import { useTimelineStore } from '../stores/TimelineStore'
 function cloneClipMetadata(clip: Clip): Clip {
   return {
     ...clip,
+    sourceOverrides: clip.sourceOverrides?.map((override) => ({
+      ...override,
+      stemTrackIds: [...override.stemTrackIds],
+    })),
     effects: clip.effects.map((effect) => ({ ...effect, params: { ...effect.params } })),
     redactions: clip.redactions?.map((redaction) => ({
       ...redaction,
@@ -26,6 +31,11 @@ function cloneClipForPaste(clip: Clip, trackId: string): Clip {
     ...cloneClipMetadata(clip),
     id: crypto.randomUUID(),
     trackId,
+    sourceOverrides: clip.sourceOverrides?.map((override) => ({
+      ...override,
+      id: crypto.randomUUID(),
+      stemTrackIds: [...override.stemTrackIds],
+    })),
     effects: clip.effects.map((effect) => ({
       ...effect,
       id: crypto.randomUUID(),
@@ -51,7 +61,7 @@ function selectedClipboardContents(): TimelineClipboardContents | null {
   const selected = new Set(selectedIds)
   const located = timeline.tracks.flatMap((track, trackIndex) =>
     track.clips
-      .filter((clip) => selected.has(clip.id))
+      .filter((clip) => selected.has(clip.id) && !linkedMasterForTrack(timeline.tracks, track.id))
       .map((clip) => ({ clip, sourceTrackId: track.id, trackIndex })),
   )
   if (!located.length) return null
@@ -71,6 +81,30 @@ function selectedClipboardContents(): TimelineClipboardContents | null {
             clip: cloneClipMetadata(item.clip),
             sourceTrackId: item.sourceTrackId,
             trackOffset: item.trackIndex - anchor.trackIndex,
+            linkedSources: timeline.tracks[item.trackIndex].mixLink
+              ? {
+                  stemTrackIds: [...timeline.tracks[item.trackIndex].mixLink!.stemTrackIds],
+                  hiddenSegments: timeline.tracks[item.trackIndex]
+                    .mixLink!.hiddenSegments?.filter(
+                      (segment) => segment.masterClipId === item.clip.id,
+                    )
+                    .map((segment) => ({ ...segment, clip: cloneClipMetadata(segment.clip) })),
+                  clips: timeline.tracks
+                    .filter((track) =>
+                      timeline.tracks[item.trackIndex].mixLink!.stemTrackIds.includes(track.id),
+                    )
+                    .flatMap((track) =>
+                      track.clips.flatMap((child) => {
+                        const start = Math.max(child.outputStart, item.clip.outputStart)
+                        const end = Math.min(
+                          child.outputStart + child.sourceEnd - child.sourceStart,
+                          item.clip.outputStart + item.clip.sourceEnd - item.clip.sourceStart,
+                        )
+                        return end > start ? [sliceLinkedClip(child, start, end)] : []
+                      }),
+                    ),
+                }
+              : undefined,
           },
         ]
       : []
@@ -100,7 +134,15 @@ function placeClipboardContents(
   const cloneBySourceId = new Map<string, Clip>()
   for (const item of contents.clips) {
     const track = expected[targetTrackIndex + item.trackOffset]
-    if (!track) return false
+    if (!track || linkedMasterForTrack(expected, track.id)) return false
+    if (
+      item.linkedSources &&
+      (track.id !== item.sourceTrackId ||
+        JSON.stringify(track.mixLink?.stemTrackIds) !==
+          JSON.stringify(item.linkedSources.stemTrackIds))
+    )
+      return false
+    if (!item.linkedSources && track.mixLink) return false
     const clone = cloneClipForPaste(item.clip, track.id)
     clones.push(clone)
     cloneBySourceId.set(item.clip.id, clone)
@@ -128,7 +170,58 @@ function placeClipboardContents(
   )
   if (!planned) return false
 
-  return timeline.commitTracks(expected, planned.tracks, label, planned.clipIds)
+  let next = synchronizeMixEdits(
+    expected,
+    planned.tracks,
+    clones.map((clip) => clip.id),
+  )
+  for (const item of contents.clips) {
+    const pasted = next
+      .flatMap((track) => track.clips)
+      .find((clip) => clip.id === cloneBySourceId.get(item.clip.id)?.id)!
+    const shift = pasted.outputStart - item.clip.outputStart
+    if (item.linkedSources?.hiddenSegments?.length)
+      next = next.map((track) =>
+        track.id === pasted.trackId
+          ? {
+              ...track,
+              mixLink: {
+                ...track.mixLink!,
+                hiddenSegments: [
+                  ...(track.mixLink?.hiddenSegments ?? []),
+                  ...item.linkedSources!.hiddenSegments!.map((segment) => ({
+                    ...segment,
+                    masterClipId: pasted.id,
+                    clip: cloneClipForPaste(segment.clip, segment.clip.trackId),
+                  })),
+                ],
+              },
+            }
+          : track,
+      )
+    for (const child of item.linkedSources?.clips ?? []) {
+      const clone = cloneClipForPaste(child, child.trackId)
+      clone.outputStart += shift
+      const target = next.find((track) => track.id === child.trackId)!
+      if (
+        target.clips.some(
+          (existing) =>
+            existing.outputStart < clone.outputStart + clone.sourceEnd - clone.sourceStart &&
+            existing.outputStart + existing.sourceEnd - existing.sourceStart > clone.outputStart,
+        )
+      )
+        return false
+      next = next.map((track) =>
+        track.id === child.trackId
+          ? {
+              ...track,
+              clips: [...track.clips, clone].sort((a, b) => a.outputStart - b.outputStart),
+            }
+          : track,
+      )
+    }
+  }
+  return timeline.commitTracks(expected, next, label, planned.clipIds, true)
 }
 
 export function copyClips(): boolean {

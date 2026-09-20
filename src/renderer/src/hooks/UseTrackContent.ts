@@ -11,15 +11,18 @@ export function useTrackContent(): TrackContent[] {
     return (state: { tracks: Track[] }) => {
       if (input === state.tracks) return previous
       input = state.tracks
-      const next = state.tracks.map(({ id, name, clips, muted, solo, color, effects }) => ({
-        id,
-        name,
-        clips,
-        muted,
-        solo,
-        color,
-        effects,
-      }))
+      const next = state.tracks.map(
+        ({ id, name, clips, muted, solo, color, effects, mixLink }) => ({
+          id,
+          name,
+          clips,
+          muted,
+          solo,
+          color,
+          effects,
+          mixLink,
+        }),
+      )
       if (
         previous.length !== next.length ||
         next.some((track, index) => !shallow(track, previous[index]))

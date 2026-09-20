@@ -1,3 +1,4 @@
+import { getIndependentTracks, resolveSourceSpans } from '../SourceRouting'
 import type { Track } from '../ProjectTypes'
 import type { AudioRenderPlan, AudioContribution } from './AudioRenderPlan'
 import {
@@ -11,14 +12,15 @@ export function buildAudioRenderPlan(
   tracks: Track[],
   mode: 'timeline' | 'edited' = 'edited',
 ): AudioRenderPlan {
-  const clips = quantizedClips(tracks),
+  const independentTracks = getIndependentTracks(tracks)
+  const clips = quantizedClips(independentTracks),
     skips = frameSkipRanges(clips),
     resolutions = resolveFrameTransitions(clips, skips)
   const activeTransitions = resolutions.flatMap((r) =>
     r.status === 'active' ? [r.transition] : [],
   )
   const transitions = mode === 'edited' ? activeTransitions : []
-  const duration = tracks
+  const duration = independentTracks
     .flatMap((t) => t.clips)
     .reduce(
       (end, c) =>
@@ -27,7 +29,7 @@ export function buildAudioRenderPlan(
     )
   const editedTimeMap = createTimelineTimeMap(duration, skips, activeTransitions)
   const timeMap = mode === 'edited' ? editedTimeMap : createTimelineTimeMap(duration, [], [])
-  const result = tracks.map((track) => {
+  const result = independentTracks.map((track) => {
     const contributions: AudioContribution[] = []
     for (const c of clips.filter((c) => c.track === track && !c.clip.muted)) {
       const wings = transitions
@@ -88,12 +90,33 @@ export function buildAudioRenderPlan(
         add(cursor, r.end)
       }
     }
-    contributions.sort(
+    const routedContributions = contributions.flatMap((contribution) => {
+      const clip = track.clips.find((candidate) => candidate.id === contribution.clipId)!
+      if (!clip.sourceOverrides?.length) return [contribution]
+      return resolveSourceSpans(
+        tracks,
+        clip,
+        contribution.source.sourceStartFrame / 48000,
+        (contribution.source.sourceStartFrame + contribution.source.frameCount) / 48000,
+      ).map((span) => ({
+        ...contribution,
+        source: {
+          audioSourceId: span.audioSourceId,
+          sourceStartFrame: toFrame(span.sourceStart),
+          frameCount: toFrame(span.sourceEnd) - toFrame(span.sourceStart),
+        },
+        outputStartFrame:
+          contribution.outputStartFrame +
+          toFrame(span.masterSourceStart) -
+          contribution.source.sourceStartFrame,
+      }))
+    })
+    routedContributions.sort(
       (a, b) =>
         a.outputStartFrame - b.outputStartFrame ||
         a.source.sourceStartFrame - b.source.sourceStartFrame,
     )
-    return { trackId: track.id, volume: track.volume, contributions }
+    return { trackId: track.id, volume: track.volume, contributions: routedContributions }
   })
   return {
     sampleRate: 48000,

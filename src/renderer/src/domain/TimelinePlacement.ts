@@ -1,3 +1,4 @@
+import { linkedMasterForTrack } from './MixLinkEdits'
 import type { Clip, Track } from '@shared/ProjectTypes'
 
 export interface ClipPlacement {
@@ -90,6 +91,14 @@ export function planClipPlacement(
   for (const item of selected) {
     const destinationIndex = targetIndex + item.trackIndex - anchor.trackIndex
     if (destinationIndex < 0 || destinationIndex >= tracks.length) return null
+    const sourceTrack = tracks[item.trackIndex]
+    const targetTrack = tracks[destinationIndex]
+    if (
+      linkedMasterForTrack(tracks, sourceTrack.id) ||
+      linkedMasterForTrack(tracks, targetTrack.id) ||
+      ((sourceTrack.mixLink || targetTrack.mixLink) && sourceTrack.id !== targetTrack.id)
+    )
+      return null
     destinationIndices.set(item.clip.id, destinationIndex)
   }
 

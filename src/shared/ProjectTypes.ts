@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MixLinkSchema, SourceOverrideSchema } from './MixLinkTypes'
 import { CrossfadeSettingsSchema } from './audio/CrossfadeTypes'
 import { SpeakerIdentityCatalogSchema } from './SpeakerIdentityTypes'
 import {
@@ -129,7 +130,7 @@ export const ClipRedactionSchema = z
   .refine((range) => range.sourceEnd > range.sourceStart, 'Redaction must have positive duration')
 export type ClipRedaction = z.infer<typeof ClipRedactionSchema>
 
-const ClipSchema = z.object({
+export const ClipSchema = z.object({
   id: z.string(),
   trackId: z.string(),
   audioSourceId: AudioSourceIdSchema,
@@ -139,14 +140,35 @@ const ClipSchema = z.object({
   gain: z.number().default(1),
   muted: z.boolean().default(false),
   redactions: z.array(ClipRedactionSchema).optional(),
+  sourceOverrides: z.array(SourceOverrideSchema).optional(),
   effects: z.array(EffectSchema).default([]),
 })
 export type Clip = z.infer<typeof ClipSchema>
 
-const TrackSchema = z.object({
+export const TrackSchema = z.object({
   id: z.string(),
   name: z.string(),
   clips: z.array(ClipSchema).default([]),
+  mixLink: MixLinkSchema.extend({
+    hiddenSegments: z
+      .array(
+        z
+          .object({
+            masterClipId: z.string().min(1),
+            masterSourceStart: z.number().finite().nonnegative(),
+            clip: ClipSchema.refine(
+              (clip) =>
+                Number.isFinite(clip.sourceStart) &&
+                Number.isFinite(clip.sourceEnd) &&
+                clip.sourceEnd > clip.sourceStart &&
+                !clip.sourceOverrides?.length,
+              'Hidden source segment must have valid raw source bounds',
+            ),
+          })
+          .strict(),
+      )
+      .optional(),
+  }).optional(),
   volume: z.number().default(1),
   muted: z.boolean().default(false),
   solo: z.boolean().default(false),
@@ -194,7 +216,7 @@ export type SpeakerLabelOverride = z.infer<typeof SpeakerLabelOverrideSchema>
 
 export const ProjectFileSchema = z
   .object({
-    version: z.literal(2),
+    version: z.union([z.literal(2), z.literal(3)]),
     createdAt: z.string(),
     audioSettings: z.object({ processingSampleRate: z.literal(48_000) }).strict(),
     audioSources: z.array(AudioSourceSchema),
@@ -209,6 +231,80 @@ export const ProjectFileSchema = z
   })
   .strict()
   .superRefine((project, context) => {
+    if (
+      project.version === 2 &&
+      project.tracks.some(
+        (track) => track.mixLink || track.clips.some((clip) => clip.sourceOverrides),
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['version'],
+        message: 'Source relationships require project version 3',
+      })
+    }
+    const trackIds = new Set<string>(),
+      clipIds = new Set<string>(),
+      owners = new Set<string>()
+    for (const track of project.tracks) {
+      if (trackIds.has(track.id))
+        context.addIssue({ code: 'custom', path: ['tracks'], message: 'Duplicate track ID' })
+      trackIds.add(track.id)
+      for (const segment of track.mixLink?.hiddenSegments ?? []) {
+        const parent = track.clips.find((clip) => clip.id === segment.masterClipId)
+        const source = project.audioSources.find(
+          (source) => source.id === segment.clip.audioSourceId,
+        )
+        const end = segment.masterSourceStart + segment.clip.sourceEnd - segment.clip.sourceStart
+        if (
+          !parent ||
+          !track.mixLink!.stemTrackIds.includes(segment.clip.trackId) ||
+          !source ||
+          segment.clip.sourceEnd > source.metadata.durationSeconds ||
+          (parent.sourceStart < end && parent.sourceEnd > segment.masterSourceStart)
+        )
+          context.addIssue({
+            code: 'custom',
+            path: ['tracks'],
+            message:
+              'Hidden source segments require a current parent, linked child and valid hidden source coverage',
+          })
+      }
+      for (const stemId of track.mixLink?.stemTrackIds ?? []) {
+        const stem = project.tracks.find((candidate) => candidate.id === stemId)
+        if (!stem || stemId === track.id || stem.mixLink || owners.has(stemId))
+          context.addIssue({
+            code: 'custom',
+            path: ['tracks'],
+            message:
+              'Mix sources require existing, uniquely owned children without nesting or cycles',
+          })
+        owners.add(stemId)
+      }
+      for (const clip of track.clips) {
+        if (clipIds.has(clip.id))
+          context.addIssue({ code: 'custom', path: ['tracks'], message: 'Duplicate clip ID' })
+        clipIds.add(clip.id)
+        const ids = new Set<string>()
+        const ranges = [...(clip.sourceOverrides ?? [])].sort(
+          (a, b) => a.sourceStart - b.sourceStart,
+        )
+        ranges.forEach((range, index) => {
+          if (
+            ids.has(range.id) ||
+            (index > 0 && ranges[index - 1].sourceEnd > range.sourceStart) ||
+            range.stemTrackIds.some((id) => !track.mixLink?.stemTrackIds.includes(id))
+          )
+            context.addIssue({
+              code: 'custom',
+              path: ['tracks'],
+              message:
+                'Source overrides require unique IDs, nonoverlapping ranges and linked children',
+            })
+          ids.add(range.id)
+        })
+      }
+    }
     const sources = new Map(project.audioSources.map((source) => [source.id, source]))
     if (sources.size !== project.audioSources.length) {
       context.addIssue({
@@ -256,6 +352,15 @@ export const ProjectFileSchema = z
             message: 'Clip trackId does not match its track',
           })
         }
+        clip.sourceOverrides?.forEach((override, index) => {
+          if (source && override.sourceEnd > source.metadata.durationSeconds) {
+            context.addIssue({
+              code: 'custom',
+              path: [...path, 'sourceOverrides', index],
+              message: 'Source override bounds must remain within the audio source',
+            })
+          }
+        })
         const redactionIds = new Set<string>()
         clip.redactions?.forEach((redaction, index) => {
           if (
@@ -339,11 +444,12 @@ export const ProjectFileSchema = z
       overrides.add(key)
     })
   })
+  .transform((project) => ({ ...project, version: 3 as const }))
 export type ProjectFile = z.infer<typeof ProjectFileSchema>
 
 export function createEmptyProject(createdAt = new Date().toISOString()): ProjectFile {
   return ProjectFileSchema.parse({
-    version: 2,
+    version: 3,
     createdAt,
     audioSettings: { processingSampleRate: 48_000 },
     audioSources: [],

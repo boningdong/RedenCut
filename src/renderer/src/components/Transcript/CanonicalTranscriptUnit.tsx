@@ -1,4 +1,5 @@
 import React, { memo, type RefObject } from 'react'
+import { trackPresentationColor } from '../../themes/trackColors'
 import { seekFromTranscript } from '../../actions/PlaybackActions'
 import type { TranscriptOccurrence } from '../../domain/transcriptProjection'
 import { hasValidatedTiming } from '../../domain/transcriptReliability'
@@ -94,7 +95,9 @@ export const CanonicalTranscriptUnit = memo(function CanonicalTranscriptUnit({
             ? 'var(--color-warning-muted)'
             : current
               ? 'var(--color-accent-subtle)'
-              : undefined,
+              : u.replacement
+                ? `color-mix(in srgb, ${trackPresentationColor(u.track.color)} 18%, transparent)`
+                : undefined,
           color: undefined,
           '--track-color': color,
           borderBottom: current && color ? `2px solid ${color}` : undefined,

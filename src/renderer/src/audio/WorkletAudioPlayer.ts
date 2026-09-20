@@ -302,10 +302,13 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
       queue.gain.disconnect()
     }
     this.queues.clear()
-    for (const track of this.tracks) {
+    for (const plan of this.renderPlan.tracks) {
+      const track = this.tracks.find((candidate) => candidate.id === plan.trackId)!
       const channelCount = Math.max(
         1,
-        ...track.clips.map((clip) => this.providers.get(clip.audioSourceId)?.channels ?? 1),
+        ...plan.contributions.map(
+          (contribution) => this.providers.get(contribution.source.audioSourceId)?.channels ?? 1,
+        ),
       )
       const node = new AudioWorkletNode(this.context!, 'redencut-player', {
         numberOfOutputs: 1,
@@ -320,11 +323,6 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
       gain.gain.value = track.volume
       node.connect(gain)
       gain.connect(this.context!.destination)
-      const plan = this.renderPlan.tracks.find((candidate) => candidate.trackId === track.id) ?? {
-        trackId: track.id,
-        volume: track.volume,
-        contributions: [],
-      }
       const queue: TrackQueue = {
         node,
         gain,

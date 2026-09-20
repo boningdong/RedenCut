@@ -145,3 +145,73 @@ it('exports a three-clip timeline with a fractional-boundary natural gap', () =>
   expect(at(audio, 5)).toBe(0)
   expect(at(audio, 7)).toBeCloseTo(-0.25, 3)
 })
+
+it('exports raw multi-source replacements through master controls without child redactions', () => {
+  const master = track([
+    {
+      ...clip(0, 2),
+      gain: 0.5,
+      sourceOverrides: [
+        { id: 'replace', sourceStart: 0.5, sourceEnd: 1.5, stemTrackIds: ['b', 'c'] },
+      ],
+    },
+  ])
+  master.mixLink = { stemTrackIds: ['b', 'c'] }
+  master.volume = 0.8
+  const b = {
+    ...track([
+      {
+        ...clip(2, 4, 0),
+        trackId: 'b',
+        gain: 0,
+        redactions: [{ id: 'old-b', sourceStart: 2, sourceEnd: 4 }],
+      },
+    ]),
+    id: 'b',
+    muted: true,
+    solo: true,
+    volume: 0,
+  }
+  const c = {
+    ...track([
+      {
+        ...clip(4, 6, 0),
+        trackId: 'c',
+        redactions: [{ id: 'old-c', sourceStart: 4, sourceEnd: 6 }],
+      },
+    ]),
+    id: 'c',
+  }
+  const audio = render([master, b, c])
+  expect(audio.length).toBe(2 * rate)
+  expect(at(audio, 0.25)).toBeCloseTo(0.06, 3)
+  expect(at(audio, 1)).toBeCloseTo(0.08, 3)
+  expect(at(audio, 1.75)).toBeCloseTo(0.06, 3)
+})
+
+it('exports master crossfade from original mix into combined replacement sources', () => {
+  const master = track([
+    {
+      ...clip(0, 2),
+      redactions: [
+        {
+          id: 'cut',
+          sourceStart: 0.8,
+          sourceEnd: 1.2,
+          crossfade: { enabled: true, durationMs: 100, curve: 'equal-power' },
+        },
+      ],
+      sourceOverrides: [
+        { id: 'replace', sourceStart: 1.2, sourceEnd: 2, stemTrackIds: ['b', 'c'] },
+      ],
+    },
+  ])
+  master.mixLink = { stemTrackIds: ['b', 'c'] }
+  const b = { ...track([{ ...clip(2, 4, 0), trackId: 'b' }]), id: 'b' }
+  const c = { ...track([{ ...clip(4, 6, 0), trackId: 'c' }]), id: 'c' }
+  const audio = render([master, b, c])
+  expect(audio.length).toBe(1.5 * rate)
+  expect(at(audio, 0.4)).toBeCloseTo(0.15, 3)
+  expect(at(audio, 0.75)).toBeCloseTo((0.15 + 0.2) / Math.sqrt(2), 3)
+  expect(at(audio, 1)).toBeCloseTo(0.2, 3)
+})

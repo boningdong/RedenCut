@@ -291,6 +291,30 @@ export const englishResources = {
     darkTheme: 'Switch to dark theme',
   },
   waveform: {
+    mixSources: 'Linked recordings',
+    mixAlignmentWarning:
+      'Current timing is preserved. Edited clips may no longer align; check alignment before linking. Linked recordings are read-only and do not play independently.',
+    mixAligned: 'These recordings are already aligned. Preserve their current timing.',
+    mixDetachWarning:
+      'Removing a recording restores the entire affected replacement interval to Mix, including other selected recordings in that interval.',
+    mixNoSources: 'Import an independent recording to link it here.',
+    mixLinkFailed:
+      'Cannot link these recordings. Check that each recording belongs to only one Mix.',
+    mixCoverageFailed:
+      'Each selected recording must cover the whole selected Mix interval without gaps or overlaps. Adjust the selection or choose another recording.',
+    mixApply: 'Apply',
+    mixCancel: 'Cancel',
+    replaceAudio: 'Replace audio…',
+    restoreMix: 'Restore Mix',
+    mixReadOnly: 'Read-only · highlights supply Mix',
+    mixReadOnlyHint:
+      'Silent by default. Highlighted intervals supply the Mix; edit timing and redactions on the Mix.',
+    mixReplacementLabel: 'Sources: {{names}}',
+    mixCollapse: 'Hide linked recordings',
+    mixExpand: 'Show linked recordings',
+    mixRemoveWarning:
+      'Removing this recording restores every affected replacement interval to Mix. Continue?',
+
     trimStart: 'Trim clip start',
     trimEnd: 'Trim clip end',
     clipActions: 'Clip actions',

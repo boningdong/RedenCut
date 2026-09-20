@@ -13,7 +13,7 @@ export interface OccurrenceSelection extends ResolvedAcousticSelection {
   scopeConflict: boolean
 }
 
-export function resolveTranscriptSelection(
+function resolveSourceTranscriptSelection(
   units: TranscriptOccurrence[],
   tracks?: TrackContent[],
 ): OccurrenceSelection | null {
@@ -79,10 +79,16 @@ export function resolveTranscriptSelection(
   const start = Math.max(
     Math.min(...resolved.sourceRanges.map((r) => r.start)),
     Math.min(...clips.map((c) => c.sourceStart)),
+    units.every((u) => u.projectionBounds)
+      ? Math.min(...units.map((u) => u.projectionBounds!.sourceStart))
+      : -Infinity,
   )
   const end = Math.min(
     Math.max(...resolved.sourceRanges.map((r) => r.end)),
     Math.max(...clips.map((c) => c.sourceEnd)),
+    units.every((u) => u.projectionBounds)
+      ? Math.max(...units.map((u) => u.projectionBounds!.sourceEnd))
+      : Infinity,
   )
   const crossesUnselected = analysis.alignment.acousticEditUnits.some(
     (a) =>
@@ -99,5 +105,31 @@ export function resolveTranscriptSelection(
     scopeConflict,
     editable: resolved.editable && !scopeConflict && hasValidatedTiming(analysis) && end > start,
     sourceRanges: end > start ? [{ start, end }] : [],
+  }
+}
+
+/** Keep acoustic resolution in the recorded source, then map edits into Mix source time. */
+export function resolveTranscriptSelection(
+  units: TranscriptOccurrence[],
+  tracks?: TrackContent[],
+): OccurrenceSelection | null {
+  const resolved = resolveSourceTranscriptSelection(units, tracks)
+  if (!resolved || !units[0]?.replacement) return resolved
+  const target = units[0].replacement
+  const consistent = units.every(
+    (unit) =>
+      unit.replacement?.clip === target.clip &&
+      unit.replacement?.sourceOffset === target.sourceOffset,
+  )
+  return {
+    ...resolved,
+    occurrence: { ...resolved.occurrence, track: target.track, clip: target.clip },
+    clips: [target.clip],
+    sourceRanges: resolved.sourceRanges.map((range) => ({
+      start: range.start + target.sourceOffset,
+      end: range.end + target.sourceOffset,
+    })),
+    scopeConflict: resolved.scopeConflict || !consistent,
+    editable: resolved.editable && consistent,
   }
 }

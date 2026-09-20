@@ -26,3 +26,10 @@ Confirm if detached sources participate in any overrides; affected complete over
 
 ## Validation
 Unit tests pin schema/migration, interval splitting, synchronized timing/history, render plan and numerical PCM replacement/crossfade, transcript ownership. UI checks cover creation, range, multi-selection, restore/unlink warnings, icon, collapse, read-only children, escaped/dismissed draft, save/reopen. Full npm run check plus harness tests. Docker MCP editing baseline and UI consistency plus targeted scenario, with actual export inspection. Report unavailable audio hardware/transcription accurately. No auto alignment, drift correction or extra boundary crossfade in v1.
+
+## Implementation refinement: hidden child topology
+
+Track.mixLink.hiddenSegments optionally stores `{ masterClipId, masterSourceStart, clip }` for linked child material outside a trimmed master occurrence.
+The source-coordinate correspondence survives save/reopen and movement; reveal restores the exact child source fragments rather than extending the last visible source across later recordings.
+Splits partition hidden segments at the actual master source seam; copies assign new owner/clip identities; deleting or detaching an owner discards its hidden entries.
+Explicit split correspondence uses the pre-edit output/source offset, so repeated master source occurrences cannot exchange child recordings.

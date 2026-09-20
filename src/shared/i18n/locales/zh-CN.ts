@@ -274,6 +274,26 @@ export const simplifiedChineseResources = {
     darkTheme: '切换到深色主题',
   },
   waveform: {
+    mixSources: '关联录音',
+    mixAlignmentWarning:
+      '保留当前时间位置。已编辑的片段可能不再对齐，请在关联前检查。关联录音为只读，不会独立播放。',
+    mixAligned: '这些录音已对齐，保留当前时间位置。',
+    mixDetachWarning: '移除录音会将受影响的整个替换区间恢复为主音轨，包括该区间内选择的其他录音。',
+    mixNoSources: '请先导入要关联的独立录音。',
+    mixLinkFailed: '无法关联这些录音。每条录音只能属于一个主音轨。',
+    mixCoverageFailed:
+      '所选录音必须完整覆盖主音轨选区，不能有空白或重叠。请调整选区或选择其他录音。',
+    mixApply: '应用',
+    mixCancel: '取消',
+    replaceAudio: '替换音轨…',
+    restoreMix: '恢复主音轨',
+    mixReadOnly: '只读 · 高亮区间提供音源',
+    mixReadOnlyHint: '默认静音。高亮区间为主音轨提供音源；请在主音轨上编辑时间和删减。',
+    mixReplacementLabel: '音源：{{names}}',
+    mixCollapse: '收起关联录音',
+    mixExpand: '展开关联录音',
+    mixRemoveWarning: '移除此录音会将所有受影响的替换区间恢复为主音轨。继续？',
+
     trimStart: '裁剪片段起点',
     trimEnd: '裁剪片段终点',
     clipActions: '片段操作',

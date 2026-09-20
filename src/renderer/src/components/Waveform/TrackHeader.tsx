@@ -21,9 +21,20 @@ interface TrackHeaderProps {
   track: Track
   /** Called when user clicks Remove — parent decides whether to confirm. */
   onRemove: (trackId: string) => void
+  readOnly?: boolean
+  onMixSources?(): void
+  collapsed?: boolean
+  onToggleChildren?(): void
 }
 
-export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
+export function TrackHeader({
+  track,
+  onRemove,
+  readOnly = false,
+  onMixSources,
+  collapsed,
+  onToggleChildren,
+}: TrackHeaderProps) {
   const { t } = useTranslation()
   const active = useTimelineStore((s) => s.selectedTrackId === track.id)
   const color = trackPresentationColor(track.color)
@@ -44,7 +55,10 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
   return (
     <div
       className="track-header"
-      onClickCapture={() => useTimelineStore.getState().setSelectedTrackId(track.id)}
+      onClickCapture={() => {
+        if (!readOnly) useTimelineStore.getState().setSelectedTrackId(track.id)
+      }}
+      data-linked-child={readOnly}
       data-active-track={active}
       style={{
         borderLeftColor: color,
@@ -55,6 +69,20 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
       }}
     >
       <div className="track-heading">
+        {track.mixLink && (
+          <button
+            className="mix-collapse"
+            aria-label={t(collapsed ? 'waveform.mixExpand' : 'waveform.mixCollapse')}
+            aria-expanded={!collapsed}
+            onClick={onToggleChildren}
+          >
+            <Icon
+              name="chevron"
+              size={12}
+              style={{ transform: collapsed ? 'rotate(-90deg)' : undefined }}
+            />
+          </button>
+        )}
         <span className="track-color" style={{ background: trackPresentationColor(track.color) }} />
         {editing ? (
           <input
@@ -75,6 +103,7 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
         ) : (
           <button
             className="track-name"
+            disabled={readOnly}
             title={t('waveform.rename', { name: track.name })}
             onDoubleClick={() => setEditing(true)}
             onClick={() => setEditing(true)}
@@ -91,36 +120,50 @@ export function TrackHeader({ track, onRemove }: TrackHeaderProps) {
           <Icon name="close" size={12} />
         </button>
       </div>
-      <div className="track-controls">
-        <button
-          aria-label={t('waveform.muteName', { name: track.name })}
-          aria-pressed={track.muted}
-          title={track.muted ? t('waveform.unmute') : t('waveform.mute')}
-          onClick={() => updateTrack(track.id, { muted: !track.muted })}
-        >
-          M
-        </button>
-        <button
-          aria-label={t('waveform.soloName', { name: track.name })}
-          aria-pressed={track.solo}
-          title={track.solo ? t('waveform.unsolo') : t('waveform.solo')}
-          onClick={() => updateTrack(track.id, { solo: !track.solo })}
-        >
-          S
-        </button>
-        <input
-          type="range"
-          aria-label={t('waveform.volumeName', { name: track.name })}
-          min={0}
-          max={1}
-          step={0.01}
-          value={track.volume}
-          onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
-          style={{ accentColor: trackPresentationColor(track.color) }}
-          title={t('waveform.volumePercent', { percent: Math.round(track.volume * 100) })}
-        />
-        <span>{Math.round(track.volume * 100)}%</span>
-      </div>
+      {readOnly ? (
+        <span className="mix-child-label" title={t('waveform.mixReadOnlyHint')}>
+          {t('waveform.mixReadOnly')}
+        </span>
+      ) : (
+        <div className="track-controls">
+          <button
+            aria-label={t('waveform.muteName', { name: track.name })}
+            aria-pressed={track.muted}
+            title={track.muted ? t('waveform.unmute') : t('waveform.mute')}
+            onClick={() => updateTrack(track.id, { muted: !track.muted })}
+          >
+            <Icon name="mute" size={13} />
+          </button>
+          <button
+            aria-label={t('waveform.soloName', { name: track.name })}
+            aria-pressed={track.solo}
+            title={track.solo ? t('waveform.unsolo') : t('waveform.solo')}
+            onClick={() => updateTrack(track.id, { solo: !track.solo })}
+          >
+            <Icon name="headphones" size={13} />
+          </button>
+          <input
+            type="range"
+            aria-label={t('waveform.volumeName', { name: track.name })}
+            min={0}
+            max={1}
+            step={0.01}
+            value={track.volume}
+            onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
+            style={{ accentColor: trackPresentationColor(track.color) }}
+            title={t('waveform.volumePercent', { percent: Math.round(track.volume * 100) })}
+          />
+          <span>{Math.round(track.volume * 100)}%</span>
+          <button
+            aria-label={t('waveform.mixSources')}
+            title={t('waveform.mixSources')}
+            aria-pressed={!!track.mixLink}
+            onClick={onMixSources}
+          >
+            <Icon name="hierarchy" size={15} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

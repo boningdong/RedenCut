@@ -11,6 +11,7 @@ export function hasSamePlaybackStructure(previous: Track[], next: Track[]): bool
           track.id === candidate.id &&
           track.muted === candidate.muted &&
           track.solo === candidate.solo &&
+          track.mixLink === candidate.mixLink &&
           track.clips === candidate.clips
         )
       }))

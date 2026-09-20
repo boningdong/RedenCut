@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Clip } from '@shared/ProjectTypes'
+import type { Clip, Track } from '@shared/ProjectTypes'
 import type { WorkspaceToken } from '@shared/session.types'
 import { useTimelineStore } from './TimelineStore'
 
@@ -7,6 +7,11 @@ export interface TimelineClipboardClip {
   clip: Clip
   sourceTrackId: string
   trackOffset: number
+  linkedSources?: {
+    stemTrackIds: string[]
+    clips: Clip[]
+    hiddenSegments?: NonNullable<Track['mixLink']>['hiddenSegments']
+  }
 }
 
 export interface TimelineClipboardContents {
