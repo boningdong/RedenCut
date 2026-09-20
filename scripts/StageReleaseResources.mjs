@@ -63,7 +63,7 @@ try {
     join(staging, 'STAGING-README.txt'),
     [
       'These are release resource inputs, not a signed or distributable application.',
-      'The project license is copied unchanged; an Apache-2.0 relicensing decision requires copyright authority review.',
+      'Original RedenCut project code is licensed under Apache-2.0; third-party software and models retain their respective licenses.',
       'Retain runtime source archives, licenses, notices, build configuration and manifest with distribution materials.',
       'An application packager must place runtime/ and speech-worker/ outside app.asar, preserve symlinks and executable permissions, and include Electron/Chromium notices.',
       'Final signing, notarization, clean-machine loading, third-party notices and LGPL replacement/relinking compliance remain release checks.',

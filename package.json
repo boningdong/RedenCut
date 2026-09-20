@@ -39,7 +39,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "GPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "commonjs",
   "volta": {
     "node": "24.14.0"

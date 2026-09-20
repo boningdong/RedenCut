@@ -311,7 +311,8 @@ Models stay in their existing cache and projects retain their existing schemas.
 Staging also copies the live worker source and model manifest, unchanged project license, and Electron/Chromium notices.
 It is a resources input, not a signed application or proof of distribution compliance.
 A final packager must preserve executable permissions/symlinks, keep native files outside `app.asar`, verify post-signing loading on a clean machine, and retain the corresponding LGPL source and replacement/relinking materials.
-The repository license remains GPL-3.0-only; removing incompatible artifacts does not by itself authorize relicensing existing code to Apache-2.0.
+The original project code is licensed under Apache-2.0 following the sole contributor's authorization; third-party software and model licenses remain unchanged.
+Dependency-notice completion and final distribution verification remain separate release work.
 See the migration design and verification report under `docs/superpowers/` for decisions and evidence.
 
 ### Rebuilding or replacing LGPL libraries in an unsigned development build

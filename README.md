@@ -219,6 +219,6 @@ Their respective licenses and model access conditions apply independently.
 
 ## License
 
-RedenCut is licensed under the **GNU General Public License v3.0 only (GPL-3.0-only)**.
+RedenCut original project code is licensed under the **Apache License 2.0 (Apache-2.0)**.
 See [LICENSE](LICENSE) for the full license text.
 Third-party dependencies and models remain subject to their respective licenses and access conditions.
