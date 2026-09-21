@@ -29,6 +29,7 @@ export function MixLinkDialog({
   const candidates = tracks.filter(
     (item) => item.id !== track.id && !item.mixLink && !owned.has(item.id),
   )
+  const addsSources = draft.some((id) => !track.mixLink?.stemTrackIds.includes(id))
   const affected = track.clips.some((clip) =>
     clip.sourceOverrides?.some((override) =>
       override.stemTrackIds.some((id) => !draft.includes(id)),
@@ -80,15 +81,20 @@ export function MixLinkDialog({
           }
         }}
       >
-        <strong>
-          {t('waveform.mixSources')} · {track.name}
-        </strong>
-        <p>{t('waveform.mixAlignmentWarning')}</p>
-        <div className="mix-source-list">
+        <strong>{t(track.mixLink ? 'waveform.mixManage' : 'waveform.mixCreate')}</strong>
+        <p>{t('waveform.mixLinkDescription')}</p>
+        <div className="mix-master-card">
+          <i style={{ background: trackPresentationColor(track.color) }} />
+          <strong>{track.name}</strong>
+          <span className="mix-role">{t('waveform.mixMaster')}</span>
+        </div>
+        <div className="mix-source-list mix-link-tree">
           {candidates.map((item) => (
-            <label key={item.id}>
+            <label key={item.id} data-checked={draft.includes(item.id)}>
               <input
                 type="checkbox"
+                aria-label={item.name}
+                disabled={!draft.includes(item.id) && draft.length >= 6}
                 checked={draft.includes(item.id)}
                 onChange={(event) => {
                   setConfirmedRemoval(false)
@@ -100,12 +106,15 @@ export function MixLinkDialog({
                 }}
               />
               <i style={{ background: trackPresentationColor(item.color) }} />
-              {item.name}
+              <span>{item.name}</span>
+              <small>
+                {t(draft.includes(item.id) ? 'waveform.mixLinkedChild' : 'waveform.mixOrdinary')}
+              </small>
             </label>
           ))}
           {!candidates.length && <p>{t('waveform.mixNoSources')}</p>}
         </div>
-        {draft.length > 0 && (
+        {addsSources && (
           <label>
             <input
               type="checkbox"
@@ -115,6 +124,8 @@ export function MixLinkDialog({
             {t('waveform.mixAligned')}
           </label>
         )}
+        {addsSources && <p>{t('waveform.mixAlignmentWarning')}</p>}
+        <p>{t('waveform.mixChildRedactions')}</p>
         {affected && (
           <label className="mix-warning">
             <input
@@ -127,15 +138,29 @@ export function MixLinkDialog({
         )}
         {failed && <p role="alert">{t('waveform.mixLinkFailed')}</p>}
         <div className="mix-dialog-actions">
+          {track.mixLink && (
+            <button
+              disabled={!draft.length}
+              onClick={() => {
+                setDraft([])
+                setConfirmedRemoval(false)
+              }}
+            >
+              {t('waveform.mixUnlinkAll')}
+            </button>
+          )}
           <button onClick={onClose}>{t('waveform.mixCancel')}</button>
           <button
-            disabled={(draft.length > 0 && !acknowledged) || (affected && !confirmedRemoval)}
+            className="mix-primary"
+            disabled={
+              (addsSources && !acknowledged) || (affected && !confirmedRemoval) || draft.length > 6
+            }
             onClick={() => {
               if (onApply(draft)) onClose()
               else setFailed(true)
             }}
           >
-            {t('waveform.mixApply')}
+            {t(track.mixLink ? 'waveform.mixSaveLinks' : 'waveform.mixCreate')}
           </button>
         </div>
       </div>

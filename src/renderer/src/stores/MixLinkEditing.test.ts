@@ -214,3 +214,35 @@ it('normalizes a spanning child into unique occurrence IDs across pre-edited mas
   ])
   expect(new Set(state().tracks[1].clips.map((c) => c.id)).size).toBe(2)
 })
+
+it('rejects more than six linked recordings without modifying the project', () => {
+  const master = state().tracks[0]
+  const children = Array.from({ length: 7 }, (_, i) => ({ ...master, id: `extra-${i}`, clips: [] }))
+  useTimelineStore.setState({ tracks: [master, ...children] })
+  const before = state().tracks
+  expect(
+    state().setMixLink(
+      master.id,
+      children.map((t) => t.id),
+    ),
+  ).toBe(false)
+  expect(state().tracks).toBe(before)
+  expect(
+    state().setMixLink(
+      master.id,
+      children.slice(0, 6).map((t) => t.id),
+    ),
+  ).toBe(true)
+})
+
+it('resizes an existing replacement and restores its removed tail in one undo', async () => {
+  state().setMixLink('mix', ['stem', 'other'])
+  state().replaceMixSources('mix', 2, 6, ['stem'])
+  const before = state().tracks
+  expect(state().replaceMixSources('mix', 3, 5, ['other'], { start: 2, end: 6 })).toBe(true)
+  expect(state().tracks[0].clips[0].sourceOverrides).toEqual([
+    expect.objectContaining({ sourceStart: 3, sourceEnd: 5, stemTrackIds: ['other'] }),
+  ])
+  await state().undo()
+  expect(state().tracks).toEqual(before)
+})

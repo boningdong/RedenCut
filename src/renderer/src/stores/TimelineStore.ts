@@ -160,7 +160,13 @@ interface TimelineState {
   // ── Track operations ───────────────────────────────────────────────────────
 
   setMixLink(mixTrackId: string, stemTrackIds: string[]): boolean
-  replaceMixSources(mixTrackId: string, start: number, end: number, stemTrackIds: string[]): boolean
+  replaceMixSources(
+    mixTrackId: string,
+    start: number,
+    end: number,
+    stemTrackIds: string[],
+    previousRange?: { start: number; end: number },
+  ): boolean
   restoreMixSources(mixTrackId: string, start: number, end: number): boolean
 
   addTrack(name?: string, audioSourceId?: AudioSourceId): string
@@ -431,9 +437,12 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const next = changeMixLink(tracks, mixTrackId, stemTrackIds)
     return next ? get().commitTracks(tracks, next, 'Change Mix sources') : false
   },
-  replaceMixSources(mixTrackId, start, end, stemTrackIds) {
+  replaceMixSources(mixTrackId, start, end, stemTrackIds, previousRange) {
     const tracks = get().tracks
-    const next = changeMixSources(tracks, mixTrackId, start, end, stemTrackIds)
+    const restored = previousRange
+      ? changeMixSources(tracks, mixTrackId, previousRange.start, previousRange.end)
+      : tracks
+    const next = restored ? changeMixSources(restored, mixTrackId, start, end, stemTrackIds) : null
     return next ? get().commitTracks(tracks, next, 'Replace Mix audio') : false
   },
   restoreMixSources(mixTrackId, start, end) {

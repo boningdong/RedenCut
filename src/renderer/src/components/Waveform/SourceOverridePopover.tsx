@@ -4,6 +4,7 @@ import type { Track } from '@shared/ProjectTypes'
 import { useTranslation } from '../../i18n/useTranslation'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useAnchoredPopover } from './UseAnchoredPopover'
+import { getMixRangeState } from './MixRangeState'
 
 export function SourceOverridePopover({
   anchor,
@@ -11,6 +12,8 @@ export function SourceOverridePopover({
   tracks,
   start,
   end,
+  duration,
+  onRangeChange,
   onApply,
   onRestore,
   onClose,
@@ -20,35 +23,40 @@ export function SourceOverridePopover({
   tracks: Track[]
   start: number
   end: number
-  onApply(ids: string[]): boolean
-  onRestore(): boolean
+  duration: number
+  onRangeChange(start: number, end: number): void
+  onApply(ids: string[], start: number, end: number): boolean
+  onRestore(start: number, end: number): boolean
   onClose(): void
 }) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
   const position = useAnchoredPopover(anchor, ref, onClose)
-  const [draft, setDraft] = useState(() => [
-    ...new Set(
-      track.clips.flatMap((clip) =>
-        (clip.sourceOverrides ?? [])
-          .filter((override) => {
-            const left = clip.outputStart + override.sourceStart - clip.sourceStart
-            const right = clip.outputStart + override.sourceEnd - clip.sourceStart
-            return left < end && right > start
-          })
-          .flatMap((override) => override.stemTrackIds),
-      ),
-    ),
-  ])
+  const [bounds, setBounds] = useState({ start: String(start), end: String(end) })
+  const left = Number(bounds.start),
+    right = Number(bounds.end)
+  const valid =
+    bounds.start.trim() !== '' &&
+    bounds.end.trim() !== '' &&
+    Number.isFinite(left) &&
+    Number.isFinite(right) &&
+    left >= 0 &&
+    right <= duration &&
+    right > left
+  const state = getMixRangeState(track, left, right)
+  // A user choice stays a draft while adjusting bounds; before choosing, show the actual range state.
+  const [chosen, setChosen] = useState<string[] | null>(null)
+  const draft = chosen ?? state.ids
   const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    setBounds({ start: String(start), end: String(end) })
+  }, [start, end])
   useEffect(() => {
     ref.current?.querySelector('input')?.focus({ preventScroll: true })
     const outside = (event: PointerEvent) => {
-      if (
-        !ref.current?.contains(event.target as Node) &&
-        !anchor.current?.contains(event.target as Node)
-      )
-        onClose()
+      const target = event.target as HTMLElement
+      if (target.closest?.('[data-range-handle]')) return
+      if (!ref.current?.contains(target) && !anchor.current?.contains(target)) onClose()
     }
     window.addEventListener('pointerdown', outside)
     return () => window.removeEventListener('pointerdown', outside)
@@ -70,50 +78,89 @@ export function SourceOverridePopover({
         }
       }}
     >
-      <strong>{t('waveform.replaceAudio')}</strong>
-      <p>
-        {start.toFixed(2)}–{end.toFixed(2)} s · {track.name}
-      </p>
+      <strong>{t('waveform.mixChooseSources')}</strong>
+      <p>{t('waveform.mixMasterName', { name: track.name })}</p>
+      <div className="mix-range-inputs">
+        {(['start', 'end'] as const).map((edge) => (
+          <label key={edge}>
+            {t(edge === 'start' ? 'waveform.mixRangeStart' : 'waveform.mixRangeEnd')}
+            <input
+              type="number"
+              min={0}
+              max={duration}
+              step={0.01}
+              value={bounds[edge]}
+              onChange={(event) => {
+                setBounds({ ...bounds, [edge]: event.target.value })
+                setFailed(false)
+              }}
+              onBlur={() => {
+                if (valid) onRangeChange(left, right)
+              }}
+            />
+          </label>
+        ))}
+      </div>
+      {!valid && <p role="alert">{t('waveform.mixRangeInvalid')}</p>}
+      {state.kind === 'mixed' && (
+        <p className="mix-warning" role="status">
+          {t('waveform.mixMixed')}
+        </p>
+      )}
+      <p>{t('waveform.mixMultiChoice')}</p>
       <div className="mix-source-list">
         {tracks
           .filter((item) => track.mixLink?.stemTrackIds.includes(item.id))
           .map((item) => (
-            <label key={item.id}>
+            <label key={item.id} data-checked={draft.includes(item.id)}>
               <input
                 type="checkbox"
+                aria-label={item.name}
                 checked={draft.includes(item.id)}
-                onChange={(event) =>
-                  setDraft(
+                onChange={(event) => {
+                  setChosen(
                     event.target.checked
                       ? [...draft, item.id]
                       : draft.filter((id) => id !== item.id),
                   )
-                }
+                  setFailed(false)
+                }}
               />
               <i style={{ background: trackPresentationColor(item.color) }} />
-              {item.name}
+              <span>{item.name}</span>
+              <small>{t('waveform.mixIndependent')}</small>
             </label>
           ))}
       </div>
+      <p>
+        {draft.length
+          ? t('waveform.mixChoiceSummary', {
+              names: draft.map((id) => tracks.find((item) => item.id === id)?.name).join(' + '),
+            })
+          : t('waveform.mixChooseHint')}
+      </p>
+      <p>{t('waveform.mixReplacementHint')}</p>
       {failed && <p role="alert">{t('waveform.mixCoverageFailed')}</p>}
-      <button
-        onClick={() => {
-          if (onRestore()) onClose()
-          else setFailed(true)
-        }}
-      >
-        {t('waveform.restoreMix')}
-      </button>
       <div className="mix-dialog-actions">
-        <button onClick={onClose}>{t('waveform.mixCancel')}</button>
         <button
-          disabled={!draft.length}
+          disabled={!valid || !state.hasReplacement}
           onClick={() => {
-            if (onApply(draft)) onClose()
+            if (onRestore(left, right)) onClose()
             else setFailed(true)
           }}
         >
-          {t('waveform.mixApply')}
+          {t('waveform.restoreMix')}
+        </button>
+        <button onClick={onClose}>{t('waveform.mixCancel')}</button>
+        <button
+          className="mix-primary"
+          disabled={!valid || !draft.length}
+          onClick={() => {
+            if (onApply(draft, left, right)) onClose()
+            else setFailed(true)
+          }}
+        >
+          {t('waveform.mixApplyReplacement')}
         </button>
       </div>
     </div>,

@@ -17,6 +17,7 @@ export function changeMixLink(
   const master = tracks.find((track) => track.id === mixTrackId)
   if (
     !master ||
+    stemTrackIds.length > 6 ||
     linkedMasterForTrack(tracks, mixTrackId) ||
     new Set(stemTrackIds).size !== stemTrackIds.length
   )

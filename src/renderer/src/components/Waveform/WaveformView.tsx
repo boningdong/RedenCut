@@ -1,3 +1,4 @@
+import { RangeSelectionHandles } from './RangeSelectionHandles'
 import { LinkedClipWaveform } from './LinkedClipWaveform'
 import { MixLinkDialog } from './MixLinkDialog'
 import { SourceOverridePopover } from './SourceOverridePopover'
@@ -77,13 +78,26 @@ export function WaveformView({
 }: WaveformViewProps) {
   const { t } = useTranslation()
   const clipboardAvailable = useTimelineClipboardStore((state) => state.contents !== null)
+  const [mixFeedback, setMixFeedback] = useState('')
+  useEffect(() => {
+    if (!mixFeedback) return
+    const timer = window.setTimeout(() => setMixFeedback(''), 3000)
+    return () => window.clearTimeout(timer)
+  }, [mixFeedback])
   const [actionFailed, setActionFailed] = useState(false)
   const tracks = useTimelineStore((s) => s.tracks)
   const [mixDialogId, setMixDialogId] = useState<string | null>(null)
   const [collapsedMixes, setCollapsedMixes] = useState<string[]>([])
+  const [editingReplacement, setEditingReplacement] = useState<
+    { start: number; end: number } | undefined
+  >()
   const [replacementOpen, setReplacementOpen] = useState(false)
   const replacementAnchor = useRef<HTMLButtonElement>(null)
-  const closeReplacement = useCallback(() => setReplacementOpen(false), [])
+  const closeReplacement = useCallback(() => {
+    setReplacementOpen(false)
+    setEditingReplacement(undefined)
+    replacementAnchor.current?.focus({ preventScroll: true })
+  }, [])
   const childIds = new Set(tracks.flatMap((track) => track.mixLink?.stemTrackIds ?? []))
   const visibleTracks = tracks
     .filter((track) => !childIds.has(track.id))
@@ -472,6 +486,24 @@ export function WaveformView({
           +
         </button>
       </div>
+      {tracks.some((track) => track.mixLink) && (
+        <div className="mix-range-toolbar">
+          <span>
+            {replacementTrack && selection
+              ? `${replacementTrack.name} · ${t('waveform.mixRangeReadout', { start: selection.start.toFixed(2), end: selection.end.toFixed(2), duration: (selection.end - selection.start).toFixed(2) })}`
+              : t('waveform.mixRangeHint')}
+          </span>
+          <button
+            disabled={!replacementTrack}
+            onClick={() => {
+              replacementAnchor.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+              setReplacementOpen(true)
+            }}
+          >
+            {t('waveform.replaceAudio')}
+          </button>
+        </div>
+      )}
       {/* Main area: fixed headers column + scrollable timeline */}
       <div className="audio-scroll-body">
         <div style={{ display: 'flex', flexDirection: 'row' }}>
@@ -502,6 +534,12 @@ export function WaveformView({
                   track={track}
                   onRemove={handleRemoveTrack}
                   readOnly={childIds.has(track.id)}
+                  parentName={
+                    tracks.find((master) => master.mixLink?.stemTrackIds.includes(track.id))?.name
+                  }
+                  linkedNames={track.mixLink?.stemTrackIds
+                    .map((id) => tracks.find((item) => item.id === id)?.name)
+                    .join(' / ')}
                   onMixSources={() => setMixDialogId(track.id)}
                   collapsed={collapsedMixes.includes(track.id)}
                   onToggleChildren={() =>
@@ -622,6 +660,19 @@ export function WaveformView({
                             ) : clip.sourceOverrides?.length ? (
                               <MixClipWaveform
                                 clip={clip}
+                                onEdit={(start, end) => {
+                                  focusTimeline()
+                                  setSelectedTrackId(track.id)
+                                  useTimelineStore.getState().setSelectedClipIds([])
+                                  useEditorStore.getState().setSelection({
+                                    origin: 'timeline',
+                                    trackId: track.id,
+                                    start,
+                                    end,
+                                  })
+                                  setEditingReplacement({ start, end })
+                                  setReplacementOpen(true)
+                                }}
                                 tracks={tracks}
                                 providers={providersBySource}
                                 pxPerSec={pxPerSec}
@@ -657,6 +708,13 @@ export function WaveformView({
                         selection={selection}
                         pxPerSec={pxPerSec}
                         trackColor={trackPresentationColor(track.color)}
+                      />
+                    )}
+                    {replacementTrack?.id === track.id && selection && (
+                      <RangeSelectionHandles
+                        selection={selection}
+                        pxPerSec={pxPerSec}
+                        duration={duration}
                       />
                     )}
                     {replacementTrack?.id === track.id && selection && (
@@ -754,40 +812,70 @@ export function WaveformView({
           key={mixDialogTrack.id}
           track={mixDialogTrack}
           tracks={tracks}
-          onApply={(ids) => useTimelineStore.getState().setMixLink(mixDialogTrack.id, ids)}
+          onApply={(ids) => {
+            const ok = useTimelineStore.getState().setMixLink(mixDialogTrack.id, ids)
+            if (ok) setMixFeedback(t('waveform.mixLinksSaved'))
+            return ok
+          }}
           onClose={() => setMixDialogId(null)}
         />
       )}
       {replacementOpen && replacementTrack && selection && (
         <SourceOverridePopover
-          key={`${replacementTrack.id}:${selection.start}:${selection.end}`}
+          key={replacementTrack.id}
           anchor={replacementAnchor}
           track={replacementTrack}
           tracks={tracks}
           start={selection.start}
           end={selection.end}
-          onApply={(ids) =>
-            useTimelineStore
-              .getState()
-              .replaceMixSources(replacementTrack.id, selection.start, selection.end, ids)
+          duration={duration}
+          onRangeChange={(start, end) =>
+            useEditorStore.getState().setSelection({ ...selection, start, end })
           }
-          onRestore={() =>
-            useTimelineStore
+          onApply={(ids, start, end) => {
+            const ok = useTimelineStore
               .getState()
-              .restoreMixSources(replacementTrack.id, selection.start, selection.end)
-          }
+              .replaceMixSources(replacementTrack.id, start, end, ids, editingReplacement)
+            if (ok) {
+              useEditorStore.getState().setSelection({ ...selection, start, end })
+              setMixFeedback(
+                t('waveform.mixReplaced', {
+                  names: ids.map((id) => tracks.find((track) => track.id === id)?.name).join(' + '),
+                }),
+              )
+            }
+            return ok
+          }}
+          onRestore={(start, end) => {
+            const ok = useTimelineStore
+              .getState()
+              .restoreMixSources(replacementTrack.id, start, end)
+            if (ok) setMixFeedback(t('waveform.mixRestored'))
+            return ok
+          }}
           onClose={closeReplacement}
         />
       )}
       {interaction.marquee && <div className="clip-marquee" style={interaction.marquee} />}
       <div className="audio-footer">
-        <span>
+        <span role="status">
           {timelineSelection?.kind === 'redaction'
             ? t('waveform.redactionSelected')
             : selectedClipId
               ? t('waveform.clipsSelected', { count: selectedClipIds.length })
-              : t('waveform.noClipSelected')}
+              : selection?.origin === 'timeline'
+                ? t('waveform.mixRangeReadout', {
+                    start: selection.start.toFixed(2),
+                    end: selection.end.toFixed(2),
+                    duration: (selection.end - selection.start).toFixed(2),
+                  })
+                : t('waveform.noClipSelected')}
         </span>
+        {mixFeedback && (
+          <span className="mix-feedback" role="status">
+            {mixFeedback}
+          </span>
+        )}
         <span className="audio-footer-hint">
           {interaction.preview?.invalid || actionFailed
             ? t('waveform.invalidDrop')

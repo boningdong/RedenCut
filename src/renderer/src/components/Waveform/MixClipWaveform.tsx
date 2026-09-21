@@ -13,14 +13,18 @@ export function MixClipWaveform({
   providers,
   pxPerSec,
   viewport,
+  onEdit,
 }: {
   clip: Clip
+  onEdit(start: number, end: number): void
   tracks: Track[]
   providers: ReadonlyMap<AudioSourceId, WaveformDataProvider>
   pxPerSec: number
   viewport: { scrollLeft: number; width: number }
 }) {
   const { t } = useTranslation()
+  const master = tracks.find((track) => track.id === clip.trackId)
+  const layered = (master?.mixLink?.stemTrackIds.length ?? 0) <= 3
   const spans = resolveSourceSpans(tracks, clip, clip.sourceStart, clip.sourceEnd)
   return (
     <>
@@ -32,6 +36,7 @@ export function MixClipWaveform({
           (item) =>
             item.sourceStart <= span.masterSourceStart && item.sourceEnd >= span.masterSourceEnd,
         )
+        if (override && !layered) return null
         const row = override?.stemTrackIds.indexOf(span.trackId) ?? 0
         const rows = override?.stemTrackIds.length ?? 1
         const outputStart = clip.outputStart + span.masterSourceStart - clip.sourceStart
@@ -54,7 +59,7 @@ export function MixClipWaveform({
               position: 'absolute',
               left: (outputStart - clip.outputStart) * pxPerSec,
               width: (span.sourceEnd - span.sourceStart) * pxPerSec,
-              top: row * (29 / rows),
+              top: override ? 16 + row * (27 / rows) : 0,
               bottom: 0,
               pointerEvents: 'none',
               overflow: 'hidden',
@@ -67,7 +72,8 @@ export function MixClipWaveform({
               sourceEndSeconds={visible.sourceEndSeconds}
               leftInClipPx={visible.leftInClipPx}
               widthPx={visible.widthPx}
-              heightPx={29 / rows}
+              heightPx={override ? 27 / rows : 29}
+              topPx={override ? 0 : 16}
               color={color}
               muted={clip.muted}
             />
@@ -82,14 +88,71 @@ export function MixClipWaveform({
           .map((id) => tracks.find((track) => track.id === id)?.name ?? '')
           .join(' + ')
         const label = t('waveform.mixReplacementLabel', { names })
+        const members = override.stemTrackIds
+          .map((id) => tracks.find((track) => track.id === id))
+          .filter((track): track is Track => !!track)
+        const width = (end - start) * pxPerSec
+        // Names occupy only a metadata strip, never sequential portions of the time range.
+        const showNames =
+          members.length <= 3 &&
+          width >=
+            35 + members.reduce((sum, member) => sum + Math.max(45, member.name.length * 8 + 12), 0)
         return (
-          <div
+          <button
+            type="button"
             key={override.id}
+            title={label}
+            aria-label={label}
             className="mix-replacement-range"
-            style={{ left: (start - clip.sourceStart) * pxPerSec, width: (end - start) * pxPerSec }}
+            data-mix-presentation={layered ? 'layered' : 'combined'}
+            style={{ left: (start - clip.sourceStart) * pxPerSec, width }}
+            onPointerDown={(event) => {
+              if (!event.altKey) event.stopPropagation()
+            }}
+            onClick={(event) => {
+              if (event.altKey) return
+              event.stopPropagation()
+              onEdit(
+                clip.outputStart + start - clip.sourceStart,
+                clip.outputStart + end - clip.sourceStart,
+              )
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
           >
-            <span title={label}>{label}</span>
-          </div>
+            {!layered && (
+              <svg
+                className="mix-illustrative-wave"
+                viewBox="0 0 240 28"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {Array.from({ length: 60 }, (_, i) => {
+                  const h = 3 + Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.21)) * 23
+                  return <path key={i} d={`M${i * 4 + 2} ${14 - h / 2}v${h}`} />
+                })}
+              </svg>
+            )}
+            <span className="mix-replacement-caption" aria-hidden="true">
+              {width >= 120 && <small>{t('waveform.mixReplaceShort')}</small>}
+              <span className="mix-participant-tags">
+                {members.map((member) => (
+                  <span
+                    key={member.id}
+                    className="mix-participant"
+                    style={{ color: trackPresentationColor(member.color) }}
+                  >
+                    <i />
+                    {showNames && member.name}
+                  </span>
+                ))}
+              </span>
+              {!showNames && (
+                <span className="mix-participant-count">
+                  {t('waveform.mixParticipants', { count: members.length })}
+                </span>
+              )}
+            </span>
+          </button>
         )
       })}
     </>

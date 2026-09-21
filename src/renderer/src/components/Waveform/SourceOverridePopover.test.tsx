@@ -21,7 +21,7 @@ const tracks = [
   { ...base, id: 'b', name: 'Bob' },
 ]
 afterEach(cleanup)
-function setup() {
+function setup(track: Track = tracks[0]) {
   const apply = vi.fn(() => true),
     close = vi.fn(),
     restore = vi.fn(() => true)
@@ -31,10 +31,12 @@ function setup() {
       <button ref={anchor}>Anchor</button>
       <SourceOverridePopover
         anchor={anchor}
-        track={tracks[0]}
+        track={track}
         tracks={tracks}
         start={1}
         end={3}
+        duration={10}
+        onRangeChange={vi.fn()}
         onApply={apply}
         onClose={close}
         onRestore={restore}
@@ -48,8 +50,8 @@ it('applies multiple choices only after explicit Apply', () => {
   fireEvent.click(screen.getByLabelText('Alice'))
   fireEvent.click(screen.getByLabelText('Bob'))
   expect(apply).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByText('Apply'))
-  expect(apply).toHaveBeenCalledExactlyOnceWith(['a', 'b'])
+  fireEvent.click(screen.getByText('Apply replacement'))
+  expect(apply).toHaveBeenCalledExactlyOnceWith(['a', 'b'], 1, 3)
   expect(close).toHaveBeenCalledOnce()
 })
 it.each(['cancel', 'escape', 'outside'])('discards draft on %s', (method) => {
@@ -61,9 +63,43 @@ it.each(['cancel', 'escape', 'outside'])('discards draft on %s', (method) => {
   expect(close).toHaveBeenCalledOnce()
   expect(apply).not.toHaveBeenCalled()
 })
-it('restores the selected interval', () => {
+it('does not restore an original interval', () => {
   const { restore, close } = setup()
   fireEvent.click(screen.getByText('Restore Mix'))
-  expect(restore).toHaveBeenCalledOnce()
-  expect(close).toHaveBeenCalledOnce()
+  expect(restore).not.toHaveBeenCalled()
+  expect(close).not.toHaveBeenCalled()
+})
+
+it('provides editable bounds and refuses invalid ranges', () => {
+  const { apply } = setup()
+  fireEvent.click(screen.getByLabelText('Alice'))
+  fireEvent.change(screen.getByLabelText('Start (seconds)'), { target: { value: '4' } })
+  fireEvent.click(screen.getByText('Apply replacement'))
+  expect(apply).not.toHaveBeenCalled()
+})
+it('never preselects the union of mixed replacements', () => {
+  const track: Track = {
+    ...tracks[0],
+    clips: [
+      {
+        id: 'clip',
+        trackId: 'mix',
+        audioSourceId: 'audio' as Track['clips'][number]['audioSourceId'],
+        sourceStart: 0,
+        sourceEnd: 10,
+        outputStart: 0,
+        gain: 1,
+        muted: false,
+        effects: [],
+        sourceOverrides: [
+          { id: 'x', sourceStart: 1, sourceEnd: 2, stemTrackIds: ['a'] },
+          { id: 'y', sourceStart: 2, sourceEnd: 3, stemTrackIds: ['b'] },
+        ],
+      },
+    ],
+  }
+  setup(track)
+  expect((screen.getByLabelText('Alice') as HTMLInputElement).checked).toBe(false)
+  expect((screen.getByLabelText('Bob') as HTMLInputElement).checked).toBe(false)
+  expect(screen.getByText(/Multiple source settings/)).toBeTruthy()
 })

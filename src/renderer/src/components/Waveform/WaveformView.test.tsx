@@ -92,6 +92,14 @@ describe('WaveformView managed providers', () => {
     expect(container.querySelector('[data-lane="child"]')).toBeNull()
     fireEvent.click(screen.getByLabelText('Show linked recordings'))
     expect(container.querySelector('[data-lane="child"]')).not.toBeNull()
+    fireEvent.click(linkButton)
+    fireEvent.click(screen.getByRole('button', { name: 'Save links' }))
+    act(() =>
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'timeline', trackId: mix.id, start: 1, end: 2 }),
+    )
+    expect(container.querySelector('.audio-footer')?.textContent).toContain('1.00–2.00 s')
   })
 
   it('offers replacement for the existing ruler range and draws selected child sources', () => {
@@ -125,7 +133,11 @@ describe('WaveformView managed providers', () => {
         onAddTrack={vi.fn()}
       />,
     )
-    expect(screen.getByText('Replace audio…')).not.toBeNull()
+    expect(screen.getAllByText('Replace audio…')).toHaveLength(2)
+    const reveal = vi.fn()
+    container.querySelector('.mix-replace-trigger')!.scrollIntoView = reveal
+    fireEvent.click(container.querySelector('.mix-range-toolbar button')!)
+    expect(reveal).toHaveBeenCalledOnce()
     const sourceWaveform = container.querySelector(
       `[data-lane="${mix.id}"] [data-source-override="override"]`,
     )
@@ -133,6 +145,13 @@ describe('WaveformView managed providers', () => {
     expect(sourceWaveform?.querySelector('[data-testid="waveform"]')).not.toBeNull()
     act(() => useEditorStore.getState().setSelection(null))
     expect(screen.getByTitle('Sources: Independent source')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Sources: Independent source' }))
+    expect(useEditorStore.getState().selection).toEqual({
+      origin: 'timeline',
+      trackId: mix.id,
+      start: 2,
+      end: 4,
+    })
   })
 
   it('shows a ruler hover guide across lanes and clears it on leave and blur', () => {

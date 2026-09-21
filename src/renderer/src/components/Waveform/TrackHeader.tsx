@@ -24,6 +24,8 @@ interface TrackHeaderProps {
   readOnly?: boolean
   onMixSources?(): void
   collapsed?: boolean
+  linkedNames?: string
+  parentName?: string
   onToggleChildren?(): void
 }
 
@@ -34,6 +36,8 @@ export function TrackHeader({
   onMixSources,
   collapsed,
   onToggleChildren,
+  linkedNames,
+  parentName,
 }: TrackHeaderProps) {
   const { t } = useTranslation()
   const active = useTimelineStore((s) => s.selectedTrackId === track.id)
@@ -111,6 +115,7 @@ export function TrackHeader({
             {track.name}
           </button>
         )}
+        {track.mixLink && <span className="mix-role">{t('waveform.mixMaster')}</span>}
         <button
           className="track-remove"
           title={t('waveform.removeTrack')}
@@ -121,7 +126,10 @@ export function TrackHeader({
         </button>
       </div>
       {readOnly ? (
-        <span className="mix-child-label" title={t('waveform.mixReadOnlyHint')}>
+        <span
+          className="mix-child-label"
+          title={`${parentName ?? ''} · ${t('waveform.mixReadOnlyHint')}`}
+        >
           {t('waveform.mixReadOnly')}
         </span>
       ) : (
@@ -163,6 +171,12 @@ export function TrackHeader({
             <Icon name="hierarchy" size={15} />
           </button>
         </div>
+      )}
+      {track.mixLink && (
+        <span className="mix-members" title={linkedNames}>
+          {t('waveform.mixMemberCount', { count: track.mixLink.stemTrackIds.length })}
+          {collapsed && linkedNames ? ` · ${linkedNames}` : ''}
+        </span>
       )}
     </div>
   )

@@ -291,6 +291,43 @@ export const englishResources = {
     darkTheme: 'Switch to dark theme',
   },
   waveform: {
+    mixChooseSources: 'Which tracks play in this interval?',
+    mixMaster: 'Master Mix',
+    mixMasterName: 'Master Mix: {{name}}',
+    mixRangeStart: 'Start (seconds)',
+    mixRangeEnd: 'End (seconds)',
+    mixRangeInvalid: 'Enter a valid range within the timeline, with the end after the start.',
+    mixMixed:
+      'Multiple source settings. Choosing tracks will replace the entire selected interval with one setting.',
+    mixMultiChoice: 'Independent recordings · select one or more',
+    mixIndependent: 'Independent',
+    mixChoiceSummary: 'Use {{names}}; other independent tracks stay silent.',
+    mixChooseHint: 'Choose tracks, or restore Mix to use the original audio.',
+    mixReplacementHint:
+      'Selected tracks replace Mix here. Master volume, mute and Redact still apply to the result.',
+    mixApplyReplacement: 'Apply replacement',
+    mixManage: 'Manage linked recordings',
+    mixCreate: 'Link to Mix',
+    mixSaveLinks: 'Save links',
+    mixUnlinkAll: 'Unlink all',
+    mixLinkDescription:
+      'Link up to 6 independent tracks to this Mix. Timing edits follow the master. Children stay silent except where used as replacement audio.',
+    mixLinkedChild: 'Linked child',
+    mixOrdinary: 'Ordinary track',
+    mixChildRedactions:
+      'Child Redact edits are ignored while linked and restored on unlink. Unlinked tracks and their edits are kept, muted.',
+    mixMemberCount: '{{count}} linked',
+    mixParticipants: '{{count}} sources',
+    mixReplaced: 'Replaced with {{names}} · Undo available',
+    mixRestored: 'Restored original Mix · Undo available',
+    mixLinksSaved: 'Links updated · Undo available',
+    mixRangeReadout: '{{start}}–{{end}} s · {{duration}} s',
+    mixRangeHint: 'Drag on the ruler to select audio; drag range edges to refine.',
+    mixRangeStartHandle: 'Adjust selection start',
+    mixRangeEndHandle: 'Adjust selection end',
+    mixIllustrative: 'Illustrative waveform · {{names}}',
+    mixReplaceShort: 'Replace',
+
     mixSources: 'Linked recordings',
     mixAlignmentWarning:
       'Current timing is preserved. Edited clips may no longer align; check alignment before linking. Linked recordings are read-only and do not play independently.',
@@ -306,7 +343,7 @@ export const englishResources = {
     mixCancel: 'Cancel',
     replaceAudio: 'Replace audio…',
     restoreMix: 'Restore Mix',
-    mixReadOnly: 'Read-only · highlights supply Mix',
+    mixReadOnly: 'Standby · read-only',
     mixReadOnlyHint:
       'Silent by default. Highlighted intervals supply the Mix; edit timing and redactions on the Mix.',
     mixReplacementLabel: 'Sources: {{names}}',

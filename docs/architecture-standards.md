@@ -137,3 +137,5 @@
 - Structural master edits synchronize child source coverage; unsupported or ambiguous edits fail atomically instead of breaking alignment. Association retains current timing and warns for previously edited recordings.
 - Transcript source identity remains independent from master edit ownership. Replacement text uses source-track background color, while its redaction target is the exact master occurrence.
 - Version 3 project writes retain links and overrides; version 2 input migrates explicitly, with no back-writing to older apps.
+- New Mix link mutations accept at most six independent recordings; existing serialized projects remain readable.
+- Replacement presentation is derived from linked count, selected source identities and available pixel width, never persisted as routing truth. Combined decorative waveforms are illustrative, not peak measurements.
