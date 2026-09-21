@@ -40,3 +40,8 @@ The packaging script additionally validates the runtime file inventory, executab
 A real installation trial still needs a separate Mac or clean user environment: browser download, copy to Applications, first launch, resource preparation, import/playback, transcription, save/reopen, export, and replacing the app while retaining user data.
 Docker UI acceptance does not certify a macOS bundle, Gatekeeper or native macOS dialogs.
 A local test package is not evidence that all public-release compatibility and third-party distribution checks are complete.
+
+## GitHub publication
+
+For tag-triggered builds and Release drafts, follow [GitHub Releases](github-releases.md).
+The Actions workflow reuses this packaging command after preparing the runtime on its ARM64 runner.

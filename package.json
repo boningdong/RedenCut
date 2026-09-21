@@ -36,7 +36,10 @@
     "runtime:check": "node scripts/runtime/CheckRuntime.mjs",
     "test:runtime": "node --test scripts/runtime/*.test.mjs",
     "runtime:stage": "node scripts/StageReleaseResources.mjs",
-    "package:mac": "node scripts/PackageMac.mjs"
+    "package:mac": "node scripts/PackageMac.mjs",
+    "release:prepare": "node scripts/release/PrepareRelease.mjs",
+    "release:draft": "node scripts/release/DraftRelease.mjs",
+    "test:release": "node --test scripts/release/*.test.mjs"
   },
   "keywords": [],
   "author": "RedenCut contributors",

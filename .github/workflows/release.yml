@@ -1,0 +1,67 @@
+name: macOS release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: Verify platform, version and tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readReleaseState, assertReleaseTag } from './scripts/release/ReleaseState.mjs'
+          if (process.platform !== 'darwin' || process.arch !== 'arm64') throw new Error('macOS arm64 runner required')
+          const state = await readReleaseState(process.cwd())
+          assertReleaseTag(state, process.env.RELEASE_TAG, process.env.RELEASE_COMMIT)
+          console.log(`Building ${state.tag} from ${state.commit}`)
+          JS
+      - name: Check model credential
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo '::error::Configure HF_TOKEN with access to pyannote/speaker-diarization-community-1 before releasing.'
+            exit 1
+          fi
+      - name: Install build prerequisites
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          for tool in cmake ninja pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
+          done
+          npm ci
+      - name: Build pinned runtime and prepare bundled model
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: npm run runtime:setup
+      - name: Test, package and verify release files
+        run: npm run release:prepare
+      - name: Create or refresh draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release:draft
