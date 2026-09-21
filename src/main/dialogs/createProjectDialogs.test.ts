@@ -10,6 +10,7 @@ const native = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({ dialog: native }))
 import { createProjectDialogs } from './createProjectDialogs'
+import { createNativeProjectDialogs } from './nativeProjectDialogs'
 import { createTranslator } from '../../shared/i18n/createTranslator'
 
 const roots: string[] = []
@@ -34,7 +35,9 @@ test('production selection preserves native options, suffix normalization and ca
   expect(await dialogs.openProject(window)).toBeNull()
   expect(native.showOpenDialog).toHaveBeenLastCalledWith(
     window,
-    expect.objectContaining({ properties: ['openDirectory'] }),
+    expect.objectContaining({
+      properties: [process.platform === 'darwin' ? 'openFile' : 'openDirectory'],
+    }),
   )
   expect(await dialogs.saveProject(window)).toBe('/episode.redencut')
   expect(await dialogs.saveProject(window)).toBeNull()
@@ -166,4 +169,33 @@ test('native dialogs resolve the committed language at invocation and retain res
     .mockResolvedValueOnce({ response: 2 })
   expect(await dialogs.dirtyProject(window)).toBe('discard')
   expect(await dialogs.dirtyProject(window)).toBe('cancel')
+})
+
+test.each(['darwin', 'win32', 'linux'] as const)(
+  'project selection on %s preserves the directory path and cancellation',
+  async (platform) => {
+    const dialogs = createNativeProjectDialogs(undefined, platform)
+    native.showOpenDialog
+      .mockResolvedValueOnce({ canceled: false, filePaths: ['/Episode.redencut'] })
+      .mockResolvedValueOnce({ canceled: true, filePaths: [] })
+    expect(await dialogs.openProject(window)).toBe('/Episode.redencut')
+    const options = native.showOpenDialog.mock.calls[0][1]
+    expect(options.properties).toEqual([platform === 'darwin' ? 'openFile' : 'openDirectory'])
+    expect(options.filters).toEqual(
+      platform === 'darwin' ? [{ name: 'RedenCut Project', extensions: ['redencut'] }] : undefined,
+    )
+    expect(await dialogs.openProject(window)).toBeNull()
+  },
+)
+
+test('saving uses the project filter and preserves an existing uppercase extension', async () => {
+  const dialogs = createNativeProjectDialogs()
+  native.showSaveDialog.mockResolvedValue({ canceled: false, filePath: '/Episode.REDENCUT' })
+  expect(await dialogs.saveProject(window)).toBe('/Episode.REDENCUT')
+  expect(native.showSaveDialog).toHaveBeenCalledWith(
+    window,
+    expect.objectContaining({
+      filters: [{ name: 'RedenCut Project', extensions: ['redencut'] }],
+    }),
+  )
 })

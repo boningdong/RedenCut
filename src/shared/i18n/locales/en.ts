@@ -567,6 +567,7 @@ export const englishResources = {
     resetSpeakerNames: 'Re-analysis will reset your custom speaker names. Continue?',
     importAudio: 'Import Audio',
     audioFiles: 'Audio Files',
+    projectFiles: '{{appName}} Project',
     saveProject: 'Save {{appName}} Project',
     openProject: 'Open {{appName}} Project',
     untitled: 'Untitled',

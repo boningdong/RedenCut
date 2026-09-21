@@ -45,3 +45,24 @@ A local test package is not evidence that all public-release compatibility and t
 
 For tag-triggered builds and Release drafts, follow [GitHub Releases](github-releases.md).
 The Actions workflow reuses this packaging command after preparing the runtime on its ARM64 runner.
+
+## Project document packages
+
+The shared `src/shared/AppIdentity.json` supplies application identity and the `.redencut` extension to both runtime constants and the packager.
+The macOS bundle exports `dev.redencut.project`, conforming to `com.apple.package` and `public.content`, and declares RedenCut as its editor and owner.
+Project documents currently reuse the application icon.
+The project remains a directory on disk; its contents and project schema are unchanged.
+The packager verifies the generated `Info.plist` declaration and referenced document icon before accepting its output.
+
+Install the built application in Applications so Launch Services can discover the declarations.
+Finder presents existing and newly saved `.redencut` directories as documents; their internal files remain accessible through Show Package Contents.
+The macOS Open dialog selects project documents, while other platforms retain directory selection.
+Finder opens are routed through the existing startup queue and project transition flow, including unsaved-change handling.
+
+For development, install a build with these declarations once, then continue using `npm run dev` and its Open command.
+Finder double-click opens the installed application, not the development server; rebuild/reinstall when validating installed-app code changes.
+Do not modify the dependency's generic Electron.app or force the user's default application association.
+
+Native acceptance must cover existing and new projects, Open-dialog double-click and cancellation, Finder cold/warm opens, and unsaved-change save/discard/cancel.
+Also verify Show Package Contents and save/reopen with a project name containing spaces or non-ASCII characters.
+Docker's prepared dialogs and unit tests do not prove these native macOS behaviors.

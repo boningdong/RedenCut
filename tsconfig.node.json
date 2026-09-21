@@ -24,6 +24,7 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
+    "src/shared/**/*.json",
     "src/renderer/src/audio/TrackBlockRenderer.ts"
   ]
 }

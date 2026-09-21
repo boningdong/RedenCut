@@ -1,6 +1,6 @@
 {
   "name": "redencut",
-  "version": "0.1.0-beta",
+  "version": "0.1.0-alpha.1",
   "description": "Local-first podcast and audio editor",
   "main": "out/main/index.js",
   "scripts": {

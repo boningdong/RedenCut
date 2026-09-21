@@ -8,6 +8,7 @@ const englishTranslator = createTranslator('en').getFixedT('en')
 
 export function createNativeProjectDialogs(
   getTranslator: () => TFunction = () => englishTranslator,
+  platform: NodeJS.Platform = process.platform,
 ): ProjectDialogs {
   return {
     async importAudio(window, purpose) {
@@ -29,9 +30,15 @@ export function createNativeProjectDialogs(
       const result = await dialog.showSaveDialog(window, {
         title: t('dialogs.saveProject', { appName: APP_NAME }),
         defaultPath: `${t('dialogs.untitled')}${APP_FILE_EXT}`,
+        filters: [
+          {
+            name: t('dialogs.projectFiles', { appName: APP_NAME }),
+            extensions: [APP_FILE_EXT.slice(1)],
+          },
+        ],
       })
       if (result.canceled || !result.filePath) return null
-      return result.filePath.endsWith(APP_FILE_EXT)
+      return result.filePath.toLowerCase().endsWith(APP_FILE_EXT)
         ? result.filePath
         : `${result.filePath}${APP_FILE_EXT}`
     },
@@ -39,7 +46,17 @@ export function createNativeProjectDialogs(
       const t = getTranslator()
       const result = await dialog.showOpenDialog(window, {
         title: t('dialogs.openProject', { appName: APP_NAME }),
-        properties: ['openDirectory'],
+        properties: [platform === 'darwin' ? 'openFile' : 'openDirectory'],
+        ...(platform === 'darwin'
+          ? {
+              filters: [
+                {
+                  name: t('dialogs.projectFiles', { appName: APP_NAME }),
+                  extensions: [APP_FILE_EXT.slice(1)],
+                },
+              ],
+            }
+          : {}),
       })
       return result.canceled ? null : (result.filePaths[0] ?? null)
     },

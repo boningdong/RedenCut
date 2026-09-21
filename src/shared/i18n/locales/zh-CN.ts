@@ -532,6 +532,7 @@ export const simplifiedChineseResources = {
     resetSpeakerNames: '重新分析将重置自定义说话人名称。是否继续？',
     importAudio: '导入音频',
     audioFiles: '音频文件',
+    projectFiles: '{{appName}} 项目',
     saveProject: '保存 {{appName}} 项目',
     openProject: '打开 {{appName}} 项目',
     untitled: '未命名',

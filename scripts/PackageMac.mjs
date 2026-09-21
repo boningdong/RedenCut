@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { stageReleaseResources } from './StageReleaseResources.mjs'
+import { verifyMacDocumentType } from './release/VerifyMacDocumentType.mjs'
 import { checkRuntime } from './runtime/CheckRuntime.mjs'
 
 const require = createRequire(import.meta.url)
@@ -43,6 +44,9 @@ try {
       extraResources: [{ from: resources, to: '.', filter: ['**/*'] }],
     },
   })
+  await verifyMacDocumentType(
+    join(repository, configuration.directories.output, 'mac-arm64/RedenCut.app'),
+  )
   const packagedRuntime = join(
     repository,
     configuration.directories.output,
