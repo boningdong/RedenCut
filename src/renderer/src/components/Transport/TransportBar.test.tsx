@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import { TransportBar } from './TransportBar'
+import { useEditorStore } from '../../stores/editor.store'
 import { useTimelineStore } from '../../stores/TimelineStore'
 import { useEffect } from 'react'
 import { usePlaybackStore } from '../../stores/PlaybackStore'
@@ -129,4 +130,15 @@ it('refreshes edited output duration after a paused settings change at timeline 
     stop()
     setAudioPlayerInstance(null)
   }
+})
+
+it('starts in Preview Mode and lets listeners toggle it off and back on', () => {
+  useEditorStore.getState().reset()
+  render(<TransportBar />)
+  const preview = screen.getByRole('button', { name: 'Preview Mode' })
+  expect(preview.getAttribute('aria-pressed')).toBe('true')
+  fireEvent.click(preview)
+  expect(preview.getAttribute('aria-pressed')).toBe('false')
+  fireEvent.click(preview)
+  expect(preview.getAttribute('aria-pressed')).toBe('true')
 })

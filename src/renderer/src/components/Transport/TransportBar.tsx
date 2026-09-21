@@ -91,10 +91,6 @@ export function TransportBar({
         </Button>
       </div>
       <div className="transport-playback">
-        <div className="transport-time">
-          <span>{formatTime(outputTime)}</span>
-          <small>/ {formatTime(outputDuration)}</small>
-        </div>
         {/* Skip to start */}
         <Button
           size="sm"
@@ -112,13 +108,6 @@ export function TransportBar({
           size="sm"
           variant="primary"
           className="transport-play"
-          style={{
-            borderRadius: '50%',
-            width: 43,
-            height: 43,
-            padding: 12,
-            border: '1px solid var(--color-accent)',
-          }}
           onClick={() => {
             void togglePlayback().catch((error: unknown) => {
               console.error('[TransportBar] Failed to toggle playback:', error)
@@ -143,61 +132,33 @@ export function TransportBar({
           <SkipForwardIcon />
         </Button>
       </div>
-      <div className="transport-options">
-        {/* Preview Mode toggle */}
-        <button
-          onClick={togglePreviewMode}
-          aria-pressed={previewMode}
-          aria-label={t('transport.preview')}
-          title={t('transport.previewHint')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            background: 'none',
-            border: `1px solid ${previewMode ? 'var(--color-accent)' : 'var(--color-border)'}`,
-            borderRadius: 4,
-            color: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
-            fontSize: 'var(--text-xs)',
-            padding: '3px 8px',
-            cursor: 'pointer',
-            letterSpacing: '0.04em',
-            transition: 'color 0.15s, border-color 0.15s',
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              backgroundColor: previewMode ? 'var(--color-accent)' : 'var(--color-text-muted)',
-              flexShrink: 0,
-              transition: 'background-color 0.15s',
-            }}
-          />
-          {t('transport.previewEdits')}
-        </button>
-
-        {/* Application settings */}
-        <button
-          onClick={onOpenSettings}
-          title={t('settings.title')}
-          aria-label={t('settings.title')}
-          style={{
-            background: 'none',
-            border: '1px solid var(--color-border)',
-            borderRadius: 6,
-            cursor: 'pointer',
-            padding: '0 10px',
-            height: 28,
-            fontSize: 14,
-            color: 'var(--color-text-muted)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <Icon name="gear" />
-        </button>
+      <div className="transport-trailing">
+        <div className="transport-time">
+          <span>{formatTime(outputTime)}</span>
+          <small>/ {formatTime(outputDuration)}</small>
+        </div>
+        <div className="transport-options">
+          <Button
+            size="sm"
+            className="transport-preview"
+            onClick={togglePreviewMode}
+            aria-pressed={previewMode}
+            aria-label={t('transport.preview')}
+            title={t('transport.previewHint')}
+          >
+            <Icon name="preview" />
+            {t('transport.previewEdits')}
+          </Button>
+          <Button
+            size="sm"
+            className="transport-settings"
+            onClick={onOpenSettings}
+            title={t('settings.title')}
+            aria-label={t('settings.title')}
+          >
+            <Icon name="gear" size={18} />
+          </Button>
+        </div>
       </div>
     </div>
   )

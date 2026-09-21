@@ -130,9 +130,10 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
     await select(1)
     await ui.call('browser_press_key', { key: 'm' })
     await expect.poll(() => ui.page.locator('.clip-redaction').count()).toBe(1)
+    await ui.call('browser_click', { target: 'button[aria-label="Preview Mode"]' })
     expect(
       await ui.page
-        .getByRole('button', { name: 'Preview', exact: true })
+        .getByRole('button', { name: 'Preview Mode', exact: true })
         .getAttribute('aria-pressed'),
     ).not.toBe('true')
     const redacted = await exportWav('redacted-preview-off')
@@ -142,11 +143,11 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
     evidence.content = { prefix, retainedTail }
     expect(prefix).toBeGreaterThan(0.98)
     expect(retainedTail).toBeGreaterThan(0.98)
-    await ui.call('browser_click', { target: 'button[aria-label="Preview"]' })
+    await ui.call('browser_click', { target: 'button[aria-label="Preview Mode"]' })
     const redactedOn = await exportWav('redacted-preview-on')
     expect(redactedOn.duration).toBe(redacted.duration)
     expect(correlation(redactedOn.pcm, redacted.pcm, 4, 4)).toBeGreaterThan(0.999)
-    await ui.call('browser_click', { target: 'button[aria-label="Preview"]' })
+    await ui.call('browser_click', { target: 'button[aria-label="Preview Mode"]' })
 
     // Undo clip redaction, then verify track-level mute keeps the timeline duration.
     await ui.call('browser_press_key', { key: 'Control+z' })
@@ -179,7 +180,7 @@ test('UI export removes redactions with Preview off, while preserving mute, gaps
     const overlap = await exportWav('retained-overlap')
     expect(overlap.duration).toBeCloseTo(13.5, 1)
     expect(correlation(overlap.pcm, original.pcm, 5, 5)).toBeGreaterThan(0.98)
-    await ui.call('browser_click', { target: 'button[aria-label="Preview"]' })
+    await ui.call('browser_click', { target: 'button[aria-label="Preview Mode"]' })
     const previewOn = await exportWav('retained-overlap-preview-on')
     expect(previewOn.duration).toBe(overlap.duration)
     expect(correlation(previewOn.pcm, overlap.pcm, 5, 5)).toBeGreaterThan(0.999)

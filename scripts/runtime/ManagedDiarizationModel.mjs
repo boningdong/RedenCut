@@ -89,6 +89,7 @@ export async function downloadHuggingFaceFile({
   fetchImplementation = fetch,
   timeoutMilliseconds = 300_000,
   maxRedirects = 5,
+  onProgress = () => {},
 }) {
   let url = new URL(
     `https://huggingface.co/${model.repository}/resolve/${model.revision}/${file.path
@@ -120,13 +121,19 @@ export async function downloadHuggingFaceFile({
   await mkdir(dirname(destination), { recursive: true })
   const handle = await open(destination, 'wx')
   let received = 0
+  onProgress({ label: `Downloading model: ${file.path}`, completed: 0, total: file.size })
   try {
     if (!response.body) throw new Error(`Hugging Face download has no body for ${file.path}`)
     for await (const chunk of response.body) {
       received += chunk.byteLength
       if (received > file.size)
         throw new Error(`Hugging Face download size mismatch for ${file.path}`)
-      await handle.write(chunk)
+      await handle.writeFile(chunk)
+      onProgress({
+        label: `Downloading model: ${file.path}`,
+        completed: received,
+        total: file.size,
+      })
     }
     if (received !== file.size)
       throw new Error(`Hugging Face download size mismatch for ${file.path}`)
@@ -148,10 +155,12 @@ export async function installManagedDiarization({
   validateLoad,
   onCredentialRequired = (message) => process.stdout.write(`${message}\n`),
   remove = rm,
+  onProgress = () => {},
   onWarning = (message) => process.stderr.write(`Warning: ${message}\n`),
 }) {
   validateDiarizationModel(model)
   if (skip) return { status: 'skipped' }
+  onProgress({ label: 'Checking diarization model' })
   const destination = resolve(modelsRoot, 'diarization', model.revision)
   try {
     await validateManagedDiarization(destination, model)
@@ -181,6 +190,7 @@ export async function installManagedDiarization({
   try {
     await mkdir(staging)
     if (importModel) {
+      onProgress({ label: 'Verifying imported model' })
       await validateModelFiles(resolve(importModel), model)
       for (const file of model.files) {
         await mkdir(dirname(join(staging, file.path)), { recursive: true })
@@ -195,6 +205,7 @@ export async function installManagedDiarization({
           file,
           destination: join(staging, file.path),
           token: credential,
+          onProgress,
         })
       }
     }
@@ -203,8 +214,10 @@ export async function installManagedDiarization({
       `${JSON.stringify(installationRecord(model), null, 2)}\n`,
       { flag: 'wx' },
     )
+    onProgress({ label: 'Verifying model files' })
     await validateManagedDiarization(staging, model)
     if (!validateLoad) throw new Error('Managed diarization load validator is required')
+    onProgress({ label: 'Testing offline model loading' })
     await validateLoad(staging, model)
     try {
       await rename(destination, displaced)

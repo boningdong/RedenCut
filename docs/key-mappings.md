@@ -59,7 +59,7 @@ The audio toolbar exposes the same context-dependent split, mute/redact and dele
 Canonical transcript selections use their own occurrence-aware editing and acoustic-boundary confirmation; audio toolbar edit actions are unavailable while that text selection is active.
 
 Clip Mute, Track Mute and Solo control audibility only; muted speech dims and leaves simultaneous-speech presentation without a redaction strike-through.
-The Preview edits toggle renders the edited output, removing eligible redacted sections and overlapping their enabled crossfade regions.
+Preview Mode is enabled by default; its toggle renders the edited output, removing eligible redacted sections and overlapping their enabled crossfade regions.
 The waveform, clip positions, transcript seeks and editing shortcuts retain editing-time coordinates; the transport counter and total duration show the current playback mode’s output time.
 Export uses the same edited render plan regardless of Preview; retained overlapping audio, ordinary track mute, and natural gaps follow the same eligibility rules.
 An enabled crossfade with equal 30 ms adjacent source regions shortens output by an additional 30 ms while keeping clip positions unchanged.

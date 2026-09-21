@@ -1,3 +1,4 @@
+import { Button } from '../ui/Button'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '@shared/ProjectTypes'
@@ -142,7 +143,7 @@ export function SourceOverridePopover({
       <p>{t('waveform.mixReplacementHint')}</p>
       {failed && <p role="alert">{t('waveform.mixCoverageFailed')}</p>}
       <div className="mix-dialog-actions">
-        <button
+        <Button
           disabled={!valid || !state.hasReplacement}
           onClick={() => {
             if (onRestore(left, right)) onClose()
@@ -150,10 +151,10 @@ export function SourceOverridePopover({
           }}
         >
           {t('waveform.restoreMix')}
-        </button>
-        <button onClick={onClose}>{t('waveform.mixCancel')}</button>
-        <button
-          className="mix-primary"
+        </Button>
+        <Button onClick={onClose}>{t('waveform.mixCancel')}</Button>
+        <Button
+          variant="primary"
           disabled={!valid || !draft.length}
           onClick={() => {
             if (onApply(draft, left, right)) onClose()
@@ -161,7 +162,7 @@ export function SourceOverridePopover({
           }}
         >
           {t('waveform.mixApplyReplacement')}
-        </button>
+        </Button>
       </div>
     </div>,
     document.body,

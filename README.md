@@ -106,13 +106,13 @@ The app never falls back to a system/Homebrew FFmpeg, an npm static binary, or a
 1. Create a project and import audio through the file picker.
 2. Generate a transcript for a track, or for all tracks, once speech resources are ready.
 3. Click a word to hear its position, then select unwanted text and press **M** or **Delete** to redact it.
-4. Enable **Preview edits** to audition the cuts, and adjust their boundaries on the waveform.
+4. Use **Preview Mode** (on by default) to audition the cuts, and adjust their boundaries on the waveform.
 5. Arrange clips and tracks, save the project, and export your audio.
 
 **Redaction and mute have different effects.**
 Redactions remove selected passages from the export and can be skipped during preview.
 Clip and track mute control audibility; ordinary muted regions and natural gaps retain their timeline placement.
-Export applies redactions even when **Preview edits** is off.
+Export applies redactions even when **Preview Mode** is off.
 
 For a portable project, use managed copies of the source audio.
 Projects that reference external files still need those files to remain available.
@@ -134,6 +134,9 @@ Speaker separation provides editable anonymous labels, not identification of rea
 Audio decoding, transcription, alignment, speaker analysis, and export run locally.
 Once the required runtimes and models are installed, normal speech inference uses offline model loading and does not need a cloud transcription service.
 Initial dependency installation and model downloads require internet access.
+
+The setup terminal shows the current phase, an animated activity indicator and elapsed time; downloads with a known size also show byte-based percentages.
+Redirected output uses plain progress lines, and model validation stays quiet unless it fails.
 
 In local development, `npm run runtime:setup` guides you through Hugging Face access when the diarization model is missing.
 Accept the model's conditions with your own account; supply a read token through the CLI's hidden prompt, `HF_TOKEN`, or an existing local HF login.

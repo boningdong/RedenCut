@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { dirname, join, parse, resolve } from 'node:path'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, open, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { createRuntimeProgress } from './RuntimeProgress.mjs'
 
 import { buildRuntime } from './BuildRuntime.mjs'
 import { installRuntimeGeneration } from './RuntimeInstaller.mjs'
@@ -78,6 +80,8 @@ export async function setupRuntime({
   installModel = installManagedDiarization,
   runPython = runManagedPython,
   environment = process.env,
+  onProgress = () => {},
+  pauseProgress = () => {},
 } = {}) {
   runtimeRoot ??= environment.REDENCUT_RUNTIME_ROOT
   modelsRoot ??= environment.REDENCUT_MODELS_ROOT ?? resolve('.runtime', 'models')
@@ -86,10 +90,11 @@ export async function setupRuntime({
   )
   let runtimeManifest
   if (!modelsOnly) {
-    const sourceRoot = bundleRoot ? resolve(bundleRoot) : await buildRuntime()
+    const sourceRoot = bundleRoot ? resolve(bundleRoot) : await buildRuntime({ onProgress })
     if (resolve(sourceRoot) === destinationRoot) {
       throw new Error('Runtime bundle and installation destination must be different directories')
     }
+    onProgress({ label: 'Installing and verifying managed runtime' })
     runtimeManifest = await installRuntimeGeneration({ bundleRoot: sourceRoot, destinationRoot })
   }
   const model = await loadDiarizationModel(join(repository, 'speech-worker', 'models.json'))
@@ -99,13 +104,25 @@ export async function setupRuntime({
     model,
     skip: skipModels,
     importModel,
+    onProgress,
+    onCredentialRequired: (message) => {
+      pauseProgress()
+      process.stdout.write(`${message}\n`)
+    },
+    onWarning: (message) => {
+      pauseProgress()
+      process.stderr.write(`Warning: ${message}\n`)
+    },
     promptForToken: () => promptHidden('Hugging Face read token: '),
     validateLoad: async (path) => {
       const cache = await mkdtemp(join(tmpdir(), 'redencut-model-validation-'))
+      let log
       try {
+        log = await open(join(cache, 'validation.log'), 'w+')
         const exitCode = await runPython({
           runtimeRoot: destinationRoot,
           cwd: cache,
+          stdio: ['ignore', log.fd, log.fd],
           environment: {
             ORT_DISABLE_TELEMETRY: '1',
             MPLCONFIGDIR: join(cache, 'matplotlib'),
@@ -127,9 +144,21 @@ export async function setupRuntime({
             path,
           ],
         })
-        if (exitCode !== 0)
-          throw new Error(`Offline diarization load validation failed (${exitCode})`)
+        if (exitCode !== 0) {
+          const { size } = await log.stat()
+          const tail = Buffer.alloc(Math.min(size, 8000))
+          const { bytesRead } = await log.read(
+            tail,
+            0,
+            tail.length,
+            Math.max(0, size - tail.length),
+          )
+          throw new Error(
+            `Offline diarization load validation failed (${exitCode})\n${tail.subarray(0, bytesRead).toString('utf8').trim()}`,
+          )
+        }
       } finally {
+        await log?.close()
         await rm(cache, { recursive: true, force: true })
       }
     },
@@ -139,7 +168,23 @@ export async function setupRuntime({
 
 async function main() {
   const options = parseArguments(process.argv.slice(2))
-  const result = await setupRuntime(options)
+  const progress = createRuntimeProgress()
+  let result
+  try {
+    result = await setupRuntime({
+      ...options,
+      onProgress: progress.update,
+      pauseProgress: progress.pause,
+    })
+    progress.finish('Runtime setup complete')
+  } catch (error) {
+    progress.finish('Runtime setup failed', false)
+    process.stderr.write(`${error.message}\n`)
+    process.exitCode = 1
+    return
+  } finally {
+    progress.pause()
+  }
   if (result.runtimeManifest)
     process.stdout.write(`Installed managed runtime ${result.runtimeManifest.runtimeId}\n`)
   process.stdout.write(`Managed diarization model: ${result.model.status}\n`)

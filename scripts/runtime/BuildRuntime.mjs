@@ -8,6 +8,7 @@ import {
   copyFile,
   cp,
   mkdir,
+  open,
   readFile,
   readdir,
   realpath,
@@ -134,7 +135,8 @@ async function writeBuildMarker(prefix, recipe) {
   )
 }
 
-async function downloadAndVerify(source, downloadsRoot) {
+async function downloadAndVerify(source, downloadsRoot, onProgress = () => {}) {
+  onProgress({ label: `Checking ${source.archive}` })
   const archivePath = join(downloadsRoot, source.archive)
   if (await exists(archivePath)) {
     const actual = await sha256File(archivePath)
@@ -147,7 +149,25 @@ async function downloadAndVerify(source, downloadsRoot) {
   try {
     const response = await fetch(source.url)
     if (!response.ok) throw new Error(`Download failed (${response.status}) for ${source.url}`)
-    await writeFile(temporaryPath, Buffer.from(await response.arrayBuffer()), { flag: 'wx' })
+    const encoding = response.headers.get('content-encoding')
+    const total =
+      !encoding || encoding === 'identity'
+        ? Number(response.headers.get('content-length'))
+        : undefined
+    const handle = await open(temporaryPath, 'wx')
+    let completed = 0
+    try {
+      if (!response.body) throw new Error(`Empty download for ${source.archive}`)
+      onProgress({ label: `Downloading ${source.archive}`, completed, total })
+      for await (const chunk of response.body) {
+        await handle.writeFile(chunk)
+        completed += chunk.byteLength
+        onProgress({ label: `Downloading ${source.archive}`, completed, total })
+      }
+    } finally {
+      await handle.close()
+    }
+    onProgress({ label: `Verifying ${source.archive}` })
     const actual = await sha256File(temporaryPath)
     if (actual !== source.sha256) {
       throw new Error(`Downloaded source hash mismatch for ${source.archive}: ${actual}`)
@@ -177,10 +197,10 @@ export async function freshExtractSource(source, downloadsRoot, sourcesRoot) {
   return sourceRoot
 }
 
-export async function bootstrapUv(lock, workRoot) {
+export async function bootstrapUv(lock, workRoot, onProgress = () => {}) {
   const source = lock.buildTools.uv
   const downloadsRoot = join(workRoot, 'downloads')
-  const archivePath = await downloadAndVerify(source, downloadsRoot)
+  const archivePath = await downloadAndVerify(source, downloadsRoot, onProgress)
   const toolRoot = join(workRoot, 'tools', `uv-${source.version}`)
   const executable = join(toolRoot, source.executable)
   if ((await exists(executable)) && (await sha256File(executable)) !== source.executableSha256) {
@@ -212,11 +232,12 @@ export async function bootstrapUv(lock, workRoot) {
   return executable
 }
 
-async function buildNativeSources(lock, workRoot) {
+async function buildNativeSources(lock, workRoot, onProgress) {
   const plan = createDarwinArm64BuildPlan(workRoot)
   const sourcesRoot = join(workRoot, 'sources')
   const jobs = String(Math.max(1, Number.parseInt(process.env.REDENCUT_BUILD_JOBS ?? '4', 10)))
 
+  onProgress({ label: 'Checking LAME build cache' })
   const lameRecipe = {
     sourceSha256: lock.sources.lame.sha256,
     configureArguments: plan.lame.configureArguments,
@@ -233,8 +254,11 @@ async function buildNativeSources(lock, workRoot) {
       join(workRoot, 'downloads'),
       sourcesRoot,
     )
+    onProgress({ label: 'Configuring LAME' })
     await run(join(sourceRoot, 'configure'), plan.lame.configureArguments, { cwd: sourceRoot })
+    onProgress({ label: 'Compiling LAME' })
     await run('make', ['-j', jobs], { cwd: sourceRoot })
+    onProgress({ label: 'Installing LAME' })
     await run('make', ['install'], { cwd: sourceRoot })
     const library = join(plan.lame.prefix, 'lib', 'libmp3lame.0.dylib')
     await run('install_name_tool', ['-id', '@rpath/libmp3lame.0.dylib', library])
@@ -242,6 +266,7 @@ async function buildNativeSources(lock, workRoot) {
     await writeBuildMarker(plan.lame.prefix, lameRecipe)
   }
 
+  onProgress({ label: 'Checking FFmpeg build cache' })
   const ffmpegRecipe = {
     sourceSha256: lock.sources.ffmpeg.sha256,
     lameRecipeFingerprint: recipeFingerprint(lameRecipe),
@@ -263,15 +288,19 @@ async function buildNativeSources(lock, workRoot) {
       ...process.env,
       PKG_CONFIG_PATH: join(plan.lame.prefix, 'lib', 'pkgconfig'),
     }
+    onProgress({ label: 'Configuring FFmpeg' })
     await run(join(sourceRoot, 'configure'), plan.ffmpeg.configureArguments, {
       cwd: sourceRoot,
       env: environment,
     })
+    onProgress({ label: 'Compiling FFmpeg' })
     await run('make', ['-j', jobs], { cwd: sourceRoot, env: environment })
+    onProgress({ label: 'Installing FFmpeg' })
     await run('make', ['install'], { cwd: sourceRoot, env: environment })
     await writeBuildMarker(plan.ffmpeg.prefix, ffmpegRecipe)
   }
 
+  onProgress({ label: 'Checking whisper.cpp build cache' })
   const whisperRecipe = {
     sourceSha256: lock.sources.whisperCpp.sha256,
     cmakeArguments: plan.whisper.cmakeArguments,
@@ -290,10 +319,13 @@ async function buildNativeSources(lock, workRoot) {
     )
     await rm(plan.whisper.buildDirectory, { recursive: true, force: true })
     await mkdir(plan.whisper.buildDirectory, { recursive: true })
+    onProgress({ label: 'Configuring whisper.cpp' })
     await run('cmake', [...plan.whisper.cmakeArguments, sourceRoot], {
       cwd: plan.whisper.buildDirectory,
     })
+    onProgress({ label: 'Compiling whisper.cpp' })
     await run('cmake', ['--build', '.', '--parallel', jobs], { cwd: plan.whisper.buildDirectory })
+    onProgress({ label: 'Installing whisper.cpp' })
     await run('cmake', ['--install', '.'], { cwd: plan.whisper.buildDirectory })
     await writeBuildMarker(plan.whisper.prefix, whisperRecipe)
   }
@@ -674,7 +706,8 @@ function parseArguments(arguments_) {
   return options
 }
 
-export async function buildRuntime({ workDirectory, bundleDirectory } = {}) {
+export async function buildRuntime({ workDirectory, bundleDirectory, onProgress = () => {} } = {}) {
+  onProgress({ label: 'Checking runtime requirements' })
   requireSupportedBuildTarget(process.platform, process.arch)
   const workRoot = resolve(workDirectory ?? join(projectRoot, '.runtime', 'build-cache'))
   const bundleRoot = resolve(
@@ -687,17 +720,19 @@ export async function buildRuntime({ workDirectory, bundleDirectory } = {}) {
   await mkdir(downloadsRoot, { recursive: true })
   await mkdir(sourcesRoot, { recursive: true })
   for (const source of Object.values(lock.sources)) {
-    await downloadAndVerify(source, downloadsRoot)
+    await downloadAndVerify(source, downloadsRoot, onProgress)
+    onProgress({ label: `Extracting ${source.archive}` })
     await extractSource(source, downloadsRoot, sourcesRoot)
   }
-  const uvExecutable = await bootstrapUv(lock, workRoot)
-  const plan = await buildNativeSources(lock, workRoot)
+  const uvExecutable = await bootstrapUv(lock, workRoot, onProgress)
+  const plan = await buildNativeSources(lock, workRoot, onProgress)
 
   if (
     (await exists(join(bundleRoot, 'manifest.json'))) ||
     (await exists(join(bundleRoot, 'bin'))) ||
     (await exists(join(bundleRoot, 'python')))
   ) {
+    onProgress({ label: 'Validating existing runtime bundle' })
     await validateExistingBundle(lock, bundleRoot, plan, pythonRecipe)
     return bundleRoot
   }
@@ -706,8 +741,11 @@ export async function buildRuntime({ workDirectory, bundleDirectory } = {}) {
   await mkdir(dirname(bundleRoot), { recursive: true })
   await mkdir(stagingRoot, { recursive: true })
   try {
+    onProgress({ label: 'Assembling native runtime' })
     await copyNativeRuntime(stagingRoot, plan)
+    onProgress({ label: 'Installing Python dependencies and building PyAV' })
     await installPythonEnvironment(lock, workRoot, stagingRoot, plan.ffmpeg.prefix, uvExecutable)
+    onProgress({ label: 'Packaging and verifying runtime files' })
     await completeBundle(lock, workRoot, stagingRoot, plan, pythonRecipe)
     await replaceBundle(stagingRoot, bundleRoot)
     return bundleRoot

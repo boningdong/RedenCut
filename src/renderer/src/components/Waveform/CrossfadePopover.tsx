@@ -1,3 +1,4 @@
+import { Button } from '../ui/Button'
 import { useEffect, useRef, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { MAX_CROSSFADE_DURATION_MS, type CrossfadeSettings } from '@shared/audio/CrossfadeTypes'
@@ -99,9 +100,9 @@ export function CrossfadePopover({
       </label>
       <p role="status">{status}</p>
       {grouped && <p>{t('waveform.crossfadeGrouped')}</p>}
-      <button type="button" onClick={onClose}>
+      <Button type="button" onClick={onClose}>
         {t('waveform.crossfadeDone')}
-      </button>
+      </Button>
     </div>,
     document.body,
   )

@@ -100,3 +100,30 @@ test('offline load validation uses an isolated cwd and child-only environment ov
   assert.equal(process.env.ORT_DISABLE_TELEMETRY, originalTelemetry)
   assert.equal(process.env.MPLCONFIGDIR, originalMatplotlib)
 })
+
+test('model validation captures successful output and retains bounded failure diagnostics', async () => {
+  const { writeSync } = await import('node:fs')
+  const stagingRoot = await mkdtemp(join(tmpdir(), 'redencut-quiet-validation-'))
+  for (const exitCode of [0, 1]) {
+    const pending = setupRuntime({
+      modelsOnly: true,
+      runtimeRoot: join(stagingRoot, 'runtime'),
+      runPython: async (options) => {
+        assert.ok(Array.isArray(options.stdio), 'Validation must not inherit terminal output')
+        writeSync(options.stdio[1], 'x'.repeat(9000) + '\nmodel diagnostic\n')
+        return exitCode
+      },
+      installModel: async (options) => {
+        await options.validateLoad(join(stagingRoot, 'model'))
+        return { status: 'installed' }
+      },
+    })
+    if (exitCode === 0) assert.equal((await pending).model.status, 'installed')
+    else
+      await assert.rejects(pending, (error) => {
+        assert.match(error.message, /model diagnostic/)
+        assert.ok(error.message.length < 8200)
+        return true
+      })
+  }
+})

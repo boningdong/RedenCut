@@ -272,3 +272,38 @@ test('imports an explicitly selected verified legacy directory', async () => {
     model.id,
   )
 })
+
+test('download progress reflects bytes written without exposing credentials', async () => {
+  const directory = await root()
+  const events = []
+  const destination = join(directory, 'download.bin')
+  await downloadHuggingFaceFile({
+    model,
+    file: { path: 'model.bin', size: 4 },
+    destination,
+    token: 'private-test-token',
+    onProgress: (event) => events.push(event),
+    fetchImplementation: async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1, 2]))
+            controller.enqueue(new Uint8Array([3, 4]))
+            controller.close()
+          },
+        }),
+        { headers: { 'content-length': '4' } },
+      ),
+  })
+  assert.deepEqual(
+    events.map(({ completed, total }) => [completed, total]),
+    [
+      [0, 4],
+      [2, 4],
+      [4, 4],
+    ],
+  )
+  assert.deepEqual([...(await readFile(destination))], [1, 2, 3, 4])
+  assert.doesNotMatch(JSON.stringify(events), /private-test-token/)
+  await rm(directory, { recursive: true })
+})

@@ -27,7 +27,7 @@ const initialState = {
   isDirty: false,
   localEditRevision: 0,
   selection: null as EditorSelection | null,
-  previewMode: false,
+  previewMode: true,
 }
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
