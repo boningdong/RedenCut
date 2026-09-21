@@ -1,7 +1,7 @@
 {
   "name": "redencut",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.1.0-beta",
+  "description": "Local-first podcast and audio editor",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -35,10 +35,14 @@
     "runtime:setup": "node scripts/runtime/SetupRuntime.mjs",
     "runtime:check": "node scripts/runtime/CheckRuntime.mjs",
     "test:runtime": "node --test scripts/runtime/*.test.mjs",
-    "runtime:stage": "node scripts/StageReleaseResources.mjs"
+    "runtime:stage": "node scripts/StageReleaseResources.mjs",
+    "package:mac": "node scripts/PackageMac.mjs",
+    "release:prepare": "node scripts/release/PrepareRelease.mjs",
+    "release:draft": "node scripts/release/DraftRelease.mjs",
+    "test:release": "node --test scripts/release/*.test.mjs"
   },
   "keywords": [],
-  "author": "",
+  "author": "RedenCut contributors",
   "license": "Apache-2.0",
   "type": "commonjs",
   "volta": {
@@ -55,6 +59,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "electron": "40.8.0",
+    "electron-builder": "26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "10.8.1",
     "eslint-config-prettier": "10.1.8",

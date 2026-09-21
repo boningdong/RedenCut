@@ -193,6 +193,13 @@ npm run check         # Formatting, lint, dead-code checks, types, tests, and bu
 See [architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), and the [test harness guide](harness/container/README.md) for more detail.
 The scripts in [package.json](package.json) are the source of truth for development commands.
 
+## Local macOS package
+
+On Apple Silicon, run `npm run package:mac` after preparing the managed runtime and model with `npm run runtime:setup`.
+This produces an ad-hoc-signed, unnotarized DMG for manual installation; automatic updates are not included.
+See [macOS packaging](docs/macos-packaging.md) for prerequisites, output paths, signing limitations and validation.
+For tag-triggered GitHub Actions builds and draft publication, see [GitHub Releases](docs/github-releases.md).
+
 ## Current limitations and roadmap
 
 RedenCut is under active development.
@@ -200,7 +207,7 @@ The current implementation includes the editing and speech features described ab
 
 Upcoming work includes:
 
-- Standalone distribution, bundled runtimes, signing, and clean-machine installation verification.
+- Developer ID signing, notarization, automatic updates, and clean-machine installation verification.
 - File-drop import and further timeline and accessibility polish.
 - Loudness normalization, configurable crossfades, and richer export controls.
 - Assisted filler-word detection and edit-transition review.
