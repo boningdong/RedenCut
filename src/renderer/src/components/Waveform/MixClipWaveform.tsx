@@ -62,6 +62,8 @@ export function MixClipWaveform({
               width: (span.sourceEnd - span.sourceStart) * pxPerSec,
               top: override ? 16 + row * (waveformHeight / rows) : 0,
               height: override ? waveformHeight / rows : waveformHeight + 16,
+              borderTop: override ? `2px solid ${color}` : undefined,
+              boxSizing: 'border-box',
               pointerEvents: 'none',
               overflow: 'hidden',
               background: override ? `color-mix(in srgb, ${color} 8%, transparent)` : undefined,
@@ -73,7 +75,7 @@ export function MixClipWaveform({
               sourceEndSeconds={visible.sourceEndSeconds}
               leftInClipPx={visible.leftInClipPx}
               widthPx={visible.widthPx}
-              heightPx={override ? waveformHeight / rows : waveformHeight}
+              heightPx={override ? waveformHeight / rows - 2 : waveformHeight}
               topPx={override ? 0 : 16}
               color={color}
               muted={clip.muted}
