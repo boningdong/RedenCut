@@ -21,6 +21,12 @@ import type { WorkspacePanelId } from '../../workspace/workspaceLayout.types'
 import { WorkspacePanel } from './WorkspacePanel'
 import { PanelDivider } from './PanelDivider'
 import { PanelDropIndicator } from './PanelDropIndicator'
+import {
+  getPanelDropGeometry,
+  TRANSPORT_DROP_SLOT_HEIGHT,
+  type PanelDropGeometry,
+} from './PanelDropGeometry'
+import { Icon } from '../ui/Icon'
 import './workspace.css'
 
 const PANEL_GAP = 13
@@ -63,9 +69,16 @@ export function EditorWorkspace({
   const root = useRef<HTMLDivElement>(null)
   const restore = useRef<(() => void) | null>(null)
   const cancelInteraction = useRef<(() => void) | null>(null)
+  const pendingPositions = useRef<Map<HTMLElement, number> | null>(null)
+  const animations = useRef<Animation[]>([])
   const [height, setHeight] = useState(400)
   const [previewRatio, setPreviewRatio] = useState<number | null>(null)
-  const [drag, setDrag] = useState<{ panel: WorkspacePanelId; lower: boolean | null } | null>(null)
+  const [drag, setDrag] = useState<{
+    panel: WorkspacePanelId
+    target: PanelDropGeometry | null
+    x: number
+    y: number
+  } | null>(null)
   const contentHeight = Math.max(
     1,
     height - WORKSPACE_PANELS.transport.minimumHeight - 2 * PANEL_GAP,
@@ -78,21 +91,59 @@ export function EditorWorkspace({
   useEffect(() => {
     const element = root.current
     if (!element || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => setHeight(element.clientHeight))
+    let observedHeight = element.clientHeight
+    const observer = new ResizeObserver(() => {
+      const nextHeight = element.clientHeight
+      if (nextHeight === observedHeight) return
+      observedHeight = nextHeight
+      cancelInteraction.current?.()
+      setHeight(nextHeight)
+    })
     observer.observe(element)
-    setHeight(element.clientHeight)
+    setHeight(observedHeight)
     return () => observer.disconnect()
   }, [])
-  useEffect(() => () => cancelInteraction.current?.(), [])
+  useEffect(
+    () => () => {
+      cancelInteraction.current?.()
+      animations.current.forEach((animation) => animation.cancel())
+    },
+    [],
+  )
   useLayoutEffect(() => {
     // Hydration or another layout command invalidates the geometry of an active gesture.
     cancelInteraction.current?.()
     restore.current?.()
     restore.current = null
+    const positions = pendingPositions.current
+    pendingPositions.current = null
+    if (!positions || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    animations.current.forEach((animation) => animation.cancel())
+    animations.current = []
+    for (const [element, top] of positions) {
+      const offset = top - element.getBoundingClientRect().top
+      if (offset && element.animate)
+        animations.current.push(
+          element.animate(
+            [{ transform: `translateY(${offset}px)` }, { transform: 'translateY(0)' }],
+            { duration: 380, easing: 'cubic-bezier(.22, 1, .36, 1)' },
+          ),
+        )
+    }
   }, [layout])
 
   const commit = (next: WorkspaceLayout) => {
     restore.current = captureEditingSurface(root.current)
+    if (
+      next.contentOrder[0] !== layout.contentOrder[0] ||
+      next.transportPosition !== layout.transportPosition
+    ) {
+      pendingPositions.current = new Map(
+        Array.from(root.current?.querySelectorAll<HTMLElement>('[data-workspace-panel]') ?? []).map(
+          (element) => [element, element.getBoundingClientRect().top],
+        ),
+      )
+    }
     updateLayout(next)
   }
 
@@ -141,34 +192,41 @@ export function EditorWorkspace({
 
   const startDrag = (panel: WorkspacePanelId, event: ReactPointerEvent) => {
     if (event.button !== 0) return
-    const targetAt = (next: PointerEvent): boolean | null => {
-      const bounds = root.current?.getBoundingClientRect()
-      if (
-        !bounds ||
-        next.clientX < bounds.left ||
-        next.clientX > bounds.right ||
-        next.clientY < bounds.top ||
-        next.clientY > bounds.bottom
-      )
-        return null
-      const offset = next.clientY - bounds.top
-      if (offset <= 52) return false
-      if (offset >= bounds.height - 52) return true
-      return null
-    }
+    animations.current.forEach((animation) => animation.cancel())
+    const bounds = root.current?.getBoundingClientRect()
+    if (!bounds) return
+    const other = layout.contentOrder.find((id) => id !== panel)!
+    const destination = root.current
+      ?.querySelector<HTMLElement>(`[data-workspace-panel="${other}"]`)
+      ?.getBoundingClientRect()
+    const start = { x: event.clientX, y: event.clientY }
+    let activated = false
+    const targetAt = (next: PointerEvent) =>
+      getPanelDropGeometry(panel, layout, bounds, destination, next.clientX, next.clientY)
     startInteraction(
       event,
-      (next) => setDrag({ panel, lower: targetAt(next) }),
+      (next) => {
+        if (!activated && Math.hypot(next.clientX - start.x, next.clientY - start.y) < 16) return
+        activated = true
+        setDrag({
+          panel,
+          target: targetAt(next),
+          x: next.clientX - bounds.left,
+          y: next.clientY - bounds.top,
+        })
+      },
       (cancelled, next) => {
-        const lower = next ? targetAt(next) : null
+        const target = activated && next ? targetAt(next) : null
         setDrag(null)
-        if (!cancelled && lower !== null)
+        if (!cancelled && target)
           commit(
-            applyWorkspaceDrop(useWorkspaceStore.getState().layout, panelDropTarget(panel, lower)),
+            applyWorkspaceDrop(
+              useWorkspaceStore.getState().layout,
+              panelDropTarget(panel, target.lower),
+            ),
           )
       },
     )
-    setDrag({ panel, lower: null })
   }
 
   const startResize = (event: ReactPointerEvent) => {
@@ -208,10 +266,10 @@ export function EditorWorkspace({
         style={
           id === 'transport'
             ? { height: WORKSPACE_PANELS.transport.minimumHeight, flexShrink: 0 }
-            : {
-                flex: `0 0 ${(id === 'transcript' ? ratio : 1 - ratio) * contentHeight}px`,
+            : ({
+                '--workspace-panel-height': `${(id === 'transcript' ? ratio : 1 - ratio) * contentHeight}px`,
                 minHeight: 0,
-              }
+              } as CSSProperties)
         }
         onDrag={(event) => startDrag(id, event)}
         commands={
@@ -285,20 +343,49 @@ export function EditorWorkspace({
           )}
         </div>
       )}
-      <div className="workspace-regions" ref={root}>
+      <div
+        className="workspace-regions"
+        ref={root}
+        data-drag-panel={drag?.panel}
+        data-transport-position={layout.transportPosition}
+        style={
+          { '--transport-drop-slot-height': `${TRANSPORT_DROP_SLOT_HEIGHT}px` } as CSSProperties
+        }
+      >
         {panels}
         {drag && (
           <div className="workspace-drop-overlay" aria-live="polite">
-            <PanelDropIndicator
-              target={panelDropTarget(drag.panel, false)}
-              lower={false}
-              active={drag.lower === false}
-            />
-            <PanelDropIndicator
-              target={panelDropTarget(drag.panel, true)}
-              lower
-              active={drag.lower === true}
-            />
+            {(drag.panel === 'transport' || drag.target) && (
+              <PanelDropIndicator
+                target={panelDropTarget(
+                  drag.panel,
+                  drag.panel === 'transport'
+                    ? layout.transportPosition === 'top'
+                    : drag.target!.lower,
+                )}
+                panel={drag.panel}
+                lower={
+                  drag.panel === 'transport'
+                    ? layout.transportPosition === 'top'
+                    : drag.target!.lower
+                }
+                active={drag.target !== null}
+                style={drag.panel === 'transport' ? undefined : drag.target?.style}
+              />
+            )}
+            <div
+              className="workspace-drag-label"
+              aria-hidden="true"
+              style={{
+                left: Math.max(8, Math.min(drag.x + 18, (root.current?.clientWidth ?? 300) - 190)),
+                top: drag.y + 16,
+              }}
+            >
+              <span className="workspace-drag-dots">
+                <Icon name="grip" />
+              </span>
+              {t(WORKSPACE_PANELS[drag.panel].labelKey)}
+            </div>
           </div>
         )}
       </div>

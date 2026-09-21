@@ -110,7 +110,8 @@ Other chords, composition events, and key releases restore normal menu shortcut 
 - With the divider focused, Up and Down move the divider by five percentage points within the available panel limits.
 - With the divider focused, Home minimizes the Transcript region and End maximizes it within the available panel limits.
 - Escape cancels an active panel drag or divider resize without clearing the audio selection.
-- Reorder panels by dragging the six-dot handle onto an upper or lower drop target; clicking the handle does not reorder panels.
+- Reorder content panels by dragging the six-dot handle into the vertically central area of the other content panel; the full destination panel highlights. Playback docks at the opposite top or bottom edge of the workspace.
+- Panel drags activate after 16 pixels of movement. Targets span the full workspace width without horizontal dead zones. Original positions, destination top/bottom edges and space outside the workspace are cancellation zones; entering a valid target responds immediately without a dwell delay. Release commits the move with a short easing animation; reduced-motion preferences disable that animation. Clicking or briefly nudging a handle does not reorder panels.
 - Command/Control shortcuts retain their editor meanings when focus is on a layout control and no pointer layout interaction is active.
 
 ## Speaker Labels

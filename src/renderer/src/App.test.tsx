@@ -491,15 +491,32 @@ describe('App transcription job identity', () => {
       y: 0,
       toJSON: () => ({}),
     })
+    vi.spyOn(
+      screen.getByRole('region', { name: 'Audio panel' }),
+      'getBoundingClientRect',
+    ).mockReturnValue({
+      left: 0,
+      right: 900,
+      top: 201,
+      bottom: 327,
+      width: 900,
+      height: 126,
+      x: 0,
+      y: 201,
+      toJSON: () => ({}),
+    })
     const drop = (label: string, y: number) => {
       const down = new MouseEvent('pointerdown', { bubbles: true, button: 0 })
       Object.defineProperty(down, 'pointerId', { value: 1 })
       fireEvent(screen.getByRole('button', { name: `Drag ${label} panel` }), down)
+      const move = new MouseEvent('pointermove', { bubbles: true, clientX: 400, clientY: y })
+      Object.defineProperty(move, 'pointerId', { value: 1 })
+      fireEvent(window, move)
       const up = new MouseEvent('pointerup', { bubbles: true, clientX: 400, clientY: y })
       Object.defineProperty(up, 'pointerId', { value: 1 })
       fireEvent(window, up)
     }
-    drop('Transcript', 390)
+    drop('Transcript', 260)
     drop('Transport', 10)
     expect(getAudioPlayerInstance()).toBe(player)
     expect(mocks.players).toHaveLength(1)

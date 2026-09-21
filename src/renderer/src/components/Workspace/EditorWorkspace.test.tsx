@@ -40,6 +40,25 @@ function setup() {
     y: 0,
     toJSON: () => ({}),
   })
+  for (const node of screen.getAllByRole('region')) {
+    node.getBoundingClientRect = () => {
+      const ids = order()
+      const index = ids.indexOf(node.getAttribute('data-workspace-panel'))
+      const top = index === 0 ? 0 : index === 1 ? 201 : 340
+      const height = index === 0 ? 188 : index === 1 ? 126 : 60
+      return {
+        left: 0,
+        right: 900,
+        top,
+        bottom: top + height,
+        width: 900,
+        height,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+      }
+    }
+  }
   act(() => resize())
   return regions
 }
@@ -92,13 +111,15 @@ describe('EditorWorkspace', () => {
     window.getSelection()!.setBaseAndExtent(text, 2, text, 8)
     const selected = window.getSelection()!.toString()
     pointer(screen.getByRole('button', { name: 'Drag Transcript panel' }), 'pointerdown', 10, 20)
-    pointer(window, 'pointerup', 400, 390)
+    pointer(window, 'pointermove', 400, 260)
+    pointer(window, 'pointerup', 400, 260)
     expect(order()).toEqual(['audio', 'transcript', 'transport'])
     expect(screen.getByTestId('transcript')).toBe(transcript)
     expect(window.getSelection()!.toString()).toBe(selected)
     expect(transcript.parentElement!.scrollTop).toBe(72)
     pointer(screen.getByRole('button', { name: 'Drag Transport panel' }), 'pointerdown', 10, 390)
-    pointer(window, 'pointerup', 400, 10)
+    pointer(window, 'pointermove', 400, 30)
+    pointer(window, 'pointerup', 400, 30)
     expect(order()).toEqual(['transport', 'audio', 'transcript'])
     expect(mounted).toEqual(['transcript', 'audio', 'transport'])
   })
@@ -112,15 +133,81 @@ describe('EditorWorkspace', () => {
     fireEvent.click(handle)
     expect(update).not.toHaveBeenCalled()
     pointer(handle, 'pointerdown', 10, 20)
-    expect(screen.getByText('Audio first')).toBeTruthy()
+    expect(document.querySelector('.workspace-drop-overlay')).toBeNull()
     pointer(window, 'pointerup', 400, 200)
     expect(update).not.toHaveBeenCalled()
     pointer(handle, 'pointerdown', 10, 20)
-    pointer(window, 'pointermove', 400, 390)
+    pointer(window, 'pointermove', 400, 260)
     expect(update).not.toHaveBeenCalled()
-    pointer(window, 'pointerup', 400, 390)
+    pointer(window, 'pointermove', 400, 260)
+    pointer(window, 'pointerup', 400, 260)
     expect(update).toHaveBeenCalledTimes(1)
     expect(order()[0]).toBe('audio')
+  })
+
+  it('ignores a short grab and release even at a legal transport destination', () => {
+    setup()
+    const handle = screen.getByRole('button', { name: 'Drag Transport panel' })
+    pointer(handle, 'pointerdown', 400, 20)
+    pointer(window, 'pointermove', 406, 25)
+    pointer(window, 'pointerup', 406, 25)
+    expect(update).not.toHaveBeenCalled()
+    expect(order()).toEqual(['transcript', 'audio', 'transport'])
+  })
+
+  it('shows the opposite transport dock before entry and activates it across the workspace width', () => {
+    setup()
+    pointer(screen.getByRole('button', { name: 'Drag Transport panel' }), 'pointerdown', 10, 390)
+    pointer(window, 'pointermove', 10, 300)
+    const guide = document.querySelector<HTMLElement>('[data-workspace-drop="upper"]')
+    expect(guide).not.toBeNull()
+    expect(guide?.getAttribute('data-active')).toBe('false')
+    act(() => resize())
+    expect(document.querySelector('[data-workspace-drop="upper"]')).not.toBeNull()
+    pointer(window, 'pointermove', 0, 30)
+    expect(guide?.getAttribute('data-active')).toBe('true')
+    pointer(window, 'pointerup', 0, 30)
+    expect(order()[0]).toBe('transport')
+  })
+
+  it('highlights the full destination immediately but cancels when released in its edge dead zone', () => {
+    setup()
+    pointer(screen.getByRole('button', { name: 'Drag Transcript panel' }), 'pointerdown', 40, 20)
+    pointer(window, 'pointermove', 400, 260)
+    const target = document.querySelector<HTMLElement>('[data-workspace-drop="lower"]')!
+    expect(target).not.toBeNull()
+    expect(target.style.top).toBe('201px')
+    expect(target.style.height).toBe('126px')
+    pointer(window, 'pointermove', 400, 210)
+    expect(document.querySelector('[data-workspace-drop]')).toBeNull()
+    pointer(window, 'pointerup', 400, 210)
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it.each([0, 10, 890, 900])('accepts drops across the full workspace width at x=%s', (x) => {
+    setup()
+    pointer(screen.getByRole('button', { name: 'Drag Transcript panel' }), 'pointerdown', 40, 20)
+    pointer(window, 'pointermove', x, 260)
+    pointer(window, 'pointerup', x, 260)
+    expect(order()).toEqual(['audio', 'transcript', 'transport'])
+    pointer(screen.getByRole('button', { name: 'Drag Transport panel' }), 'pointerdown', 10, 390)
+    pointer(window, 'pointermove', x, 30)
+    pointer(window, 'pointerup', x, 30)
+    expect(order()).toEqual(['transport', 'audio', 'transcript'])
+  })
+
+  it('does not move a panel dropped in its original region or outside the workspace', () => {
+    setup()
+    for (const [x, y] of [
+      [400, 100],
+      [901, 260],
+      [-1, 260],
+    ]) {
+      pointer(screen.getByRole('button', { name: 'Drag Transcript panel' }), 'pointerdown', 40, 20)
+      pointer(window, 'pointermove', x, y)
+      pointer(window, 'pointerup', x, y)
+    }
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('cancels dragging and resizing through Escape and pointer cancellation', () => {
@@ -219,10 +306,18 @@ describe('EditorWorkspace', () => {
     fireEvent.keyDown(divider, { key: 'Home' })
     expect(Number(divider.getAttribute('aria-valuenow'))).toBe(38)
     expect(
-      parseFloat(screen.getByRole('region', { name: 'Transcript panel' }).style.flexBasis),
+      parseFloat(
+        screen
+          .getByRole('region', { name: 'Transcript panel' })
+          .style.getPropertyValue('--workspace-panel-height'),
+      ),
     ).toBeCloseTo(120)
     expect(
-      parseFloat(screen.getByRole('region', { name: 'Audio panel' }).style.flexBasis),
+      parseFloat(
+        screen
+          .getByRole('region', { name: 'Audio panel' })
+          .style.getPropertyValue('--workspace-panel-height'),
+      ),
     ).toBeCloseTo(194)
     fireEvent.keyDown(divider, { key: 'ArrowDown' })
     expect(Number(divider.getAttribute('aria-valuenow'))).toBe(43)

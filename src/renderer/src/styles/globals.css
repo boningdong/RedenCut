@@ -654,6 +654,20 @@ summary:focus-visible,
   --redaction-ink: #ddc3ff;
   --redaction-stripes: repeating-linear-gradient(135deg, #382947df 0 5px, #574066df 5px 10px);
 }
+/* Light surfaces need a translucent mask instead of the dark theme's opaque ink. */
+[data-theme='light'] .clip-redaction {
+  --redaction-ink: #9b8caf;
+  --redaction-stripes: repeating-linear-gradient(135deg, #e5e0ece0 0 5px, #d3cadfe0 5px 10px);
+}
+[data-theme='light'] .clip-redaction:hover,
+[data-theme='light'] .clip-redaction[data-selected='true'],
+[data-theme='light'] .clip-redaction:has(> button:not(.redaction-cycle):focus-visible) {
+  --redaction-ink: #80659f;
+  --redaction-stripes: repeating-linear-gradient(135deg, #dfd6e9df 0 5px, #c7b8d9df 5px 10px);
+}
+[data-theme='light'] .redaction-edge:focus-visible::after {
+  background: var(--redaction-ink);
+}
 .clip-redaction:not(:has(.redaction-frame)):hover .redaction-edge::after {
   opacity: 1;
 }
