@@ -140,7 +140,7 @@ Time edits originate on Mix and synchronize child material; child redactions sur
 The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.
 
 Linked masters show an explicit Mix role, member count and expandable child hierarchy; the child × remains Delete Track, while unlinking is a separate management action.
-At most six independent tracks can be linked. The master row keeps its normal height: up to three linked tracks use stacked source waveforms, four through six use one illustrative waveform.
+At most six independent tracks can be linked. Linked master rows are slightly taller (80 px versus the ordinary 64 px), with centered waveforms: up to three linked tracks use stacked source waveforms, four through six use one theme-accent illustrative waveform.
 Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement opens its visible interval directly.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
 Range edge handles adjust only the selection; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.

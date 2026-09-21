@@ -24,6 +24,7 @@ export function MixClipWaveform({
 }) {
   const { t } = useTranslation()
   const master = tracks.find((track) => track.id === clip.trackId)
+  const waveformHeight = master?.mixLink ? 45 : 29
   const layered = (master?.mixLink?.stemTrackIds.length ?? 0) <= 3
   const spans = resolveSourceSpans(tracks, clip, clip.sourceStart, clip.sourceEnd)
   return (
@@ -59,8 +60,8 @@ export function MixClipWaveform({
               position: 'absolute',
               left: (outputStart - clip.outputStart) * pxPerSec,
               width: (span.sourceEnd - span.sourceStart) * pxPerSec,
-              top: override ? 16 + row * (27 / rows) : 0,
-              bottom: 0,
+              top: override ? 16 + row * (waveformHeight / rows) : 0,
+              height: override ? waveformHeight / rows : waveformHeight + 16,
               pointerEvents: 'none',
               overflow: 'hidden',
               background: override ? `color-mix(in srgb, ${color} 8%, transparent)` : undefined,
@@ -72,7 +73,7 @@ export function MixClipWaveform({
               sourceEndSeconds={visible.sourceEndSeconds}
               leftInClipPx={visible.leftInClipPx}
               widthPx={visible.widthPx}
-              heightPx={override ? 27 / rows : 29}
+              heightPx={override ? waveformHeight / rows : waveformHeight}
               topPx={override ? 0 : 16}
               color={color}
               muted={clip.muted}

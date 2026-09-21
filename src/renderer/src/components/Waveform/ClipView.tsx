@@ -96,7 +96,7 @@ export function ClipView({
             sourceEndSeconds={visible.sourceEndSeconds}
             leftInClipPx={visible.leftInClipPx}
             widthPx={visible.widthPx}
-            heightPx={29}
+            heightPx={track.mixLink ? 45 : 29}
             color={trackPresentationColor(track.color)}
             muted={clip.muted}
           />

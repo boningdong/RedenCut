@@ -66,7 +66,8 @@ interface WaveformViewProps {
 // Layout constants
 const HEADER_WIDTH = 190 // px — header column width
 const RULER_HEIGHT = 28 // px — ruler row height
-const LANE_HEIGHT = 64 // px — clip lane height
+const LANE_HEIGHT = 64 // px — ordinary clip lane height
+const MIX_LANE_HEIGHT = 80 // linked master has room for source presentation
 
 export function WaveformView({
   workspaceControls,
@@ -525,7 +526,11 @@ export function WaveformView({
               <div
                 key={track.id}
                 style={{
-                  height: childIds.has(track.id) ? 44 : LANE_HEIGHT,
+                  height: childIds.has(track.id)
+                    ? 44
+                    : track.mixLink
+                      ? MIX_LANE_HEIGHT
+                      : LANE_HEIGHT,
                   display: 'flex',
                   alignItems: 'stretch',
                 }}
@@ -617,7 +622,11 @@ export function WaveformView({
                     data-track-name={track.name}
                     data-linked-child={childIds.has(track.id)}
                     style={{
-                      height: childIds.has(track.id) ? 44 : LANE_HEIGHT,
+                      height: childIds.has(track.id)
+                        ? 44
+                        : track.mixLink
+                          ? MIX_LANE_HEIGHT
+                          : LANE_HEIGHT,
                       position: 'relative',
                       cursor: 'crosshair',
                       overflow: 'hidden',
