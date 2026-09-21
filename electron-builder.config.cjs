@@ -42,8 +42,6 @@ module.exports = {
     hardenedRuntime: true,
     entitlements: 'resources/entitlements.mac.plist',
     entitlementsInherit: 'resources/entitlements.mac.plist',
-    // Preserve existing ad-hoc signatures and the native runtime hash inventory.
-    signIgnore: ['Contents/Resources/runtime/'],
   },
   dmg: { sign: false },
   artifactName: '${productName}-${version}-${arch}.${ext}',

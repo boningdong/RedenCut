@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { stageReleaseResources } from './StageReleaseResources.mjs'
 import { verifyMacDocumentType } from './release/VerifyMacDocumentType.mjs'
+import { stageSignedMacResources } from './release/StageSignedMacResources.mjs'
 import { checkRuntime } from './runtime/CheckRuntime.mjs'
 
 const require = createRequire(import.meta.url)
@@ -41,7 +42,12 @@ try {
     publish: 'never',
     config: {
       ...configuration,
-      extraResources: [{ from: resources, to: '.', filter: ['**/*'] }],
+      afterSign: ({ appOutDir }) =>
+        stageSignedMacResources({
+          appPath: join(appOutDir, `${configuration.productName}.app`),
+          resourcesPath: resources,
+          entitlementsPath: join(repository, configuration.mac.entitlements),
+        }),
     },
   })
   await verifyMacDocumentType(

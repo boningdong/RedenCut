@@ -10,7 +10,7 @@ The output is `dist-electron/package/RedenCut-<version>-arm64.dmg`, with the app
 The version comes from `package.json`; the app ID is `dev.redencut.app`.
 This first packaging target is macOS arm64 only; Intel, Windows, and automatic updating are not included.
 
-The script builds the Electron application, stages and checks the existing managed runtime and model, packages the application, and checks the runtime again at its final installed-bundle path.
+The script builds the Electron application, stages and checks the existing managed runtime and model, packages the application, adds the managed resources after Electron signing, re-signs the outer application bundle, and checks the runtime again at its final installed-bundle path.
 Temporary resource staging directories are removed on completion or failure; downloader caches remain under `.runtime/`.
 Packaging writes the standard build/output directories and must not run concurrently with another build of this checkout.
 
@@ -24,7 +24,7 @@ The runtime's source archives, build evidence and license inventory travel with 
 The app uses ad-hoc signing and is not Apple-notarized.
 No Apple developer account, certificate, publishing token or updater is required.
 The Electron bundle is signed with JIT and library-validation exceptions required by this local ad-hoc build.
-The native runtime retains its existing ad-hoc signatures so its verified hash inventory stays valid.
+The native runtime retains its existing ad-hoc signatures so its verified hash inventory stays valid. It enters the bundle after Electron signing because the signing tool scans every bundled file before applying ignore rules; copying it with preserved relative symlinks and re-signing only the outer application avoids exhausting file descriptors on the release runner.
 When adding Developer ID signing later, explicitly reconcile runtime signing with the manifest rather than weakening runtime integrity validation.
 
 A browser-downloaded build may be blocked by Gatekeeper, including a developer-verification or damaged-app message.

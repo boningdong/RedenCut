@@ -4,7 +4,7 @@
 
 Pushing a `v*` tag runs `.github/workflows/release.yml` on a GitHub-hosted macOS 15 ARM64 runner.
 The workflow checks the tag against `package.json`, the lockfile and the checked-out commit; builds the pinned native runtime; prepares the bundled diarization model; runs validation; builds and verifies the DMG; then creates a GitHub Release **draft**.
-Versions containing a prerelease suffix, including `0.1.0-alpha.1`, are marked as prereleases and are not marked Latest.
+Versions containing a prerelease suffix, including `0.1.0-alpha.2`, are marked as prereleases and are not marked Latest.
 There is no updater, Developer ID signing or Apple notarization in this pipeline.
 
 The draft contains:
@@ -35,19 +35,19 @@ No personal GitHub token, local `gh` installation, or Apple credential is requir
 GitHub runner availability, usage limits and billing depend on repository visibility and account settings.
 The workflow asserts ARM64 explicitly so an unexpected runner architecture fails before building.
 
-## First release: 0.1.0-alpha.1
+## Next release: 0.1.0-alpha.2
 
 Use a clean `main` checkout containing all changes intended for release, after merging and reviewing the packaging branch.
 Do not create the tag from a worktree that still lacks another task's pending changes.
-The current package version is `0.1.0-alpha.1`; create its tag only after the intended release commit is on `main`.
+The failed `v0.1.0-alpha.1` tag points to the earlier commit. Keep that tag unchanged. The current package version is `0.1.0-alpha.2`; create its tag only after the fix commit is on `main`.
 
 ```sh
 git switch main
 git pull --ff-only origin main
 git status --short
 # Continue only when the working tree is clean and the intended changes are present.
-git tag -a v0.1.0-alpha.1 -m "RedenCut 0.1.0-alpha.1"
-git push origin v0.1.0-alpha.1
+git tag -a v0.1.0-alpha.2 -m "RedenCut 0.1.0-alpha.2"
+git push origin v0.1.0-alpha.2
 ```
 
 Open **Actions → macOS release** and wait for the tagged run to succeed.
@@ -64,13 +64,13 @@ Each published version gets a new version number and a new tag.
 For example, to prepare the next alpha on the release branch or main checkout:
 
 ```sh
-npm version 0.1.0-alpha.2 --no-git-tag-version
+npm version 0.1.0-alpha.3 --no-git-tag-version
 git add package.json package-lock.json
-git commit -m "Release 0.1.0-alpha.2"
+git commit -m "Release 0.1.0-alpha.3"
 # Merge the version commit into main if it was prepared on a separate branch.
 git push origin main
-git tag -a v0.1.0-alpha.2 -m "RedenCut 0.1.0-alpha.2"
-git push origin v0.1.0-alpha.2
+git tag -a v0.1.0-alpha.3 -m "RedenCut 0.1.0-alpha.3"
+git push origin v0.1.0-alpha.3
 ```
 
 Before tagging, ensure the checkout is main at the intended release commit and is clean.
