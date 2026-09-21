@@ -31,10 +31,10 @@ export function SourceOverridePopover({
 }) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
-  const position = useAnchoredPopover(anchor, ref, onClose)
-  const [bounds, setBounds] = useState({ start: String(start), end: String(end) })
-  const left = Number(bounds.start),
-    right = Number(bounds.end)
+  const position = useAnchoredPopover(anchor, ref, onClose, true)
+  const [bounds, setBounds] = useState({ start: start.toFixed(2), end: end.toFixed(2) })
+  const left = bounds.start === start.toFixed(2) ? start : Number(bounds.start),
+    right = bounds.end === end.toFixed(2) ? end : Number(bounds.end)
   const valid =
     bounds.start.trim() !== '' &&
     bounds.end.trim() !== '' &&
@@ -49,7 +49,7 @@ export function SourceOverridePopover({
   const draft = chosen ?? state.ids
   const [failed, setFailed] = useState(false)
   useEffect(() => {
-    setBounds({ start: String(start), end: String(end) })
+    setBounds({ start: start.toFixed(2), end: end.toFixed(2) })
   }, [start, end])
   useEffect(() => {
     ref.current?.querySelector('input')?.focus({ preventScroll: true })

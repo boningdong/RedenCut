@@ -450,8 +450,7 @@
   width: 8px;
   padding: 0;
   border: 0;
-  border-inline: 1px solid var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  background: transparent;
   cursor: ew-resize;
   touch-action: none;
   z-index: 36;
@@ -460,10 +459,11 @@
   content: '';
   position: absolute;
   width: 2px;
-  height: 14px;
+  top: 35%;
+  bottom: 35%;
+  border-radius: 2px;
   background: var(--color-accent);
-  top: calc(50% - 7px);
-  left: 2px;
+  left: 3px;
 }
 .mix-replacement-range {
   position: absolute;

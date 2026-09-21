@@ -341,6 +341,7 @@ export const englishResources = {
       'Each selected recording must cover the whole selected Mix interval without gaps or overlaps. Adjust the selection or choose another recording.',
     mixApply: 'Apply',
     mixCancel: 'Cancel',
+    editReplacement: 'Edit replacement…',
     replaceAudio: 'Replace audio…',
     restoreMix: 'Restore Mix',
     mixReadOnly: 'Standby · read-only',

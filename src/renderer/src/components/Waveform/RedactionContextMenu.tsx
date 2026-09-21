@@ -7,11 +7,13 @@ export function RedactionContextMenu({
   y,
   onEdit,
   onClose,
+  label,
 }: {
   x: number
   y: number
   onEdit(): void
   onClose(): void
+  label?: string
 }) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
@@ -58,7 +60,7 @@ export function RedactionContextMenu({
       }}
     >
       <button type="button" role="menuitem" onClick={onEdit}>
-        {t('waveform.editCrossfadeMenu')}
+        {label ?? t('waveform.editCrossfadeMenu')}
       </button>
     </div>,
     document.body,

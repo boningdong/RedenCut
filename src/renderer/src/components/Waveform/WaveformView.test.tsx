@@ -134,6 +134,7 @@ describe('WaveformView managed providers', () => {
       />,
     )
     expect(screen.getAllByText('Replace audio…')).toHaveLength(2)
+    expect(container.querySelector('[data-range-handle]')).toBeNull()
     const reveal = vi.fn()
     container.querySelector('.mix-replace-trigger')!.scrollIntoView = reveal
     fireEvent.click(container.querySelector('.mix-range-toolbar button')!)
@@ -146,12 +147,73 @@ describe('WaveformView managed providers', () => {
     act(() => useEditorStore.getState().setSelection(null))
     expect(screen.getByTitle('Sources: Independent source')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Sources: Independent source' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(container.querySelectorAll('[data-range-handle]')).toHaveLength(2)
+    expect(screen.getAllByText('Edit replacement…')).toHaveLength(2)
+    const boundsSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 600,
+      top: 300,
+      bottom: 600,
+      width: 500,
+      height: 300,
+    } as DOMRect)
+    fireEvent.click(container.querySelector('.mix-range-toolbar button')!)
+    fireEvent.change(screen.getByLabelText('End (seconds)'), { target: { value: '5' } })
+    fireEvent.blur(screen.getByLabelText('End (seconds)'))
+    fireEvent.click(screen.getByText('Cancel'))
+    expect(useEditorStore.getState().selection?.end).toBe(4)
+    boundsSpy.mockRestore()
+
     expect(useEditorStore.getState().selection).toEqual({
       origin: 'timeline',
       trackId: mix.id,
       start: 2,
       end: 4,
     })
+  })
+
+  it('clears stale replacement handles when history restores a larger applied interval', () => {
+    useTimelineStore.getState().initFromAudioSource(source)
+    const mix = useTimelineStore.getState().tracks[0]
+    const child = {
+      ...mix,
+      id: 'child',
+      name: 'Child',
+      clips: mix.clips.map((clip) => ({ ...clip, id: 'child-clip', trackId: 'child' })),
+    }
+    const master = {
+      ...mix,
+      mixLink: { stemTrackIds: ['child'] },
+      clips: mix.clips.map((clip) => ({
+        ...clip,
+        sourceOverrides: [
+          { id: 'override', sourceStart: 2, sourceEnd: 4, stemTrackIds: ['child'] },
+        ],
+      })),
+    }
+    useTimelineStore.setState({ tracks: [master, child] })
+    const { container } = render(
+      <WaveformView duration={10} providersBySource={new Map()} onAddTrack={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Sources: Child' }))
+    expect(container.querySelectorAll('[data-range-handle]')).toHaveLength(2)
+    act(() =>
+      useTimelineStore.setState({
+        tracks: [
+          {
+            ...master,
+            clips: master.clips.map((clip) => ({
+              ...clip,
+              sourceOverrides: [{ ...clip.sourceOverrides[0], sourceEnd: 5 }],
+            })),
+          },
+          child,
+        ],
+      }),
+    )
+    expect(container.querySelectorAll('[data-range-handle]')).toHaveLength(0)
+    expect(useEditorStore.getState().selection).toBeNull()
   })
 
   it('shows a ruler hover guide across lanes and clears it on leave and blur', () => {

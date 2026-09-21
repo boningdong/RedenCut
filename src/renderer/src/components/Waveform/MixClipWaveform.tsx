@@ -25,7 +25,6 @@ export function MixClipWaveform({
   const { t } = useTranslation()
   const master = tracks.find((track) => track.id === clip.trackId)
   const waveformHeight = master?.mixLink ? 45 : 29
-  const layered = (master?.mixLink?.stemTrackIds.length ?? 0) <= 3
   const spans = resolveSourceSpans(tracks, clip, clip.sourceStart, clip.sourceEnd)
   return (
     <>
@@ -35,9 +34,10 @@ export function MixClipWaveform({
         if (!provider || !track) return null
         const override = clip.sourceOverrides?.find(
           (item) =>
-            item.sourceStart <= span.masterSourceStart && item.sourceEnd >= span.masterSourceEnd,
+            Math.round(item.sourceStart * 48000) <= Math.round(span.masterSourceStart * 48000) &&
+            Math.round(item.sourceEnd * 48000) >= Math.round(span.masterSourceEnd * 48000),
         )
-        if (override && !layered) return null
+        if (override && override.stemTrackIds.length > 3) return null
         const row = override?.stemTrackIds.indexOf(span.trackId) ?? 0
         const rows = override?.stemTrackIds.length ?? 1
         const outputStart = clip.outputStart + span.masterSourceStart - clip.sourceStart
@@ -82,6 +82,7 @@ export function MixClipWaveform({
         )
       })}
       {(clip.sourceOverrides ?? []).map((override) => {
+        const layered = override.stemTrackIds.length <= 3
         const start = Math.max(clip.sourceStart, override.sourceStart)
         const end = Math.min(clip.sourceEnd, override.sourceEnd)
         if (end <= start) return null
@@ -117,6 +118,14 @@ export function MixClipWaveform({
                 clip.outputStart + start - clip.sourceStart,
                 clip.outputStart + end - clip.sourceStart,
               )
+            }}
+            onContextMenu={(event) => {
+              onEdit(
+                clip.outputStart + start - clip.sourceStart,
+                clip.outputStart + end - clip.sourceStart,
+              )
+              // Bubble to the lane's replacement context menu after selecting this interval.
+              event.preventDefault()
             }}
             onKeyDown={(event) => event.stopPropagation()}
           >

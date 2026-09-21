@@ -6,12 +6,16 @@ export function RangeSelectionHandles({
   selection,
   pxPerSec,
   duration,
+  onCommit,
 }: {
   selection: EditorSelection
   pxPerSec: number
   duration: number
+  onCommit?(next: EditorSelection, original: EditorSelection): boolean
 }) {
   const { t } = useTranslation()
+  const commitRef = useRef(onCommit)
+  commitRef.current = onCommit
   const gesture = useRef<{
     edge: 'start' | 'end'
     x: number
@@ -44,7 +48,16 @@ export function RangeSelectionHandles({
         )
     }
     const finish = (event: PointerEvent) => {
+      const active = gesture.current
+      if (!active) return
       move(event)
+      const next = useEditorStore.getState().selection
+      if (
+        next &&
+        (next.start !== active.original.start || next.end !== active.original.end) &&
+        commitRef.current?.(next, active.original) === false
+      )
+        useEditorStore.getState().setSelection(active.original)
       gesture.current = null
     }
     const cancel = () => {
@@ -102,9 +115,8 @@ export function RangeSelectionHandles({
             if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
             event.preventDefault()
             const step = (event.shiftKey ? 0.1 : 0.01) * (event.key === 'ArrowLeft' ? -1 : 1)
-            useEditorStore
-              .getState()
-              .setSelection(resized(selection, edge, selection[edge] + step, duration))
+            const next = resized(selection, edge, selection[edge] + step, duration)
+            if (onCommit?.(next, selection) !== false) useEditorStore.getState().setSelection(next)
           }}
         />
       ))}

@@ -6,10 +6,11 @@ export function placePopover(
   height: number,
   viewportWidth: number,
   viewportHeight: number,
+  preferAbove = false,
 ) {
   const above = Math.max(0, anchor.top - 16)
   const below = Math.max(0, viewportHeight - anchor.bottom - 16)
-  const onTop = height <= above || above >= below
+  const onTop = height <= above || (preferAbove && above >= 180) || above >= below
   const maxHeight = onTop ? above : below
   return {
     left: Math.max(
@@ -25,12 +26,25 @@ export function useAnchoredPopover(
   anchor: RefObject<HTMLElement | null>,
   panel: RefObject<HTMLElement | null>,
   onMissing: () => void,
+  avoidLane = false,
 ) {
   const [position, setPosition] = useState({ left: 8, top: 8, maxHeight: window.innerHeight - 16 })
   useLayoutEffect(() => {
     const measure = () => {
       if (!anchor.current || !panel.current) return
-      const rect = anchor.current.getBoundingClientRect()
+      const anchorRect = anchor.current.getBoundingClientRect()
+      const laneRect = avoidLane
+        ? anchor.current.closest('[data-lane]')?.getBoundingClientRect()
+        : null
+      const rect = laneRect
+        ? {
+            ...anchorRect,
+            left: anchorRect.left,
+            right: anchorRect.right,
+            top: laneRect.top,
+            bottom: laneRect.bottom,
+          }
+        : anchorRect
       let left = Math.max(0, rect.left),
         right = Math.min(window.innerWidth, rect.right)
       let top = Math.max(0, rect.top),
@@ -58,6 +72,7 @@ export function useAnchoredPopover(
         size.height,
         window.innerWidth,
         window.innerHeight,
+        avoidLane,
       )
       setPosition((old) =>
         old.left === next.left && old.top === next.top && old.maxHeight === next.maxHeight
@@ -84,6 +99,6 @@ export function useAnchoredPopover(
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
     }
-  }, [anchor, panel, onMissing])
+  }, [anchor, panel, onMissing, avoidLane])
   return position
 }

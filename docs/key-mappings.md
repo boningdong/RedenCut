@@ -140,8 +140,10 @@ Time edits originate on Mix and synchronize child material; child redactions sur
 The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.
 
 Linked masters show an explicit Mix role, member count and expandable child hierarchy; the child × remains Delete Track, while unlinking is a separate management action.
-At most six independent tracks can be linked. Linked master rows are slightly taller (80 px versus the ordinary 64 px), with centered waveforms: up to three linked tracks use stacked source waveforms, four through six use one theme-accent illustrative waveform.
+At most six independent tracks can be linked. Linked master rows are slightly taller (80 px versus the ordinary 64 px), with centered waveforms: intervals using up to three sources use parallel stacked waveforms; intervals using four through six sources use one theme-accent illustrative waveform.
 Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement opens its visible interval directly.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
 Range edge handles adjust only the selection; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.
 The persistent replacement entry reveals the selected Mix range before opening its floating editor.
+
+Selecting a linked Mix interval does not open its source editor. Ordinary range selections have no resize grips; selecting an applied replacement reveals grips that resize that replacement while preserving its sources (one undo per drag). Use Edit replacement or the context menu to open its editor. Narrow intervals use an icon shortcut. The source editor stays outside the master lane, preferring the space above it; displayed bounds use two decimal places without rounding unchanged audio boundaries.

@@ -3,10 +3,11 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Track } from '@shared/ProjectTypes'
+import type { WaveformDataProvider } from './WaveformDataProvider'
 import { MixClipWaveform } from './MixClipWaveform'
 vi.mock('./CanvasWaveform', () => ({ CanvasWaveform: () => <div /> }))
 afterEach(cleanup)
-function setup(count: number, scale = 40) {
+function setup(count: number, scale = 40, fractional = false) {
   const clip: Track['clips'][number] = {
     id: 'clip',
     trackId: 'mix',
@@ -18,7 +19,12 @@ function setup(count: number, scale = 40) {
     muted: false,
     effects: [],
     sourceOverrides: [
-      { id: 'replace', sourceStart: 11, sourceEnd: 13, stemTrackIds: ['s0', 's1'] },
+      {
+        id: 'replace',
+        sourceStart: fractional ? 11.123459 : 11,
+        sourceEnd: fractional ? 13.987651 : 13,
+        stemTrackIds: ['s0', 's1'],
+      },
     ],
   }
   const master: Track = {
@@ -47,7 +53,7 @@ function setup(count: number, scale = 40) {
     <MixClipWaveform
       clip={clip}
       tracks={tracks}
-      providers={new Map()}
+      providers={new Map([[clip.audioSourceId, {} as WaveformDataProvider]])}
       pxPerSec={scale}
       viewport={{ scrollLeft: 0, width: 1000 }}
       onEdit={onEdit}
@@ -60,9 +66,9 @@ it('opens the exact output bounds without bubbling into clip actions', () => {
   fireEvent.click(screen.getByRole('button', { name: /Sources: s0/ }))
   expect(onEdit).toHaveBeenCalledExactlyOnceWith(6, 8)
 })
-it('uses linked count, not replacement count, for waveform presentation', () => {
+it('keeps two selected sources layered even with six linked tracks', () => {
   const { container } = setup(6)
-  expect(container.querySelector('[data-mix-presentation="combined"]')).not.toBeNull()
+  expect(container.querySelector('[data-mix-presentation="layered"]')).not.toBeNull()
   expect(screen.getByText('2 sources')).toBeTruthy()
 })
 it('keeps small groups layered with names when space allows', () => {
@@ -70,4 +76,11 @@ it('keeps small groups layered with names when space allows', () => {
   expect(container.querySelector('[data-mix-presentation="layered"]')).not.toBeNull()
   expect(screen.getByText('s0')).toBeTruthy()
   expect(screen.getByText('s1')).toBeTruthy()
+})
+
+it('keeps fractional replacement boundaries on separate parallel rows', () => {
+  const { container } = setup(3, 40, true)
+  const rows = container.querySelectorAll('[data-source-override="replace"]')
+  expect(rows).toHaveLength(2)
+  expect((rows[0] as HTMLElement).style.top).not.toBe((rows[1] as HTMLElement).style.top)
 })

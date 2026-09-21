@@ -320,6 +320,7 @@ export const simplifiedChineseResources = {
       '所选录音必须完整覆盖主音轨选区，不能有空白或重叠。请调整选区或选择其他录音。',
     mixApply: '应用',
     mixCancel: '取消',
+    editReplacement: '编辑替换…',
     replaceAudio: '替换音轨…',
     restoreMix: '恢复主音轨',
     mixReadOnly: '备用 · 只读',

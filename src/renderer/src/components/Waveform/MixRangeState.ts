@@ -41,3 +41,19 @@ export function getMixRangeState(
     ? { kind: 'uniform', ids, hasReplacement: true }
     : { kind: 'mixed', ids: [], hasReplacement: true }
 }
+
+/** Reject stale selections after history restores a different interval, including a larger one. */
+export function isExactMixReplacement(track: Track, start: number, end: number): boolean {
+  if (getMixRangeState(track, start, end).kind !== 'uniform') return false
+  const spans = track.clips.flatMap((clip) =>
+    (clip.sourceOverrides ?? []).map((override) => ({
+      start: clip.outputStart + Math.max(clip.sourceStart, override.sourceStart) - clip.sourceStart,
+      end: clip.outputStart + Math.min(clip.sourceEnd, override.sourceEnd) - clip.sourceStart,
+    })),
+  )
+  const frame = (value: number) => Math.round(value * 48000)
+  return (
+    spans.some((span) => frame(span.start) === frame(start)) &&
+    spans.some((span) => frame(span.end) === frame(end))
+  )
+}

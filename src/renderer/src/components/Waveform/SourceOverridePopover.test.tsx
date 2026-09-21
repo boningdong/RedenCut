@@ -21,7 +21,7 @@ const tracks = [
   { ...base, id: 'b', name: 'Bob' },
 ]
 afterEach(cleanup)
-function setup(track: Track = tracks[0]) {
+function setup(track: Track = tracks[0], start = 1, end = 3) {
   const apply = vi.fn(() => true),
     close = vi.fn(),
     restore = vi.fn(() => true)
@@ -33,8 +33,8 @@ function setup(track: Track = tracks[0]) {
         anchor={anchor}
         track={track}
         tracks={tracks}
-        start={1}
-        end={3}
+        start={start}
+        end={end}
         duration={10}
         onRangeChange={vi.fn()}
         onApply={apply}
@@ -102,4 +102,13 @@ it('never preselects the union of mixed replacements', () => {
   expect((screen.getByLabelText('Alice') as HTMLInputElement).checked).toBe(false)
   expect((screen.getByLabelText('Bob') as HTMLInputElement).checked).toBe(false)
   expect(screen.getByText(/Multiple source settings/)).toBeTruthy()
+})
+
+it('shows two decimals without silently rounding stored bounds', () => {
+  const { apply } = setup(tracks[0], 1.234567, 3.987654)
+  expect((screen.getByLabelText('Start (seconds)') as HTMLInputElement).value).toBe('1.23')
+  expect((screen.getByLabelText('End (seconds)') as HTMLInputElement).value).toBe('3.99')
+  fireEvent.click(screen.getByLabelText('Alice'))
+  fireEvent.click(screen.getByText('Apply replacement'))
+  expect(apply).toHaveBeenCalledWith(['a'], 1.234567, 3.987654)
 })

@@ -1,3 +1,5 @@
+import { RedactionContextMenu } from './RedactionContextMenu'
+import { getMixRangeState, isExactMixReplacement } from './MixRangeState'
 import { RangeSelectionHandles } from './RangeSelectionHandles'
 import { LinkedClipWaveform } from './LinkedClipWaveform'
 import { MixLinkDialog } from './MixLinkDialog'
@@ -89,14 +91,26 @@ export function WaveformView({
   const tracks = useTimelineStore((s) => s.tracks)
   const [mixDialogId, setMixDialogId] = useState<string | null>(null)
   const [collapsedMixes, setCollapsedMixes] = useState<string[]>([])
-  const [editingReplacement, setEditingReplacement] = useState<
-    { start: number; end: number } | undefined
+  const [editingReplacement, setEditingReplacementState] = useState<
+    { start: number; end: number; trackId: string } | undefined
   >()
+  const editingReplacementRef = useRef(editingReplacement)
+  const setEditingReplacement = useCallback((next: typeof editingReplacement) => {
+    editingReplacementRef.current = next
+    setEditingReplacementState(next)
+  }, [])
+  const [replacementMenu, setReplacementMenu] = useState<{ x: number; y: number } | null>(null)
   const [replacementOpen, setReplacementOpen] = useState(false)
   const replacementAnchor = useRef<HTMLButtonElement>(null)
   const closeReplacement = useCallback(() => {
     setReplacementOpen(false)
-    setEditingReplacement(undefined)
+    replacementAnchor.current?.focus({ preventScroll: true })
+    const applied = editingReplacementRef.current
+    const selected = useEditorStore.getState().selection
+    if (applied && selected?.trackId === applied.trackId)
+      useEditorStore
+        .getState()
+        .setSelection({ ...selected, start: applied.start, end: applied.end })
     replacementAnchor.current?.focus({ preventScroll: true })
   }, [])
   const childIds = new Set(tracks.flatMap((track) => track.mixLink?.stemTrackIds ?? []))
@@ -152,6 +166,26 @@ export function WaveformView({
     selection?.origin === 'timeline'
       ? tracks.find((track) => track.id === selection.trackId && track.mixLink)
       : undefined
+  useEffect(() => {
+    if (
+      !selection ||
+      !replacementTrack ||
+      (editingReplacement && selection.trackId !== editingReplacement.trackId)
+    ) {
+      setEditingReplacement(undefined)
+      setReplacementOpen(false)
+    } else if (
+      editingReplacement &&
+      !isExactMixReplacement(replacementTrack, editingReplacement.start, editingReplacement.end)
+    ) {
+      setEditingReplacement(undefined)
+      setReplacementOpen(false)
+      useEditorStore.getState().setSelection(null)
+    }
+  }, [selection, replacementTrack, editingReplacement, setEditingReplacement])
+  const replacementLabel = t(
+    editingReplacement ? 'waveform.editReplacement' : 'waveform.replaceAudio',
+  )
   const hasTrackRange = Boolean(
     selection?.trackId && tracks.some((track) => track.id === selection.trackId),
   )
@@ -501,7 +535,7 @@ export function WaveformView({
               setReplacementOpen(true)
             }}
           >
-            {t('waveform.replaceAudio')}
+            {replacementLabel}
           </button>
         </div>
       )}
@@ -589,7 +623,11 @@ export function WaveformView({
                 }}
                 onPointerLeave={() => setRulerHoverX(null)}
                 onPointerCancel={() => setRulerHoverX(null)}
-                onPointerDown={rangeInteraction.begin}
+                onPointerDown={(event) => {
+                  setEditingReplacement(undefined)
+                  setReplacementOpen(false)
+                  rangeInteraction.begin(event)
+                }}
                 onClick={(event) => {
                   if (!rangeInteraction.consumeClick()) handleLaneClick(event)
                 }}
@@ -636,6 +674,12 @@ export function WaveformView({
                     data-drop-invalid={
                       interaction.preview?.targetTrackId === track.id && interaction.preview.invalid
                     }
+                    onContextMenu={(event) => {
+                      if (!track.mixLink || !useEditorStore.getState().selection) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      setReplacementMenu({ x: event.clientX, y: event.clientY })
+                    }}
                     onClick={(e) => {
                       if (!childIds.has(track.id) && !interaction.consumeClick())
                         handleLaneClick(e, track.id)
@@ -679,8 +723,8 @@ export function WaveformView({
                                     start,
                                     end,
                                   })
-                                  setEditingReplacement({ start, end })
-                                  setReplacementOpen(true)
+                                  setEditingReplacement({ start, end, trackId: track.id })
+                                  setReplacementOpen(false)
                                 }}
                                 tracks={tracks}
                                 providers={providersBySource}
@@ -719,22 +763,41 @@ export function WaveformView({
                         trackColor={trackPresentationColor(track.color)}
                       />
                     )}
-                    {replacementTrack?.id === track.id && selection && (
+                    {replacementTrack?.id === track.id && selection && editingReplacement && (
                       <RangeSelectionHandles
                         selection={selection}
                         pxPerSec={pxPerSec}
                         duration={duration}
+                        onCommit={(next) => {
+                          const original = editingReplacement
+                          const state = getMixRangeState(track, original.start, original.end)
+                          if (state.kind !== 'uniform') return false
+                          const ok = useTimelineStore
+                            .getState()
+                            .replaceMixSources(track.id, next.start, next.end, state.ids, original)
+                          if (ok)
+                            setEditingReplacement({
+                              start: next.start,
+                              end: next.end,
+                              trackId: track.id,
+                            })
+                          else setMixFeedback(t('waveform.mixCoverageFailed'))
+                          return ok
+                        }}
                       />
                     )}
                     {replacementTrack?.id === track.id && selection && (
                       <button
                         ref={replacementAnchor}
                         className="mix-replace-trigger"
+                        aria-label={replacementLabel}
+                        title={replacementLabel}
                         style={{
                           left: Math.max(
                             viewport.scrollLeft + 4,
                             Math.min(
-                              ((selection.start + selection.end) / 2) * pxPerSec - 60,
+                              ((selection.start + selection.end) / 2) * pxPerSec -
+                                ((selection.end - selection.start) * pxPerSec < 140 ? 14 : 60),
                               viewport.scrollLeft + viewport.width - 132,
                             ),
                           ),
@@ -745,7 +808,23 @@ export function WaveformView({
                           setReplacementOpen(true)
                         }}
                       >
-                        {t('waveform.replaceAudio')}
+                        {(selection.end - selection.start) * pxPerSec < 140 ? (
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 16 16"
+                            aria-hidden="true"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M2 5h11m-3-3 3 3-3 3M14 11H3m3-3-3 3 3 3" />
+                          </svg>
+                        ) : (
+                          replacementLabel
+                        )}
                       </button>
                     )}
                     {/* Gap overlays — cover waveform between clips */}
@@ -829,6 +908,20 @@ export function WaveformView({
           onClose={() => setMixDialogId(null)}
         />
       )}
+      {replacementMenu && replacementTrack && selection && (
+        <RedactionContextMenu
+          {...replacementMenu}
+          label={replacementLabel}
+          onEdit={() => {
+            setReplacementMenu(null)
+            setReplacementOpen(true)
+          }}
+          onClose={() => {
+            setReplacementMenu(null)
+            replacementAnchor.current?.focus({ preventScroll: true })
+          }}
+        />
+      )}
       {replacementOpen && replacementTrack && selection && (
         <SourceOverridePopover
           key={replacementTrack.id}
@@ -846,6 +939,7 @@ export function WaveformView({
               .getState()
               .replaceMixSources(replacementTrack.id, start, end, ids, editingReplacement)
             if (ok) {
+              setEditingReplacement({ start, end, trackId: replacementTrack.id })
               useEditorStore.getState().setSelection({ ...selection, start, end })
               setMixFeedback(
                 t('waveform.mixReplaced', {
@@ -859,7 +953,10 @@ export function WaveformView({
             const ok = useTimelineStore
               .getState()
               .restoreMixSources(replacementTrack.id, start, end)
-            if (ok) setMixFeedback(t('waveform.mixRestored'))
+            if (ok) {
+              setEditingReplacement(undefined)
+              setMixFeedback(t('waveform.mixRestored'))
+            }
             return ok
           }}
           onClose={closeReplacement}

@@ -18,3 +18,16 @@ it('uses the larger side and limits height when neither side fits', () => {
     placePopover({ left: 100, right: 200, top: 120, bottom: 160 }, 180, 300, 300, 300),
   ).toEqual({ left: 60, top: 168, maxHeight: 124 })
 })
+
+it('prefers a scrollable area above the entire lane for source editing', () => {
+  const position = placePopover(
+    { left: 300, right: 400, top: 220, bottom: 300 },
+    350,
+    500,
+    1000,
+    800,
+    true,
+  )
+  expect(position.top + position.maxHeight).toBeLessThan(220)
+  expect(position.maxHeight).toBeGreaterThanOrEqual(180)
+})
