@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs'
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import type { ModelDefinition, ModelFile } from '../../shared/modelManifest.schema'
+import type { ManagedModelLocation } from './ManagedModelLocation'
 import { resourcePaths } from './resourcePaths'
 export async function verifyModelFile(path: string, file: ModelFile): Promise<boolean> {
   try {
@@ -28,9 +29,17 @@ export async function stagedModelFile(path: string, file: ModelFile): Promise<Mo
   return file
 }
 export class ModelRegistry {
-  constructor(readonly root: string) {}
+  constructor(
+    readonly root: string,
+    readonly managed?: ManagedModelLocation,
+  ) {}
+  managedPath(model: ModelDefinition): string | undefined {
+    return this.managed && model.capability === 'diarization'
+      ? join(this.managed.root, 'diarization', model.revision)
+      : undefined
+  }
   async resolve(model: ModelDefinition): Promise<string | null> {
-    const { installed } = resourcePaths(this.root, model)
+    const installed = this.managedPath(model) ?? resourcePaths(this.root, model).installed
     try {
       const record = JSON.parse(await readFile(join(installed, 'installation.json'), 'utf8'))
       if (
@@ -56,6 +65,7 @@ export class ModelRegistry {
     }
   }
   async publish(model: ModelDefinition): Promise<string> {
+    if (this.managedPath(model)) throw new Error('managed-model-required')
     const { staging, installed } = resourcePaths(this.root, model)
     const files: ModelFile[] = []
     for (const file of model.files) {

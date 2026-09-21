@@ -109,3 +109,11 @@ The launcher mounts only this directory read-only at `/test-models`; the tests l
 No token, account profile, download, or modification of the original model directory is involved.
 A missing fixture is an explicit test prerequisite failure, not a skipped or simulated speech success.
 Use the audio-only image to exercise missing-Python setup feedback and the speech image for complete real-model E2Es.
+
+## Managed diarization fixtures
+
+The app resolves diarization independently of its downloaded Whisper/alignment models.
+`run.sh` mounts the current checkout's `.runtime/models` read-only at `/managed-models` when it exists and sets `REDENCUT_MODELS_ROOT` explicitly.
+Use `REDENCUT_TEST_MANAGED_MODEL_FIXTURE` to select another already verified managed models directory.
+No acquisition or authorization occurs during UI acceptance; missing models remain visibly unavailable.
+The existing `REDENCUT_TEST_MODEL_FIXTURE` still supplies downloaded Whisper/alignment models for real speech E2Es.

@@ -251,16 +251,7 @@ function installApi(initial: RendererSession) {
     resourcesPrepare: vi.fn<IElectronAPI['resourcesPrepare']>(),
     resourcesCancel: vi.fn<IElectronAPI['resourcesCancel']>(),
     onResourcesChanged: vi.fn(() => vi.fn()),
-    modelAccessLocal: vi.fn(async () => ({ status: 'missing' as const })),
-    modelAccessVerifyLocal: vi.fn(),
-    modelAccessGet: vi.fn<IElectronAPI['modelAccessGet']>(async () => ({
-      status: 'unchecked',
-      hasToken: false,
-    })),
-    modelAccessVerify: vi.fn<IElectronAPI['modelAccessVerify']>(),
-    modelAccessClear: vi.fn<IElectronAPI['modelAccessClear']>(),
-    modelAccessOpenConditions: vi.fn<IElectronAPI['modelAccessOpenConditions']>(),
-    onModelAccessChanged: vi.fn(() => vi.fn()),
+
     appPreferences: {
       get: vi.fn<IElectronAPI['appPreferences']['get']>(async () => ({
         themeId: 'dark',

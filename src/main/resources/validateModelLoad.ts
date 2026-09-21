@@ -1,8 +1,9 @@
 import { offlineEnvironment } from '../speech/inferenceEnvironment'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { writeFile, rm } from 'node:fs/promises'
+import { writeFile, rm, mkdtemp } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import type { ModelDefinition } from '../../shared/modelManifest.schema'
 import type { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
@@ -25,20 +26,31 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
       if (/TOKEN|SECRET|PASSWORD/i.test(key)) delete (env as NodeJS.ProcessEnv)[key]
     env.HF_HUB_DISABLE_IMPLICIT_TOKEN = '1'
     if (model.capability !== 'transcription') {
-      await execute(
-        runtime.getSpeechPythonPath(),
-        [
-          '-m',
-          'redencut_speech_worker.validate_model',
-          '--manifest',
-          manifest,
-          '--model-id',
-          model.id,
-          '--path',
-          directory,
-        ],
-        { env, signal, timeout: 180_000, maxBuffer: 1024 * 1024 },
-      )
+      const scratch = await mkdtemp(join(tmpdir(), 'redencut-model-load-'))
+      try {
+        await execute(
+          runtime.getSpeechPythonPath(),
+          [
+            '-m',
+            'redencut_speech_worker.validate_model',
+            '--manifest',
+            manifest,
+            '--model-id',
+            model.id,
+            '--path',
+            directory,
+          ],
+          {
+            cwd: scratch,
+            env: { ...env, MPLCONFIGDIR: join(scratch, 'matplotlib') },
+            signal,
+            timeout: 180_000,
+            maxBuffer: 1024 * 1024,
+          },
+        )
+      } finally {
+        await rm(scratch, { recursive: true, force: true })
+      }
       return
     }
     const probe = join(directory, `.load-check-${randomUUID()}.wav`)

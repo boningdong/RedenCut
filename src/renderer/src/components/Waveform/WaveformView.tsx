@@ -1,10 +1,10 @@
-import { RedactionContextMenu } from './RedactionContextMenu'
 import { getMixRangeState, isExactMixReplacement } from './MixRangeState'
 import { RangeSelectionHandles } from './RangeSelectionHandles'
 import { LinkedClipWaveform } from './LinkedClipWaveform'
 import { MixLinkDialog } from './MixLinkDialog'
 import { SourceOverridePopover } from './SourceOverridePopover'
 import { MixClipWaveform } from './MixClipWaveform'
+import { useTimelineContextMenu } from './UseTimelineContextMenu'
 import { TimelineRuler } from './TimelineRuler'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { useRangeSelection } from './UseRangeSelection'
@@ -99,7 +99,6 @@ export function WaveformView({
     editingReplacementRef.current = next
     setEditingReplacementState(next)
   }, [])
-  const [replacementMenu, setReplacementMenu] = useState<{ x: number; y: number } | null>(null)
   const [replacementOpen, setReplacementOpen] = useState(false)
   const replacementAnchor = useRef<HTMLButtonElement>(null)
   const closeReplacement = useCallback(() => {
@@ -161,6 +160,7 @@ export function WaveformView({
     useEditorStore.getState().setSelection(null)
     audioPanel.current?.focus({ preventScroll: true })
   }, [])
+  const contextMenu = useTimelineContextMenu(focusTimeline, () => setActionFailed(true))
   const selection = useEditorStore((s) => s.selection)
   const replacementTrack =
     selection?.origin === 'timeline'
@@ -409,6 +409,7 @@ export function WaveformView({
       onPointerCancelCapture={() => setPointerOwner(null)}
       onLostPointerCapture={() => setPointerOwner(null)}
     >
+      {contextMenu.menu}
       <div className="feature-toolbar">
         {workspaceControls}
         <span className="feature-title">{t('waveform.audio')}</span>
@@ -675,10 +676,32 @@ export function WaveformView({
                       interaction.preview?.targetTrackId === track.id && interaction.preview.invalid
                     }
                     onContextMenu={(event) => {
-                      if (!track.mixLink || !useEditorStore.getState().selection) return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      setReplacementMenu({ x: event.clientX, y: event.clientY })
+                      if (childIds.has(track.id)) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        return
+                      }
+                      const range = useEditorStore.getState().selection
+                      const canReplace =
+                        track.mixLink && range?.origin === 'timeline' && range.trackId === track.id
+                      const applied =
+                        (event.target as HTMLElement).closest('.mix-replacement-range') ||
+                        editingReplacement
+                      contextMenu.open(
+                        event,
+                        track.id,
+                        canReplace
+                          ? [
+                              {
+                                id: 'replace-audio',
+                                label: t(
+                                  applied ? 'waveform.editReplacement' : 'waveform.replaceAudio',
+                                ),
+                                action: () => setReplacementOpen(true),
+                              },
+                            ]
+                          : [],
+                      )
                     }}
                     onClick={(e) => {
                       if (!childIds.has(track.id) && !interaction.consumeClick())
@@ -906,20 +929,6 @@ export function WaveformView({
             return ok
           }}
           onClose={() => setMixDialogId(null)}
-        />
-      )}
-      {replacementMenu && replacementTrack && selection && (
-        <RedactionContextMenu
-          {...replacementMenu}
-          label={replacementLabel}
-          onEdit={() => {
-            setReplacementMenu(null)
-            setReplacementOpen(true)
-          }}
-          onClose={() => {
-            setReplacementMenu(null)
-            replacementAnchor.current?.focus({ preventScroll: true })
-          }}
         />
       )}
       {replacementOpen && replacementTrack && selection && (

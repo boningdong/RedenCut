@@ -2,6 +2,9 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import * as playerRegistry from '@shared/PlayerTypes'
+import { usePlaybackStore } from '../../stores/PlaybackStore'
+import { useTimelineClipboardStore } from '../../stores/TimelineClipboardStore'
 import { WaveformView } from './WaveformView'
 import { useTimelineStore } from '../../stores/TimelineStore'
 import { useEditorStore } from '../../stores/editor.store'
@@ -51,6 +54,8 @@ function setup() {
   return { ...view, clip: view.container.querySelector('[data-clip-id="a"]')! }
 }
 beforeEach(() => {
+  useTimelineClipboardStore.getState().clear()
+  usePlaybackStore.getState().reset()
   useEditorStore.getState().reset()
   useTimelineStore.getState().reset()
   vi.stubGlobal('PointerEvent', MouseEvent)
@@ -238,5 +243,106 @@ it('a second ordinary click deselects a clip but retains its range for redaction
     start: 0,
     end: 5,
   })
+  expect(useTimelineStore.getState().undoStack).toHaveLength(0)
+})
+
+it('right-click preserves a range and redacts it without muting or moving the clip', () => {
+  const { clip } = setup()
+  act(() =>
+    useEditorStore
+      .getState()
+      .setSelection({ origin: 'timeline', start: 1, end: 2, trackId: 'one' }),
+  )
+  fireEvent.pointerDown(clip, { button: 2 })
+  fireEvent.contextMenu(clip, { clientX: 60, clientY: 50 })
+  expect(useEditorStore.getState().selection).toMatchObject({ start: 1, end: 2 })
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Redact selected range' }))
+  expect(useTimelineStore.getState().tracks[0].clips[0]).toMatchObject({
+    muted: false,
+    outputStart: 0,
+    redactions: [{ sourceStart: 1, sourceEnd: 2 }],
+  })
+  expect(useTimelineStore.getState().undoStack).toHaveLength(1)
+})
+it('mutes and unmutes a clip through the context menu without shortcut labels', () => {
+  const { clip } = setup()
+  fireEvent.contextMenu(clip)
+  expect(screen.getByRole('menu').querySelector('kbd')).toBeNull()
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Mute clip' }))
+  expect(useTimelineStore.getState().tracks[0].clips[0].muted).toBe(true)
+  fireEvent.contextMenu(clip)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Unmute clip' }))
+  expect(useTimelineStore.getState().tracks[0].clips[0].muted).toBe(false)
+})
+it('preserves a timeline range when dismissing the disabled blank-lane menu', () => {
+  const { container } = setup()
+  const range = { origin: 'timeline' as const, trackId: 'one', start: 1, end: 2 }
+  act(() => useEditorStore.getState().setSelection(range))
+  fireEvent.contextMenu(container.querySelector('[data-lane="one"]')!)
+  const menu = screen.getByRole('menu')
+  expect(menu.contains(document.activeElement)).toBe(true)
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(useEditorStore.getState().selection).toEqual(range)
+})
+it('keeps a multi-clip selection for mute and removes only the clicked redaction', () => {
+  const { container, clip } = setup()
+  act(() => {
+    const track = useTimelineStore.getState().tracks[0]
+    useTimelineStore.setState({
+      tracks: [
+        {
+          ...track,
+          clips: [
+            { ...track.clips[0], redactions: [{ id: 'r', sourceStart: 1, sourceEnd: 2 }] },
+            { ...track.clips[0], id: 'b', outputStart: 6 },
+          ],
+        },
+      ],
+    })
+    useTimelineStore.getState().setSelectedClipIds(['a', 'b'])
+  })
+  fireEvent.contextMenu(clip)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Mute clips' }))
+  expect(useTimelineStore.getState().tracks[0].clips.map((c) => c.muted)).toEqual([true, true])
+  fireEvent.contextMenu(container.querySelector('[data-redaction-id="r"]')!)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Remove redact' }))
+  expect(useTimelineStore.getState().tracks[0].clips[0].redactions ?? []).toHaveLength(0)
+  expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(2)
+  void act(() => useTimelineStore.getState().undo())
+  expect(useTimelineStore.getState().tracks[0].clips[0].redactions).toMatchObject([{ id: 'r' }])
+})
+
+it('splits at the current playhead and keeps copy/paste scoped to the chosen lane', () => {
+  const { clip, container } = setup()
+  vi.spyOn(playerRegistry, 'getAudioPlayerInstance').mockReturnValue({
+    getCurrentTime: () => 2,
+  } as playerRegistry.IAudioPlayer)
+  fireEvent.contextMenu(clip, { clientX: 160 })
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Split at playhead' }))
+  expect(
+    useTimelineStore.getState().tracks[0].clips.map((c) => [c.sourceStart, c.sourceEnd]),
+  ).toEqual([
+    [0, 2],
+    [2, 5],
+  ])
+  fireEvent.contextMenu(container.querySelector('[data-clip-id]')!)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Copy clips' }))
+  fireEvent.contextMenu(container.querySelector('[data-lane="two"]')!)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Paste at playhead' }))
+  expect(useTimelineStore.getState().tracks[1].clips).toMatchObject([
+    { outputStart: 2, sourceStart: 0, sourceEnd: 2 },
+  ])
+})
+it('menu arrows skip disabled commands and Escape restores focus without editing', () => {
+  const { clip, container } = setup()
+  fireEvent.contextMenu(clip)
+  expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Mute clip' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'End' })
+  expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete clips' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Mute clip' }))
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+  expect(document.activeElement).toBe(container.querySelector('.audio-panel-view'))
   expect(useTimelineStore.getState().undoStack).toHaveLength(0)
 })

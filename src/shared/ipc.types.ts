@@ -8,7 +8,6 @@ import type { SpeechTaskSelection } from './SpeechTaskPlanner'
 import type { SaveSpeakerIdentitiesRequest } from './SpeakerIdentityTypes'
 import type { SpeechBatchScope, SpeechBatchProgress, SpeechBatchSummary } from './speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from './resources.types'
-import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from './modelAccess.types'
 import type { PublicMessage, TranscriptionProgress, SpeechProgress } from './publicMessages'
 import type {
   AppPreferencesSnapshot,
@@ -128,13 +127,6 @@ export interface IElectronAPI {
   resourcesOpenGuide(guide: 'tools' | 'python'): Promise<void>
   resourcesCancel(): Promise<ResourceSnapshot>
   onResourcesChanged(listener: (snapshot: ResourceSnapshot) => void): () => void
-  modelAccessLocal(): Promise<LocalModelLoginSnapshot>
-  modelAccessVerifyLocal(): Promise<ModelAccessSnapshot>
-  modelAccessGet(): Promise<ModelAccessSnapshot>
-  modelAccessVerify(token?: string): Promise<ModelAccessSnapshot>
-  modelAccessClear(): Promise<ModelAccessSnapshot>
-  modelAccessOpenConditions(): Promise<void>
-  onModelAccessChanged(listener: (snapshot: ModelAccessSnapshot) => void): () => void
   appPreferences: {
     get(): Promise<AppPreferencesSnapshot>
     setTheme(themeId: ThemeId): Promise<AppPreferencesSnapshot>

@@ -8,6 +8,7 @@ export function electronEnvironment(source: NodeJS.ProcessEnv): Record<string, s
   for (const key of [
     'REDENCUT_SPEECH_WORKER_ROOT',
     'REDENCUT_RUNTIME_ROOT',
+    'REDENCUT_MODELS_ROOT',
     'REDENCUT_SPEECH_MANIFEST',
     'REDENCUT_SPEECH_MODEL_CACHE',
     'REDENCUT_WHISPER_MODEL_DIR',

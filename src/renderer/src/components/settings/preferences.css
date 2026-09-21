@@ -953,19 +953,6 @@ html[data-theme='light'] .preferences-dialog {
   font-size: 12px;
   margin: 12px 0;
 }
-.preferences-dialog.access-dialog {
-  width: 470px;
-  padding: 28px;
-}
-.preferences-dialog input[type='password'] {
-  width: 100%;
-  padding: 10px;
-  background: var(--raised);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  margin: 16px 0;
-}
 
 .preferences-dialog .segmented .theme-label {
   padding: 0;
@@ -1189,26 +1176,6 @@ html[data-theme='light'] .preferences-dialog {
 .preferences-dialog .section-chevron.expanded svg {
   transform: rotate(90deg);
 }
-.preferences-dialog .auth-method {
-  margin: 24px 0;
-}
-.preferences-dialog .auth-method h3 {
-  font-size: 14px;
-  line-height: 24px;
-  font-weight: 600;
-  margin: 0;
-}
-.preferences-dialog .auth-method p {
-  margin-top: 10px;
-}
-.preferences-dialog .auth-method .resource-actions {
-  position: static;
-}
-.preferences-dialog .auth-method-divider {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 24px 0;
-}
 
 /* Expand the text disclosure hit area to the whole header, matching development setup. */
 .preferences-dialog .text-resource > .resource-heading {
@@ -1252,25 +1219,6 @@ html[data-theme='light'] .preferences-dialog {
   background: var(--raised);
 }
 
-.preferences-dialog.access-dialog {
-  height: 640px;
-  max-height: calc(100dvh - 40px);
-  overflow: hidden;
-}
-.preferences-dialog.access-dialog[open] {
-  display: flex;
-  flex-direction: column;
-}
-.preferences-dialog.access-dialog > .modal-heading {
-  flex-shrink: 0;
-}
-.preferences-dialog .access-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding-right: 6px;
-}
 .preferences-dialog button.recheck-action {
   min-height: 32px;
   padding: 6px 10px;

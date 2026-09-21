@@ -3,7 +3,6 @@ import type { MediaRecoverySnapshot } from '../shared/MediaRecoveryTypes'
 import type { SaveSpeakerIdentitiesRequest } from '../shared/SpeakerIdentityTypes'
 import type { SpeechBatchSummary } from '../shared/speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from '../shared/resources.types'
-import type { ModelAccessSnapshot, LocalModelLoginSnapshot } from '../shared/modelAccess.types'
 import type { PublicMessage } from '../shared/publicMessages'
 import type {
   AppPreferencesSnapshot,
@@ -77,21 +76,6 @@ const api = {
     ipcRenderer.on('resources:changed', handler)
     return () => {
       ipcRenderer.off('resources:changed', handler)
-    }
-  },
-  modelAccessLocal: () => invokeSafe<LocalModelLoginSnapshot>(invoke, 'model-access:local'),
-  modelAccessVerifyLocal: () =>
-    invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:verify-local'),
-  modelAccessGet: () => invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:get'),
-  modelAccessVerify: (token?: string) =>
-    invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:verify', token),
-  modelAccessClear: () => invokeSafe<ModelAccessSnapshot>(invoke, 'model-access:clear'),
-  modelAccessOpenConditions: () => invokeSafe<void>(invoke, 'model-access:open-conditions'),
-  onModelAccessChanged: (listener: (value: ModelAccessSnapshot) => void) => {
-    const handler = (_event: IpcRendererEvent, value: ModelAccessSnapshot) => listener(value)
-    ipcRenderer.on('model-access:changed', handler)
-    return () => {
-      ipcRenderer.off('model-access:changed', handler)
     }
   },
   appPreferences: {

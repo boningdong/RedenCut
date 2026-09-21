@@ -1,10 +1,8 @@
 import { create } from 'zustand'
 import type { ResourceSnapshot, ResourcePreparation } from '@shared/resources.types'
-import type { ModelAccessSnapshot } from '@shared/modelAccess.types'
 import type { IElectronAPI } from '@shared/ipc.types'
 interface ResourcesState {
   snapshot: ResourceSnapshot | null
-  access: ModelAccessSnapshot
   error: boolean
   pending: boolean
   hydrate: () => Promise<void>
@@ -12,17 +10,12 @@ interface ResourcesState {
   selectWhisper: (modelId: string) => Promise<void>
   prepare: (target: ResourcePreparation) => Promise<void>
   cancel: () => Promise<void>
-  verifyLocal: () => Promise<void>
-  verify: (token?: string) => Promise<void>
-  clearToken: () => Promise<void>
-  openConditions: () => Promise<void>
   dispose: () => void
 }
 export function createResourcesStore(getApi: () => IElectronAPI) {
   let subscriptions: (() => void)[] = []
   let hydration: Promise<void> | null = null
   let lifecycle = 0
-  let accessRevision = 0
   let pendingCount = 0
   return create<ResourcesState>()((set, get) => {
     const apply = (snapshot: ResourceSnapshot) => {
@@ -51,7 +44,6 @@ export function createResourcesStore(getApi: () => IElectronAPI) {
       })
     return {
       snapshot: null,
-      access: { status: 'unchecked', hasToken: false },
       error: false,
       pending: false,
       hydrate: () => {
@@ -63,19 +55,11 @@ export function createResourcesStore(getApi: () => IElectronAPI) {
             api.onResourcesChanged((value) => {
               if (generation === lifecycle) apply(value)
             }),
-            api.onModelAccessChanged((access) => {
-              if (generation === lifecycle) {
-                accessRevision += 1
-                set({ access })
-              }
-            }),
           ]
         hydration = run(async () => {
-          const revision = accessRevision
-          const [snapshot, access] = await Promise.all([api.resourcesGet(), api.modelAccessGet()])
+          const snapshot = await api.resourcesGet()
           if (generation === lifecycle) {
             apply(snapshot)
-            if (revision === accessRevision) set({ access })
           }
         }).finally(() => {
           hydration = null
@@ -101,40 +85,6 @@ export function createResourcesStore(getApi: () => IElectronAPI) {
           const snapshot = await getApi().resourcesCancel()
           if (generation === lifecycle) apply(snapshot)
         }),
-      verifyLocal: () =>
-        run(async () => {
-          const generation = lifecycle
-          accessRevision += 1
-          set({ access: { ...get().access, status: 'checking' } })
-          try {
-            const access = await getApi().modelAccessVerifyLocal()
-            if (generation === lifecycle) set({ access })
-          } catch {
-            if (generation === lifecycle)
-              set({ access: { ...get().access, status: 'network-error' } })
-          }
-        }),
-      verify: (token) =>
-        run(async () => {
-          const generation = lifecycle
-          accessRevision += 1
-          set({ access: { ...get().access, status: 'checking' } })
-          try {
-            const access = await getApi().modelAccessVerify(token)
-            if (generation === lifecycle) set({ access })
-          } catch {
-            if (generation === lifecycle)
-              set({ access: { ...get().access, status: 'network-error' } })
-          }
-        }),
-      clearToken: () =>
-        run(async () => {
-          const generation = lifecycle
-          accessRevision += 1
-          const access = await getApi().modelAccessClear()
-          if (generation === lifecycle) set({ access })
-        }),
-      openConditions: () => run(() => getApi().modelAccessOpenConditions()),
       dispose: () => {
         lifecycle += 1
         subscriptions.forEach((fn) => fn())

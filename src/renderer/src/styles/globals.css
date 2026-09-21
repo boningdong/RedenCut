@@ -707,7 +707,7 @@ summary:focus-visible,
   opacity: 0;
 }
 .crossfade-popover,
-.redaction-context-menu {
+.editor-context-menu {
   z-index: 10000;
   max-width: calc(100vw - 16px);
   padding: 12px;
@@ -750,7 +750,7 @@ summary:focus-visible,
   font-size: var(--text-xs);
 }
 .crossfade-popover button,
-.redaction-context-menu button {
+.editor-context-menu button {
   color: inherit;
   background: transparent;
   border: 0;
@@ -759,4 +759,31 @@ summary:focus-visible,
 }
 .crossfade-popover button {
   align-self: flex-end;
+}
+
+.editor-context-menu {
+  min-width: 190px;
+  padding: 5px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+.editor-context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 3px;
+  padding: 7px 10px;
+}
+.editor-context-menu button:not(:disabled):is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--color-accent) 22%, var(--color-bg-secondary));
+  outline: none;
+}
+.editor-context-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.editor-context-menu [role='separator'] {
+  height: 1px;
+  background: var(--color-border);
+  margin: 5px;
 }

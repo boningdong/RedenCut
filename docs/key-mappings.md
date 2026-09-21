@@ -75,7 +75,8 @@ Moving a trimmed overlay translates its full stored range, preserving hidden met
 
 New redactions start with a 30 ms equal-power crossfade; existing redactions without settings keep their previous behavior.
 Right-click an overlay, or use Shift+F10/the context-menu key while it is focused, then choose Edit crossfade to open its floating editor.
-The single menu entry leads to an editor containing enable, duration and curve controls; disabling preserves the chosen settings.
+The Edit crossfade entry leads to an editor containing enable, duration and curve controls; disabling preserves the chosen settings.
+Remove redact restores that overlay’s audio coverage as one undoable edit.
 The editor appears above the visible overlay when space permits, flips below or clamps inside the viewport, and closes when the anchor leaves view.
 Idle and ordinarily selected overlays hide crossfade envelopes and handles; only crossfade editing exposes those controls.
 Drag either crossfade handle to change both adjacent region widths together; release commits one undoable edit, and Escape cancels the active gesture.
@@ -141,9 +142,25 @@ The Mute and Solo header icons preserve their existing semantics and shortcuts; 
 
 Linked masters show an explicit Mix role, member count and expandable child hierarchy; the child × remains Delete Track, while unlinking is a separate management action.
 At most six independent tracks can be linked. Linked master rows are slightly taller (80 px versus the ordinary 64 px), with centered waveforms: intervals using up to three sources use parallel stacked waveforms; intervals using four through six sources use one theme-accent illustrative waveform.
-Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement opens its visible interval directly.
+Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement selects its visible interval.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
-Range edge handles adjust only the selection; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.
+Applied-replacement edge handles adjust its audio coverage; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.
 The persistent replacement entry reveals the selected Mix range before opening its floating editor.
 
 Selecting a linked Mix interval does not open its source editor. Ordinary range selections have no resize grips; selecting an applied replacement reveals grips that resize that replacement while preserving its sources (one undo per drag). Use Edit replacement or the context menu to open its editor. Narrow intervals use an icon shortcut. The source editor stays outside the master lane, preferring the space above it; displayed bounds use two decimal places without rounding unchanged audio boundaries.
+## Context Menus
+
+Right-click selected transcript text for Redact selection or Copy text; redaction keeps the existing occurrence and acoustic-boundary confirmation rules.
+Right-click redacted speech to remove its owning overlay; overlapping overlays are listed by their visible timeline intervals so the user can choose one explicitly.
+Removing an overlay restores its entire coverage, which can extend beyond the clicked word; it does not change ordinary clip mute.
+
+Right-click a clip for Split at playhead, Mute/Unmute, Copy, Cut, Duplicate, Paste at playhead and Delete.
+A timeline range also exposes Redact selected range on an intersecting clip in its target track; it applies to the range across that track’s intersecting clips, preserving gaps.
+Right-clicking an already selected clip retains multi-selection; other clips become the selection.
+Right-clicking a blank lane offers Paste at playhead without discarding the existing selection; choosing Paste targets that lane.
+Opening a context menu never seeks the playhead.
+Split requires one selected clip and a playhead strictly inside its bounds.
+
+Context menus omit shortcut labels.
+Arrow keys move between enabled commands, Home/End select the first/last enabled command, Enter or Space activates it, and Escape dismisses and restores focus.
+Menus close on outside pointer interaction, viewport scrolling or resizing; keyboard input inside them cannot trigger background editor commands.

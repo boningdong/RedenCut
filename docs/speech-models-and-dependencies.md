@@ -12,7 +12,7 @@ Settings and onboarding now use ResourceManager to download the fixed multilingu
 They do not discover or migrate developer caches described below.
 The native executable/Python runtime is prepared by the managed runtime scripts for development and release-resource staging; signed application packaging and distribution remain separate release work.
 Downloads are staged, integrity checked and load-tested before installation, and can be canceled/resumed without changing existing project results.
-The optional diarization model requires explicit Hugging Face file-access verification; credentials are platform-protected and never passed to normal inference.
+Development acquisition of the optional diarization model requires HF access through runtime:setup; the application only validates and loads it offline. Packaged releases include the model.
 Public files have pinned hashes in models.json; gated metadata must be verified with authorized immutable-revision metadata where public hashes are unavailable.
 The base transcription model is the pinned multilingual base candidate; this integration does not establish production quality/performance acceptance.
 The previous shell provisioning commands remain developer/harness utilities rather than the application's model discovery mechanism.
@@ -250,7 +250,7 @@ When adding or replacing a speech dependency, update this document in the same c
 
 Non-bundled builds show read-only tool and Python import checks in Settings and onboarding.
 Run `npm run runtime:setup` at the current project root, then click Validate in the app.
-This prepares `.runtime/<platform>-<arch>` with FFmpeg, FFprobe, whisper-cli and a Python environment; it does not download models.
+This prepares `.runtime/<platform>-<arch>` with FFmpeg, FFprobe, whisper-cli and a Python environment, and prepares optional diarization under `.runtime/models/diarization/<revision>`.
 The setup command obtains its pinned uv tool; developers and end users do not need a separately installed uv for inference.
 `speech:native:setup` remains a compatibility alias for existing scripts and older instructions, not a harness-specific requirement.
 Model preparation is blocked until the required runtime checks pass; uv itself is only needed for environment setup.
@@ -260,19 +260,20 @@ Bundled builds omit developer instructions and validate their supplied runtime i
 
 Environment checks publish each item's checking/completed state through resource snapshots; completed tools need not wait visually for Python library imports.
 The resource section headers share one icon/title scale, and collapsing text-editing details never changes feature preferences or active preparation.
-Development-only model authorization can detect the active Hugging Face login using HF_TOKEN (then legacy HUGGING_FACE_HUB_TOKEN), HF_TOKEN_PATH, HF_HOME/token, or the documented XDG/default cache location.
-Detection returns only a found/missing/unavailable status, never credentials or token fragments.
-The credential boundary accepts both personal access tokens and longer CLI OAuth tokens, with a shared 16 KiB input limit and safe bearer characters; local detection does not establish validity, expiry, or model permissions.
-Explicit use validates access to every required pinned model file and saves an encrypted app copy only after success.
-Removing the app copy does not log the developer out of the CLI; packaged builds do not read local CLI credentials.
-Reference: https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables
+Diarization acquisition happens only in `npm run runtime:setup`, never in onboarding or Settings.
+The CLI guides registration and acceptance on the HF model page, then reads a hidden token or explicitly configured/local HF credentials.
+Use `--skip-models` to continue without speaker recognition, `--models-only` to provision after installing the runtime, and `--import-model <directory>` to reuse a legacy installation after pinned-file verification and an offline load check.
+The CLI stores no token in `.runtime`; inference runs offline without authentication.
+The development Runtime panel displays the path and validates the installed model; missing or invalid files point back to the CLI.
+`REDENCUT_MODELS_ROOT` explicitly overrides the development model root; packaged builds ignore it and use `resources/models`.
+Native runtime availability remains independent of this optional model.
 
 ### Model preparation entry points
 
-For the app, use Download in Text editing, then authorize speaker recognition and return to the resource panel to download its model. Authorization checks permissions only; the download is a separate explicit action with progress in the resource panel.
-`npm run runtime:setup` prepares the complete managed development runtime; `setup:speech` remains a compatibility alias.
-`npm run setup:speech-models` is the standalone worker model-provisioning command; `speech:native:provision` remains a compatibility alias for existing developer scripts and older instructions.
-This command uses `REDENCUT_SPEECH_MODEL_CACHE` or the standalone worker cache documented above, and does not populate the app ResourceManager. App users should use the UI download flow rather than this command.
+For the app, use Download in Text editing for Whisper and alignment models.
+`npm run runtime:setup` prepares the managed runtime and diarization model; `setup:speech` remains a compatibility alias.
+`npm run setup:speech-models` remains a separate standalone worker provisioning tool; it does not populate the application's model roots.
+Release resource staging requires verified diarization weights and bundled license/attribution material; the full installer compliance/signing audit is a separate release gate.
 
 ### Resetting development app data
 

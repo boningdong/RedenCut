@@ -84,6 +84,8 @@ describe('WaveformView managed providers', () => {
     expect(screen.queryByLabelText('Mute Linked microphone')).toBeNull()
     const before = useTimelineStore.getState().selectedTrackId
     fireEvent.click(childLane)
+    fireEvent.contextMenu(childLane)
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(useTimelineStore.getState().selectedTrackId).toBe(before)
     const linkButton = screen.getByLabelText('Linked recordings')
     expect(linkButton.getAttribute('aria-pressed')).toBe('true')
@@ -135,6 +137,10 @@ describe('WaveformView managed providers', () => {
       />,
     )
     expect(screen.getAllByText('Replace audio…')).toHaveLength(2)
+    fireEvent.contextMenu(container.querySelector(`[data-lane="${mix.id}"] .waveform-clip`)!)
+    expect(screen.getByRole('menuitem', { name: 'Replace audio…' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: 'Redact selected range' })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
     expect(container.querySelector('[data-range-handle]')).toBeNull()
     const reveal = vi.fn()
     container.querySelector('.mix-replace-trigger')!.scrollIntoView = reveal

@@ -78,7 +78,7 @@ git clone https://github.com/boningdong/RedenCut.git
 cd RedenCut
 npm ci
 
-# Build and install the complete managed audio/Python runtime.
+# Prepare the audio/Python runtime and optional speaker model.
 npm run runtime:setup
 npm run runtime:check
 
@@ -87,13 +87,15 @@ npm run dev
 ```
 
 We recommend installing the local AI tools for the full transcript-based editing experience.
-The managed runtime supplies the native tools and Python dependencies together; AI models are downloaded separately.
+The setup command supplies the native tools, Python dependencies and optional diarization model together.
+Whisper and alignment models are downloaded in the app.
 You can skip AI model downloads and use RedenCut solely for waveform and multitrack audio editing.
 Choose to skip speech preparation during onboarding; transcription, text-based editing, and speaker analysis will remain unavailable until you complete setup.
 You can enable these features later through Settings after preparing the required models.
 
-For text based editing, open **Settings → Speech & resources**, validate the development environment, and download the text-editing models.
-Optional speaker recognition has a separate authorization and model-download step.
+For text based editing, open **Settings → Models & dependencies**, validate the development environment, and download the text-editing models.
+For optional speaker recognition in development, run `npm run runtime:setup` to prepare the managed model, then validate it under Runtime.
+Release builds include this model and expose only the speaker-recognition toggle.
 The app's model preparation does not install native executables or the Python environment.
 
 See [speech models and dependencies](docs/speech-models-and-dependencies.md) for managed runtime, model caches, and setup details.
@@ -133,11 +135,14 @@ Audio decoding, transcription, alignment, speaker analysis, and export run local
 Once the required runtimes and models are installed, normal speech inference uses offline model loading and does not need a cloud transcription service.
 Initial dependency installation and model downloads require internet access.
 
-Optional speaker separation requires your own Hugging Face account, acceptance of the model's access conditions, and authorization in the app.
-The app encrypts its saved credential with Electron's platform-backed storage and does not pass it to inference workers.
-Model authorization and downloading are separate actions.
+In local development, `npm run runtime:setup` guides you through Hugging Face access when the diarization model is missing.
+Accept the model's conditions with your own account; supply a read token through the CLI's hidden prompt, `HF_TOKEN`, or an existing local HF login.
+Verified models are reused without authentication and stored in `.runtime/models/diarization/<revision>/`, outside Git.
+Use `npm run runtime:setup -- --skip-models` to skip this optional asset, or `--models-only` to prepare it after the native runtime is installed.
+Settings and onboarding show model validation under Runtime; they never request or save HF credentials.
+Packaged releases include the model, so end users only control the speaker-recognition switch.
 
-Download app models through Settings or onboarding.
+Download Whisper and alignment models through Settings or onboarding.
 `npm run setup:speech-models` provisions a separate developer worker cache; it does **not** populate the app's managed model library.
 
 Model revisions, dependencies, access requirements, and environment details are recorded in [speech models and dependencies](docs/speech-models-and-dependencies.md) and the [model manifest](speech-worker/models.json).

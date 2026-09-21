@@ -12,12 +12,15 @@ import type {
   ResourcePreparation,
   ResourceCapability,
 } from '../../shared/resources.types'
-import type { HuggingFaceAccessService } from '../speech/huggingface/HuggingFaceAccessService'
+import type { ManagedModelState } from '../../shared/developmentEnvironment.types'
 import type { ModelRegistry } from './ModelRegistry'
 import { ModelDownloader } from './ModelDownloader'
 import { resourcePaths } from './resourcePaths'
 export class ResourceManager {
+  private readonly lifetime = new AbortController()
   private resources: ResourceState[]
+  private managedState?: ManagedModelState
+  private reading: Promise<ResourceSnapshot> | null = null
   private development?: DevelopmentEnvironment
   private revision = 0
   private selectedWhisperModelId?: string
@@ -31,7 +34,6 @@ export class ResourceManager {
     models: ModelDefinition[],
     readonly registry: ModelRegistry,
     private readonly downloader = new ModelDownloader(),
-    private readonly access?: HuggingFaceAccessService,
     private readonly validateLoad: ((
       model: ModelDefinition,
       path: string,
@@ -45,6 +47,7 @@ export class ResourceManager {
     this.models = models.filter((m) => m.capability !== 'transcription-smoke')
     this.selectedWhisperModelId = selectWhisperDefinition(this.models)?.id
     this.resources = this.models.map((m) => ({
+      ...(registry.managedPath(m) ? { source: registry.managed!.source } : {}),
       id: m.id,
       capability: m.capability as ResourceCapability,
       status: 'missing',
@@ -61,7 +64,9 @@ export class ResourceManager {
   private snapshot(): ResourceSnapshot {
     return {
       revision: this.revision,
-      ...(this.development ? { development: this.development } : {}),
+      ...(this.development
+        ? { development: { ...this.development, diarization: this.managedState } }
+        : {}),
       selectedWhisperModelId: this.selectedWhisperModelId,
       whisperModels: this.models.flatMap((m) =>
         m.capability === 'transcription' && m.selection
@@ -79,7 +84,15 @@ export class ResourceManager {
     const snapshot = this.snapshot()
     for (const listener of this.listeners) listener(snapshot)
   }
-  async read({ refreshEnvironment = true } = {}): Promise<ResourceSnapshot> {
+  read({ refreshEnvironment = true } = {}): Promise<ResourceSnapshot> {
+    if (this.lifetime.signal.aborted) return Promise.resolve(this.snapshot())
+    if (this.reading) return this.reading
+    this.reading = this.refresh(refreshEnvironment).finally(() => {
+      this.reading = null
+    })
+    return this.reading
+  }
+  private async refresh(refreshEnvironment: boolean): Promise<ResourceSnapshot> {
     await this.ensureHydrated()
     if (this.environment && !this.active && (refreshEnvironment || !this.development)) {
       this.development = await this.environment.check((state) => {
@@ -88,9 +101,11 @@ export class ResourceManager {
       })
       this.emit()
     }
+    if (!this.active && (refreshEnvironment || !this.managedState)) await this.refreshManagedModel()
     if (!this.active) {
       let changed = false
       for (const model of this.models) {
+        if (this.registry.managedPath(model)) continue
         const state = this.resources.find((r) => r.id === model.id)!
         if (state.status === 'ready' && !(await this.registry.resolve(model))) {
           state.status = 'missing'
@@ -102,6 +117,50 @@ export class ResourceManager {
     }
     return this.snapshot()
   }
+  private async refreshManagedModel(): Promise<void> {
+    if (this.lifetime.signal.aborted) return
+    const model = this.models.find((m) => this.registry.managedPath(m))
+    if (!model) return
+    const directory = this.registry.managedPath(model)!
+    const state = this.resources.find((r) => r.id === model.id)!
+    this.managedState = {
+      id: model.id,
+      revision: model.revision,
+      path: join(this.registry.managed!.displayRoot, 'diarization', model.revision)
+        .split('\\')
+        .join('/'),
+      status: 'checking',
+    }
+    state.status = 'verifying'
+    delete state.error
+    this.emit()
+    let exists = false
+    try {
+      exists = (await stat(directory)).isDirectory()
+    } catch {
+      /* Not installed. */
+    }
+    const path = await this.registry.resolve(model)
+    if (!path) {
+      this.managedState.status = exists ? 'invalid' : 'missing'
+      state.status = exists ? 'failed' : 'missing'
+      state.error = exists ? 'managed-model-invalid' : 'managed-model-required'
+      state.downloadedBytes = 0
+    } else {
+      try {
+        await this.validateLoad(model, path, this.lifetime.signal)
+        this.managedState.status = 'ready'
+        state.status = 'ready'
+        state.downloadedBytes = state.totalBytes!
+      } catch {
+        this.managedState.status = 'invalid'
+        state.status = 'failed'
+        state.error = 'managed-model-invalid'
+        state.downloadedBytes = 0
+      }
+    }
+    this.emit()
+  }
   private ensureHydrated(): Promise<void> {
     return (this.hydrated ??= this.hydrate())
   }
@@ -112,6 +171,7 @@ export class ResourceManager {
       preferences?.whisperModelId,
     )?.id
     for (const model of this.models) {
+      if (this.registry.managedPath(model)) continue
       const state = this.resources.find((r) => r.id === model.id)!
       if (await this.registry.resolve(model)) {
         state.status = 'ready'
@@ -156,6 +216,7 @@ export class ResourceManager {
   }
 
   prepare(target: ResourcePreparation): Promise<ResourceSnapshot> {
+    if (this.lifetime.signal.aborted) return Promise.resolve(this.snapshot())
     if (this.selecting) return Promise.reject(new Error('resources-busy'))
     if (this.preparing) return this.preparing
     this.preparing = this.start(target).finally(() => {
@@ -165,9 +226,17 @@ export class ResourceManager {
   }
   private async start(target: ResourcePreparation): Promise<ResourceSnapshot> {
     await this.read({ refreshEnvironment: false })
+    if (this.lifetime.signal.aborted) return this.snapshot()
     if (this.active) return this.snapshot()
-    if (target === 'diarization' && !this.snapshot().baseReady)
-      throw new Error('base-resources-required')
+    if (target === 'diarization') {
+      if (
+        this.resources
+          .filter((r) => r.capability === 'diarization')
+          .every((r) => r.status === 'ready')
+      )
+        return this.snapshot()
+      throw new Error('managed-model-required')
+    }
     if (
       typeof target === 'object' &&
       !this.models.some((m) => m.id === target.modelId && m.capability === 'transcription')
@@ -196,10 +265,8 @@ export class ResourceManager {
       this.emit()
       return this.snapshot()
     }
-    const token = target === 'diarization' ? await this.access?.downloadToken() : undefined
-    if (target === 'diarization' && !token) throw new Error('access-denied')
     const controller = new AbortController()
-    const done = this.run(selected, controller.signal, token).finally(() => {
+    const done = this.run(selected, controller.signal).finally(() => {
       this.active = null
     })
     this.active = { controller, done }
@@ -273,7 +340,6 @@ export class ResourceManager {
           state.error = ['access-denied', 'integrity-failed'].includes(reason)
             ? reason
             : 'download-failed'
-          if (reason === 'access-denied') this.access?.revoke()
         }
         for (const queued of this.resources)
           if (queued.id !== state.id && queued.status === 'verifying')
@@ -283,6 +349,11 @@ export class ResourceManager {
       }
     }
   }
+  async shutdown(): Promise<void> {
+    this.lifetime.abort()
+    this.active?.controller.abort()
+    await Promise.allSettled([this.reading, this.preparing, this.active?.done])
+  }
   async cancel(): Promise<ResourceSnapshot> {
     await this.preparing?.catch(() => {})
     this.active?.controller.abort()
@@ -290,8 +361,14 @@ export class ResourceManager {
     return this.read({ refreshEnvironment: false })
   }
   async getModelPaths(): Promise<Record<string, string>> {
+    await this.read({ refreshEnvironment: false })
     const paths: Record<string, string> = {}
     for (const model of this.models) {
+      if (
+        this.registry.managedPath(model) &&
+        this.resources.find((r) => r.id === model.id)?.status !== 'ready'
+      )
+        continue
       const path = await this.registry.resolve(model)
       if (path) paths[model.id] = path
     }

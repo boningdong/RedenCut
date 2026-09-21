@@ -4,6 +4,7 @@ export type ResourceCapability = 'transcription' | 'alignment' | 'diarization'
 type ResourceStatus = 'missing' | 'downloading' | 'verifying' | 'paused' | 'ready' | 'failed'
 export interface ResourceState {
   id: string
+  source?: 'development-runtime' | 'bundled'
   capability: ResourceCapability
   status: ResourceStatus
   downloadedBytes: number
