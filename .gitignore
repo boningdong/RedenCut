@@ -1,5 +1,5 @@
 # ── Dependencies ──────────────────────────────────────────────────────────────
-node_modules/
+node_modules
 
 # ── Brainstorm sessions ───────────────────────────────────────────────────────
 .superpowers/
@@ -32,6 +32,6 @@ dist-electron/
 *.swo
 
 # Managed native runtime and build artifacts
-.runtime/
+.runtime
 .runtime-build/
 .runtime-cache/
