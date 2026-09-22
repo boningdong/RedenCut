@@ -120,13 +120,18 @@ it.each([1, 3, 6])('fills available replacement height with %i real source rows'
   expect(container.querySelector('svg')).toBeNull()
 })
 
-it('draws the processed composite in output coordinates while preserving six source overlays', () => {
-  const provider = {} as WaveformDataProvider
-  const { container } = setup(6, 40, false, 6, provider)
-  const waveform = container.querySelector('[data-processed-waveform] [data-canvas-start]')!
-  expect(waveform.getAttribute('data-canvas-start')).toBe('5')
-  expect(waveform.getAttribute('data-canvas-scale')).toBe('1.7')
-  expect(waveform.getAttribute('data-canvas-gain')).toBe('2')
-  expect(container.querySelectorAll('[data-canvas-start]')).toHaveLength(1)
-  expect(container.querySelectorAll('[data-source-override="replace"]')).toHaveLength(6)
-})
+it.each([2, 6])(
+  'draws the processed composite without residual %i-source row decorations',
+  (count) => {
+    const provider = {} as WaveformDataProvider
+    const { container } = setup(count, 40, false, count, provider)
+    const waveform = container.querySelector('[data-processed-waveform] [data-canvas-start]')!
+    expect(waveform.getAttribute('data-canvas-start')).toBe('5')
+    expect(waveform.getAttribute('data-canvas-scale')).toBe('1.7')
+    expect(waveform.getAttribute('data-canvas-gain')).toBe('2')
+    expect(container.querySelectorAll('[data-canvas-start]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-waveform-track]')).toHaveLength(0)
+    expect(container.querySelectorAll('.mix-participant')).toHaveLength(count)
+    expect(screen.getByRole('button', { name: /Sources: s0/ })).toBeTruthy()
+  },
+)

@@ -65,63 +65,64 @@ export function MixClipWaveform({
           />
         </div>
       )}
-      {spans.map((span, index) => {
-        const provider = providers.get(span.audioSourceId)
-        const track = tracks.find((item) => item.id === span.trackId)
-        if (!provider || !track) return null
-        const override = clip.sourceOverrides?.find(
-          (item) =>
-            Math.round(item.sourceStart * 48000) <= Math.round(span.masterSourceStart * 48000) &&
-            Math.round(item.sourceEnd * 48000) >= Math.round(span.masterSourceEnd * 48000),
-        )
-        const row = override?.stemTrackIds.indexOf(span.trackId) ?? 0
-        const rows = override?.stemTrackIds.length ?? 1
-        const outputStart = clip.outputStart + span.masterSourceStart - clip.sourceStart
-        const visible = calculateVisibleWaveformRange({
-          outputStart,
-          sourceStart: span.sourceStart,
-          sourceEnd: span.sourceEnd,
-          pxPerSec,
-          viewportStartPx: viewport.scrollLeft,
-          viewportWidthPx: viewport.width,
-        })
-        if (!visible) return null
-        const color = trackPresentationColor(track.color)
-        return (
-          <div
-            key={index}
-            data-source-override={override?.id}
-            data-waveform-track={track.id}
-            style={{
-              position: 'absolute',
-              left: (outputStart - clip.outputStart) * pxPerSec,
-              width: (span.sourceEnd - span.sourceStart) * pxPerSec,
-              top: `calc(${override ? (row * 100) / rows : 0}% - ${override ? (row * captionHeight) / rows : 0}px)`,
-              height: `calc(${100 / rows}% - ${captionHeight / rows}px)`,
-              borderTop: override ? `1px solid ${color}` : undefined,
-              boxSizing: 'border-box',
-              pointerEvents: 'none',
-              overflow: 'hidden',
-              background: override ? `color-mix(in srgb, ${color} 8%, transparent)` : undefined,
-            }}
-          >
-            {!displayProvider && (
-              <CanvasWaveform
-                provider={provider}
-                sourceStartSeconds={visible.sourceStartSeconds}
-                sourceEndSeconds={visible.sourceEndSeconds}
-                leftInClipPx={visible.leftInClipPx}
-                widthPx={visible.widthPx}
-                amplitudeScale={override ? undefined : waveformScale}
-                gain={waveformGain}
-                topPx={0}
-                color={color}
-                muted={clip.muted}
-              />
-            )}
-          </div>
-        )
-      })}
+      {!displayProvider &&
+        spans.map((span, index) => {
+          const provider = providers.get(span.audioSourceId)
+          const track = tracks.find((item) => item.id === span.trackId)
+          if (!provider || !track) return null
+          const override = clip.sourceOverrides?.find(
+            (item) =>
+              Math.round(item.sourceStart * 48000) <= Math.round(span.masterSourceStart * 48000) &&
+              Math.round(item.sourceEnd * 48000) >= Math.round(span.masterSourceEnd * 48000),
+          )
+          const row = override?.stemTrackIds.indexOf(span.trackId) ?? 0
+          const rows = override?.stemTrackIds.length ?? 1
+          const outputStart = clip.outputStart + span.masterSourceStart - clip.sourceStart
+          const visible = calculateVisibleWaveformRange({
+            outputStart,
+            sourceStart: span.sourceStart,
+            sourceEnd: span.sourceEnd,
+            pxPerSec,
+            viewportStartPx: viewport.scrollLeft,
+            viewportWidthPx: viewport.width,
+          })
+          if (!visible) return null
+          const color = trackPresentationColor(track.color)
+          return (
+            <div
+              key={index}
+              data-source-override={override?.id}
+              data-waveform-track={track.id}
+              style={{
+                position: 'absolute',
+                left: (outputStart - clip.outputStart) * pxPerSec,
+                width: (span.sourceEnd - span.sourceStart) * pxPerSec,
+                top: `calc(${override ? (row * 100) / rows : 0}% - ${override ? (row * captionHeight) / rows : 0}px)`,
+                height: `calc(${100 / rows}% - ${captionHeight / rows}px)`,
+                borderTop: override ? `1px solid ${color}` : undefined,
+                boxSizing: 'border-box',
+                pointerEvents: 'none',
+                overflow: 'hidden',
+                background: override ? `color-mix(in srgb, ${color} 8%, transparent)` : undefined,
+              }}
+            >
+              {!displayProvider && (
+                <CanvasWaveform
+                  provider={provider}
+                  sourceStartSeconds={visible.sourceStartSeconds}
+                  sourceEndSeconds={visible.sourceEndSeconds}
+                  leftInClipPx={visible.leftInClipPx}
+                  widthPx={visible.widthPx}
+                  amplitudeScale={override ? undefined : waveformScale}
+                  gain={waveformGain}
+                  topPx={0}
+                  color={color}
+                  muted={clip.muted}
+                />
+              )}
+            </div>
+          )
+        })}
       {(clip.sourceOverrides ?? []).map((override) => {
         const start = Math.max(clip.sourceStart, override.sourceStart)
         const end = Math.min(clip.sourceEnd, override.sourceEnd)
