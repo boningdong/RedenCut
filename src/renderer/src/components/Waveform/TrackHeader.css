@@ -145,12 +145,29 @@
   font: inherit;
 }
 
+.track-header .track-controls .track-effects-trigger {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 0;
+}
 .track-header .track-controls .track-effects-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  border-right: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   font:
     italic 600 12px Georgia,
     serif;
   letter-spacing: -1px;
   padding-right: 1px;
+}
+.track-header .track-controls .track-effects-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
 }
 .track-header .track-remove {
   flex-shrink: 0;

@@ -29,8 +29,10 @@ export function TrackEffectsMenu({
         <span className="track-effects-symbol" aria-hidden="true">
           fx
         </span>
-        <span>{t('waveform.effects')}</span>
-        <Icon name="chevron" size={10} />
+        <span className="track-effects-label">
+          <span>{t('waveform.effects')}</span>
+          <Icon name="chevron" size={10} />
+        </span>
       </button>
       {open && (
         <TrackControlPopover
