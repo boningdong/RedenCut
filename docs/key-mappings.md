@@ -176,6 +176,8 @@ Gain is a post-effect adjustment in dB; Volume retains the output percentage con
 The speech-leveling effect is labeled Auto Level in English and 人声均衡 in Simplified Chinese.
 Effects shows an icon and dropdown arrow; any enabled effect highlights the trigger and Auto Level exposes a persistent checked menu item.
 Auto Level balances speech levels on the composed track, including replacement audio; disabling it preserves settings and source recordings.
+It follows the track's own active-level reference rather than raising the entire program to a fixed LUFS target; manual Gain remains a separate post-effect adjustment.
+During preparation, the waveform status distinguishes audio processing from waveform generation and shows measured progress when available; the previous waveform remains visible until the new result is ready.
 Playback preparation announces its pending state in the transport; processing errors surface through the existing player error path.
 
 Volume and Gain sliders audition their current value during a drag without saving each movement.

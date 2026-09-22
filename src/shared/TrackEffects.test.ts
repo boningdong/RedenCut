@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createEmptyProject, ProjectFileSchema, TrackSchema } from './ProjectTypes'
-import {
-  getNormalizeEffect,
-  NORMALIZE_DEFAULTS,
-  normalizationFilter,
-  trackGain,
-} from './TrackEffects'
+import { getNormalizeEffect, NORMALIZE_DEFAULTS, trackGain } from './TrackEffects'
 
 const effect = {
   id: 'normalize-1',
@@ -69,17 +64,12 @@ describe('track effect contracts', () => {
       TrackSchema.parse({ id: 't', name: 'Voice', effects: [effect, { ...effect, id: 'n2' }] }),
     ).toThrow()
   })
-  it('preserves legacy effects and builds a bounded shared speech filter', () => {
+  it('preserves legacy effects', () => {
     const track = TrackSchema.parse({
       id: 't',
       name: 'Voice',
       effects: [{ id: 'eq', type: 'eq', enabled: false, params: { frequency: 120 } }],
     })
     expect(track.effects[0].params).toEqual({ frequency: 120 })
-    expect(normalizationFilter(NORMALIZE_DEFAULTS)).toContain('dynaudnorm=')
-    expect(normalizationFilter(NORMALIZE_DEFAULTS)).toContain(
-      'loudnorm=I=-16:TP=-1.5:LRA=7:linear=false',
-    )
-    expect(normalizationFilter(NORMALIZE_DEFAULTS)).toMatch(/aresample=48000$/)
   })
 })

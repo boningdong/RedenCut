@@ -1,6 +1,6 @@
 import type { Track } from '@shared/ProjectTypes'
 import type { SessionPrecondition } from '@shared/session.types'
-import type { PreparedTrackDescriptor } from '@shared/PreparedAudioTypes'
+import type { PreparedAudioProgress, PreparedTrackDescriptor } from '@shared/PreparedAudioTypes'
 import { useEditorStore } from '../../stores/editor.store'
 import type { WaveformDataProvider, WaveformRangeRequest } from './WaveformDataProvider'
 
@@ -12,31 +12,59 @@ export class PreparedWaveformProvider implements WaveformDataProvider {
   private disposed = false
   constructor(private readonly session: SessionPrecondition) {}
 
-  async prepare(tracks: Track[], trackId: string): Promise<void> {
-    this.descriptor = await this.currentRevision((session) =>
-      window.electronAPI.preparedAudio.prepare({
-        ...session,
-        requestId: this.requestId,
-        tracks,
-        trackId,
-        mode: 'timeline',
-      }),
-    )
-    if (this.disposed) {
-      await this.release()
-      throw new DOMException('Waveform preparation cancelled', 'AbortError')
+  async prepare(
+    tracks: Track[],
+    trackId: string,
+    onProgress?: (progress: PreparedAudioProgress) => void,
+  ): Promise<void> {
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const poll = async () => {
+      if (stopped || this.disposed || !onProgress || !window.electronAPI.preparedAudio.progress)
+        return
+      try {
+        const progress = await this.currentRevision((session) =>
+          window.electronAPI.preparedAudio.progress({ ...session, requestId: this.requestId }),
+        )
+        if (!stopped && !this.disposed && progress) onProgress(progress)
+      } catch {
+        /* Preparation reports failures; progress is advisory. */
+      }
+      if (!stopped && !this.disposed)
+        timer = setTimeout(() => {
+          void poll()
+        }, 250)
     }
-    const result = await this.currentRevision((session) =>
-      window.electronAPI.preparedAudio.waveform({
-        ...session,
-        requestId: this.requestId,
-        handle: this.descriptor!.handle,
-        startFrame: 0,
-        endFrame: this.descriptor!.frameCount,
-        targetBuckets: 1,
-      }),
-    )
-    this.peak = result.peak
+    void poll()
+    try {
+      this.descriptor = await this.currentRevision((session) =>
+        window.electronAPI.preparedAudio.prepare({
+          ...session,
+          requestId: this.requestId,
+          tracks,
+          trackId,
+          mode: 'timeline',
+        }),
+      )
+      if (this.disposed) {
+        await this.release()
+        throw new DOMException('Waveform preparation cancelled', 'AbortError')
+      }
+      const result = await this.currentRevision((session) =>
+        window.electronAPI.preparedAudio.waveform({
+          ...session,
+          requestId: this.requestId,
+          handle: this.descriptor!.handle,
+          startFrame: 0,
+          endFrame: this.descriptor!.frameCount,
+          targetBuckets: 1,
+        }),
+      )
+      this.peak = result.peak
+    } finally {
+      stopped = true
+      if (timer !== undefined) clearTimeout(timer)
+    }
   }
   async getPeak(): Promise<number> {
     return this.peak

@@ -98,6 +98,12 @@ const api = {
     },
   },
   preparedAudio: {
+    progress: (request) =>
+      invokeSafe<Awaited<ReturnType<PreparedAudioAPI['progress']>>>(
+        invoke,
+        'effects:progress',
+        request,
+      ),
     waveform: (request) =>
       invokeSafe<Awaited<ReturnType<PreparedAudioAPI['waveform']>>>(
         invoke,

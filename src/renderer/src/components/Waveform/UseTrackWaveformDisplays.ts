@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { PreparedAudioProgress } from '@shared/PreparedAudioTypes'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import { getNormalizeEffect } from '@shared/TrackEffects'
 import { useEditorStore } from '../../stores/editor.store'
@@ -8,6 +9,7 @@ import { useWaveformDisplayStore } from './WaveformDisplayState'
 
 export interface TrackWaveformDisplay {
   provider?: WaveformDataProvider
+  progress?: PreparedAudioProgress
   updating: boolean
   failed: boolean
   peak?: number
@@ -106,7 +108,11 @@ export function useTrackWaveformDisplays(
       // Ignore unrelated track extent and effects while retaining every linked source.
       const relevant = processingTracks.filter((item) => related.has(item.id))
       void pending
-        .prepare(relevant, track.id)
+        .prepare(relevant, track.id, (progress) => {
+          if (entries.current.get(track.id) !== entry) return
+          entry.progress = progress
+          publish()
+        })
         .then(async () => {
           const peak = await pending.getPeak()
           if (entries.current.get(track.id) !== entry) {

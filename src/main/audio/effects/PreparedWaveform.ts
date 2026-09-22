@@ -58,6 +58,14 @@ export class PreparedWaveform {
     frameCount: number,
     signal: AbortSignal,
   ): Promise<PreparedWaveform> {
+    const builder = PreparedWaveform.builder(path, channels, frameCount, signal)
+    for await (const { frames, bytes } of readPcmFrames(path, channels, 0, frameCount, signal))
+      builder.append(bytes.subarray(0, frames * channels * 4))
+    return builder.finish()
+  }
+
+  /** Accumulates the bounded index while the final PCM is written. */
+  static builder(path: string, channels: number, frameCount: number, signal: AbortSignal) {
     const framesPerBucket = Math.max(1, Math.ceil(frameCount / 65536))
     const base = new Float32Array(Math.ceil(frameCount / framesPerBucket) * 2)
     for (let i = 0; i < base.length; i += 2) {
@@ -65,35 +73,49 @@ export class PreparedWaveform {
       base[i + 1] = -Infinity
     }
     let peak = 0
-    for await (const { start, frames, bytes } of readPcmFrames(
-      path,
-      channels,
-      0,
-      frameCount,
-      signal,
-    )) {
-      for (let frame = 0; frame < frames; frame++) {
-        const bucket = Math.floor((start + frame) / framesPerBucket) * 2
-        for (let channel = 0; channel < channels; channel++) {
-          const value = bytes.readFloatLE((frame * channels + channel) * 4)
-          if (!Number.isFinite(value)) throw new Error('Non-finite prepared PCM')
-          base[bucket] = Math.min(base[bucket], value)
-          base[bucket + 1] = Math.max(base[bucket + 1], value)
-          peak = Math.max(peak, Math.abs(value))
+    let completed = 0
+    return {
+      append(bytes: Buffer): void {
+        signal.throwIfAborted()
+        if (bytes.length % (channels * 4)) throw new Error('Unaligned prepared PCM')
+        const frames = bytes.length / (channels * 4)
+        if (completed + frames > frameCount) throw new Error('Prepared PCM duration mismatch')
+        for (let frame = 0; frame < frames; frame++) {
+          const bucket = Math.floor((completed + frame) / framesPerBucket) * 2
+          for (let channel = 0; channel < channels; channel++) {
+            const value = bytes.readFloatLE((frame * channels + channel) * 4)
+            if (!Number.isFinite(value)) throw new Error('Non-finite prepared PCM')
+            base[bucket] = Math.min(base[bucket], value)
+            base[bucket + 1] = Math.max(base[bucket + 1], value)
+            peak = Math.max(peak, Math.abs(value))
+          }
         }
-      }
+        completed += frames
+      },
+      finish(): PreparedWaveform {
+        signal.throwIfAborted()
+        if (completed !== frameCount) throw new Error('Prepared PCM duration mismatch')
+        const levels = [base]
+        while (levels.at(-1)!.length > 2) {
+          const previous = levels.at(-1)!
+          const next = new Float32Array(Math.ceil(previous.length / 4) * 2)
+          for (let i = 0; i < next.length; i += 2) {
+            next[i] = Math.min(previous[i * 2], previous[i * 2 + 2] ?? Infinity)
+            next[i + 1] = Math.max(previous[i * 2 + 1], previous[i * 2 + 3] ?? -Infinity)
+          }
+          levels.push(next)
+        }
+        return new PreparedWaveform(
+          path,
+          channels,
+          signal,
+          frameCount,
+          framesPerBucket,
+          levels,
+          peak,
+        )
+      },
     }
-    const levels = [base]
-    while (levels.at(-1)!.length > 2) {
-      const previous = levels.at(-1)!
-      const next = new Float32Array(Math.ceil(previous.length / 4) * 2)
-      for (let i = 0; i < next.length; i += 2) {
-        next[i] = Math.min(previous[i * 2], previous[i * 2 + 2] ?? Infinity)
-        next[i + 1] = Math.max(previous[i * 2 + 1], previous[i * 2 + 3] ?? -Infinity)
-      }
-      levels.push(next)
-    }
-    return new PreparedWaveform(path, channels, signal, frameCount, framesPerBucket, levels, peak)
   }
 
   static validate(

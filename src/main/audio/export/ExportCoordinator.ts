@@ -20,6 +20,7 @@ import {
 } from '../../project/CleanupWarningSink'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
 import { buildRenderArgs } from '../Renderer'
+import { prepareAutoLevelExport } from './PreparedExport'
 
 export interface ExportChild extends EventEmitter {
   stderr: NodeJS.ReadableStream | null
@@ -126,6 +127,7 @@ export class ExportCoordinator {
     request: ExportStartRequest,
   ): Promise<SessionJobResult<boolean, ExportJobId>> {
     const { identity, controller } = active
+    let preparedExport: Awaited<ReturnType<typeof prepareAutoLevelExport>> | undefined
     let temporaryOutput: string | null = null
     let backupOutput: string | null = null
     let temporaryOwned = false
@@ -150,9 +152,23 @@ export class ExportCoordinator {
           throwIfAborted(controller.signal)
         }
         active.state = 'rendering'
+        if (
+          buildAudioRenderPlan(request.project.tracks, 'edited').tracks.some(
+            (track) => track.normalize,
+          )
+        ) {
+          preparedExport = await prepareAutoLevelExport(
+            request.project,
+            sourcePaths,
+            controller.signal,
+          )
+        }
+        throwIfAborted(controller.signal)
         const child = this.dependencies.spawn(
           this.dependencies.ffmpegPath(),
-          buildRenderArgs(request.project, sourcePaths, temporaryOutput),
+          preparedExport
+            ? preparedExport.args(temporaryOutput)
+            : buildRenderArgs(request.project, sourcePaths, temporaryOutput),
         )
         await waitForSuccessfulClose(
           child,
@@ -314,6 +330,11 @@ export class ExportCoordinator {
           active.state = controller.signal.aborted ? 'cancelled' : 'failed'
       }
       const cleanupErrors: unknown[] = []
+      try {
+        await preparedExport?.dispose()
+      } catch (error) {
+        cleanupErrors.push(error)
+      }
       if (temporaryOwned && temporaryOutput) {
         try {
           await this.dependencies.remove(temporaryOutput)

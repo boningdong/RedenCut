@@ -311,7 +311,8 @@ export const englishResources = {
       'Child Redact edits are ignored while linked and restored on unlink. Unlinked tracks and their edits are kept, muted.',
     fitWaveform: 'Fit waveform',
     resetWaveform: 'Reset waveform zoom',
-    updatingWaveform: 'Updating waveform…',
+    processingAudio: 'Processing audio…',
+    buildingWaveform: 'Preparing waveform…',
     failedWaveform: 'Waveform update failed',
     mixMemberCount: '{{count}} linked',
     mixParticipants: '{{count}} sources',
@@ -557,7 +558,7 @@ export const englishResources = {
     done: 'Done!',
     exporting: 'Exporting…',
     cancelling: 'Cancelling…',
-    loudness: 'Loudness target: {{value}} LUFS',
+    trackProcessing: 'Includes track effects, Gain and Volume.',
   },
   workspace: {
     reset: 'Reset layout',

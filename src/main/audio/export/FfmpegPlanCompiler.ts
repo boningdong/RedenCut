@@ -1,4 +1,3 @@
-import { normalizationFilter } from '@shared/TrackEffects'
 import type { AudioContribution, AudioRenderPlan } from '@shared/audio/AudioRenderPlan'
 
 /** Compile the shared sample-domain plan. Clip and track gain each apply once. */
@@ -39,14 +38,12 @@ export function compileFfmpegPlan(
     const label = `track${trackLabels.length}`
     const mix =
       segments.length > 1 ? `amix=inputs=${segments.length}:normalize=0:duration=longest,` : ''
-    const normalize = track.normalize ? `${normalizationFilter(track.normalize)},` : ''
     const gain = track.gainDb ? `volume=${10 ** (track.gainDb / 20)},` : ''
-    // Normalize in the track's own channel layout, exactly as playback preparation does.
-    // Only then adapt mono to the stereo master at Web Audio's unity duplication gain.
+    // This graph renders dry PCM; Auto Level is applied by the shared prepared-track
+    // processor before manual gain in playback and before mixing prepared export inputs.
+    // Adapt mono to the stereo master at Web Audio's unity duplication gain.
     const masterChannels = stereoMix && !stereoTrack ? 'pan=stereo|c0=c0|c1=c0,' : ''
-    parts.push(
-      `${segments.join('')}${mix}${normalize}${masterChannels}${gain}volume=${track.volume}[${label}]`,
-    )
+    parts.push(`${segments.join('')}${mix}${masterChannels}${gain}volume=${track.volume}[${label}]`)
     trackLabels.push(`[${label}]`)
   }
   let output: string

@@ -4,7 +4,7 @@ import { normalizePublicError, publicMessage } from '../../i18n/messages'
 // ExportModal
 //
 // Triggered from the "Export" button in the transport bar area.
-// Shows a format selector, LUFS target, and export progress. Destination
+// Shows a format selector, track-processing summary, and export progress. Destination
 // selection remains main-process owned.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -211,10 +211,10 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
           </select>
         </label>
 
-        {/* LUFS (display only) */}
+        {/* Export uses the current track processing and output levels. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-            {t('export.loudness', { value: draft.export?.targetLUFS ?? -16 })}
+            {t('export.trackProcessing')}
           </span>
         </div>
 

@@ -1,6 +1,7 @@
 import { DEFAULT_WORKSPACE_LAYOUT as layout } from '../shared/workspaceLayout.types'
 import { expect, test, vi } from 'vitest'
 import type { IElectronAPI, PendingProjectOpenEvent } from '../shared/ipc.types'
+import type { WorkspaceToken } from '../shared/session.types'
 
 const mocks = vi.hoisted(() => ({
   api: null as IElectronAPI | null,
@@ -84,4 +85,17 @@ test('app preferences unwrap get/set results and unsubscribe the exact changed l
   await expect(mocks.api!.appPreferences.setLocale('en')).rejects.toMatchObject({
     code: 'operation-failed',
   })
+})
+
+test('prepared audio progress forwards its session-scoped request and unwraps the result', async () => {
+  const { ipcRenderer } = await import('electron')
+  const request = {
+    workspaceToken: 'workspace' as WorkspaceToken,
+    revision: 1,
+    requestId: 'lease',
+  }
+  const progress = { phase: 'waveform', completed: 12, total: 20 }
+  vi.mocked(ipcRenderer.invoke).mockResolvedValueOnce({ ok: true, value: progress })
+  expect(await mocks.api!.preparedAudio.progress(request)).toEqual(progress)
+  expect(ipcRenderer.invoke).toHaveBeenLastCalledWith('effects:progress', request)
 })

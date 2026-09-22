@@ -11,6 +11,7 @@ vi.mock('../../stores/editor.store', () => ({
 const session: SessionPrecondition = { workspaceToken: 'first' as WorkspaceToken, revision: 1 }
 const buckets = [{ min: -0.25, max: 0.5 }]
 const api = {
+  progress: vi.fn<PreparedAudioAPI['progress']>(),
   prepare: vi.fn<PreparedAudioAPI['prepare']>(),
   waveform: vi.fn<PreparedAudioAPI['waveform']>(),
   read: vi.fn<PreparedAudioAPI['read']>(),
@@ -37,8 +38,12 @@ beforeEach(() => {
   api.prepare.mockResolvedValue({ handle: 'prepared', channels: 2, frameCount: 96000 })
   api.waveform.mockResolvedValue({ buckets, peak: 0.875 })
   api.release.mockResolvedValue(undefined)
+  api.progress.mockResolvedValue(null)
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 it('prepares timeline coordinates and clamps frame ranges and bucket counts', async () => {
   const provider = new PreparedWaveformProvider(session)
@@ -169,4 +174,25 @@ it('discards a successful range response after its workspace changes', async () 
   state.session = { workspaceToken: 'second' as WorkspaceToken, revision: 1 }
   pending.resolve({ buckets, peak: 0.875 })
   await expect(reading).rejects.toMatchObject({ name: 'AbortError' })
+})
+
+it('polls measured progress only while preparing and stops after completion', async () => {
+  vi.useFakeTimers()
+  const pending = deferred<{ handle: string; channels: number; frameCount: number }>()
+  api.prepare.mockReturnValue(pending.promise)
+  api.progress.mockResolvedValue({ phase: 'processing', completed: 48000, total: 96000 })
+  const changed = vi.fn()
+  const provider = new PreparedWaveformProvider(session)
+  const preparing = provider.prepare([], 'track', changed)
+  await vi.advanceTimersByTimeAsync(250)
+  expect(changed).toHaveBeenCalledWith({ phase: 'processing', completed: 48000, total: 96000 })
+  api.progress.mockResolvedValue({ phase: 'waveform', completed: 72000, total: 96000 })
+  await vi.advanceTimersByTimeAsync(250)
+  expect(changed).toHaveBeenLastCalledWith({ phase: 'waveform', completed: 72000, total: 96000 })
+  pending.resolve({ handle: 'prepared', channels: 2, frameCount: 96000 })
+  await preparing
+  const calls = api.progress.mock.calls.length
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(api.progress).toHaveBeenCalledTimes(calls)
+  await provider.dispose()
 })

@@ -51,6 +51,8 @@ The supplied stacked-source UI is the intended source-provenance presentation. A
 
 ## Change-Focused Exploration
 
+For Auto Level preparation changes, additionally import a reproducibly generated long audio fixture through the prepared import dialog. Observe both processing and waveform phases with real percentages, a retained painted waveform while work is pending, and eventual completion. Toggle the effect off/on and adjust Gain to exercise reuse without stale status. Verify leveling and preview/export sample parity with real PCM integration tests; UI status alone cannot establish audio correctness. Cover independent consumer cancellation and project teardown with pool/IPC tests.
+
 After mandatory coverage, try one or two relevant variations, chosen before execution.
 Examples include changing zoom before selecting a clip, using a shortcut instead of a button, or inspecting a menu and dismissing it.
 Report discoveries and recovery attempts separately; exploration does not replace missing checkpoints.

@@ -46,7 +46,7 @@ export function buildRenderArgs(
   ]
 }
 
-function formatToEncodeArgs(format: string): string[] {
+export function formatToEncodeArgs(format: string): string[] {
   switch (format) {
     case 'wav':
       return ['-c:a', 'pcm_s16le']

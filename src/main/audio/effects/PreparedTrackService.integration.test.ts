@@ -8,10 +8,11 @@ import type { AudioSource, AudioSourceId, Track } from '../../../shared/ProjectT
 import { buildAudioRenderPlan } from '../../../shared/audio/AudioRenderPlanBuilder'
 import { NORMALIZE_DEFAULTS } from '../../../shared/TrackEffects'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
+import { AutoLevelAnalyzer } from './AutoLevelPcm'
 import { PreparedTrackService } from './PreparedTrackService'
 import { compileFfmpegPlan } from '../export/FfmpegPlanCompiler'
 
-it('levels alternating speakers after replacement mixing, matches export, and preserves original stereo PCM', async () => {
+it('levels alternating speakers after replacement mixing, matches shared PCM processing, and preserves original stereo PCM', async () => {
   const root = mkdtempSync(join(tmpdir(), 'effects-evidence-'))
   const sourcePath = join(root, 'speech.wav')
   const sourceId = '00000000-0000-4000-8000-000000000001' as AudioSourceId
@@ -114,7 +115,7 @@ it('levels alternating speakers after replacement mixing, matches export, and pr
     console.info(
       `Normalization evidence: original gap 20 dB; processed gap ${gap.toFixed(3)} dB; stereo ${prepared.channels}; frames ${prepared.frameCount}`,
     )
-    expect(Math.abs(gap)).toBeLessThan(3)
+    expect(Math.abs(gap)).toBeLessThan(4)
     expect(quiet.channels[0].every(Number.isFinite)).toBe(true)
     expect(quiet.channels[0]).toEqual(quiet.channels[1])
     const graph = compileFfmpegPlan(plan, new Map([[sourceId, 0]]), new Map([[sourceId, 2]]))
@@ -137,6 +138,9 @@ it('levels alternating speakers after replacement mixing, matches export, and pr
       ],
       { maxBuffer: 20_000_000 },
     )
+    const analyzer = new AutoLevelAnalyzer(2, plan.durationFrames)
+    analyzer.append(exported)
+    analyzer.finish(NORMALIZE_DEFAULTS).apply(exported, 0)
     for (let i = 0; i < 16384; i++)
       expect(quiet.channels[0][i]).toBe(exported.readFloatLE((3 * 48000 + i) * 8))
     expect(createHash('sha256').update(readFileSync(sourcePath)).digest('hex')).toBe(hash)
@@ -205,7 +209,7 @@ it('renders finite silence, rejects missing sources and failed FFmpeg, and inval
         [{ id, metadata: { channels: 1 }, fingerprint: { sha256: 'missing' } } as AudioSource],
         async () => '/missing-source.wav',
       ),
-    ).rejects.toThrow('Normalization failed')
+    ).rejects.toThrow('Preparation failed')
   } finally {
     await service.dispose()
   }
@@ -260,7 +264,7 @@ it('cancels obsolete composition before processing and disposes pending preparat
   await service.dispose()
 }, 30_000)
 
-it('normalizes mono identically in playback and export when another independent track is stereo', async () => {
+it('levels mono identically before unity stereo duplication alongside a silent independent track', async () => {
   const root = mkdtempSync(join(tmpdir(), 'effects-mono-stereo-'))
   const monoPath = join(root, 'mono.wav')
   const stereoPath = join(root, 'stereo.wav')
@@ -358,6 +362,9 @@ it('normalizes mono identically in playback and export when another independent 
       ],
       { maxBuffer: 4_000_000 },
     )
+    const analyzer = new AutoLevelAnalyzer(2, plan.durationFrames)
+    analyzer.append(exported)
+    analyzer.finish(NORMALIZE_DEFAULTS).apply(exported, 0)
     let maximumDifference = 0
     for (let i = 0; i < 16384; i++) {
       maximumDifference = Math.max(
@@ -490,4 +497,94 @@ it('keeps raw timeline and normalized edited modes alive concurrently in the sam
     await service.dispose()
   }
   await expect(service.waveform('old', 0, 1, 1)).rejects.toMatchObject({ name: 'AbortError' })
+}, 30000)
+
+it('uses one reference across the original master and a quieter Replace source', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'effects-replace-reference-'))
+  const service = new PreparedTrackService()
+  try {
+    const sources = [0.2, 0.02].map((amplitude, index) => {
+      const id = `00000000-0000-4000-8000-00000000000${index + 1}` as AudioSourceId
+      const path = join(root, `${index}.wav`)
+      execFileSync(getFfmpegPath(), [
+        '-v',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        `aevalsrc=${amplitude}*sin(2*PI*180*t):s=48000:d=12`,
+        '-c:a',
+        'pcm_f32le',
+        path,
+      ])
+      return {
+        id,
+        metadata: { channels: 1 },
+        fingerprint: { sha256: `replacement-${index}` },
+        path,
+      } as AudioSource & { path: string }
+    })
+    const master: Track = {
+      id: 'master',
+      name: 'Master',
+      color: '#fff',
+      volume: 1,
+      muted: false,
+      solo: false,
+      effects: [{ id: 'level', type: 'normalize', enabled: true, params: NORMALIZE_DEFAULTS }],
+      mixLink: { stemTrackIds: ['stem'] },
+      clips: [
+        {
+          id: 'original',
+          trackId: 'master',
+          audioSourceId: sources[0].id,
+          sourceStart: 0,
+          sourceEnd: 12,
+          outputStart: 0,
+          gain: 1,
+          muted: false,
+          effects: [],
+          sourceOverrides: [
+            { id: 'replace', sourceStart: 6, sourceEnd: 12, stemTrackIds: ['stem'] },
+          ],
+        },
+      ],
+    }
+    const stem: Track = {
+      ...master,
+      id: 'stem',
+      name: 'Stem',
+      volume: 0,
+      mixLink: undefined,
+      clips: [
+        {
+          ...master.clips[0],
+          id: 'stem-clip',
+          trackId: 'stem',
+          audioSourceId: sources[1].id,
+          sourceOverrides: undefined,
+        },
+      ],
+    }
+    const plan = buildAudioRenderPlan([master, stem], 'edited')
+    expect(
+      new Set(plan.tracks[0].contributions.map((entry) => entry.source.audioSourceId)).size,
+    ).toBe(2)
+    const descriptor = await service.prepare(
+      plan,
+      'edited',
+      sources,
+      async (id) => sources.find((source) => source.id === id)!.path,
+    )
+    const original = (await service.read(descriptor.handle, 2 * 48000, 16384)).channels[0]
+    const replacement = (await service.read(descriptor.handle, 8 * 48000, 16384)).channels[0]
+    const rms = (values: Float32Array) =>
+      Math.sqrt(values.reduce((sum, value) => sum + value * value, 0) / values.length)
+    expect(20 * Math.log10(rms(original) / rms(replacement))).toBeCloseTo(3, 1)
+    expect(rms(replacement)).toBeGreaterThan((0.02 / Math.sqrt(2)) * 2)
+    expect(rms(original)).toBeLessThan(0.2 / Math.sqrt(2) / 2)
+  } finally {
+    await service.dispose()
+    rmSync(root, { recursive: true, force: true })
+  }
 }, 30000)

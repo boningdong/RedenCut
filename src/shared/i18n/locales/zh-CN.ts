@@ -291,7 +291,8 @@ export const simplifiedChineseResources = {
       '关联期间忽略子轨自身的 Redact，解除后恢复。解除关联会保留音轨与编辑，并保持静音。',
     fitWaveform: '适配波形',
     resetWaveform: '重置波形缩放',
-    updatingWaveform: '正在更新波形…',
+    processingAudio: '正在处理音频…',
+    buildingWaveform: '正在生成波形…',
     failedWaveform: '波形更新失败',
     mixMemberCount: '{{count}} 条关联',
     mixParticipants: '{{count}} 人',
@@ -522,7 +523,7 @@ export const simplifiedChineseResources = {
     done: '完成！',
     exporting: '正在导出…',
     cancelling: '正在取消…',
-    loudness: '响度目标：{{value}} LUFS',
+    trackProcessing: '包含轨道效果、增益和音量设置。',
   },
   workspace: {
     reset: '重置布局',

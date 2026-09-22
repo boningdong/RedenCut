@@ -234,3 +234,102 @@ it('prepares a raw composite and keeps waveform handles bound to their consumer 
   await f.call('release', raw)
   expect(await f.call('waveform', read)).toMatchObject({ ok: false })
 })
+
+it('shares playback/waveform preparation and reports lease-scoped progress', async () => {
+  const f = setup()
+  let finish!: (value: unknown) => void
+  mocks.prepare.mockImplementationOnce((_plan, _mode, _sources, _resolver, onProgress) => {
+    onProgress({ phase: 'processing', completed: 123, total: 48000 })
+    return new Promise((resolve) => {
+      finish = resolve
+    })
+  })
+  const first = f.call('prepare')
+  const secondRequest = { ...f.request, requestId: 'waveform', mode: 'edited' }
+  const second = f.call('prepare', secondRequest)
+  expect(mocks.prepare).toHaveBeenCalledTimes(1)
+  expect(await f.call('progress', secondRequest)).toMatchObject({
+    ok: true,
+    value: { phase: 'processing', completed: 123, total: 48000 },
+  })
+  expect(
+    await f.call('progress', secondRequest, Object.assign(new EventEmitter(), { id: 2 })),
+  ).toEqual({ ok: true, value: null })
+  await f.call('release')
+  expect(mocks.dispose).not.toHaveBeenCalled()
+  finish({ handle: 'handle', channels: 1, frameCount: 48000 })
+  expect(await first).toMatchObject({ ok: false })
+  expect(await second).toMatchObject({ ok: true })
+  expect(await f.call('progress')).toEqual({ ok: true, value: null })
+  await f.call('release', secondRequest)
+  expect(mocks.dispose).not.toHaveBeenCalled()
+  await f.jobs.cancelAndSettleToken(token)
+  expect(mocks.dispose).toHaveBeenCalledTimes(1)
+})
+
+it('denies reading a handle belonging to another live lease in the same sender', async () => {
+  const f = setup()
+  await f.call('prepare')
+  const other = {
+    ...f.request,
+    requestId: 'other',
+    tracks: [{ ...f.request.tracks[0], effects: [] }],
+  }
+  mocks.prepare.mockResolvedValueOnce({ handle: 'other-handle', channels: 1, frameCount: 48000 })
+  await f.call('prepare', other)
+  expect(
+    await f.call('read', { ...f.request, handle: 'other-handle', startFrame: 0, frameCount: 1 }),
+  ).toMatchObject({ ok: false })
+  expect(
+    await f.call('waveform', {
+      ...f.request,
+      handle: 'other-handle',
+      startFrame: 0,
+      endFrame: 1,
+      targetBuckets: 1,
+    }),
+  ).toMatchObject({ ok: false })
+  expect(mocks.read).not.toHaveBeenCalled()
+  expect(mocks.waveform).not.toHaveBeenCalled()
+  await f.jobs.cancelAndSettleSender(1)
+  expect(mocks.dispose).toHaveBeenCalledTimes(2)
+})
+
+it('destroys cached idle artifacts when the sender disappears', async () => {
+  const f = setup()
+  await f.call('prepare')
+  await f.call('release')
+  expect(mocks.dispose).not.toHaveBeenCalled()
+  f.sender.emit('destroyed')
+  await vi.waitFor(() => expect(mocks.dispose).toHaveBeenCalledTimes(1))
+  expect(await f.call('progress')).toEqual({ ok: true, value: null })
+})
+
+it('keeps a replacement request alive after an obsolete pending job completes', async () => {
+  const f = setup()
+  let finish!: (value: unknown) => void
+  mocks.prepare.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
+  const old = f.call('prepare')
+  await f.call('release')
+  mocks.prepare.mockResolvedValueOnce({ handle: 'new-handle', channels: 1, frameCount: 48000 })
+  expect(await f.call('prepare')).toMatchObject({ ok: true, value: { handle: 'new-handle' } })
+  finish({ handle: 'old-handle', channels: 1, frameCount: 48000 })
+  expect(await old).toMatchObject({ ok: false })
+  expect(await f.call('progress')).toMatchObject({ ok: true, value: { phase: 'waveform' } })
+  await f.jobs.cancelAndSettleToken(token)
+})
+
+it('rejects new consumers of an existing pool after workspace closing starts', async () => {
+  const f = setup()
+  await f.call('prepare')
+  f.jobs.beginClosing(token)
+  expect(await f.call('prepare', { ...f.request, requestId: 'late' })).toMatchObject({ ok: false })
+  expect(mocks.prepare).toHaveBeenCalledTimes(1)
+  await f.jobs.cancelAndSettleToken(token)
+  expect(mocks.dispose).toHaveBeenCalledTimes(1)
+})

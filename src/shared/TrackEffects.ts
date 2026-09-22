@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+// targetLufs and loudnessRange are persisted legacy settings; Auto Level now
+// preserves the incoming program reference instead of imposing a LUFS target.
 const NormalizeParamsSchema = z
   .object({
     targetLufs: z.number().finite().min(-70).max(-5).default(-16),
@@ -33,10 +35,4 @@ export function getNormalizeEffect(track: {
 
 export function trackGain(track: { gainDb?: number }): number {
   return 10 ** ((track.gainDb ?? 0) / 20)
-}
-
-/** Keep playback preparation and export on exactly the same speech-leveling algorithm. */
-export function normalizationFilter(params: NormalizeParams): string {
-  const { targetLufs, truePeakDbtp, loudnessRange } = NormalizeParamsSchema.parse(params)
-  return `dynaudnorm=f=500:g=11:m=4:r=0.1:n=1:c=1:t=0.01,loudnorm=I=${targetLufs}:TP=${truePeakDbtp}:LRA=${loudnessRange}:linear=false,aresample=48000`
 }

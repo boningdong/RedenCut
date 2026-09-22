@@ -1,3 +1,4 @@
+import { WaveformPreparationStatus } from './WaveformPreparationStatus'
 import { TimelineScrollbar } from './TimelineScrollbar'
 import { getMixRangeState, isExactMixReplacement } from './MixRangeState'
 import { RangeSelectionHandles } from './RangeSelectionHandles'
@@ -746,13 +747,7 @@ export function WaveformView({
                   >
                     {(waveformDisplays.get(track.id)?.updating ||
                       waveformDisplays.get(track.id)?.failed) && (
-                      <span className="waveform-update-status" role="status">
-                        {t(
-                          waveformDisplays.get(track.id)?.failed
-                            ? 'waveform.failedWaveform'
-                            : 'waveform.updatingWaveform',
-                        )}
-                      </span>
+                      <WaveformPreparationStatus display={waveformDisplays.get(track.id)!} />
                     )}
                     {track.clips.map((clip) => {
                       const proposed = previewClips.get(clip.id)

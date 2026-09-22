@@ -23,7 +23,15 @@ export interface PreparedWaveformData {
   buckets: { min: number; max: number }[]
   peak: number
 }
+export interface PreparedAudioProgress {
+  phase: 'processing' | 'waveform'
+  completed: number
+  total: number
+}
 export interface PreparedAudioAPI {
+  progress(
+    request: SessionPrecondition & { requestId: string },
+  ): Promise<PreparedAudioProgress | null>
   waveform(
     request: SessionPrecondition & {
       requestId: string

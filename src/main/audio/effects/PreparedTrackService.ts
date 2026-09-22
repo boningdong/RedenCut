@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdtemp, open, rm, stat } from 'node:fs/promises'
+import { mkdtemp, open, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -9,10 +9,12 @@ import type { AudioSampleChunk, PlaybackMode } from '../../../shared/PlayerTypes
 import {
   MAX_PREPARED_READ_FRAMES,
   type PreparedTrackDescriptor,
+  type PreparedAudioProgress,
 } from '../../../shared/PreparedAudioTypes'
 import { compileFfmpegPlan } from '../export/FfmpegPlanCompiler'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
 import { PreparedWaveform } from './PreparedWaveform'
+import { preparePcmStream } from './PreparedPcmStream'
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 
 export function preparedTrackKey(
@@ -23,7 +25,7 @@ export function preparedTrackKey(
   return createHash('sha256')
     .update(
       JSON.stringify({
-        algorithm: 1,
+        algorithm: 2,
         mode,
         durationFrames: plan.durationFrames,
         identities,
@@ -64,7 +66,7 @@ export class PreparedTrackService {
       channels: number
       frameCount: number
       signal: AbortSignal
-      waveform?: Promise<PreparedWaveform>
+      waveform: PreparedWaveform
     }
   >()
   private controller = new AbortController()
@@ -74,6 +76,7 @@ export class PreparedTrackService {
     mode: PlaybackMode,
     sources: AudioSource[],
     resolveOriginal: (id: AudioSourceId) => Promise<string>,
+    onProgress?: (progress: PreparedAudioProgress) => void,
   ): Promise<PreparedTrackDescriptor> {
     this.controller.signal.throwIfAborted()
     const used = new Set(
@@ -101,13 +104,12 @@ export class PreparedTrackService {
             const file = this.files.get(descriptor.handle)
             this.files.delete(descriptor.handle)
             if (file) {
-              await file.waveform?.catch(() => {})
               await rm(file.path, { force: true })
             }
           }
         }
         signal.throwIfAborted()
-        return this.render(plan, inputs, resolveOriginal, signal)
+        return this.render(plan, inputs, resolveOriginal, signal, onProgress)
       })()
       this.slots.set(trackId, { key, controller, result: entry })
       this.entries.set(key, entry)
@@ -156,8 +158,7 @@ export class PreparedTrackService {
     const file = this.files.get(handle)
     if (!file) throw new Error('Unknown prepared audio handle')
     PreparedWaveform.validate(startFrame, endFrame, targetBuckets, file.frameCount)
-    file.waveform ??= PreparedWaveform.load(file.path, file.channels, file.frameCount, file.signal)
-    const waveform = await file.waveform
+    const waveform = file.waveform
     file.signal.throwIfAborted()
     if (this.files.get(handle) !== file) throw new Error('Unknown prepared audio handle')
     const result = await waveform.read(startFrame, endFrame, targetBuckets)
@@ -166,14 +167,19 @@ export class PreparedTrackService {
     return result
   }
 
+  preparedPath(handle: string): string {
+    this.controller.signal.throwIfAborted()
+    const file = this.files.get(handle)
+    if (!file) throw new Error('Unknown prepared audio handle')
+    file.signal.throwIfAborted()
+    return file.path
+  }
+
   async dispose(): Promise<void> {
     this.controller.abort()
     await Promise.allSettled(this.entries.values())
     this.entries.clear()
     this.slots.clear()
-    await Promise.allSettled(
-      [...this.files.values()].flatMap((file) => (file.waveform ? [file.waveform] : [])),
-    )
     this.files.clear()
     await rm(await this.directory, { recursive: true, force: true })
   }
@@ -183,6 +189,7 @@ export class PreparedTrackService {
     sources: AudioSource[],
     resolveOriginal: (id: AudioSourceId) => Promise<string>,
     signal: AbortSignal,
+    onProgress?: (progress: PreparedAudioProgress) => void,
   ): Promise<PreparedTrackDescriptor> {
     const inputs: string[] = []
     for (const source of sources) {
@@ -202,59 +209,75 @@ export class PreparedTrackService {
       new Map(sources.map((source) => [source.id, source.metadata.channels])),
     )
     signal.throwIfAborted()
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn(
-          getFfmpegPath(),
-          [
-            '-v',
-            'error',
-            '-y',
-            ...inputs,
-            '-filter_complex',
-            graph,
-            '-map',
-            '[export]',
-            '-ac',
-            String(channels),
-            '-ar',
-            '48000',
-            '-f',
-            'f32le',
-            '-c:a',
-            'pcm_f32le',
-            path,
-          ],
-          { stdio: ['ignore', 'ignore', 'pipe'], env: runtimeEnvironment(process.env) },
-        )
-        let failure: Error | undefined
-        let diagnostic = ''
-        const abort = () => child.kill('SIGKILL')
-        signal.addEventListener('abort', abort, { once: true })
-        child.stderr.on('data', (chunk) => {
-          diagnostic = (diagnostic + String(chunk)).slice(-4096)
-        })
-        child.once('error', (error) => {
-          failure = error
-        })
-        child.once('close', (code) => {
-          signal.removeEventListener('abort', abort)
-          if (signal.aborted) reject(new DOMException('Normalization cancelled', 'AbortError'))
-          else if (failure || code !== 0)
-            reject(failure ?? new Error(`Normalization failed: ${diagnostic}`))
-          else resolve()
-        })
-        if (signal.aborted) abort()
+    const child = spawn(
+      getFfmpegPath(),
+      [
+        '-v',
+        'error',
+        '-y',
+        ...inputs,
+        '-filter_complex',
+        graph,
+        '-map',
+        '[export]',
+        '-ac',
+        String(channels),
+        '-ar',
+        '48000',
+        '-f',
+        'f32le',
+        '-c:a',
+        'pcm_f32le',
+        'pipe:1',
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'], env: runtimeEnvironment(process.env) },
+    )
+    let diagnostic = ''
+    const abort = () => {
+      child.kill('SIGKILL')
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    child.stderr.on('data', (chunk) => {
+      diagnostic = (diagnostic + String(chunk)).slice(-4096)
+    })
+    const exited = new Promise<void>((resolve, reject) => {
+      let failure: Error | undefined
+      child.once('error', (error) => {
+        failure = error
       })
+      child.once('close', (code) => {
+        if (signal.aborted) reject(new DOMException('Preparation cancelled', 'AbortError'))
+        else if (failure || code !== 0)
+          reject(failure ?? new Error(`Preparation failed: ${diagnostic}`))
+        else resolve()
+      })
+    })
+    // Observe early spawn failures while the stream pipeline is still unwinding.
+    void exited.catch(() => {})
+    if (signal.aborted) abort()
+    try {
+      const waveform = await preparePcmStream(
+        child.stdout,
+        path,
+        channels,
+        plan.durationFrames,
+        plan.tracks.find((track) => track.normalize)?.normalize,
+        signal,
+        onProgress,
+      )
+      await exited
       signal.throwIfAborted()
-      const size = (await stat(path)).size
-      if (size !== plan.durationFrames * channels * 4)
-        throw new Error('Prepared PCM duration mismatch')
-      this.files.set(handle, { path, channels, frameCount: plan.durationFrames, signal })
+      this.files.set(handle, { path, channels, frameCount: plan.durationFrames, signal, waveform })
       return { handle, channels, frameCount: plan.durationFrames }
     } catch (error) {
+      abort()
+      await exited.catch(() => {})
       await rm(path, { force: true })
+      signal.throwIfAborted()
+      if (diagnostic.trim()) throw new Error(`Preparation failed: ${diagnostic}`, { cause: error })
       throw error
+    } finally {
+      signal.removeEventListener('abort', abort)
     }
   }
 }
