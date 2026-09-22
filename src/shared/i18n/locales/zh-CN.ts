@@ -239,6 +239,7 @@ export const simplifiedChineseResources = {
     importing: '正在导入 {{name}}：{{stage}} ({{percent}}%)',
   },
   transport: {
+    preparingAudio: '正在准备音频…',
     undo: '撤销',
     undoHint: '撤销 (⌘Z)',
     redo: '重做',
@@ -256,6 +257,14 @@ export const simplifiedChineseResources = {
     darkTheme: '切换到深色主题',
   },
   waveform: {
+    effects: '效果',
+    normalize: '响度标准化',
+    volumeShort: '音量',
+    gain: '增益',
+    gainName: '{{name}} 增益',
+    resetLevel: '重置',
+    trackActions: '{{name}} 轨道操作',
+
     mixChooseSources: '此区间使用哪些音轨？',
     mixMaster: '主 Mix',
     mixMasterName: '主 Mix：{{name}}',

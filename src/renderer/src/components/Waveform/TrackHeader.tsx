@@ -1,19 +1,12 @@
 import { useTranslation } from '../../i18n/useTranslation'
-// ─────────────────────────────────────────────────────────────────────────────
-// TrackHeader
-//
-// Fixed-width (~90px) left-side header for a single track lane.
-// Contains: editable name, mute toggle, solo toggle, volume slider,
-// color swatch (read-only display), and remove button.
-//
-// All mutations go through timeline.store (updateTrack / removeTrack).
-// Mute and Solo are click-only — no keyboard shortcuts to avoid conflict
-// with the global S = Split shortcut.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { trackPresentationColor } from '../../themes/trackColors'
 import { Icon } from '../ui/Icon'
 import React, { useState, useCallback } from 'react'
+import { getNormalizeEffect } from '@shared/TrackEffects'
+import { TrackLevelControl } from './TrackLevelControl'
+import { TrackEffectsMenu } from './TrackEffectsMenu'
+import { EditorContextMenu } from '../ui/EditorContextMenu'
+import './TrackHeader.css'
 import type { Track } from '@shared/ProjectTypes'
 import { useTimelineStore } from '../../stores/TimelineStore'
 
@@ -43,6 +36,11 @@ export function TrackHeader({
   const active = useTimelineStore((s) => s.selectedTrackId === track.id)
   const color = trackPresentationColor(track.color)
   const updateTrack = useTimelineStore((s) => s.updateTrack)
+  const setTrackGain = useTimelineStore((s) => s.setTrackGain)
+  const setTrackVolume = useTimelineStore((s) => s.setTrackVolume)
+  const toggleTrackNormalize = useTimelineStore((s) => s.toggleTrackNormalize)
+  const [context, setContext] = useState<{ x: number; y: number } | null>(null)
+  const closeContext = useCallback(() => setContext(null), [])
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState(track.name)
 
@@ -59,6 +57,20 @@ export function TrackHeader({
   return (
     <div
       className="track-header"
+      tabIndex={0}
+      aria-label={t('waveform.trackActions', { name: track.name })}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        setContext({ x: event.clientX, y: event.clientY })
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault()
+          event.stopPropagation()
+          const rect = event.currentTarget.getBoundingClientRect()
+          setContext({ x: rect.left + 10, y: rect.bottom })
+        }
+      }}
       onClickCapture={() => {
         if (!readOnly) useTimelineStore.getState().setSelectedTrackId(track.id)
       }}
@@ -73,20 +85,6 @@ export function TrackHeader({
       }}
     >
       <div className="track-heading">
-        {track.mixLink && (
-          <button
-            className="mix-collapse"
-            aria-label={t(collapsed ? 'waveform.mixExpand' : 'waveform.mixCollapse')}
-            aria-expanded={!collapsed}
-            onClick={onToggleChildren}
-          >
-            <Icon
-              name="chevron"
-              size={12}
-              style={{ transform: collapsed ? 'rotate(-90deg)' : undefined }}
-            />
-          </button>
-        )}
         <span className="track-color" style={{ background: trackPresentationColor(track.color) }} />
         {editing ? (
           <input
@@ -116,14 +114,6 @@ export function TrackHeader({
           </button>
         )}
         {track.mixLink && <span className="mix-role">{t('waveform.mixMaster')}</span>}
-        <button
-          className="track-remove"
-          title={t('waveform.removeTrack')}
-          aria-label={t('waveform.remove', { name: track.name })}
-          onClick={() => onRemove(track.id)}
-        >
-          <Icon name="close" size={12} />
-        </button>
       </div>
       {readOnly ? (
         <span
@@ -134,6 +124,14 @@ export function TrackHeader({
         </span>
       ) : (
         <div className="track-controls">
+          <button
+            aria-label={t('waveform.mixSources')}
+            title={t('waveform.mixSources')}
+            aria-pressed={!!track.mixLink}
+            onClick={onMixSources}
+          >
+            <Icon name="hierarchy" size={14} />
+          </button>
           <button
             aria-label={t('waveform.muteName', { name: track.name })}
             aria-pressed={track.muted}
@@ -150,27 +148,42 @@ export function TrackHeader({
           >
             <Icon name="headphones" size={13} />
           </button>
-          <input
-            type="range"
-            aria-label={t('waveform.volumeName', { name: track.name })}
-            min={0}
-            max={1}
-            step={0.01}
+          <TrackLevelControl
+            kind="volume"
+            name={track.name}
             value={track.volume}
-            onChange={(e) => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
-            style={{ accentColor: trackPresentationColor(track.color) }}
-            title={t('waveform.volumePercent', { percent: Math.round(track.volume * 100) })}
+            onCommit={(value) => setTrackVolume(track.id, value)}
           />
-          <span>{Math.round(track.volume * 100)}%</span>
-          <button
-            aria-label={t('waveform.mixSources')}
-            title={t('waveform.mixSources')}
-            aria-pressed={!!track.mixLink}
-            onClick={onMixSources}
-          >
-            <Icon name="hierarchy" size={15} />
-          </button>
+          <TrackEffectsMenu
+            active={track.effects.some((effect) => effect.enabled)}
+            normalized={!!getNormalizeEffect(track)}
+            onToggleNormalize={() => toggleTrackNormalize(track.id)}
+          />
+          <TrackLevelControl
+            kind="gain"
+            name={track.name}
+            value={track.gainDb ?? 0}
+            onCommit={(value) => setTrackGain(track.id, value)}
+          />
         </div>
+      )}
+      {context && (
+        <EditorContextMenu
+          {...context}
+          onClose={closeContext}
+          items={[
+            ...(track.mixLink && onToggleChildren
+              ? [
+                  {
+                    id: 'collapse',
+                    label: t(collapsed ? 'waveform.mixExpand' : 'waveform.mixCollapse'),
+                    action: onToggleChildren,
+                  },
+                ]
+              : []),
+            { id: 'remove', label: t('waveform.removeTrack'), action: () => onRemove(track.id) },
+          ]}
+        />
       )}
       {track.mixLink && (
         <span className="mix-members" title={linkedNames}>

@@ -68,8 +68,8 @@ interface WaveformViewProps {
 // Layout constants
 const HEADER_WIDTH = 190 // px — header column width
 const RULER_HEIGHT = 28 // px — ruler row height
-const LANE_HEIGHT = 64 // px — ordinary clip lane height
-const MIX_LANE_HEIGHT = 80 // linked master has room for source presentation
+const LANE_HEIGHT = 92 // px — ordinary clip lane height
+const MIX_LANE_HEIGHT = 108 // linked master has room for source presentation
 
 export function WaveformView({
   workspaceControls,

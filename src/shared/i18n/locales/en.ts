@@ -257,6 +257,7 @@ export const englishResources = {
     importing: 'Importing {{name}}: {{stage}} ({{percent}}%)',
   },
   transport: {
+    preparingAudio: 'Preparing audio…',
     undo: 'Undo',
     undoHint: 'Undo (⌘Z)',
     redo: 'Redo',
@@ -274,6 +275,14 @@ export const englishResources = {
     darkTheme: 'Switch to dark theme',
   },
   waveform: {
+    effects: 'Effects',
+    normalize: 'Normalize',
+    volumeShort: 'Vol',
+    gain: 'Gain',
+    gainName: '{{name}} gain',
+    resetLevel: 'Reset',
+    trackActions: '{{name}} track actions',
+
     mixChooseSources: 'Which tracks play in this interval?',
     mixMaster: 'Master Mix',
     mixMasterName: 'Master Mix: {{name}}',
