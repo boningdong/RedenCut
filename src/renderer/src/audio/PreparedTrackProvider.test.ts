@@ -71,14 +71,12 @@ it('preserves managed-runtime guidance as an Error through playback error callba
 it('keeps public reasons on prepared reads without leaking unknown IPC fields', async () => {
   useEditorStore.setState({ session: session(1) })
   const prepare = vi.fn().mockResolvedValue({ handle: 'ready', channels: 1, frameCount: 48000 })
-  const read = vi
-    .fn()
-    .mockRejectedValue({
-      code: 'operation-failed',
-      reason: 'stale-session',
-      message: '/private/diagnostic',
-      privatePath: '/private/diagnostic',
-    })
+  const read = vi.fn().mockRejectedValue({
+    code: 'operation-failed',
+    reason: 'stale-session',
+    message: '/private/diagnostic',
+    privatePath: '/private/diagnostic',
+  })
   vi.stubGlobal('window', { electronAPI: { preparedAudio: { prepare, read, release: vi.fn() } } })
   const provider = new PreparedTrackProvider()
   const samples = await provider.prepare([], 'track', 'timeline')
