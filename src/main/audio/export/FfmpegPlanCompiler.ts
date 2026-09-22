@@ -15,6 +15,9 @@ export function compileFfmpegPlan(
   let segmentIndex = 0
   for (const track of plan.tracks) {
     const segments: string[] = []
+    const stereoTrack = track.contributions.some(
+      (contribution) => (sourceChannels.get(contribution.source.audioSourceId) ?? 1) >= 2,
+    )
     for (const contribution of track.contributions) {
       const { source, outputStartFrame, gain } = contribution
       const sourceIndex = sourceIndexes.get(source.audioSourceId)
@@ -24,7 +27,9 @@ export function compileFfmpegPlan(
       const envelope = envelopeFilter(contribution)
       // Web Audio duplicates mono into stereo at unity, unlike FFmpeg's default -3 dB upmix.
       const channels =
-        stereoMix && sourceChannels.get(source.audioSourceId) === 1 ? ',pan=stereo|c0=c0|c1=c0' : ''
+        stereoTrack && sourceChannels.get(source.audioSourceId) === 1
+          ? ',pan=stereo|c0=c0|c1=c0'
+          : ''
       parts.push(
         `[${sourceIndex}:a]aresample=48000,atrim=start_sample=${source.sourceStartFrame}:end_sample=${source.sourceStartFrame + source.frameCount},asetpts=PTS-STARTPTS${channels},volume=${gain}${envelope},adelay=${outputStartFrame}S:all=1[${label}]`,
       )
@@ -36,7 +41,12 @@ export function compileFfmpegPlan(
       segments.length > 1 ? `amix=inputs=${segments.length}:normalize=0:duration=longest,` : ''
     const normalize = track.normalize ? `${normalizationFilter(track.normalize)},` : ''
     const gain = track.gainDb ? `volume=${10 ** (track.gainDb / 20)},` : ''
-    parts.push(`${segments.join('')}${mix}${normalize}${gain}volume=${track.volume}[${label}]`)
+    // Normalize in the track's own channel layout, exactly as playback preparation does.
+    // Only then adapt mono to the stereo master at Web Audio's unity duplication gain.
+    const masterChannels = stereoMix && !stereoTrack ? 'pan=stereo|c0=c0|c1=c0,' : ''
+    parts.push(
+      `${segments.join('')}${mix}${normalize}${masterChannels}${gain}volume=${track.volume}[${label}]`,
+    )
     trackLabels.push(`[${label}]`)
   }
   let output: string

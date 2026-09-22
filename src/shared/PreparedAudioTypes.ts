@@ -2,7 +2,7 @@ import type { Track } from './ProjectTypes'
 import type { PlaybackMode, AudioSampleChunk } from './PlayerTypes'
 import type { SessionPrecondition } from './session.types'
 
-export interface PrepareTrackRequest extends SessionPrecondition {
+interface PrepareTrackRequest extends SessionPrecondition {
   requestId: string
   tracks: Track[]
   trackId: string
@@ -13,7 +13,7 @@ export interface PreparedTrackDescriptor {
   channels: number
   frameCount: number
 }
-export interface PreparedTrackReadRequest extends SessionPrecondition {
+interface PreparedTrackReadRequest extends SessionPrecondition {
   requestId: string
   handle: string
   startFrame: number

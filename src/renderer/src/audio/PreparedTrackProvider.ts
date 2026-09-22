@@ -17,13 +17,15 @@ export class PreparedTrackProvider {
     if (this.disposed) throw new DOMException('Player destroyed', 'AbortError')
     const session = this.currentSession()
     this.session = session
-    const descriptor = await window.electronAPI.preparedAudio.prepare({
-      ...session,
-      requestId: this.requestId,
-      tracks,
-      trackId,
-      mode,
-    })
+    const descriptor = await this.withCurrentRevision((current) =>
+      window.electronAPI.preparedAudio.prepare({
+        ...current,
+        requestId: this.requestId,
+        tracks,
+        trackId,
+        mode,
+      }),
+    )
     if (this.disposed) throw new DOMException('Player destroyed', 'AbortError')
     if (
       !descriptor.handle ||
@@ -68,6 +70,22 @@ export class PreparedTrackProvider {
     this.disposed = true
     if (this.session)
       await window.electronAPI.preparedAudio.release({ ...this.session, requestId: this.requestId })
+  }
+
+  private async withCurrentRevision<T>(
+    operation: (session: SessionPrecondition) => Promise<T>,
+  ): Promise<T> {
+    let session = this.currentSession()
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await operation(session)
+      } catch (error) {
+        if (this.disposed) throw new DOMException('Player destroyed', 'AbortError')
+        const current = this.currentSession()
+        if (current.revision === session.revision || attempt >= 2) throw error
+        session = current
+      }
+    }
   }
 
   private currentSession(): SessionPrecondition {

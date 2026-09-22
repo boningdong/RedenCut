@@ -181,3 +181,25 @@ it('rejects unknown sources, duplicate tracks, and invalid linked children befor
     expect(await f.call('prepare', { ...f.request, tracks })).toMatchObject({ ok: false })
   expect(mocks.prepare).not.toHaveBeenCalled()
 })
+
+it('keeps admitted preparation and reads valid across ordinary saves of the same workspace', async () => {
+  const f = setup()
+  let finish!: (value: unknown) => void
+  mocks.prepare.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
+  const preparing = f.call('prepare')
+  f.controller.assertCurrent.mockImplementation(() => {
+    throw new Error('Stale workspace revision')
+  })
+  finish({ handle: 'handle', channels: 1, frameCount: 48000 })
+  expect(await preparing).toMatchObject({ ok: true })
+  mocks.read.mockResolvedValue({ startFrame: 0, frameCount: 1, channels: [new Float32Array(1)] })
+  const request = { ...f.request, handle: 'handle', startFrame: 0, frameCount: 1 }
+  expect(await f.call('read', request)).toMatchObject({ ok: true })
+  f.controller.workspace = { ...f.controller.workspace }
+  expect(await f.call('read', request)).toMatchObject({ ok: false })
+})

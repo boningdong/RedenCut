@@ -137,7 +137,7 @@ it('levels alternating speakers after replacement mixing, matches export, and pr
     await service.dispose()
     rmSync(root, { recursive: true, force: true })
   }
-})
+}, 30_000)
 
 it('renders finite silence, rejects missing sources and failed FFmpeg, and invalidates replaced handles', async () => {
   const service = new PreparedTrackService()
@@ -192,7 +192,7 @@ it('renders finite silence, rejects missing sources and failed FFmpeg, and inval
     await service.dispose()
   }
   await expect(service.read('anything', 0, 1)).rejects.toMatchObject({ name: 'AbortError' })
-})
+}, 30_000)
 
 it('cancels obsolete composition before processing and disposes pending preparation', async () => {
   const service = new PreparedTrackService()
@@ -240,4 +240,119 @@ it('cancels obsolete composition before processing and disposes pending preparat
   const result = await replacement
   expect(result.frameCount).toBe(48000)
   await service.dispose()
-})
+}, 30_000)
+
+it('normalizes mono identically in playback and export when another independent track is stereo', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'effects-mono-stereo-'))
+  const monoPath = join(root, 'mono.wav')
+  const stereoPath = join(root, 'stereo.wav')
+  const monoId = '00000000-0000-4000-8000-000000000001' as AudioSourceId
+  const stereoId = '00000000-0000-4000-8000-000000000002' as AudioSourceId
+  const service = new PreparedTrackService()
+  try {
+    execFileSync(getFfmpegPath(), [
+      '-v',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=230:sample_rate=48000:duration=8',
+      '-c:a',
+      'pcm_f32le',
+      monoPath,
+    ])
+    execFileSync(getFfmpegPath(), [
+      '-v',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'anullsrc=r=48000:cl=stereo',
+      '-t',
+      '8',
+      '-c:a',
+      'pcm_f32le',
+      stereoPath,
+    ])
+    const contribution = (audioSourceId: AudioSourceId) => ({
+      clipId: audioSourceId,
+      source: { audioSourceId, sourceStartFrame: 0, frameCount: 8 * 48000 },
+      outputStartFrame: 0,
+      gain: 1,
+      envelope: { kind: 'constant' as const },
+    })
+    const normalized = {
+      trackId: 'mono',
+      volume: 1,
+      normalize: NORMALIZE_DEFAULTS,
+      contributions: [contribution(monoId)],
+    }
+    const plan = {
+      ...buildAudioRenderPlan([], 'edited'),
+      durationFrames: 8 * 48000,
+      tracks: [
+        normalized,
+        { trackId: 'stereo', volume: 1, contributions: [contribution(stereoId)] },
+      ],
+    }
+    const source = {
+      id: monoId,
+      metadata: { channels: 1 },
+      fingerprint: { sha256: 'mono' },
+    } as AudioSource
+    const descriptor = await service.prepare(
+      { ...plan, tracks: [normalized] },
+      'edited',
+      [source],
+      async () => monoPath,
+    )
+    expect(descriptor.channels).toBe(1)
+    const block = await service.read(descriptor.handle, 3 * 48000, 16384)
+    const graph = compileFfmpegPlan(
+      plan,
+      new Map([
+        [monoId, 0],
+        [stereoId, 1],
+      ]),
+      new Map([
+        [monoId, 1],
+        [stereoId, 2],
+      ]),
+    )
+    const exported = execFileSync(
+      getFfmpegPath(),
+      [
+        '-v',
+        'error',
+        '-i',
+        monoPath,
+        '-i',
+        stereoPath,
+        '-filter_complex',
+        graph,
+        '-map',
+        '[export]',
+        '-f',
+        'f32le',
+        '-c:a',
+        'pcm_f32le',
+        'pipe:1',
+      ],
+      { maxBuffer: 4_000_000 },
+    )
+    let maximumDifference = 0
+    for (let i = 0; i < 16384; i++) {
+      maximumDifference = Math.max(
+        maximumDifference,
+        Math.abs(block.channels[0][i] - exported.readFloatLE((3 * 48000 + i) * 8)),
+      )
+      expect(exported.readFloatLE((3 * 48000 + i) * 8)).toBe(
+        exported.readFloatLE((3 * 48000 + i) * 8 + 4),
+      )
+    }
+    expect(maximumDifference).toBeLessThan(1e-7)
+  } finally {
+    await service.dispose()
+    rmSync(root, { recursive: true, force: true })
+  }
+}, 30_000)

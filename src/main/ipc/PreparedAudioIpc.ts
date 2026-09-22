@@ -10,7 +10,14 @@ export function registerPreparedAudioIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
 ): void {
-  const leases = new Map<string, { service: PreparedTrackService; dispose: () => Promise<void> }>()
+  const leases = new Map<
+    string,
+    {
+      service: PreparedTrackService
+      workspace: WorkspaceController['workspace']
+      dispose: () => Promise<void>
+    }
+  >()
   const leaseKey = (senderId: number, workspaceToken: string, requestId: string) =>
     JSON.stringify([senderId, workspaceToken, requestId])
   ipcMain.handle('effects:prepare', (event, input: unknown) =>
@@ -55,7 +62,7 @@ export function registerPreparedAudioIpc(
           { kind: 'effects', ...request, senderId: event.sender.id, jobId: requestId },
           () => ({ cancel: dispose, settled: Promise.resolve() }),
         )
-        lease = { service, dispose }
+        lease = { service, dispose, workspace: controller.workspace }
         leases.set(key, lease)
         event.sender.once('destroyed', onDestroyed)
       }
@@ -65,14 +72,16 @@ export function registerPreparedAudioIpc(
         sources,
         resolveOriginal,
       )
-      controller.assertCurrent(request)
+      // An ordinary save advances revision without changing immutable PCM composition.
+      // The admitted lease and exact workspace still guard project switches and disposal.
+      if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
+        throw new PublicIpcError('stale-session')
       return result
     }, console.error),
   )
   ipcMain.handle('effects:read', (event, input: unknown) =>
     toIpcResult(async () => {
       const request = requireSessionPrecondition(input)
-      controller.assertCurrent(request)
       const candidate = input as Record<string, unknown>
       const key = leaseKey(
         event.sender.id,
@@ -82,6 +91,7 @@ export function registerPreparedAudioIpc(
       const lease = leases.get(key)
       if (
         !lease ||
+        controller.workspace !== lease.workspace ||
         typeof candidate.handle !== 'string' ||
         typeof candidate.startFrame !== 'number' ||
         typeof candidate.frameCount !== 'number'
@@ -92,7 +102,10 @@ export function registerPreparedAudioIpc(
         candidate.startFrame,
         candidate.frameCount,
       )
-      controller.assertCurrent(request)
+      // An ordinary save advances revision without changing immutable PCM composition.
+      // The admitted lease and exact workspace still guard project switches and disposal.
+      if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
+        throw new PublicIpcError('stale-session')
       return result
     }, console.error),
   )
