@@ -16,6 +16,34 @@ import { compileFfmpegPlan } from './FfmpegPlanCompiler'
 const sourceId = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 
 describe('managed FFmpeg sample parity', () => {
+  it('normalizes the composite before manual gain and volume', () => {
+    const plan = buildAudioRenderPlan([], 'edited')
+    plan.tracks = [
+      {
+        trackId: 'mix',
+        volume: 0.5,
+        gainDb: 6,
+        normalize: { targetLufs: -16, truePeakDbtp: -1.5, loudnessRange: 7 },
+        contributions: [sourceId, 'replacement' as AudioSourceId].map((audioSourceId) => ({
+          clipId: audioSourceId,
+          source: { audioSourceId, sourceStartFrame: 0, frameCount: 48000 },
+          outputStartFrame: 0,
+          gain: 1,
+          envelope: { kind: 'constant' as const },
+        })),
+      },
+    ]
+    const graph = compileFfmpegPlan(
+      plan,
+      new Map([
+        [sourceId, 0],
+        ['replacement', 1],
+      ]),
+    )
+    expect(graph).toContain('amix=inputs=2:normalize=0:duration=longest,dynaudnorm=')
+    expect(graph).toContain('aresample=48000,volume=1.9952623149688795,volume=0.5')
+  })
+
   it('duplicates mono at unity when mixing with stereo', () => {
     const monoId = 'mono' as AudioSourceId
     const plan: AudioRenderPlan = {

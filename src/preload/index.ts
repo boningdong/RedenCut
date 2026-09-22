@@ -1,3 +1,4 @@
+import type { PreparedAudioAPI } from '../shared/PreparedAudioTypes'
 import type { ProjectOpenProgressEvent } from '../shared/AudioPreparationTypes'
 import type { MediaRecoverySnapshot } from '../shared/MediaRecoveryTypes'
 import type { SaveSpeakerIdentitiesRequest } from '../shared/SpeakerIdentityTypes'
@@ -95,6 +96,17 @@ const api = {
       ipcRenderer.on('app-preferences:changed', handler)
       return () => ipcRenderer.off('app-preferences:changed', handler)
     },
+  },
+  preparedAudio: {
+    prepare: (request) =>
+      invokeSafe<Awaited<ReturnType<PreparedAudioAPI['prepare']>>>(
+        invoke,
+        'effects:prepare',
+        request,
+      ),
+    read: (request) =>
+      invokeSafe<Awaited<ReturnType<PreparedAudioAPI['read']>>>(invoke, 'effects:read', request),
+    release: (request) => invokeSafe<void>(invoke, 'effects:release', request),
   },
   audio: {
     selectImportFile: (expected: SessionPrecondition) =>

@@ -1,3 +1,4 @@
+import type { PreparedAudioAPI } from './PreparedAudioTypes'
 import type { ProjectOpenProgressEvent } from './AudioPreparationTypes'
 import type {
   MediaRecoverySnapshot,
@@ -121,6 +122,7 @@ export interface RenderProgress {
 export interface RenderProgressEvent extends SessionJobRequest<ExportJobId>, RenderProgress {}
 
 export interface IElectronAPI {
+  preparedAudio: PreparedAudioAPI
   resourcesSelectWhisper(modelId: string): Promise<ResourceSnapshot>
   resourcesGet(): Promise<ResourceSnapshot>
   resourcesPrepare(target: ResourcePreparation): Promise<ResourceSnapshot>

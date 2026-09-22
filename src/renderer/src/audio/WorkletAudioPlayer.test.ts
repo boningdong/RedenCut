@@ -141,6 +141,135 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
 
   afterEach(() => vi.unstubAllGlobals())
 
+  it('awaits normalized PCM, seeks in processed time, and updates gain without preparing again', async () => {
+    const samples = provider()
+    const prepare = vi.fn(async () => samples)
+    const dispose = vi.fn(async () => {})
+    const player = new WorkletAudioPlayer({ prepare, dispose })
+    const original = {
+      ...track('normalized'),
+      effects: [
+        {
+          id: 'norm',
+          type: 'normalize' as const,
+          enabled: true,
+          params: { targetLufs: -16, truePeakDbtp: -1.5, loudnessRange: 7 },
+        },
+      ],
+    }
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([original])
+    await player.play()
+    expect(prepare).toHaveBeenCalledTimes(1)
+    expect(samples.readFrames).toHaveBeenCalledWith(0, 4096, expect.any(AbortSignal))
+    player.setTracks([{ ...original, gainDb: 6, volume: 0.5 }])
+    expect(prepare).toHaveBeenCalledTimes(1)
+    const gain = FakeNode.instances[0].connect.mock.calls[0][0]
+    expect(gain.gain.value).toBeCloseTo(0.5 * 10 ** (6 / 20))
+    player.seekTo(3)
+    await vi.waitFor(() =>
+      expect(samples.readFrames).toHaveBeenCalledWith(144000, 4096, expect.any(AbortSignal)),
+    )
+    await player.destroy()
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('never attaches obsolete normalization after an edit or destruction', async () => {
+    let resolve!: (provider: AudioSampleProvider) => void
+    const pending = new Promise<AudioSampleProvider>((done) => {
+      resolve = done
+    })
+    const prepare = vi.fn(() => pending)
+    const player = new WorkletAudioPlayer({ prepare, dispose: async () => {} })
+    const original = {
+      ...track('normalized'),
+      effects: [
+        {
+          id: 'norm',
+          type: 'normalize' as const,
+          enabled: true,
+          params: { targetLufs: -16, truePeakDbtp: -1.5, loudnessRange: 7 },
+        },
+      ],
+    }
+    await player.registerAudioSource(SOURCE_ID, provider())
+    player.setTracks([original])
+    const playing = player.play()
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalled())
+    player.setTracks([{ ...original, effects: [] }])
+    await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(1))
+    const obsolete = provider()
+    resolve(obsolete)
+    await playing
+    expect(obsolete.readFrames).not.toHaveBeenCalled()
+    expect(FakeNode.instances).toHaveLength(1)
+    await player.destroy()
+  })
+
+  it('rejects processed read failures and disposes while normalization is pending', async () => {
+    const failed = provider()
+    vi.mocked(failed.readFrames).mockRejectedValue(new Error('processed read failed'))
+    const player = new WorkletAudioPlayer({ prepare: async () => failed, dispose: async () => {} })
+    const normalized = {
+      ...track('normalized'),
+      effects: [
+        {
+          id: 'norm',
+          type: 'normalize' as const,
+          enabled: true,
+          params: { targetLufs: -16, truePeakDbtp: -1.5, loudnessRange: 7 },
+        },
+      ],
+    }
+    player.setTracks([normalized])
+    await expect(player.play()).rejects.toThrow('processed read failed')
+    await player.destroy()
+    let resolve!: (samples: AudioSampleProvider) => void
+    const prepare = vi.fn(
+      () =>
+        new Promise<AudioSampleProvider>((done) => {
+          resolve = done
+        }),
+    )
+    const dispose = vi.fn(async () => {})
+    const pendingPlayer = new WorkletAudioPlayer({ prepare, dispose })
+    pendingPlayer.setTracks([normalized])
+    const playing = pendingPlayer.play()
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalled())
+    await pendingPlayer.destroy()
+    const late = provider()
+    resolve(late)
+    await playing
+    expect(late.readFrames).not.toHaveBeenCalled()
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('surfaces preparation failure without creating a dry queue', async () => {
+    const player = new WorkletAudioPlayer({
+      prepare: async () => {
+        throw new Error('failed preparation')
+      },
+      dispose: async () => {},
+    })
+    player.setTracks([
+      {
+        ...track('normalized'),
+        effects: [
+          {
+            id: 'norm',
+            type: 'normalize' as const,
+            enabled: true,
+            params: { targetLufs: -16, truePeakDbtp: -1.5, loudnessRange: 7 },
+          },
+        ],
+      },
+    ])
+    await expect(player.play()).rejects.toThrow('failed preparation')
+    expect(FakeNode.instances).toHaveLength(0)
+    expect(player.isPlaying()).toBe(false)
+    await player.destroy()
+  })
+
   it.each([false, true])(
     'settles paused prefill after delayed consumption acknowledgement (read failure: %s)',
     async (failRead) => {

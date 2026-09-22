@@ -1,3 +1,4 @@
+import { registerPreparedAudioIpc } from './ipc/PreparedAudioIpc'
 import { MediaRecoveryCoordinator } from './project/MediaRecoveryCoordinator'
 import { MediaRecoveryService } from './project/MediaRecoveryService'
 import { registerMediaRecoveryIpc } from './ipc/MediaRecoveryIpc'
@@ -179,6 +180,7 @@ startApplicationLifecycle({
       dialogs,
     )
     registerAudioIpc(controller, jobs, console.error, dialogs)
+    registerPreparedAudioIpc(controller, jobs)
     registerTranscriptIpc(controller, jobs)
     registerSpeechAnalysisIpc(controller, jobs, console.error, {
       resources,

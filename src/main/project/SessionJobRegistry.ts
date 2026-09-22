@@ -1,6 +1,6 @@
 import type { WorkspaceToken } from '../../shared/session.types'
 
-type SessionJobKind = 'import' | 'transcription' | 'speech-analysis' | 'export'
+type SessionJobKind = 'import' | 'transcription' | 'speech-analysis' | 'export' | 'effects'
 
 export interface SessionJobIdentity {
   kind: SessionJobKind

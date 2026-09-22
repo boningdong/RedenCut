@@ -1,3 +1,5 @@
+import { trackGain } from '@shared/TrackEffects'
+import { PreparedTrackProvider } from './PreparedTrackProvider'
 import { hasSamePlaybackStructure } from './PlaybackStructure'
 import type { AudioSourceId, Track } from '@shared/ProjectTypes'
 import type {
@@ -18,6 +20,7 @@ const MAX_FRAMES = SAMPLE_RATE * 3
 const READ_FRAMES = 4096
 
 interface TrackQueue {
+  prepared?: AudioSampleProvider
   node: AudioWorkletNode
   gain: GainNode
   generation: number
@@ -40,6 +43,12 @@ interface PrefillWaiter {
 }
 
 export class WorkletAudioPlayer implements RenderAudioPlayer {
+  constructor(
+    private readonly preparation: Pick<
+      PreparedTrackProvider,
+      'prepare' | 'dispose'
+    > = new PreparedTrackProvider(),
+  ) {}
   private context: AudioContext | null = null
   private contextInitialization: Promise<void> | null = null
   private contextLifecycle = 0
@@ -71,6 +80,7 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
   private stateCallbacks = new Set<(playing: boolean) => void>()
   private durationCallbacks = new Set<(duration: number) => void>()
   private endedCallbacks = new Set<() => void>()
+  private preparationCallbacks = new Set<(preparing: boolean) => void>()
   private errorCallbacks = new Set<(error: Error) => void>()
 
   async registerAudioSource(id: AudioSourceId, samples: AudioSampleProvider): Promise<void> {
@@ -94,7 +104,7 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
     if (volumeOnlyChange) {
       for (const track of tracks) {
         const queue = this.queues.get(track.id)
-        if (queue) queue.gain.gain.value = track.volume
+        if (queue) queue.gain.gain.value = track.volume * trackGain(track)
       }
       return
     }
@@ -218,6 +228,11 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
     this.endedCallbacks.add(callback)
     return () => this.endedCallbacks.delete(callback)
   }
+  onPreparationStateChange(callback: (preparing: boolean) => void): () => void {
+    this.preparationCallbacks.add(callback)
+    return () => this.preparationCallbacks.delete(callback)
+  }
+
   onError(callback: (error: Error) => void): () => void {
     this.errorCallbacks.add(callback)
     return () => this.errorCallbacks.delete(callback)
@@ -226,6 +241,7 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
   destroy(): Promise<void> {
     if (this.destruction) return this.destruction
     this.destroyed = true
+    this.preparationCallbacks.forEach((callback) => callback(false))
     this.rebuildToken++
     this.contextLifecycle++
     this.pause()
@@ -241,7 +257,10 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
     const context = this.context
     const initialization = this.contextInitialization
     this.context = null
-    const teardown = [context ? Promise.resolve().then(() => context.close()) : Promise.resolve()]
+    const teardown = [
+      this.preparation.dispose(),
+      context ? Promise.resolve().then(() => context.close()) : Promise.resolve(),
+    ]
     if (initialization) teardown.push(initialization)
     this.destruction = Promise.allSettled(teardown).then((results) => {
       const failure = results.find(
@@ -302,7 +321,29 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
       queue.gain.disconnect()
     }
     this.queues.clear()
-    for (const plan of this.renderPlan.tracks) {
+    const preparationTracks = this.tracks
+    const preparationMode = this.mode
+    const plans = this.renderPlan.tracks
+    const preparing = plans.some((plan) => plan.normalize)
+    if (preparing) this.preparationCallbacks.forEach((callback) => callback(true))
+    let prepared: (AudioSampleProvider | undefined)[]
+    try {
+      prepared = await Promise.all(
+        plans.map((plan) =>
+          plan.normalize
+            ? this.preparation.prepare(preparationTracks, plan.trackId, preparationMode)
+            : Promise.resolve(undefined),
+        ),
+      )
+    } catch (error) {
+      if (rebuildToken !== this.rebuildToken || this.destroyed) return
+      throw error
+    } finally {
+      if (rebuildToken === this.rebuildToken)
+        this.preparationCallbacks.forEach((callback) => callback(false))
+    }
+    if (rebuildToken !== this.rebuildToken || this.destroyed) return
+    for (const [planIndex, plan] of plans.entries()) {
       const track = this.tracks.find((candidate) => candidate.id === plan.trackId)!
       const channelCount = Math.max(
         1,
@@ -320,10 +361,11 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
         },
       })
       const gain = this.context!.createGain()
-      gain.gain.value = track.volume
+      gain.gain.value = track.volume * trackGain(track)
       node.connect(gain)
       gain.connect(this.context!.destination)
       const queue: TrackQueue = {
+        prepared: prepared[planIndex],
         node,
         gain,
         generation: ++this.queueGeneration,
@@ -419,13 +461,16 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
           MAX_FRAMES - queue.queuedFrames - this.inFlightFrames(queue),
         )
         if (count <= 0) break
-        const channels = await renderTrackBlock(
-          queue.plan,
-          queue.outputFrame,
-          count,
-          this.providers,
-          queue.controller.signal,
-        )
+        const channels = queue.prepared
+          ? (await queue.prepared.readFrames(queue.outputFrame, count, queue.controller.signal))
+              .channels
+          : await renderTrackBlock(
+              queue.plan,
+              queue.outputFrame,
+              count,
+              this.providers,
+              queue.controller.signal,
+            )
         if (generation !== queue.generation) return
         this.diagnostics.maximumReadFrames = Math.max(this.diagnostics.maximumReadFrames, count)
         sendPcmChunk(queue.node.port, { type: 'pcm', generation, channels, gain: 1 })
@@ -436,6 +481,7 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
         queue.node.port.postMessage({ type: 'end', generation })
       }
     } catch (error) {
+      if (generation !== queue.generation || queue.controller.signal.aborted) return
       const waiter = queue.prefillWaiter
       if (waiter?.generation === generation) {
         queue.prefillWaiter = null
@@ -493,6 +539,7 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
 
   private emitError(error: unknown): void {
     if (isAbortError(error)) return
+    this.pause()
     const resolved = error instanceof Error ? error : new Error(String(error))
     this.errorCallbacks.forEach((callback) => callback(resolved))
   }

@@ -1,3 +1,4 @@
+import { normalizationFilter } from '@shared/TrackEffects'
 import type { AudioContribution, AudioRenderPlan } from '@shared/audio/AudioRenderPlan'
 
 /** Compile the shared sample-domain plan. Clip and track gain each apply once. */
@@ -33,7 +34,9 @@ export function compileFfmpegPlan(
     const label = `track${trackLabels.length}`
     const mix =
       segments.length > 1 ? `amix=inputs=${segments.length}:normalize=0:duration=longest,` : ''
-    parts.push(`${segments.join('')}${mix}volume=${track.volume}[${label}]`)
+    const normalize = track.normalize ? `${normalizationFilter(track.normalize)},` : ''
+    const gain = track.gainDb ? `volume=${10 ** (track.gainDb / 20)},` : ''
+    parts.push(`${segments.join('')}${mix}${normalize}${gain}volume=${track.volume}[${label}]`)
     trackLabels.push(`[${label}]`)
   }
   let output: string
