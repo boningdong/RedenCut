@@ -356,3 +356,87 @@ it('normalizes mono identically in playback and export when another independent 
     rmSync(root, { recursive: true, force: true })
   }
 }, 30_000)
+
+it('prepares four concurrent unequal-length tracks with offset stereo sources and redactions', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'effects-multitrack-'))
+  const service = new PreparedTrackService()
+  try {
+    const durations = [13.17, 31.12345, 37.89123, 18.5]
+    const sources = durations.map((duration, index) => {
+      const id = `00000000-0000-4000-8000-00000000000${index + 1}` as AudioSourceId
+      const path = join(root, `${index}.wav`)
+      execFileSync(getFfmpegPath(), [
+        '-v',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        `sine=frequency=${180 + index * 50}:sample_rate=${index % 2 ? 44100 : 48000}:duration=${duration}`,
+        '-ac',
+        index % 2 ? '2' : '1',
+        '-c:a',
+        'pcm_f32le',
+        path,
+      ])
+      return {
+        id,
+        metadata: { channels: index % 2 ? 2 : 1, durationSeconds: duration },
+        fingerprint: { sha256: String(index) },
+        path,
+      } as AudioSource & { path: string }
+    })
+    const tracks: Track[] = sources.map((source, index) => ({
+      id: `track${index}`,
+      name: `Track${index}`,
+      color: '#fff',
+      volume: 1,
+      muted: false,
+      solo: false,
+      effects: [{ id: 'normalize', type: 'normalize', enabled: true, params: NORMALIZE_DEFAULTS }],
+      clips: [
+        {
+          id: `clip${index}`,
+          trackId: `track${index}`,
+          audioSourceId: source.id,
+          sourceStart: index * 0.17,
+          sourceEnd: durations[index],
+          outputStart: index * 1.47,
+          gain: 1,
+          muted: false,
+          effects: [],
+          redactions: [
+            {
+              id: `redact${index}`,
+              sourceStart: 3.1123,
+              sourceEnd: 6.8834,
+              crossfade: { enabled: true, durationMs: 50, curve: 'equal-power' },
+            },
+          ],
+        },
+      ],
+    }))
+    for (const mode of ['timeline', 'edited'] as const) {
+      const plan = buildAudioRenderPlan(tracks, mode)
+      const results = await Promise.all(
+        plan.tracks.map((track) =>
+          service.prepare(
+            { ...plan, tracks: [track] },
+            mode,
+            sources,
+            async (id) => sources.find((s) => s.id === id)!.path,
+          ),
+        ),
+      )
+      expect(results.every((result) => result.frameCount === plan.durationFrames)).toBe(true)
+      for (const result of results)
+        expect(
+          (
+            await service.read(result.handle, Math.min(48000, result.frameCount - 4096), 4096)
+          ).channels[0].every(Number.isFinite),
+        ).toBe(true)
+    }
+  } finally {
+    await service.dispose()
+    rmSync(root, { recursive: true, force: true })
+  }
+}, 30_000)

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { RuntimeValidationError } from '../runtime/RuntimeValidator'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
@@ -202,4 +203,13 @@ it('keeps admitted preparation and reads valid across ordinary saves of the same
   expect(await f.call('read', request)).toMatchObject({ ok: true })
   f.controller.workspace = { ...f.controller.workspace }
   expect(await f.call('read', request)).toMatchObject({ ok: false })
+})
+
+it('returns public managed-runtime guidance when Normalize cannot resolve FFmpeg', async () => {
+  const f = setup()
+  mocks.prepare.mockRejectedValueOnce(new RuntimeValidationError('ffmpeg', 'missing'))
+  expect(await f.call('prepare')).toMatchObject({
+    ok: false,
+    error: { code: 'operation-failed', reason: 'runtime-unavailable' },
+  })
 })

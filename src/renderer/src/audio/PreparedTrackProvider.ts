@@ -1,6 +1,7 @@
 import type { Track, AudioSourceId } from '@shared/ProjectTypes'
 import type { AudioSampleProvider, PlaybackMode } from '@shared/PlayerTypes'
 import type { SessionPrecondition } from '@shared/session.types'
+import { normalizePublicError } from '../i18n/messages'
 import { useEditorStore } from '../stores/editor.store'
 
 /** Owns the session lease; queue generations decide whether completed preparation may attach. */
@@ -44,13 +45,17 @@ export class PreparedTrackProvider {
       frameCount: descriptor.frameCount,
       readFrames: async (startFrame, frameCount, signal) => {
         signal.throwIfAborted()
-        const chunk = await window.electronAPI.preparedAudio.read({
-          ...this.currentSession(),
-          requestId: this.requestId,
-          handle: descriptor.handle,
-          startFrame,
-          frameCount,
-        })
+        const chunk = await window.electronAPI.preparedAudio
+          .read({
+            ...this.currentSession(),
+            requestId: this.requestId,
+            handle: descriptor.handle,
+            startFrame,
+            frameCount,
+          })
+          .catch((error: unknown) => {
+            throw playbackError(error)
+          })
         signal.throwIfAborted()
         if (
           chunk.startFrame !== startFrame ||
@@ -82,7 +87,7 @@ export class PreparedTrackProvider {
       } catch (error) {
         if (this.disposed) throw new DOMException('Player destroyed', 'AbortError')
         const current = this.currentSession()
-        if (current.revision === session.revision || attempt >= 2) throw error
+        if (current.revision === session.revision || attempt >= 2) throw playbackError(error)
         session = current
       }
     }
@@ -94,4 +99,10 @@ export class PreparedTrackProvider {
       throw new DOMException('Project changed', 'AbortError')
     return { workspaceToken: session.workspaceToken, revision: session.revision }
   }
+}
+
+/** Playback callbacks carry Error instances; retain only the public IPC reason for localization. */
+function playbackError(error: unknown): Error {
+  if (error instanceof Error) return error
+  return Object.assign(new Error('Audio preparation failed'), normalizePublicError(error))
 }
