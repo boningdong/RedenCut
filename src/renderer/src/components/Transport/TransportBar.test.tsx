@@ -142,3 +142,11 @@ it('starts in Preview Mode and lets listeners toggle it off and back on', () => 
   fireEvent.click(preview)
   expect(preview.getAttribute('aria-pressed')).toBe('true')
 })
+
+it('announces preparation until ready and clears it when the project resets', () => {
+  render(<TransportBar />)
+  act(() => usePlaybackStore.getState().setPreparing(true))
+  expect(screen.getByRole('status').textContent).toContain('Preparing audio')
+  act(() => usePlaybackStore.getState().reset())
+  expect(screen.queryByRole('status')).toBeNull()
+})

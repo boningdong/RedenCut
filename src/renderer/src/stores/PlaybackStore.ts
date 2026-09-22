@@ -19,6 +19,7 @@
 import { create } from 'zustand'
 
 interface PlaybackState {
+  isPreparing: boolean
   isPlaying: boolean
   currentTime: number // editing timeline seconds
   duration: number // editing timeline seconds
@@ -29,6 +30,7 @@ interface PlaybackState {
   revealTimelineTime: (time: number) => void
 
   // ── Actions ──────────────────────────────────────────────────────────────
+  setPreparing: (preparing: boolean) => void
   setPlaying: (playing: boolean) => void
   setCurrentTime: (time: number, outputTime?: number) => void
   setDuration: (duration: number, outputDuration?: number) => void
@@ -36,6 +38,7 @@ interface PlaybackState {
 }
 
 const initialState = {
+  isPreparing: false,
   isPlaying: false,
   currentTime: 0,
   duration: 0,
@@ -47,6 +50,7 @@ const initialState = {
 export const usePlaybackStore = create<PlaybackState>()((set) => ({
   ...initialState,
 
+  setPreparing: (preparing) => set({ isPreparing: preparing }),
   setPlaying: (playing) => set({ isPlaying: playing }),
   setCurrentTime: (time, outputTime = time) =>
     set({ currentTime: time, outputCurrentTime: outputTime }),

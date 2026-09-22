@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { NormalizeEffectSchema } from './TrackEffects'
 import { MixLinkSchema, SourceOverrideSchema } from './MixLinkTypes'
 import { CrossfadeSettingsSchema } from './audio/CrossfadeTypes'
 import { SpeakerIdentityCatalogSchema } from './SpeakerIdentityTypes'
@@ -112,12 +113,14 @@ const ExportSettingsSchema = z.object({
   sampleRate: z.number().default(48_000),
 })
 
-const EffectSchema = z.object({
+const LegacyEffectSchema = z.object({
   id: z.string(),
   type: z.enum(['gain', 'eq', 'compressor', 'noise-reduction']),
   enabled: z.boolean().default(true),
   params: z.record(z.string(), z.number()).default({}),
 })
+
+const EffectSchema = z.union([NormalizeEffectSchema, LegacyEffectSchema])
 
 export const ClipRedactionSchema = z
   .object({
@@ -141,40 +144,46 @@ export const ClipSchema = z.object({
   muted: z.boolean().default(false),
   redactions: z.array(ClipRedactionSchema).optional(),
   sourceOverrides: z.array(SourceOverrideSchema).optional(),
-  effects: z.array(EffectSchema).default([]),
+  effects: z.array(LegacyEffectSchema).default([]),
 })
 export type Clip = z.infer<typeof ClipSchema>
 
-export const TrackSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  clips: z.array(ClipSchema).default([]),
-  mixLink: MixLinkSchema.extend({
-    hiddenSegments: z
-      .array(
-        z
-          .object({
-            masterClipId: z.string().min(1),
-            masterSourceStart: z.number().finite().nonnegative(),
-            clip: ClipSchema.refine(
-              (clip) =>
-                Number.isFinite(clip.sourceStart) &&
-                Number.isFinite(clip.sourceEnd) &&
-                clip.sourceEnd > clip.sourceStart &&
-                !clip.sourceOverrides?.length,
-              'Hidden source segment must have valid raw source bounds',
-            ),
-          })
-          .strict(),
-      )
-      .optional(),
-  }).optional(),
-  volume: z.number().default(1),
-  muted: z.boolean().default(false),
-  solo: z.boolean().default(false),
-  color: z.string().default('#4f46e5'),
-  effects: z.array(EffectSchema).default([]),
-})
+export const TrackSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    clips: z.array(ClipSchema).default([]),
+    mixLink: MixLinkSchema.extend({
+      hiddenSegments: z
+        .array(
+          z
+            .object({
+              masterClipId: z.string().min(1),
+              masterSourceStart: z.number().finite().nonnegative(),
+              clip: ClipSchema.refine(
+                (clip) =>
+                  Number.isFinite(clip.sourceStart) &&
+                  Number.isFinite(clip.sourceEnd) &&
+                  clip.sourceEnd > clip.sourceStart &&
+                  !clip.sourceOverrides?.length,
+                'Hidden source segment must have valid raw source bounds',
+              ),
+            })
+            .strict(),
+        )
+        .optional(),
+    }).optional(),
+    volume: z.number().default(1),
+    gainDb: z.number().finite().min(-24).max(24).optional(),
+    muted: z.boolean().default(false),
+    solo: z.boolean().default(false),
+    color: z.string().default('#4f46e5'),
+    effects: z.array(EffectSchema).default([]),
+  })
+  .refine(
+    (track) => track.effects.filter((effect) => effect.type === 'normalize').length <= 1,
+    'Only one Normalize effect is allowed per track',
+  )
 export type Track = z.infer<typeof TrackSchema>
 /** Content and presentation consumers do not depend on the live mixer level. */
 export type TrackContent = Omit<Track, 'volume'>
@@ -216,7 +225,7 @@ export type SpeakerLabelOverride = z.infer<typeof SpeakerLabelOverrideSchema>
 
 export const ProjectFileSchema = z
   .object({
-    version: z.union([z.literal(2), z.literal(3)]),
+    version: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     createdAt: z.string(),
     audioSettings: z.object({ processingSampleRate: z.literal(48_000) }).strict(),
     audioSources: z.array(AudioSourceSchema),
@@ -231,6 +240,19 @@ export const ProjectFileSchema = z
   })
   .strict()
   .superRefine((project, context) => {
+    if (
+      project.version < 4 &&
+      project.tracks.some(
+        (track) =>
+          track.gainDb !== undefined || track.effects.some((effect) => effect.type === 'normalize'),
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['version'],
+        message: 'Track gain and Normalize require project version 4',
+      })
+    }
     if (
       project.version === 2 &&
       project.tracks.some(
@@ -444,12 +466,12 @@ export const ProjectFileSchema = z
       overrides.add(key)
     })
   })
-  .transform((project) => ({ ...project, version: 3 as const }))
+  .transform((project) => ({ ...project, version: 4 as const }))
 export type ProjectFile = z.infer<typeof ProjectFileSchema>
 
 export function createEmptyProject(createdAt = new Date().toISOString()): ProjectFile {
   return ProjectFileSchema.parse({
-    version: 3,
+    version: 4,
     createdAt,
     audioSettings: { processingSampleRate: 48_000 },
     audioSources: [],

@@ -1,18 +1,23 @@
 import * as renderPlans from '@shared/audio/AudioRenderPlanBuilder'
 import { expect, it, vi } from 'vitest'
-import type { Track } from '@shared/ProjectTypes'
+import type { Track, AudioSourceId } from '@shared/ProjectTypes'
 import { PlaybackTimelineAdapter } from './PlaybackTimelineAdapter'
 import type { RenderAudioPlayer } from '@shared/PlayerTypes'
-const tracks = [
+const tracks: Track[] = [
   {
     id: 't',
+    name: 'Voice',
+    color: '#a393ee',
+    effects: [],
     volume: 1,
     muted: false,
     solo: false,
     clips: [
       {
         id: 'c',
-        audioSourceId: 's',
+        trackId: 't',
+        effects: [],
+        audioSourceId: 's' as AudioSourceId,
         sourceStart: 0,
         sourceEnd: 2,
         outputStart: 0,
@@ -29,7 +34,7 @@ const tracks = [
       },
     ],
   },
-] as Track[]
+]
 function fixture() {
   let time = 0
   const callbacks = new Set<(n: number) => void>()

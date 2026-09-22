@@ -1,3 +1,4 @@
+import { NORMALIZE_DEFAULTS } from '@shared/TrackEffects'
 import {
   DEFAULT_CROSSFADE_SETTINGS,
   CrossfadeSettingsSchema,
@@ -172,6 +173,9 @@ interface TimelineState {
   addTrack(name?: string, audioSourceId?: AudioSourceId): string
   removeTrack(trackId: string): void
   updateTrack(trackId: string, patch: Partial<Omit<Track, 'id' | 'clips'>>): void
+  setTrackGain(trackId: string, gainDb: number): void
+  setTrackVolume(trackId: string, volume: number): void
+  toggleTrackNormalize(trackId: string): void
 
   // ── Clip operations ────────────────────────────────────────────────────────
 
@@ -466,6 +470,40 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     next = next.filter((track) => track.id !== trackId)
     get().commitTracks(tracks, next, 'Remove track')
     if (get().selectedTrackId === trackId) set({ selectedTrackId: null })
+  },
+
+  setTrackGain(trackId, gainDb) {
+    if (!Number.isFinite(gainDb) || gainDb < -24 || gainDb > 24) return
+    const track = get().tracks.find((entry) => entry.id === trackId)
+    if (!track || (track.gainDb ?? 0) === gainDb) return
+    commitTrackAudioSettings(trackId, { gainDb }, 'Adjust track gain')
+  },
+
+  setTrackVolume(trackId, volume) {
+    if (!Number.isFinite(volume) || volume < 0 || volume > 1) return
+    const track = get().tracks.find((entry) => entry.id === trackId)
+    if (!track || track.volume === volume) return
+    commitTrackAudioSettings(trackId, { volume }, 'Adjust track volume')
+  },
+
+  toggleTrackNormalize(trackId) {
+    const track = get().tracks.find((entry) => entry.id === trackId)
+    if (!track) return
+    const existing = track.effects.find((effect) => effect.type === 'normalize')
+    const effects: Track['effects'] = existing
+      ? track.effects.map((effect) =>
+          effect === existing ? { ...effect, enabled: !effect.enabled } : effect,
+        )
+      : [
+          ...track.effects,
+          {
+            id: nextId('normalize'),
+            type: 'normalize',
+            enabled: true,
+            params: { ...NORMALIZE_DEFAULTS },
+          },
+        ]
+    commitTrackAudioSettings(trackId, { effects }, 'Toggle track normalization')
   },
 
   // ── updateTrack ─────────────────────────────────────────────────────────────
@@ -1127,4 +1165,21 @@ function addRedactions(clips: Clip[], startTime: number, endTime: number, trackI
   }
 
   return result
+}
+
+/** Level gestures submit a single completed value so history is independent of pointer event count. */
+function commitTrackAudioSettings(
+  trackId: string,
+  patch: Partial<Pick<Track, 'volume' | 'gainDb' | 'effects'>>,
+  label: string,
+): void {
+  const state = useTimelineStore.getState()
+  if (linkedMasterForTrack(state.tracks, trackId)) return
+  if (!state.tracks.some((track) => track.id === trackId)) return
+  useTimelineStore.setState({
+    tracks: state.tracks.map((track) => (track.id === trackId ? { ...track, ...patch } : track)),
+    undoStack: [...state.undoStack, { before: cloneTracks(state.tracks), label }],
+    redoStack: [],
+  })
+  markTimelineEdited()
 }

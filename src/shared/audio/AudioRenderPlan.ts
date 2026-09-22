@@ -1,3 +1,4 @@
+import type { NormalizeParams } from '../TrackEffects'
 import type { SourceSpan, CrossfadeResolution } from './CrossfadeTypes'
 import type { GainEnvelope } from './GainEnvelope'
 import type { TimelineTimeMap } from './TimelineTimeMap'
@@ -10,6 +11,8 @@ export interface AudioContribution {
 }
 export interface TrackRenderPlan {
   trackId: string
+  gainDb?: number
+  normalize?: NormalizeParams
   volume: number
   contributions: AudioContribution[]
 }

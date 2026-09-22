@@ -15,7 +15,7 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 | Core editing | ✅ | Split, mute, unmute, clip removal, clip movement, selection, undo, redo, and atomic managed-package save/load. |
 | Transcript | ✅ | Local whisper.cpp generation, word-level timestamps, per-track visibility and generation, click-to-seek, active-word highlighting, text-driven muting, timestamp calibration, and muted-word display control. |
 | Multi-track timeline | 🚧 | Stacked tracks, track headers, browse-based track addition, track removal, clip repositioning, and synchronized playback are implemented; file-drop import and remaining polish are pending. |
-| Export | 🚧 | Main-owned destination selection, MP3/WAV/FLAC/AAC encoding, output placement, clip/track gain, mute/solo routing, multi-track mixing, and progress events are implemented; loudness processing and richer error presentation remain incomplete. |
+| Export | 🚧 | Main-owned destination selection, MP3/WAV/FLAC/AAC encoding, output placement, clip/track gain, mute/solo routing, multi-track mixing, and progress events are implemented; track speech loudness leveling is implemented; configurable final-master loudness and richer error presentation remain incomplete. |
 
 ## Current Milestone — Complete Timeline and Export
 
@@ -54,15 +54,16 @@ Status legend: ✅ complete, 🚧 in progress, ⏳ planned.
 
 ### Loudness Normalization
 
-- Add two-pass FFmpeg `loudnorm` processing using the project's LUFS target and true-peak ceiling.
+- [x] Non-destructive track speech leveling and loudness normalization, including synchronized replacement sources, shared by prepared playback and export.
+- [ ] Add optional final-master two-pass loudness normalization independent of per-track processing.
 - Make loudness and true-peak settings editable in the export UI.
 - Verify rendered loudness against the requested target with representative fixtures.
 
 ### Gain and Crossfades
 
-- Apply clip gain and track volume during export.
+- [x] Apply clip gain, post-effect track gain, and track volume during playback and export.
 - Add configurable crossfades at edit boundaries to prevent audible clicks.
-- Provide a playback approximation for gain and transitions without changing the `IAudioPlayer` boundary.
+- [x] Share transition rendering semantics and effect ordering between playback and export.
 
 ### Inspector
 

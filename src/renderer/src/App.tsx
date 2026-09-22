@@ -142,6 +142,7 @@ export default function App() {
     const player = playerRef.current
     playerRef.current = null
     setAudioPlayerInstance(null)
+    usePlaybackStore.getState().setPreparing(false)
     playerSubscriptions.current.splice(0).forEach((unsubscribe) => unsubscribe())
     if (!player) return
     player.pause()
@@ -170,6 +171,7 @@ export default function App() {
                 usePlaybackStore.getState().setCurrentTime(time, player.getOutputCurrentTime()),
               ),
               player.onPlayStateChange(usePlaybackStore.getState().setPlaying),
+              player.onPreparationStateChange(usePlaybackStore.getState().setPreparing),
               player.onDurationChange((duration) => {
                 usePlaybackStore.getState().setDuration(duration, player.getOutputDuration())
                 usePlaybackStore
@@ -207,6 +209,7 @@ export default function App() {
         usePlaybackStore.getState().reset()
         if (request.retainVisibleEditorState) {
           useTimelineStore.getState().refreshAudioSources(result.sources)
+          prepared.player.setTracks(useTimelineStore.getState().tracks)
         } else {
           useTimelineStore.getState().loadFromProject(result.sources, result.draft.tracks)
           useTranscriptStore.getState().reset()
@@ -619,6 +622,12 @@ export default function App() {
         if (!saved) return
         if (!sameSession(useEditorStore.getState().session, currentSession)) return
         acknowledgeSave(saved, capturedLocalEditRevision)
+        if (saved.workspaceToken !== currentSession.workspaceToken) {
+          const position = playerRef.current?.getCurrentTime() ?? 0
+          await loadSession(saved, undefined, true)
+          if (useEditorStore.getState().session?.workspaceToken !== saved.workspaceToken) return
+          playerRef.current?.seekTo(position)
+        }
         invalidateTranscriptJobForSession(useEditorStore.getState().session)
         invalidateImportJobForSession(useEditorStore.getState().session)
         setError(null)
@@ -627,7 +636,13 @@ export default function App() {
           setError(normalizePublicError(reason))
       }
     },
-    [acknowledgeSave, invalidateImportJobForSession, invalidateTranscriptJobForSession, snapshot],
+    [
+      acknowledgeSave,
+      invalidateImportJobForSession,
+      invalidateTranscriptJobForSession,
+      loadSession,
+      snapshot,
+    ],
   )
 
   useKeyboardShortcuts({

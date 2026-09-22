@@ -58,7 +58,7 @@ describe('ProjectFileSchema', () => {
   it('parses the first published managed-package schema and applies defaults', () => {
     const project = ProjectFileSchema.parse(managedProject())
 
-    expect(project.version).toBe(3)
+    expect(project.version).toBe(4)
     expect(project.audioSettings.processingSampleRate).toBe(48_000)
     expect(project.tracks[0].clips.map((clip) => clip.audioSourceId)).toEqual([
       SOURCE_ID,

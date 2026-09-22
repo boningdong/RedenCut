@@ -12,7 +12,7 @@ export function useTrackContent(): TrackContent[] {
       if (input === state.tracks) return previous
       input = state.tracks
       const next = state.tracks.map(
-        ({ id, name, clips, muted, solo, color, effects, mixLink }) => ({
+        ({ id, name, clips, muted, solo, color, effects, mixLink, gainDb }) => ({
           id,
           name,
           clips,
@@ -21,6 +21,7 @@ export function useTrackContent(): TrackContent[] {
           color,
           effects,
           mixLink,
+          gainDb,
         }),
       )
       if (

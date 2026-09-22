@@ -45,6 +45,7 @@ export function TransportBar({
   const undo = useTimelineStore((s) => s.undo)
   const redo = useTimelineStore((s) => s.redo)
   const hasAudio = useTimelineStore((s) => s.tracks.some((track) => track.clips.length > 0))
+  const isPreparing = usePlaybackStore((s) => s.isPreparing)
   const isPlaying = usePlaybackStore((s) => s.isPlaying)
   const outputTime = usePlaybackStore((s) => s.outputCurrentTime)
   const outputDuration = usePlaybackStore((s) => s.outputDuration)
@@ -133,6 +134,11 @@ export function TransportBar({
         </Button>
       </div>
       <div className="transport-trailing">
+        {isPreparing && (
+          <span role="status" className="transport-preparing">
+            {t('transport.preparingAudio')}
+          </span>
+        )}
         <div className="transport-time">
           <span>{formatTime(outputTime)}</span>
           <small>/ {formatTime(outputDuration)}</small>

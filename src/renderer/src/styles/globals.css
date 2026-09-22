@@ -827,3 +827,10 @@ summary:focus-visible,
   background: var(--color-border);
   margin: 5px;
 }
+
+.transport-preparing {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  max-width: 110px;
+  line-height: 1.3;
+}

@@ -1,3 +1,4 @@
+import { NORMALIZE_DEFAULTS } from '../TrackEffects'
 import { describe, expect, it } from 'vitest'
 import type { Track } from '../ProjectTypes'
 import { ClipRedactionSchema } from '../ProjectTypes'
@@ -291,6 +292,29 @@ describe('Mix source replacement', () => {
       })),
     ]
   }
+  it('owns Normalize and manual gain on the composed master, ignoring child settings', () => {
+    const tracks = linked()
+    tracks[0].gainDb = 3
+    tracks[0].effects = [
+      { id: 'master-normalize', type: 'normalize', enabled: true, params: NORMALIZE_DEFAULTS },
+    ]
+    tracks[1].gainDb = -24
+    tracks[1].effects = [
+      {
+        id: 'child-normalize',
+        type: 'normalize',
+        enabled: true,
+        params: { ...NORMALIZE_DEFAULTS, targetLufs: -30 },
+      },
+    ]
+    const plan = buildAudioRenderPlan(tracks)
+    expect(plan.tracks).toHaveLength(1)
+    expect(plan.tracks[0].gainDb).toBe(3)
+    expect(plan.tracks[0].normalize).toEqual(NORMALIZE_DEFAULTS)
+    expect(new Set(plan.tracks[0].contributions.map((c) => c.source.audioSourceId))).toEqual(
+      new Set(['s', 'b', 'c']),
+    )
+  })
   it('omits linked child output and ignores child solo/redactions for master transitions', () => {
     const plan = buildAudioRenderPlan(linked())
     expect(plan.tracks.map((t) => t.trackId)).toEqual(['t'])

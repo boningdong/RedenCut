@@ -352,6 +352,7 @@ function installApi(initial: RendererSession) {
         return vi.fn()
       }),
     },
+    preparedAudio: { prepare: vi.fn(), read: vi.fn(), release: vi.fn() },
   } satisfies IElectronAPI
   Object.defineProperty(window, 'electronAPI', { configurable: true, value: api })
   return {
@@ -796,6 +797,23 @@ describe('App transcription job identity', () => {
       expect(screen.queryByRole('alert')).toBeNull()
     },
   )
+
+  it('rebinds playback after Save As while retaining the playhead and track edits', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    const saved = session(TOKEN_B, 2, SOURCE_A, 'Saved')
+    const { api } = await renderInitialized(initial)
+    const originalPlayer = getAudioPlayerInstance()!
+    originalPlayer.seekTo(2)
+    act(() => useTimelineStore.getState().setTrackGain('track-1', 3))
+    api.project.saveAs.mockResolvedValueOnce(saved)
+    fireEvent.click(screen.getByRole('button', { name: 'Save As' }))
+    await waitFor(() => expect(getAudioPlayerInstance()).not.toBe(originalPlayer))
+    await waitFor(() => expect(getAudioPlayerInstance()?.getCurrentTime()).toBe(2))
+    expect(mocks.players[0].destroy).toHaveBeenCalled()
+    expect(useTimelineStore.getState().tracks[0].gainDb).toBe(3)
+    expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B)
+    expect(useEditorStore.getState().isDirty).toBe(false)
+  })
 
   it('keeps an r1 import active across an ordinary save revision and reports its failure', async () => {
     const initial = session(TOKEN_A, 1, SOURCE_A, 'A')

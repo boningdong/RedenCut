@@ -101,6 +101,9 @@ export class PlaybackTimelineAdapter implements IAudioPlayer {
   onEnded(callback: () => void): () => void {
     return this.raw.onEnded(callback)
   }
+  onPreparationStateChange(callback: (preparing: boolean) => void): () => void {
+    return this.raw.onPreparationStateChange?.(callback) ?? (() => {})
+  }
   onError(callback: (error: Error) => void): () => void {
     return this.raw.onError(callback)
   }

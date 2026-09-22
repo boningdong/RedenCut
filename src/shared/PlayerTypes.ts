@@ -102,6 +102,8 @@ export interface IAudioPlayer {
   /** Fires when playback reaches the end of the output timeline. */
   onEnded(callback: () => void): () => void
 
+  onPreparationStateChange?(callback: (preparing: boolean) => void): () => void
+
   onError(callback: (error: Error) => void): () => void
 
   getDiagnostics(): PlaybackDiagnostics

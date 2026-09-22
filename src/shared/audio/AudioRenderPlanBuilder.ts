@@ -1,3 +1,4 @@
+import { getNormalizeEffect } from '../TrackEffects'
 import { getIndependentTracks, resolveSourceSpans } from '../SourceRouting'
 import type { Track } from '../ProjectTypes'
 import type { AudioRenderPlan, AudioContribution } from './AudioRenderPlan'
@@ -116,7 +117,13 @@ export function buildAudioRenderPlan(
         a.outputStartFrame - b.outputStartFrame ||
         a.source.sourceStartFrame - b.source.sourceStartFrame,
     )
-    return { trackId: track.id, volume: track.volume, contributions: routedContributions }
+    return {
+      trackId: track.id,
+      volume: track.volume,
+      contributions: routedContributions,
+      ...(track.gainDb !== undefined ? { gainDb: track.gainDb } : {}),
+      ...(getNormalizeEffect(track) ? { normalize: getNormalizeEffect(track)!.params } : {}),
+    }
   })
   return {
     sampleRate: 48000,

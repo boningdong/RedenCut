@@ -132,7 +132,7 @@ Escape closes settings or explicitly skips onboarding; dialog closure leaves act
 
 ## Mix Source Replacement
 
-The monochrome hierarchy button after a track's volume selects independent recordings to lock to that Mix.
+The monochrome hierarchy button at the start of the track control grid selects independent recordings to lock to that Mix.
 Its connected branch lines represent the master and indented children; active background indicates an established link.
 Linked child tracks are compact and read-only; their stored redactions and track controls are ignored while supplying replacement source audio.
 Use the existing ruler range and target Mix, then Replace audio to open the anchored floating selector.
@@ -141,8 +141,8 @@ Replacement is not Redact and never shortens time by itself; master Redact and c
 Time edits originate on Mix and synchronize child material; child redactions survive unlink, which returns affected replacement ranges to Mix after a warning.
 The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.
 
-Linked masters show an explicit Mix role, member count and expandable child hierarchy; the child × remains Delete Track, while unlinking is a separate management action.
-At most six independent tracks can be linked. Linked master rows are slightly taller (80 px versus the ordinary 64 px), with centered waveforms: intervals using up to three sources use parallel stacked waveforms; intervals using four through six sources use one theme-accent illustrative waveform.
+Linked masters show an explicit Mix role, member count and expandable child hierarchy. Right-click a track header or press Shift+F10 while it is focused for Delete Track and collapse/expand commands; unlinking remains a separate management action. The track-name row has no action buttons.
+At most six independent tracks can be linked. Linked master rows are taller (108 px versus ordinary 92 px; linked children remain 44 px), with centered waveforms: intervals using up to three sources use parallel stacked waveforms; intervals using four through six sources use one theme-accent illustrative waveform.
 Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement selects its visible interval.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
 Applied-replacement edge handles adjust its audio coverage; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.
@@ -165,3 +165,13 @@ Split requires one selected clip and a playhead strictly inside its bounds.
 Context menus omit shortcut labels.
 Arrow keys move between enabled commands, Home/End select the first/last enabled command, Enter or Space activates it, and Escape dismisses and restores focus.
 Menus close on outside pointer interaction, viewport scrolling or resizing; keyboard input inside them cannot trigger background editor commands.
+
+## Track Levels and Effects
+
+The track header uses a six-column grid with 26 px control rows: Sync, Mute, Solo and a three-column Volume control above three-column Effects and Gain controls.
+Volume and Gain use transparent A2 surfaces, setting indicators and hover/focus feedback.
+Click a level region to open its anchored editor; a completed slider gesture commits one undo item, while Escape or an outside click discards an uncommitted slider gesture. Gain also accepts a numeric dB entry: Enter or blur commits a valid value once, invalid or out-of-range input reverts, and Escape cancels the numeric draft.
+Gain is a post-effect adjustment in dB; Volume retains the output percentage control.
+Effects shows an icon and dropdown arrow; any enabled effect highlights the trigger and Normalize exposes a persistent checked menu item.
+Normalize balances speech levels on the composed track, including replacement audio; disabling it preserves settings and source recordings.
+Playback preparation announces its pending state in the transport; processing errors surface through the existing player error path.

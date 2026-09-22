@@ -136,6 +136,16 @@
 - Shared source routing substitutes contributions within the existing frame render plan, preserving envelopes and editing/output time mapping. Child tracks never independently protect redactions or schedule audible contributions.
 - Structural master edits synchronize child source coverage; unsupported or ambiguous edits fail atomically instead of breaking alignment. Association retains current timing and warns for previously edited recordings.
 - Transcript source identity remains independent from master edit ownership. Replacement text uses source-track background color, while its redaction target is the exact master occurrence.
-- Version 3 project writes retain links and overrides; version 2 input migrates explicitly, with no back-writing to older apps.
+- Version 4 project writes retain track gain, normalization, links and overrides; versions 2 and 3 migrate explicitly, with no back-writing to older apps.
 - New Mix link mutations accept at most six independent recordings; existing serialized projects remain readable.
 - Replacement presentation is derived from linked count, selected source identities and available pixel width, never persisted as routing truth. Combined decorative waveforms are illustrative, not peak measurements.
+
+## Track Loudness Effects
+
+- Track gain and typed Normalize settings are project metadata, version 4; source recordings are never overwritten.
+- `TrackEffects.ts` owns parameter validation and the shared speech-leveling/loudness filter definition; resolve replacements and mix contributions before applying Normalize, then apply manual gain and volume once.
+- Main owns prepared Float32 PCM and FFmpeg processes behind session-scoped leases; renderer requests use source IDs, track metadata and opaque handles, never file paths.
+- Playback preparation uses the current render mode's exact composition; export uses the edited composition and the identical filter sequence. Prepared audio is regenerated after composition changes, not after post-effect gain or volume changes.
+- Prepared reads are bounded and active-session validated; late results cannot attach to a replaced playback generation. Project closure and player disposal settle preparation and remove owned temporary artifacts.
+- Normalize is speech leveling plus loudness normalization, not speaker separation or a guarantee of identical loudness for simultaneous speakers. Manual positive gain or summing multiple tracks can exceed the per-effect peak ceiling.
+- Level gestures and effect toggles use track snapshot history; UI checked/highlight state derives from saved effect state rather than separate booleans.
