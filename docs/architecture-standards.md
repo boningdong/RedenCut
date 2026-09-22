@@ -139,7 +139,7 @@
 - Transcript source identity remains independent from master edit ownership. Replacement text uses source-track background color, while its redaction target is the exact master occurrence.
 - Version 4 project writes retain track gain, normalization, links and overrides; versions 2 and 3 migrate explicitly, with no back-writing to older apps.
 - New Mix link mutations accept at most six independent recordings; existing serialized projects remain readable.
-- Replacement presentation is derived from linked count, selected source identities and available pixel width, never persisted as routing truth. Replacement waveforms use the actual prepared composite output when available, with source provenance retained as overlays; pending raw source rows are separate rather than summed extrema.
+- Replacement presentation is derived from linked count, selected source identities and available pixel width, never persisted as routing truth. Replacement intervals always show separate source-colored waveform rows, including after processing completes. These rows visualize routed source provenance, with master Gain applied; they are not a decomposition of nonlinear Mix effects. Prepared composite waveforms remain outside replacement intervals, and audio processing still applies to the actual complete Mix.
 
 ## Track Loudness Effects
 

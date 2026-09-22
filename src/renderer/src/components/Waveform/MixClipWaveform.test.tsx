@@ -120,18 +120,20 @@ it.each([1, 3, 6])('fills available replacement height with %i real source rows'
   expect(container.querySelector('svg')).toBeNull()
 })
 
-it.each([2, 6])(
-  'draws the processed composite without residual %i-source row decorations',
+it.each([1, 2, 3, 6])(
+  'preserves %i colored source waveforms after processing completes',
   (count) => {
     const provider = {} as WaveformDataProvider
     const { container } = setup(count, 40, false, count, provider)
-    const waveform = container.querySelector('[data-processed-waveform] [data-canvas-start]')!
-    expect(waveform.getAttribute('data-canvas-start')).toBe('5')
-    expect(waveform.getAttribute('data-canvas-scale')).toBe('1.7')
-    expect(waveform.getAttribute('data-canvas-gain')).toBe('2')
-    expect(container.querySelectorAll('[data-canvas-start]')).toHaveLength(1)
-    expect(container.querySelectorAll('[data-waveform-track]')).toHaveLength(0)
+    const rows = container.querySelectorAll('[data-source-override="replace"]')
+    expect(rows).toHaveLength(count)
+    for (const row of rows) {
+      expect(row.querySelector('[data-canvas-start]')).not.toBeNull()
+      expect(row.querySelector('[data-canvas-start]')?.getAttribute('data-canvas-start')).toBe('11')
+    }
+    expect(container.querySelectorAll('[data-processed-waveform]')).toHaveLength(2)
+    expect(container.querySelector('[data-source-override] [data-processed-waveform]')).toBeNull()
     expect(container.querySelectorAll('.mix-participant')).toHaveLength(count)
-    expect(screen.getByRole('button', { name: /Sources: s0/ })).toBeTruthy()
+    expect(container.querySelector('[data-mix-presentation="layered"]')).not.toBeNull()
   },
 )

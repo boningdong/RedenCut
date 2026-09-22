@@ -38,16 +38,16 @@ Capture before/after screenshots and actual actions; use the same restart/save e
 ## Waveform Effects and Replacement Display
 
 Run these checks when changing waveform rendering, track Gain/effects, or Mix source replacement presentation, alongside the UI consistency workflow.
-Use the audio fixture with ordinary tracks and a linked Mix; select representative 1/3/6-source replacements, including two or three sources where an obsolete divider would cross the composite waveform.
-The old stacked-source UI is a regression reference, not the expected completed processed presentation.
+Use the audio fixture with ordinary tracks and a linked Mix; select representative 1/3/6-source replacements, including two or three sources with different colors that must remain visible after processing completes.
+The supplied stacked-source UI is the intended source-provenance presentation. An Apply-only transient success is a failure: wait for processing to finish before evaluating the rows.
 
 | ID | Expected observable outcome | Evidence |
 | --- | --- | --- |
 | `waveform-fit` | Initial full-source peak occupies about 85% of the available waveform region, with raster tolerance. Pan/zoom/trim do not refit it; Gain visibly changes amplitude, Volume does not. Explicit Fit/Reset changes only view scale. | Before/after screenshots and rendered-pixel measurements where available. |
 | `waveform-overflow` | Increase Gain until peaks exceed the fixed display scale. Only overflowing bar ends gradually brighten in the track hue; gaps remain empty, no continuous top/bottom lines appear, and the interior of unaffected bars retains its normal color. Reduce Gain or Fit to remove the highlight. This denotes display overflow, not an assertion of audio clipping. | Normal/overflow/restored screenshots, at normal/narrow widths and both explicit themes; inspect actual pixels, not just DOM status. |
-| `replacement-composite` | Completed replacement processing displays one actual composite waveform with usable height. No obsolete stacked-source backgrounds, horizontal separators or silent source baselines cross it. Initial pending source rows may remain only until processed output is ready. | Compare 1/3/6-source replacements, including a processed Normalize result, with the old stacked-source layout; record pending states unavailable with short fixtures explicitly. |
+| `replacement-source-layers` | Completed processing retains a real waveform for every chosen source in a separate source-colored row. Rows share available height and preserve their time alignment. Neither a single master-colored composite nor empty decorative rows may replace them. | Wait until preparation and painting finish, then inspect 1/2/3/6-source cases, Normalize enabled, narrow view and project reopen; compare actual colored waveform pixels, not only captions or the instant after Apply. |
 | `replacement-provenance` | Source names or color dots/count remain accurate and legible after processing. Linked rows retain their own waveforms/colors; clicking the replacement and opening its editor still selects the exact interval and checked sources. | Screenshot plus reopened source-editor snapshot; narrow ranges may use dots/count. |
-| `waveform-transitions` | Toggle Normalize and revise a replacement, then Undo/Redo. Old decorations do not persist with new processed data; no stale waveform from another track/project attaches. Save/restart/reopen preserves effects and routing, while view fit remains ephemeral. | Ordered screenshots/snapshots; asynchronous stale/error paths may additionally use focused automated tests. |
+| `waveform-transitions` | Toggle Normalize and revise a replacement, then Undo/Redo. Source waveforms remain present after each completed processing transition; no stale waveform from another track/project attaches. Save/restart/reopen preserves effects and routing, while view fit remains ephemeral. | Ordered screenshots/snapshots; asynchronous stale/error paths may additionally use focused automated tests. |
 
 ## Change-Focused Exploration
 
