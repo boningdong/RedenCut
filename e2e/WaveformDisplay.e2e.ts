@@ -111,6 +111,52 @@ test('waveform pixels follow Gain and Normalize while Volume leaves the display 
       .poll(async () => (await waveformPixels(ui.page)).hash, { timeout: 30_000 })
       .toBe(baseline.hash)
     await capture('waveform-normalize-disabled')
+    await setGain('12')
+    await expect
+      .poll(async () =>
+        ui.page.locator('.waveform-clip canvas').first().getAttribute('data-visual-overflow'),
+      )
+      .toBe('true')
+    const edges = await ui.page
+      .locator('.waveform-clip canvas')
+      .first()
+      .evaluate((canvas: HTMLCanvasElement) => {
+        const { width, height } = canvas
+        const data = canvas.getContext('2d')!.getImageData(0, 0, width, height).data
+        let edgeInk = 0,
+          edgeLight = 0,
+          edgeOpaque = 0,
+          middleLight = 0,
+          middleOpaque = 0
+        for (const y of [0, height - 1])
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4
+            if (data[i + 3] > 20) edgeInk++
+            if (data[i + 3] > 220) {
+              edgeOpaque++
+              edgeLight += data[i] + data[i + 1] + data[i + 2]
+            }
+          }
+        for (let x = 0; x < width; x++) {
+          const i = (Math.floor(height / 2) * width + x) * 4
+          if (data[i + 3] > 220) {
+            middleOpaque++
+            middleLight += data[i] + data[i + 1] + data[i + 2]
+          }
+        }
+        return {
+          coverage: edgeInk / (width * 2),
+          edgeLight: edgeLight / edgeOpaque,
+          middleLight: middleLight / middleOpaque,
+        }
+      })
+    expect(edges.coverage).toBeGreaterThan(0)
+    expect(edges.coverage).toBeLessThan(0.8)
+    expect(edges.edgeLight).toBeGreaterThan(edges.middleLight)
+    writeFileSync(join(ui.directory, 'overflow-pixels.json'), JSON.stringify(edges, null, 2))
+    await capture('waveform-gradient-overflow')
+    await setGain('0')
+    await expect.poll(async () => (await waveformPixels(ui.page)).hash).toBe(baseline.hash)
     await ui.call('redencut_stop', { discardUnsaved: true })
   } catch (error) {
     if (ui.directory) {

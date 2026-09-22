@@ -128,11 +128,6 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
       gain,
     )
     canvas.dataset.visualOverflow = String(overflow)
-    if (overflow) {
-      context.fillStyle = color
-      context.fillRect(0, 0, backingWidth, devicePixelRatio)
-      context.fillRect(0, backingHeight - devicePixelRatio, backingWidth, devicePixelRatio)
-    }
     canvas.dataset.waveformReady = String(
       cachedRange.range.buckets.length > 0 && backingWidth > 0 && backingHeight > 0,
     )

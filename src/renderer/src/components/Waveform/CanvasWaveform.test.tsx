@@ -196,6 +196,7 @@ it('fits the full-source peak once and preserves scale across scrolling and gain
   await waitFor(() =>
     expect(container.querySelector('canvas')?.dataset.visualOverflow).toBe('true'),
   )
+  expect(context.fillRect.mock.calls.every(([, , width]) => width < 30)).toBe(true)
   vi.restoreAllMocks()
 })
 

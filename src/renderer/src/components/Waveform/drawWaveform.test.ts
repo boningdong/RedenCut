@@ -97,3 +97,40 @@ it('uses rounded bars when a browser drawing context supports paths', () => {
   expect(filled).toBe(1)
   expect(fillRectCalls).toHaveLength(0)
 })
+
+it('brightens only overflowing bar ends with a local gradient and leaves gaps empty', () => {
+  const { context, fillRectCalls } = recordingContext()
+  const gradients: Array<Array<[number, string]>> = []
+  const paints: unknown[] = []
+  Object.assign(context, {
+    createLinearGradient: () => {
+      const stops: Array<[number, string]> = []
+      gradients.push(stops)
+      return { addColorStop: (offset: number, color: string) => stops.push([offset, color]) }
+    },
+    fillRect: (x: number, y: number, width: number, height: number) => {
+      fillRectCalls.push({ x, y, width, height })
+      paints.push(context.fillStyle)
+    },
+  })
+  const overflow = drawWaveform(
+    context,
+    [
+      { min: -0.2, max: 2 },
+      { min: -2, max: 0.2 },
+      { min: -0.2, max: 0.2 },
+    ],
+    30,
+    80,
+    '#aa6699',
+  )
+  expect(overflow).toBe(true)
+  expect(gradients).toHaveLength(2)
+  expect(gradients[0][0][1]).toBe('rgba(255, 255, 255, 0.45)')
+  expect(gradients[0][gradients[0].length - 1][1]).toBe('rgba(255, 255, 255, 0)')
+  expect(gradients[1][0][1]).toBe('rgba(255, 255, 255, 0)')
+  expect(gradients[1][gradients[1].length - 1][1]).toBe('rgba(255, 255, 255, 0.45)')
+  expect(fillRectCalls).toHaveLength(5)
+  expect(fillRectCalls.every((bar) => bar.width === 1.5)).toBe(true)
+  expect(paints[paints.length - 1]).toBe('#aa6699')
+})
