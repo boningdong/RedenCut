@@ -212,3 +212,24 @@ it('auditions sliders while dragging without saving and restores sound on cancel
   fireEvent.keyDown(slider, { key: 'Escape' })
   expect(screen.getByTestId('preview').textContent).toBe('0')
 })
+
+it('clears an audition when a drag returns to its original gain without creating history', () => {
+  const onCommit = vi.fn()
+  const onCancelPreview = vi.fn()
+  render(
+    <TrackLevelControl
+      kind="gain"
+      name="Mix"
+      value={0}
+      onCommit={onCommit}
+      onCancelPreview={onCancelPreview}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Mix gain' }))
+  const slider = screen.getByRole('slider')
+  fireEvent.change(slider, { target: { value: '6' } })
+  fireEvent.change(slider, { target: { value: '0' } })
+  fireEvent.pointerUp(slider)
+  expect(onCommit).not.toHaveBeenCalled()
+  expect(onCancelPreview).toHaveBeenCalledOnce()
+})

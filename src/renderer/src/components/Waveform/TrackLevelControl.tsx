@@ -66,8 +66,10 @@ export function TrackLevelControl({
   const format = (level: number) =>
     volume ? `${Math.round(level * 100)}%` : `${level > 0 ? '+' : ''}${level} dB`
   const commit = () => {
-    if (draftRef.current !== value) onCommit(draftRef.current)
-    previewing.current = false
+    if (draftRef.current !== value) {
+      onCommit(draftRef.current)
+      previewing.current = false
+    } else restorePreview()
   }
   return (
     <>

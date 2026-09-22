@@ -38,7 +38,7 @@ export function registerPreparedAudioIpc(
       const tracks = project.tracks
       const plan = buildAudioRenderPlan(tracks, candidate.mode as 'timeline' | 'edited')
       const track = plan.tracks.find((track) => track.trackId === candidate.trackId)
-      if (!track?.normalize || plan.durationFrames <= 0) throw new PublicIpcError('invalid-request')
+      if (!track || plan.durationFrames <= 0) throw new PublicIpcError('invalid-request')
       const resolveOriginal = controller.captureOriginalResolver(request)
       const sources = controller.workspace.project.audioSources
       const key = leaseKey(event.sender.id, request.workspaceToken, requestId)
@@ -104,6 +104,36 @@ export function registerPreparedAudioIpc(
       )
       // An ordinary save advances revision without changing immutable PCM composition.
       // The admitted lease and exact workspace still guard project switches and disposal.
+      if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
+        throw new PublicIpcError('stale-session')
+      return result
+    }, console.error),
+  )
+  ipcMain.handle('effects:waveform', (event, input: unknown) =>
+    toIpcResult(async () => {
+      const request = requireSessionPrecondition(input)
+      const candidate = input as Record<string, unknown>
+      const key = leaseKey(
+        event.sender.id,
+        request.workspaceToken,
+        requireJobId(candidate.requestId),
+      )
+      const lease = leases.get(key)
+      if (
+        !lease ||
+        controller.workspace !== lease.workspace ||
+        typeof candidate.handle !== 'string' ||
+        typeof candidate.startFrame !== 'number' ||
+        typeof candidate.endFrame !== 'number' ||
+        typeof candidate.targetBuckets !== 'number'
+      )
+        throw new PublicIpcError('invalid-request')
+      const result = await lease.service.waveform(
+        candidate.handle,
+        candidate.startFrame,
+        candidate.endFrame,
+        candidate.targetBuckets,
+      )
       if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
         throw new PublicIpcError('stale-session')
       return result

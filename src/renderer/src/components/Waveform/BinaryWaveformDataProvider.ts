@@ -7,6 +7,33 @@ import type {
 } from './WaveformDataProvider'
 
 export class BinaryWaveformDataProvider implements WaveformDataProvider {
+  private peakPromise?: Promise<number>
+
+  getPeak(): Promise<number> {
+    this.peakPromise ??= this.readRange({
+      sourceStartSeconds: 0,
+      sourceEndSeconds: this.descriptor.frameCount / this.descriptor.sampleRate,
+      targetPixelWidth: 1,
+      signal: new AbortController().signal,
+    })
+      .then(({ buckets }) =>
+        buckets.reduce(
+          (peak, bucket) =>
+            Math.max(
+              peak,
+              Number.isFinite(bucket.min) ? Math.abs(bucket.min) : 0,
+              Number.isFinite(bucket.max) ? Math.abs(bucket.max) : 0,
+            ),
+          0,
+        ),
+      )
+      .catch((error: unknown) => {
+        this.peakPromise = undefined
+        throw error
+      })
+    return this.peakPromise
+  }
+
   constructor(private readonly descriptor: AudioSourceCacheDescriptor) {}
 
   async readRange(request: WaveformRangeRequest): Promise<WaveformBucketRange> {

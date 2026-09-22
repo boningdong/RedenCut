@@ -12,6 +12,7 @@ import {
 } from '../../../shared/PreparedAudioTypes'
 import { compileFfmpegPlan } from '../export/FfmpegPlanCompiler'
 import { getFfmpegPath } from '../../runtime/AppRuntimeLocator'
+import { PreparedWaveform } from './PreparedWaveform'
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 
 export function preparedTrackKey(
@@ -56,7 +57,16 @@ export class PreparedTrackService {
     string,
     { key: string; controller: AbortController; result: Promise<PreparedTrackDescriptor> }
   >()
-  private files = new Map<string, { path: string; channels: number; frameCount: number }>()
+  private files = new Map<
+    string,
+    {
+      path: string
+      channels: number
+      frameCount: number
+      signal: AbortSignal
+      waveform?: Promise<PreparedWaveform>
+    }
+  >()
   private controller = new AbortController()
 
   async prepare(
@@ -78,7 +88,7 @@ export class PreparedTrackService {
     )
     let entry = this.entries.get(key)
     if (!entry) {
-      const trackId = plan.tracks[0].trackId
+      const trackId = JSON.stringify([plan.tracks[0].trackId, mode])
       const previous = this.slots.get(trackId)
       previous?.controller.abort()
       const controller = new AbortController()
@@ -90,7 +100,10 @@ export class PreparedTrackService {
           if (descriptor) {
             const file = this.files.get(descriptor.handle)
             this.files.delete(descriptor.handle)
-            if (file) await rm(file.path, { force: true })
+            if (file) {
+              await file.waveform?.catch(() => {})
+              await rm(file.path, { force: true })
+            }
           }
         }
         signal.throwIfAborted()
@@ -128,6 +141,7 @@ export class PreparedTrackService {
       await input.close()
     }
     this.controller.signal.throwIfAborted()
+    if (this.files.get(handle) !== file) throw new Error('Unknown prepared audio handle')
     const channels = Array.from({ length: file.channels }, (_, channel) => {
       const samples = new Float32Array(frameCount)
       for (let frame = 0; frame < frameCount; frame++)
@@ -137,11 +151,29 @@ export class PreparedTrackService {
     return { startFrame, frameCount, channels }
   }
 
+  async waveform(handle: string, startFrame: number, endFrame: number, targetBuckets: number) {
+    this.controller.signal.throwIfAborted()
+    const file = this.files.get(handle)
+    if (!file) throw new Error('Unknown prepared audio handle')
+    PreparedWaveform.validate(startFrame, endFrame, targetBuckets, file.frameCount)
+    file.waveform ??= PreparedWaveform.load(file.path, file.channels, file.frameCount, file.signal)
+    const waveform = await file.waveform
+    file.signal.throwIfAborted()
+    if (this.files.get(handle) !== file) throw new Error('Unknown prepared audio handle')
+    const result = await waveform.read(startFrame, endFrame, targetBuckets)
+    file.signal.throwIfAborted()
+    if (this.files.get(handle) !== file) throw new Error('Unknown prepared audio handle')
+    return result
+  }
+
   async dispose(): Promise<void> {
     this.controller.abort()
     await Promise.allSettled(this.entries.values())
     this.entries.clear()
     this.slots.clear()
+    await Promise.allSettled(
+      [...this.files.values()].flatMap((file) => (file.waveform ? [file.waveform] : [])),
+    )
     this.files.clear()
     await rm(await this.directory, { recursive: true, force: true })
   }
@@ -218,7 +250,7 @@ export class PreparedTrackService {
       const size = (await stat(path)).size
       if (size !== plan.durationFrames * channels * 4)
         throw new Error('Prepared PCM duration mismatch')
-      this.files.set(handle, { path, channels, frameCount: plan.durationFrames })
+      this.files.set(handle, { path, channels, frameCount: plan.durationFrames, signal })
       return { handle, channels, frameCount: plan.durationFrames }
     } catch (error) {
       await rm(path, { force: true })

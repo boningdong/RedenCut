@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, input: unknown) => Promise<unknown>>(),
   prepare: vi.fn(),
   read: vi.fn(),
+  waveform: vi.fn(),
   dispose: vi.fn(),
 }))
 vi.mock('electron', () => ({
@@ -21,6 +22,7 @@ vi.mock('../audio/effects/PreparedTrackService', () => ({
   PreparedTrackService: class {
     prepare = mocks.prepare
     read = mocks.read
+    waveform = mocks.waveform
     dispose = mocks.dispose
   },
 }))
@@ -212,4 +214,23 @@ it('returns public managed-runtime guidance when Normalize cannot resolve FFmpeg
     ok: false,
     error: { code: 'operation-failed', reason: 'runtime-unavailable' },
   })
+})
+
+it('prepares a raw composite and keeps waveform handles bound to their consumer lease', async () => {
+  const f = setup()
+  const raw = {
+    ...f.request,
+    requestId: 'waveform',
+    tracks: [{ ...f.request.tracks[0], effects: [] }],
+  }
+  expect(await f.call('prepare', raw)).toMatchObject({ ok: true })
+  mocks.waveform.mockResolvedValue({ buckets: [{ min: -0.5, max: 0.5 }], peak: 0.75 })
+  const read = { ...raw, handle: 'handle', startFrame: 0, endFrame: 48000, targetBuckets: 1 }
+  expect(await f.call('waveform', read)).toEqual({
+    ok: true,
+    value: { buckets: [{ min: -0.5, max: 0.5 }], peak: 0.75 },
+  })
+  expect(await f.call('waveform', { ...read, requestId: 'playback' })).toMatchObject({ ok: false })
+  await f.call('release', raw)
+  expect(await f.call('waveform', read)).toMatchObject({ ok: false })
 })

@@ -309,6 +309,10 @@ export const englishResources = {
     mixOrdinary: 'Ordinary track',
     mixChildRedactions:
       'Child Redact edits are ignored while linked and restored on unlink. Unlinked tracks and their edits are kept, muted.',
+    fitWaveform: 'Fit waveform',
+    resetWaveform: 'Reset waveform zoom',
+    updatingWaveform: 'Updating waveform…',
+    failedWaveform: 'Waveform update failed',
     mixMemberCount: '{{count}} linked',
     mixParticipants: '{{count}} sources',
     mixReplaced: 'Replaced with {{names}} · Undo available',

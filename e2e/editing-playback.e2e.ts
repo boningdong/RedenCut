@@ -119,6 +119,39 @@ test('split and drag survive save and reopen as visible clips with audible playb
     expect(Math.abs(moved[1].duration - split[1].duration)).toBeLessThan(0.15)
     await ui.screenshot('moved')
 
+    // Revise the move through the public undo/redo shortcuts and observe the gap itself.
+    await ui.call('browser_press_key', { key: 'Control+z' })
+    await expect
+      .poll(
+        async () => {
+          const clips = await layout(ui.page)
+          return Math.abs(clips[1].start - (clips[0].start + clips[0].duration))
+        },
+        { timeout: 5000 },
+      )
+      .toBeLessThan(0.1)
+    await drawnWaveforms(ui.page, 2)
+    const undone = await layout(ui.page)
+    expect(Math.abs(undone[1].start - split[1].start)).toBeLessThan(0.1)
+    await ui.screenshot('move-undone')
+    await ui.call('browser_press_key', { key: 'Control+Shift+z' })
+    await expect
+      .poll(
+        async () => {
+          const clips = await layout(ui.page)
+          return clips[1].start - (clips[0].start + clips[0].duration)
+        },
+        { timeout: 5000 },
+      )
+      .toBeGreaterThan(1.8)
+    await drawnWaveforms(ui.page, 2)
+    const redone = await layout(ui.page)
+    for (let i = 0; i < 2; i++) {
+      expect(Math.abs(redone[i].start - moved[i].start)).toBeLessThan(0.1)
+      expect(Math.abs(redone[i].duration - moved[i].duration)).toBeLessThan(0.1)
+    }
+    await ui.screenshot('move-redone')
+
     // Save and fully restart; compare the reopened visible layout with the edited layout.
     const selection = { type: 'project', name: 'edited-audio.redencut' }
     await ui.call('redencut_prepare_dialog', { request: { purpose: 'save-project', selection } })
@@ -147,7 +180,7 @@ test('split and drag survive save and reopen as visible clips with audible playb
     expect(levels.filter((value) => value > 0.002).length).toBeGreaterThanOrEqual(5)
     writeFileSync(
       join(ui.directory, 'editing-observations.json'),
-      JSON.stringify({ split, moved, reopened, levels }, null, 2),
+      JSON.stringify({ split, moved, undone, redone, reopened, levels }, null, 2),
     )
     await ui.call('redencut_stop')
   } catch (error) {

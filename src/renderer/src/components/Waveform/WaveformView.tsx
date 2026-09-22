@@ -54,6 +54,8 @@ import { copyClips, cutClips, pasteClips, duplicateClips } from '../../actions/C
 import './ClipEditing.css'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { TrackHeader } from './TrackHeader'
+import { useTrackWaveformDisplays } from './UseTrackWaveformDisplays'
+import { useWaveformDisplayStore, fittedWaveformScale } from './WaveformDisplayState'
 import { getTimelineContentWidth } from './TimelineViewportGeometry'
 import { useTimelineZoom } from './UseTimelineZoom'
 
@@ -90,6 +92,31 @@ export function WaveformView({
   }, [mixFeedback])
   const [actionFailed, setActionFailed] = useState(false)
   const tracks = useTimelineStore((s) => s.tracks)
+  const waveformDisplays = useTrackWaveformDisplays(tracks, providersBySource)
+  const waveformScales = useWaveformDisplayStore((s) => s.scales)
+  const waveformGainPreviews = useWaveformDisplayStore((s) => s.gainPreviews)
+  const fitWaveform = async (trackId: string) => {
+    const track = tracks.find((item) => item.id === trackId)
+    if (!track) return
+    const workspace = useEditorStore.getState().session?.workspaceToken
+    const display = waveformDisplays.get(trackId)
+    const peaks =
+      display?.peak !== undefined
+        ? [display.peak]
+        : await Promise.all(
+            track.clips.map(async (clip) => {
+              const peak = await (providersBySource.get(clip.audioSourceId)?.getPeak?.() ??
+                Promise.resolve(1))
+              return peak * Math.abs(clip.gain)
+            }),
+          )
+    if (useEditorStore.getState().session?.workspaceToken !== workspace) return
+    const child = tracks.some((item) => item.mixLink?.stemTrackIds.includes(trackId))
+    const gain = child ? 1 : 10 ** ((waveformGainPreviews[trackId] ?? track.gainDb ?? 0) / 20)
+    useWaveformDisplayStore
+      .getState()
+      .setScale(trackId, fittedWaveformScale(Math.max(0, ...peaks) * gain))
+  }
   const [mixDialogId, setMixDialogId] = useState<string | null>(null)
   const [collapsedMixes, setCollapsedMixes] = useState<string[]>([])
   const [editingReplacement, setEditingReplacementState] = useState<
@@ -574,6 +601,10 @@ export function WaveformView({
                 <TrackHeader
                   track={track}
                   onRemove={handleRemoveTrack}
+                  onFitWaveform={() => {
+                    void fitWaveform(track.id).catch(() => setActionFailed(true))
+                  }}
+                  onResetWaveform={() => useWaveformDisplayStore.getState().setScale(track.id, 1)}
                   readOnly={childIds.has(track.id)}
                   parentName={
                     tracks.find((master) => master.mixLink?.stemTrackIds.includes(track.id))?.name
@@ -713,6 +744,16 @@ export function WaveformView({
                       if (!childIds.has(track.id)) interaction.begin(e)
                     }}
                   >
+                    {(waveformDisplays.get(track.id)?.updating ||
+                      waveformDisplays.get(track.id)?.failed) && (
+                      <span className="waveform-update-status" role="status">
+                        {t(
+                          waveformDisplays.get(track.id)?.failed
+                            ? 'waveform.failedWaveform'
+                            : 'waveform.updatingWaveform',
+                        )}
+                      </span>
+                    )}
                     {track.clips.map((clip) => {
                       const proposed = previewClips.get(clip.id)
                       const dimmed =
@@ -725,6 +766,13 @@ export function WaveformView({
                           clip={clip}
                           track={track}
                           readOnly={childIds.has(track.id)}
+                          displayProvider={waveformDisplays.get(track.id)?.provider}
+                          waveformScale={waveformScales[track.id]}
+                          waveformGain={
+                            (waveformDisplays.get(track.id)?.provider ? 1 : clip.gain) *
+                            10 ** ((waveformGainPreviews[track.id] ?? track.gainDb ?? 0) / 20)
+                          }
+                          waveformUpdating={waveformDisplays.get(track.id)?.updating}
                           waveform={
                             childIds.has(track.id) ? (
                               <LinkedClipWaveform
@@ -732,6 +780,7 @@ export function WaveformView({
                                 track={track}
                                 tracks={tracks}
                                 provider={providersBySource.get(clip.audioSourceId)}
+                                waveformScale={waveformScales[track.id]}
                                 pxPerSec={pxPerSec}
                                 viewport={viewport}
                               />
@@ -753,6 +802,13 @@ export function WaveformView({
                                 }}
                                 tracks={tracks}
                                 providers={providersBySource}
+                                displayProvider={waveformDisplays.get(track.id)?.provider}
+                                waveformScale={waveformScales[track.id]}
+                                waveformGain={
+                                  (waveformDisplays.get(track.id)?.provider ? 1 : clip.gain) *
+                                  10 ** ((waveformGainPreviews[track.id] ?? track.gainDb ?? 0) / 20)
+                                }
+                                waveformUpdating={waveformDisplays.get(track.id)?.updating}
                                 pxPerSec={pxPerSec}
                                 viewport={viewport}
                               />

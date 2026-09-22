@@ -71,6 +71,7 @@
 ## Playback
 
 - UI components depend on [`IAudioPlayer`](../src/shared/PlayerTypes.ts), not a concrete playback implementation.
+- Waveform display scale is ephemeral view state, initially fitted to full original source peaks and independent of audio Gain/Volume; effect output waveforms use session-scoped prepared PCM peak caches, while Gain only multiplies drawing values.
 - Waveform UI depends on `WaveformDataProvider`; playback remains owned by the preview player through `IAudioPlayer`; storage and decoding must not leak into the renderer.
 - Use [`WorkletAudioPlayer`](../src/renderer/src/audio/WorkletAudioPlayer.ts) with managed PCM providers; compressed WebCodecs chunking and media-element fallbacks are not supported playback paths.
 - Push current track and clip state through `IAudioPlayer.setTracks` after timeline changes rather than reading renderer stores from shared playback contracts.
@@ -138,7 +139,7 @@
 - Transcript source identity remains independent from master edit ownership. Replacement text uses source-track background color, while its redaction target is the exact master occurrence.
 - Version 4 project writes retain track gain, normalization, links and overrides; versions 2 and 3 migrate explicitly, with no back-writing to older apps.
 - New Mix link mutations accept at most six independent recordings; existing serialized projects remain readable.
-- Replacement presentation is derived from linked count, selected source identities and available pixel width, never persisted as routing truth. Combined decorative waveforms are illustrative, not peak measurements.
+- Replacement presentation is derived from linked count, selected source identities and available pixel width, never persisted as routing truth. Replacement waveforms use the actual prepared composite output when available, with source provenance retained as overlays; pending raw source rows are separate rather than summed extrema.
 
 ## Track Loudness Effects
 

@@ -75,7 +75,8 @@ it('fits compact waveform and highlights only supplied Mix intervals despite chi
   ])
   expect(
     waveform.mock.calls.every(
-      ([props]) => props.heightPx <= 30 && props.topPx === undefined && props.muted === false,
+      ([props]) =>
+        props.heightPx === undefined && props.topPx === undefined && props.muted === false,
     ),
   ).toBe(true)
 })

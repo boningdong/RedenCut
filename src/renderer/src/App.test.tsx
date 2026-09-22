@@ -352,7 +352,7 @@ function installApi(initial: RendererSession) {
         return vi.fn()
       }),
     },
-    preparedAudio: { prepare: vi.fn(), read: vi.fn(), release: vi.fn() },
+    preparedAudio: { prepare: vi.fn(), read: vi.fn(), waveform: vi.fn(), release: vi.fn() },
   } satisfies IElectronAPI
   Object.defineProperty(window, 'electronAPI', { configurable: true, value: api })
   return {

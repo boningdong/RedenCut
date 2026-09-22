@@ -171,3 +171,86 @@ describe('CanvasWaveform', () => {
     expect(container.querySelector('canvas')?.style.opacity).toBe('0.55')
   })
 })
+
+it('fits the full-source peak once and preserves scale across scrolling and gain changes', async () => {
+  const context = recordingContext()
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D,
+  )
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
+  const provider: WaveformDataProvider = {
+    getPeak: vi.fn(async () => 0.5),
+    readRange: vi.fn(async () => ({ buckets: [{ min: -0.25, max: 0.25 }] })),
+  }
+  const props = waveformProps({ provider, widthPx: 30, heightPx: 100 })
+  const { container, rerender } = render(<CanvasWaveform {...props} />)
+  await waitFor(() =>
+    expect(context.fillRect).toHaveBeenLastCalledWith(14.25, 28.749999999999996, 1.5, 42.5),
+  )
+  rerender(<CanvasWaveform {...props} sourceStartSeconds={8} sourceEndSeconds={9} gain={2} />)
+  await waitFor(() =>
+    expect(context.fillRect).toHaveBeenLastCalledWith(14.25, 7.500000000000001, 1.5, 85),
+  )
+  expect(container.querySelector('canvas')?.dataset.visualOverflow).toBe('false')
+  rerender(<CanvasWaveform {...props} gain={3} />)
+  await waitFor(() =>
+    expect(container.querySelector('canvas')?.dataset.visualOverflow).toBe('true'),
+  )
+  vi.restoreAllMocks()
+})
+
+it('uses a safe unity scale for an entirely silent source', async () => {
+  const context = recordingContext()
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D,
+  )
+  const provider: WaveformDataProvider = {
+    getPeak: async () => 0,
+    readRange: async () => ({ buckets: [{ min: 0, max: 0 }] }),
+  }
+  const { container } = render(<CanvasWaveform {...waveformProps({ provider })} />)
+  await waitFor(() => expect(container.querySelector('canvas')?.dataset.waveformReady).toBe('true'))
+  expect(container.querySelector('canvas')?.dataset.visualOverflow).toBe('false')
+  expect(context.fillRect.mock.calls.flat().every(Number.isFinite)).toBe(true)
+  vi.restoreAllMocks()
+})
+
+it('redraws gain, visual scale, height and color changes without rereading source buckets', async () => {
+  const context = recordingContext()
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D,
+  )
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
+  const provider: WaveformDataProvider = {
+    getPeak: vi.fn(async () => 0.5),
+    readRange: vi.fn(async () => ({ buckets: [{ min: -0.25, max: 0.25 }] })),
+  }
+  const props = waveformProps({ provider, widthPx: 30, heightPx: 100 })
+  const { rerender } = render(<CanvasWaveform {...props} />)
+  await waitFor(() => expect(context.fillRect).toHaveBeenCalled())
+  const originalHeight = context.fillRect.mock.lastCall![3]
+  rerender(<CanvasWaveform {...props} gain={2} />)
+  await waitFor(() => expect(context.fillRect.mock.lastCall![3]).toBeCloseTo(originalHeight * 2))
+  rerender(<CanvasWaveform {...props} gain={2} amplitudeScale={1} heightPx={80} color="#123456" />)
+  await waitFor(() => expect(context.fillRect).toHaveBeenLastCalledWith(14.25, 20, 1.5, 40))
+  expect(context.fillStyle).toBe('#123456')
+  expect(provider.readRange).toHaveBeenCalledTimes(1)
+  expect(provider.getPeak).toHaveBeenCalledTimes(1)
+  vi.restoreAllMocks()
+})
+
+it('does not amplify near-silent original sources', async () => {
+  const context = recordingContext()
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D,
+  )
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 })
+  const provider: WaveformDataProvider = {
+    getPeak: async () => 1e-12,
+    readRange: async () => ({ buckets: [{ min: -1e-12, max: 1e-12 }] }),
+  }
+  render(<CanvasWaveform {...waveformProps({ provider, widthPx: 30, heightPx: 100 })} />)
+  await waitFor(() => expect(context.fillRect).toHaveBeenCalled())
+  expect(context.fillRect.mock.lastCall![3]).toBe(1)
+  vi.restoreAllMocks()
+})

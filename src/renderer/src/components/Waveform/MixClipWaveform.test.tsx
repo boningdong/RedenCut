@@ -5,9 +5,27 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { Track } from '@shared/ProjectTypes'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { MixClipWaveform } from './MixClipWaveform'
-vi.mock('./CanvasWaveform', () => ({ CanvasWaveform: () => <div /> }))
+vi.mock('./CanvasWaveform', () => ({
+  CanvasWaveform: (props: {
+    sourceStartSeconds: number
+    amplitudeScale?: number
+    gain?: number
+  }) => (
+    <div
+      data-canvas-start={props.sourceStartSeconds}
+      data-canvas-scale={props.amplitudeScale}
+      data-canvas-gain={props.gain}
+    />
+  ),
+}))
 afterEach(cleanup)
-function setup(count: number, scale = 40, fractional = false) {
+function setup(
+  count: number,
+  scale = 40,
+  fractional = false,
+  selectedCount = 2,
+  displayProvider?: WaveformDataProvider,
+) {
   const clip: Track['clips'][number] = {
     id: 'clip',
     trackId: 'mix',
@@ -23,7 +41,7 @@ function setup(count: number, scale = 40, fractional = false) {
         id: 'replace',
         sourceStart: fractional ? 11.123459 : 11,
         sourceEnd: fractional ? 13.987651 : 13,
-        stemTrackIds: ['s0', 's1'],
+        stemTrackIds: Array.from({ length: selectedCount }, (_, i) => 's' + i),
       },
     ],
   }
@@ -52,6 +70,9 @@ function setup(count: number, scale = 40, fractional = false) {
   const view = render(
     <MixClipWaveform
       clip={clip}
+      displayProvider={displayProvider}
+      waveformScale={1.7}
+      waveformGain={2}
       tracks={tracks}
       providers={new Map([[clip.audioSourceId, {} as WaveformDataProvider]])}
       pxPerSec={scale}
@@ -83,4 +104,29 @@ it('keeps fractional replacement boundaries on separate parallel rows', () => {
   const rows = container.querySelectorAll('[data-source-override="replace"]')
   expect(rows).toHaveLength(2)
   expect((rows[0] as HTMLElement).style.top).not.toBe((rows[1] as HTMLElement).style.top)
+})
+
+it.each([1, 3, 6])('fills available replacement height with %i real source rows', (count) => {
+  const { container } = setup(count, 40, false, count)
+  const rows = Array.from(
+    container.querySelectorAll<HTMLElement>('[data-source-override="replace"]'),
+  )
+  expect(rows).toHaveLength(count)
+  for (const row of rows) {
+    expect(parseFloat(row.style.height.slice(5))).toBeCloseTo(100 / count, 3)
+    expect(row.style.height).toContain('px)')
+  }
+  expect(new Set(rows.map((row) => row.style.top)).size).toBe(count)
+  expect(container.querySelector('svg')).toBeNull()
+})
+
+it('draws the processed composite in output coordinates while preserving six source overlays', () => {
+  const provider = {} as WaveformDataProvider
+  const { container } = setup(6, 40, false, 6, provider)
+  const waveform = container.querySelector('[data-processed-waveform] [data-canvas-start]')!
+  expect(waveform.getAttribute('data-canvas-start')).toBe('5')
+  expect(waveform.getAttribute('data-canvas-scale')).toBe('1.7')
+  expect(waveform.getAttribute('data-canvas-gain')).toBe('2')
+  expect(container.querySelectorAll('[data-canvas-start]')).toHaveLength(1)
+  expect(container.querySelectorAll('[data-source-override="replace"]')).toHaveLength(6)
 })

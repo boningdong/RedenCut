@@ -8,6 +8,7 @@ import { TrackLevelControl } from './TrackLevelControl'
 import { TrackEffectsMenu } from './TrackEffectsMenu'
 import { EditorContextMenu } from '../ui/EditorContextMenu'
 import './TrackHeader.css'
+import { useWaveformDisplayStore } from './WaveformDisplayState'
 import type { Track } from '@shared/ProjectTypes'
 import { useTimelineStore } from '../../stores/TimelineStore'
 
@@ -21,6 +22,8 @@ interface TrackHeaderProps {
   linkedNames?: string
   parentName?: string
   onToggleChildren?(): void
+  onFitWaveform?(): void
+  onResetWaveform?(): void
 }
 
 export function TrackHeader({
@@ -32,6 +35,8 @@ export function TrackHeader({
   onToggleChildren,
   linkedNames,
   parentName,
+  onFitWaveform,
+  onResetWaveform,
 }: TrackHeaderProps) {
   const { t } = useTranslation()
   const active = useTimelineStore((s) => s.selectedTrackId === track.id)
@@ -43,9 +48,11 @@ export function TrackHeader({
   const [context, setContext] = useState<{ x: number; y: number } | null>(null)
   const closeContext = useCallback(() => setContext(null), [])
   const restoreTrackPreview = useCallback(() => {
+    useWaveformDisplayStore.getState().previewGain(track.id)
     getAudioPlayerInstance()?.setTracks(useTimelineStore.getState().tracks)
-  }, [])
+  }, [track.id])
   const previewTrackLevel = (setting: 'gainDb' | 'volume', value: number) => {
+    if (setting === 'gainDb') useWaveformDisplayStore.getState().previewGain(track.id, value)
     getAudioPlayerInstance()?.setTracks(
       useTimelineStore
         .getState()
@@ -195,7 +202,10 @@ export function TrackHeader({
             value={track.gainDb ?? 0}
             onPreview={(value) => previewTrackLevel('gainDb', value)}
             onCancelPreview={restoreTrackPreview}
-            onCommit={(value) => setTrackGain(track.id, value)}
+            onCommit={(value) => {
+              setTrackGain(track.id, value)
+              useWaveformDisplayStore.getState().previewGain(track.id)
+            }}
           />
         </div>
       )}
@@ -204,6 +214,18 @@ export function TrackHeader({
           {...context}
           onClose={closeContext}
           items={[
+            ...(onFitWaveform
+              ? [{ id: 'fit-waveform', label: t('waveform.fitWaveform'), action: onFitWaveform }]
+              : []),
+            ...(onResetWaveform
+              ? [
+                  {
+                    id: 'reset-waveform',
+                    label: t('waveform.resetWaveform'),
+                    action: onResetWaveform,
+                  },
+                ]
+              : []),
             ...(track.mixLink && onToggleChildren
               ? [
                   {

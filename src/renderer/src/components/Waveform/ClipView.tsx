@@ -11,6 +11,10 @@ interface Props {
   clip: Clip
   track: Track
   provider?: WaveformDataProvider
+  displayProvider?: WaveformDataProvider
+  waveformScale?: number
+  waveformGain?: number
+  waveformUpdating?: boolean
   pxPerSec: number
   viewport: { scrollLeft: number; width: number }
   readOnly?: boolean
@@ -26,6 +30,10 @@ export function ClipView({
   clip,
   track,
   provider,
+  displayProvider,
+  waveformScale,
+  waveformGain,
+  waveformUpdating,
   pxPerSec,
   viewport,
   readOnly = false,
@@ -38,16 +46,19 @@ export function ClipView({
   onFocusTimeline,
 }: Props) {
   const { t } = useTranslation()
-  const visible = provider
-    ? calculateVisibleWaveformRange({
-        outputStart: clip.outputStart,
-        sourceStart: clip.sourceStart,
-        sourceEnd: clip.sourceEnd,
-        pxPerSec,
-        viewportStartPx: viewport.scrollLeft,
-        viewportWidthPx: viewport.width,
-      })
-    : null
+  const visible =
+    (displayProvider ?? provider)
+      ? calculateVisibleWaveformRange({
+          outputStart: clip.outputStart,
+          sourceStart: displayProvider ? clip.outputStart : clip.sourceStart,
+          sourceEnd: displayProvider
+            ? clip.outputStart + clip.sourceEnd - clip.sourceStart
+            : clip.sourceEnd,
+          pxPerSec,
+          viewportStartPx: viewport.scrollLeft,
+          viewportWidthPx: viewport.width,
+        })
+      : null
   return (
     <div
       className="waveform-clip"
@@ -88,19 +99,26 @@ export function ClipView({
           {track.name}
         </span>
       )}
-      {waveform ??
-        (provider && visible && (
-          <CanvasWaveform
-            provider={provider}
-            sourceStartSeconds={visible.sourceStartSeconds}
-            sourceEndSeconds={visible.sourceEndSeconds}
-            leftInClipPx={visible.leftInClipPx}
-            widthPx={visible.widthPx}
-            heightPx={track.mixLink ? 45 : 29}
-            color={trackPresentationColor(track.color)}
-            muted={clip.muted}
-          />
-        ))}
+      <div
+        data-waveform-region="true"
+        data-waveform-updating={waveformUpdating || undefined}
+        style={{ position: 'absolute', top: readOnly ? 2 : 19, bottom: 3, left: 0, right: 0 }}
+      >
+        {waveform ??
+          ((displayProvider ?? provider) && visible && (
+            <CanvasWaveform
+              provider={(displayProvider ?? provider)!}
+              sourceStartSeconds={visible.sourceStartSeconds}
+              sourceEndSeconds={visible.sourceEndSeconds}
+              leftInClipPx={visible.leftInClipPx}
+              widthPx={visible.widthPx}
+              amplitudeScale={waveformScale}
+              gain={waveformGain}
+              color={trackPresentationColor(track.color)}
+              muted={clip.muted}
+            />
+          ))}
+      </div>
       {!readOnly &&
         (clip.redactions ?? []).map((redaction) => (
           <ClipRedactionOverlay

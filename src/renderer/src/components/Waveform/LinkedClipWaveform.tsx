@@ -10,6 +10,7 @@ export function LinkedClipWaveform({
   track,
   tracks,
   provider,
+  waveformScale,
   pxPerSec,
   viewport,
 }: {
@@ -17,6 +18,7 @@ export function LinkedClipWaveform({
   track: Track
   tracks: Track[]
   provider?: WaveformDataProvider
+  waveformScale?: number
   pxPerSec: number
   viewport: { scrollLeft: number; width: number }
 }) {
@@ -80,11 +82,11 @@ export function LinkedClipWaveform({
             {provider && visible && (
               <CanvasWaveform
                 provider={provider}
+                amplitudeScale={waveformScale}
                 sourceStartSeconds={visible.sourceStartSeconds}
                 sourceEndSeconds={visible.sourceEndSeconds}
                 leftInClipPx={visible.leftInClipPx}
                 widthPx={visible.widthPx}
-                heightPx={24}
                 color={color}
                 muted={false}
               />

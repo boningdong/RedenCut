@@ -14,8 +14,16 @@ export function MixClipWaveform({
   pxPerSec,
   viewport,
   onEdit,
+  displayProvider,
+  waveformScale,
+  waveformGain,
+  waveformUpdating,
 }: {
   clip: Clip
+  displayProvider?: WaveformDataProvider
+  waveformScale?: number
+  waveformGain?: number
+  waveformUpdating?: boolean
   onEdit(start: number, end: number): void
   tracks: Track[]
   providers: ReadonlyMap<AudioSourceId, WaveformDataProvider>
@@ -24,10 +32,39 @@ export function MixClipWaveform({
 }) {
   const { t } = useTranslation()
   const master = tracks.find((track) => track.id === clip.trackId)
-  const waveformHeight = master?.mixLink ? 45 : 29
+  const captionHeight = clip.sourceOverrides?.length ? 17 : 0
+  const compositeVisible = displayProvider
+    ? calculateVisibleWaveformRange({
+        outputStart: clip.outputStart,
+        sourceStart: clip.outputStart,
+        sourceEnd: clip.outputStart + clip.sourceEnd - clip.sourceStart,
+        pxPerSec,
+        viewportStartPx: viewport.scrollLeft,
+        viewportWidthPx: viewport.width,
+      })
+    : null
   const spans = resolveSourceSpans(tracks, clip, clip.sourceStart, clip.sourceEnd)
   return (
     <>
+      {displayProvider && compositeVisible && (
+        <div
+          data-processed-waveform="true"
+          data-waveform-updating={waveformUpdating || undefined}
+          style={{ position: 'absolute', inset: `0 0 ${captionHeight}px` }}
+        >
+          <CanvasWaveform
+            provider={displayProvider}
+            sourceStartSeconds={compositeVisible.sourceStartSeconds}
+            sourceEndSeconds={compositeVisible.sourceEndSeconds}
+            leftInClipPx={compositeVisible.leftInClipPx}
+            widthPx={compositeVisible.widthPx}
+            amplitudeScale={waveformScale}
+            gain={waveformGain}
+            color={trackPresentationColor(master?.color ?? '#888888')}
+            muted={clip.muted}
+          />
+        </div>
+      )}
       {spans.map((span, index) => {
         const provider = providers.get(span.audioSourceId)
         const track = tracks.find((item) => item.id === span.trackId)
@@ -37,7 +74,6 @@ export function MixClipWaveform({
             Math.round(item.sourceStart * 48000) <= Math.round(span.masterSourceStart * 48000) &&
             Math.round(item.sourceEnd * 48000) >= Math.round(span.masterSourceEnd * 48000),
         )
-        if (override && override.stemTrackIds.length > 3) return null
         const row = override?.stemTrackIds.indexOf(span.trackId) ?? 0
         const rows = override?.stemTrackIds.length ?? 1
         const outputStart = clip.outputStart + span.masterSourceStart - clip.sourceStart
@@ -60,8 +96,8 @@ export function MixClipWaveform({
               position: 'absolute',
               left: (outputStart - clip.outputStart) * pxPerSec,
               width: (span.sourceEnd - span.sourceStart) * pxPerSec,
-              top: `calc(50% - ${waveformHeight / 2}px + ${override ? row * (waveformHeight / rows) : 0}px)`,
-              height: override ? waveformHeight / rows : waveformHeight,
+              top: `calc(${override ? (row * 100) / rows : 0}% - ${override ? (row * captionHeight) / rows : 0}px)`,
+              height: `calc(${100 / rows}% - ${captionHeight / rows}px)`,
               borderTop: override ? `1px solid ${color}` : undefined,
               boxSizing: 'border-box',
               pointerEvents: 'none',
@@ -69,22 +105,24 @@ export function MixClipWaveform({
               background: override ? `color-mix(in srgb, ${color} 8%, transparent)` : undefined,
             }}
           >
-            <CanvasWaveform
-              provider={provider}
-              sourceStartSeconds={visible.sourceStartSeconds}
-              sourceEndSeconds={visible.sourceEndSeconds}
-              leftInClipPx={visible.leftInClipPx}
-              widthPx={visible.widthPx}
-              heightPx={override ? waveformHeight / rows - 1 : waveformHeight}
-              topPx={0}
-              color={color}
-              muted={clip.muted}
-            />
+            {!displayProvider && (
+              <CanvasWaveform
+                provider={provider}
+                sourceStartSeconds={visible.sourceStartSeconds}
+                sourceEndSeconds={visible.sourceEndSeconds}
+                leftInClipPx={visible.leftInClipPx}
+                widthPx={visible.widthPx}
+                amplitudeScale={override ? undefined : waveformScale}
+                gain={waveformGain}
+                topPx={0}
+                color={color}
+                muted={clip.muted}
+              />
+            )}
           </div>
         )
       })}
       {(clip.sourceOverrides ?? []).map((override) => {
-        const layered = override.stemTrackIds.length <= 3
         const start = Math.max(clip.sourceStart, override.sourceStart)
         const end = Math.min(clip.sourceEnd, override.sourceEnd)
         if (end <= start) return null
@@ -98,9 +136,8 @@ export function MixClipWaveform({
         const width = (end - start) * pxPerSec
         // Names occupy only a metadata strip, never sequential portions of the time range.
         const showNames =
-          members.length <= 3 &&
           width >=
-            35 + members.reduce((sum, member) => sum + Math.max(45, member.name.length * 8 + 12), 0)
+          35 + members.reduce((sum, member) => sum + Math.max(45, member.name.length * 8 + 12), 0)
         return (
           <button
             type="button"
@@ -108,7 +145,7 @@ export function MixClipWaveform({
             title={label}
             aria-label={label}
             className="mix-replacement-range"
-            data-mix-presentation={layered ? 'layered' : 'combined'}
+            data-mix-presentation={displayProvider ? 'processed' : 'layered'}
             style={{ left: (start - clip.sourceStart) * pxPerSec, width }}
             onPointerDown={(event) => {
               if (!event.altKey) event.stopPropagation()
@@ -131,21 +168,11 @@ export function MixClipWaveform({
             }}
             onKeyDown={(event) => event.stopPropagation()}
           >
-            {!layered && (
-              <svg
-                className="mix-illustrative-wave"
-                style={{ height: waveformHeight }}
-                viewBox="0 0 240 28"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                {Array.from({ length: 60 }, (_, i) => {
-                  const h = 3 + Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.21)) * 23
-                  return <path key={i} d={`M${i * 4 + 2} ${14 - h / 2}v${h}`} />
-                })}
-              </svg>
-            )}
-            <span className="mix-replacement-caption" aria-hidden="true">
+            <span
+              className="mix-replacement-caption"
+              aria-hidden="true"
+              style={{ top: 'auto', bottom: 0 }}
+            >
               {width >= 120 && <small>{t('waveform.mixReplaceShort')}</small>}
               <span className="mix-participant-tags">
                 {members.map((member) => (

@@ -46,3 +46,19 @@ describe('BinaryWaveformDataProvider', () => {
     ])
   })
 })
+
+it('caches the whole original source peak from the coarsest level', async () => {
+  const bytes = new Uint8Array(64)
+  const data = new DataView(bytes.buffer)
+  data.setFloat32(56, -0.875, true)
+  const fetch = vi.fn(async () => new Response(bytes, { status: 206 }))
+  vi.stubGlobal('fetch', fetch)
+  const provider = new BinaryWaveformDataProvider(descriptor)
+  expect(await provider.getPeak()).toBe(0.875)
+  expect(await provider.getPeak()).toBe(0.875)
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(fetch).toHaveBeenCalledWith(
+    `redencut://cache/${descriptor.audioSourceId}/waveform/65536`,
+    expect.objectContaining({ headers: { Range: 'bytes=0-63' } }),
+  )
+})

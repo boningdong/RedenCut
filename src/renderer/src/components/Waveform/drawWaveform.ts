@@ -21,10 +21,14 @@ export function drawWaveform(
   height: number,
   color: string,
   pixelRatio = 1,
-): void {
+  amplitudeScale = 1,
+  gain = 1,
+): boolean {
   context.clearRect(0, 0, width, height)
   context.fillStyle = color
-  if (width <= 0 || height <= 0 || buckets.length === 0) return
+  if (width <= 0 || height <= 0 || buckets.length === 0) return false
+  let overflow = false
+  const multiplier = amplitudeScale * gain
   const count = Math.min(buckets.length, Math.max(1, Math.floor(width / (3 * pixelRatio))))
   const step = width / count
   const barWidth = Math.min(1.5 * pixelRatio, step)
@@ -34,8 +38,12 @@ export function drawWaveform(
     const start = Math.floor((index * buckets.length) / count)
     const end = Math.floor(((index + 1) * buckets.length) / count)
     for (let bucket = start; bucket < end; bucket++) {
-      min = Math.min(min, amplitude(buckets[bucket].min))
-      max = Math.max(max, amplitude(buckets[bucket].max))
+      const low = buckets[bucket].min * multiplier
+      const high = buckets[bucket].max * multiplier
+      overflow ||=
+        (Number.isFinite(low) && Math.abs(low) > 1) || (Number.isFinite(high) && Math.abs(high) > 1)
+      min = Math.min(min, amplitude(low))
+      max = Math.max(max, amplitude(high))
     }
     const top = Math.min(height - Math.min(pixelRatio, height), ((1 - max) / 2) * height)
     const bottom = ((1 - min) / 2) * height
@@ -47,4 +55,5 @@ export function drawWaveform(
       context.fill()
     } else context.fillRect(left, top, barWidth, barHeight)
   }
+  return overflow
 }

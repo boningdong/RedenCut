@@ -289,6 +289,10 @@ export const simplifiedChineseResources = {
     mixOrdinary: '普通音轨',
     mixChildRedactions:
       '关联期间忽略子轨自身的 Redact，解除后恢复。解除关联会保留音轨与编辑，并保持静音。',
+    fitWaveform: '适配波形',
+    resetWaveform: '重置波形缩放',
+    updatingWaveform: '正在更新波形…',
+    failedWaveform: '波形更新失败',
     mixMemberCount: '{{count}} 条关联',
     mixParticipants: '{{count}} 人',
     mixReplaced: '已替换为 {{names}} · 可撤销',

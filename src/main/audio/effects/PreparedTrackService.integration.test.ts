@@ -89,6 +89,23 @@ it('levels alternating speakers after replacement mixing, matches export, and pr
     const prepared = await service.prepare(plan, 'edited', [source], async () => sourcePath)
     const loud = await service.read(prepared.handle, 9 * 48000, 16384)
     const quiet = await service.read(prepared.handle, 3 * 48000, 16384)
+    const waveform = await service.waveform(prepared.handle, 3 * 48000, 3 * 48000 + 16384, 1)
+    expect(waveform.buckets[0].min).toBeLessThanOrEqual(Math.min(...quiet.channels[0]))
+    expect(waveform.buckets[0].max).toBeGreaterThanOrEqual(Math.max(...quiet.channels[0]))
+    expect(waveform.peak).toBeGreaterThan(0)
+    expect(waveform.peak).toBeLessThan(1)
+    const raw = await service.prepare(
+      { ...plan, tracks: [{ ...plan.tracks[0], normalize: undefined, gainDb: 12, volume: 0.1 }] },
+      'timeline',
+      [source],
+      async () => sourcePath,
+    )
+    const rawQuiet = await service.waveform(raw.handle, 3 * 48000, 3 * 48000 + 16384, 1)
+    const rawLoud = await service.waveform(raw.handle, 9 * 48000, 9 * 48000 + 16384, 1)
+    expect(rawLoud.buckets[0].max / rawQuiet.buckets[0].max).toBeCloseTo(10, 1)
+    expect(rawLoud.peak).toBeLessThan(0.4)
+    const normalizedLoud = await service.waveform(prepared.handle, 9 * 48000, 9 * 48000 + 16384, 1)
+    expect(normalizedLoud.buckets[0].max / waveform.buckets[0].max).toBeLessThan(1.5)
     const rms = (samples: Float32Array) =>
       Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length)
     const gap = 20 * Math.log10(rms(loud.channels[0]) / rms(quiet.channels[0]))
@@ -159,6 +176,7 @@ it('renders finite silence, rejects missing sources and failed FFmpeg, and inval
     )
     expect(changed.frameCount).toBe(24000)
     await expect(service.read(first.handle, 0, 100)).rejects.toThrow('Unknown')
+    await expect(service.waveform(first.handle, 0, 100, 1)).rejects.toThrow('Unknown')
     const id = '00000000-0000-4000-8000-000000000001' as AudioSourceId
     const invalid = {
       ...base,
@@ -440,3 +458,36 @@ it('prepares four concurrent unequal-length tracks with offset stereo sources an
     rmSync(root, { recursive: true, force: true })
   }
 }, 30_000)
+
+it('keeps raw timeline and normalized edited modes alive concurrently in the same lease', async () => {
+  const service = new PreparedTrackService()
+  const plan = {
+    ...buildAudioRenderPlan([], 'timeline'),
+    durationFrames: 48000,
+    tracks: [{ trackId: 'same', volume: 0.5, gainDb: 20, contributions: [] }],
+  }
+  try {
+    const [raw, normalized] = await Promise.all([
+      service.prepare(plan, 'timeline', [], async () => ''),
+      service.prepare(
+        { ...plan, tracks: [{ ...plan.tracks[0], normalize: NORMALIZE_DEFAULTS }] },
+        'edited',
+        [],
+        async () => '',
+      ),
+    ])
+    for (const descriptor of [raw, normalized]) {
+      expect(await service.waveform(descriptor.handle, 0, 48000, 2)).toEqual({
+        buckets: [
+          { min: 0, max: 0 },
+          { min: 0, max: 0 },
+        ],
+        peak: 0,
+      })
+      await expect(service.waveform(descriptor.handle, 0, 48001, 2)).rejects.toThrow('range')
+    }
+  } finally {
+    await service.dispose()
+  }
+  await expect(service.waveform('old', 0, 1, 1)).rejects.toMatchObject({ name: 'AbortError' })
+}, 30000)

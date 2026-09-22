@@ -5,21 +5,21 @@ Update the implementation and this document together whenever a mapping or its c
 
 ## Editor Shortcuts
 
-| Key | Action | Context and behavior |
-| --- | --- | --- |
-| Space | Play or pause | Requires an active player. In preview mode, playback skips redacted sections. |
-| S | Split at playhead | Requires an active player and exactly one selected clip; the playhead must be strictly inside that clip's output range. |
-| M | Mute clips or redact selection | Applies the inverse of the primary clip’s mute state to all selected clips in one edit. Otherwise redacts a waveform range on the selected track. In canonical transcript text, creates overlays in the exact occurrence, asking for confirmation when acoustic boundaries expand the selection. |
-| U | Unmute clips | Unmutes all selected clips in one edit, or muted clips overlapping the waveform selection on its owning track; overlays are unchanged. |
-| Delete or Backspace | Remove selected object or redact selection | Removes a selected overlay to restore its audio; a selected clip is removed instead. With a range or transcript selection, creates clip-owned overlays. |
-| Escape | Cancel drag or clear selection | Cancels an active overlay move or resize without an edit; otherwise clears waveform and timeline selection. |
-| Left Arrow | Nudge backward | Seeks one second backward, clamped to zero. |
-| Right Arrow | Nudge forward | Seeks one second forward, clamped to the player duration. |
-| Shift+Left Arrow | Nudge backward farther | Seeks five seconds backward, clamped to zero. |
-| Shift+Right Arrow | Nudge forward farther | Seeks five seconds forward, clamped to the player duration. |
-| Command+S or Control+S | Save project | Calls the save callback supplied by the application. |
-| Command+Z or Control+Z | Undo | Undoes the last timeline or saved person/association edit in chronological order. |
-| Command+Shift+Z or Control+Shift+Z | Redo | Redoes the last undone timeline or person/association edit. |
+| Key                                | Action                                     | Context and behavior                                                                                                                                                                                                                                                                             |
+| ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Space                              | Play or pause                              | Requires an active player. In preview mode, playback skips redacted sections.                                                                                                                                                                                                                    |
+| S                                  | Split at playhead                          | Requires an active player and exactly one selected clip; the playhead must be strictly inside that clip's output range.                                                                                                                                                                          |
+| M                                  | Mute clips or redact selection             | Applies the inverse of the primary clip’s mute state to all selected clips in one edit. Otherwise redacts a waveform range on the selected track. In canonical transcript text, creates overlays in the exact occurrence, asking for confirmation when acoustic boundaries expand the selection. |
+| U                                  | Unmute clips                               | Unmutes all selected clips in one edit, or muted clips overlapping the waveform selection on its owning track; overlays are unchanged.                                                                                                                                                           |
+| Delete or Backspace                | Remove selected object or redact selection | Removes a selected overlay to restore its audio; a selected clip is removed instead. With a range or transcript selection, creates clip-owned overlays.                                                                                                                                          |
+| Escape                             | Cancel drag or clear selection             | Cancels an active overlay move or resize without an edit; otherwise clears waveform and timeline selection.                                                                                                                                                                                      |
+| Left Arrow                         | Nudge backward                             | Seeks one second backward, clamped to zero.                                                                                                                                                                                                                                                      |
+| Right Arrow                        | Nudge forward                              | Seeks one second forward, clamped to the player duration.                                                                                                                                                                                                                                        |
+| Shift+Left Arrow                   | Nudge backward farther                     | Seeks five seconds backward, clamped to zero.                                                                                                                                                                                                                                                    |
+| Shift+Right Arrow                  | Nudge forward farther                      | Seeks five seconds forward, clamped to the player duration.                                                                                                                                                                                                                                      |
+| Command+S or Control+S             | Save project                               | Calls the save callback supplied by the application.                                                                                                                                                                                                                                             |
+| Command+Z or Control+Z             | Undo                                       | Undoes the last timeline or saved person/association edit in chronological order.                                                                                                                                                                                                                |
+| Command+Shift+Z or Control+Shift+Z | Redo                                       | Redoes the last undone timeline or person/association edit.                                                                                                                                                                                                                                      |
 
 ## Clip Clipboard and Selection
 
@@ -84,7 +84,6 @@ Drag either crossfade handle to change both adjacent region widths together; rel
 Escape without an active gesture, Done, or an outside click returns to ordinary overlay selection.
 Keyboard input inside the floating editor stays local, so Space, arrows and Delete cannot trigger background audio edits.
 
-
 ## Native Menu Routing
 
 Main uses `before-input-event` to bypass Electron's default menu accelerators only for Command/Control+S and Command/Control+Z (including Shift+Z).
@@ -143,13 +142,14 @@ Time edits originate on Mix and synchronize child material; child redactions sur
 The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.
 
 Linked masters show an explicit Mix role, member count and expandable child hierarchy. Right-click a track header or press Shift+F10 while it is focused for Delete Track and collapse/expand commands; unlinking remains a separate management action. The visible × beside the track name also removes the track through the same removal flow, without activating it.
-At most six independent tracks can be linked. Linked master rows are taller (108 px versus ordinary 92 px; linked children remain 44 px), with centered waveforms: intervals using up to three sources use parallel stacked waveforms; intervals using four through six sources use one theme-accent illustrative waveform.
-Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement selects its visible interval.
+At most six independent tracks can be linked. Linked master rows are taller (108 px versus ordinary 92 px; linked children remain 44 px), with waveforms filling the available region below the clip label. Replacements show the actual processed composite waveform; while its first result is pending, one through six sources use separate rows that share the available height.
+Replacement labels show source names when they fit, otherwise source-color dots and a participant count; clicking the replacement selects its visible interval.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
 Applied-replacement edge handles adjust its audio coverage; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.
 The persistent replacement entry reveals the selected Mix range before opening its floating editor.
 
 Selecting a linked Mix interval does not open its source editor. Ordinary range selections have no resize grips; selecting an applied replacement reveals grips that resize that replacement while preserving its sources (one undo per drag). Use Edit replacement or the context menu to open its editor. Narrow intervals use an icon shortcut. The source editor stays outside the master lane, preferring the space above it; displayed bounds use two decimal places without rounding unchanged audio boundaries.
+
 ## Context Menus
 
 Right-click selected transcript text for Redact selection or Copy text; redaction keeps the existing occurrence and acoustic-boundary confirmation rules.
@@ -179,3 +179,5 @@ Playback preparation announces its pending state in the transport; processing er
 
 Volume and Gain sliders audition their current value during a drag without saving each movement.
 Release commits one undoable edit; Escape, pointer cancellation, or closing an unfinished slider edit restores the saved track levels.
+
+Track context menus provide **Fit waveform** (fit the current waveform, including Gain, to 85% of its available height) and **Reset waveform zoom** (unity display scale). These change view state only and do not create edit history. Volume does not change waveform amplitude.
