@@ -462,7 +462,8 @@
 }
 .mix-replacement-range {
   position: absolute;
-  top: 0;
+  /* Share the clip label strip; leave the entire waveform region for sources. */
+  top: -19px;
   bottom: 0;
   border: 0;
   border-inline: 1px solid var(--color-text-secondary);
@@ -524,10 +525,10 @@
 }
 .mix-illustrative-wave {
   position: absolute;
-  top: 50%;
+  top: 19px;
   left: 0;
   width: 100%;
-  transform: translateY(-50%);
+  height: calc(100% - 19px);
   color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-primary));
   pointer-events: none;

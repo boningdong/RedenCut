@@ -106,34 +106,41 @@ it('keeps fractional replacement boundaries on separate parallel rows', () => {
   expect((rows[0] as HTMLElement).style.top).not.toBe((rows[1] as HTMLElement).style.top)
 })
 
-it.each([1, 3, 6])('fills available replacement height with %i real source rows', (count) => {
+it.each([1, 2, 3])('fills available replacement height with %i real source rows', (count) => {
   const { container } = setup(count, 40, false, count)
   const rows = Array.from(
     container.querySelectorAll<HTMLElement>('[data-source-override="replace"]'),
   )
   expect(rows).toHaveLength(count)
   for (const row of rows) {
-    expect(parseFloat(row.style.height.slice(5))).toBeCloseTo(100 / count, 3)
-    expect(row.style.height).toContain('px)')
+    expect(parseFloat(row.style.height)).toBeCloseTo(100 / count, 3)
+    expect(row.style.height).toMatch(/%$/)
   }
   expect(new Set(rows.map((row) => row.style.top)).size).toBe(count)
   expect(container.querySelector('svg')).toBeNull()
 })
 
-it.each([1, 2, 3, 6])(
-  'preserves %i colored source waveforms after processing completes',
-  (count) => {
-    const provider = {} as WaveformDataProvider
-    const { container } = setup(count, 40, false, count, provider)
-    const rows = container.querySelectorAll('[data-source-override="replace"]')
-    expect(rows).toHaveLength(count)
-    for (const row of rows) {
-      expect(row.querySelector('[data-canvas-start]')).not.toBeNull()
-      expect(row.querySelector('[data-canvas-start]')?.getAttribute('data-canvas-start')).toBe('11')
-    }
-    expect(container.querySelectorAll('[data-processed-waveform]')).toHaveLength(2)
-    expect(container.querySelector('[data-source-override] [data-processed-waveform]')).toBeNull()
-    expect(container.querySelectorAll('.mix-participant')).toHaveLength(count)
-    expect(container.querySelector('[data-mix-presentation="layered"]')).not.toBeNull()
-  },
-)
+it.each([1, 2, 3])('preserves %i colored source waveforms after processing completes', (count) => {
+  const provider = {} as WaveformDataProvider
+  const { container } = setup(count, 40, false, count, provider)
+  const rows = container.querySelectorAll('[data-source-override="replace"]')
+  expect(rows).toHaveLength(count)
+  for (const row of rows) {
+    expect(row.querySelector('[data-canvas-start]')).not.toBeNull()
+    expect(row.querySelector('[data-canvas-start]')?.getAttribute('data-canvas-start')).toBe('11')
+  }
+  expect(container.querySelectorAll('[data-processed-waveform]')).toHaveLength(2)
+  expect(container.querySelector('[data-source-override] [data-processed-waveform]')).toBeNull()
+  expect(container.querySelectorAll('.mix-participant')).toHaveLength(count)
+  expect(container.querySelector('[data-mix-presentation="layered"]')).not.toBeNull()
+})
+
+it.each([4, 5, 6])('keeps %i selected sources in the original compact presentation', (count) => {
+  const { container } = setup(6, 40, false, count, {} as WaveformDataProvider)
+  expect(container.querySelector('[data-mix-presentation="combined"]')).not.toBeNull()
+  expect(container.querySelectorAll('[data-source-override]')).toHaveLength(0)
+  expect(container.querySelectorAll('.mix-illustrative-wave')).toHaveLength(1)
+  expect(container.querySelectorAll('.mix-participant')).toHaveLength(count)
+  expect(screen.getByText(`${count} sources`)).toBeTruthy()
+  expect(container.querySelectorAll('[data-processed-waveform]')).toHaveLength(2)
+})

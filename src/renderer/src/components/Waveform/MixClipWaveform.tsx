@@ -31,7 +31,6 @@ export function MixClipWaveform({
   viewport: { scrollLeft: number; width: number }
 }) {
   const { t } = useTranslation()
-  const captionHeight = clip.sourceOverrides?.length ? 17 : 0
   const spans = resolveSourceSpans(tracks, clip, clip.sourceStart, clip.sourceEnd)
   return (
     <>
@@ -43,6 +42,7 @@ export function MixClipWaveform({
             Math.round(item.sourceStart * 48000) <= Math.round(span.masterSourceStart * 48000) &&
             Math.round(item.sourceEnd * 48000) >= Math.round(span.masterSourceEnd * 48000),
         )
+        if (override && override.stemTrackIds.length > 3) return null
         // Replacement rows are source provenance, not a temporary processing placeholder.
         // Use processed Mix audio only in the intervals that still belong to the master.
         const processed = !override && displayProvider
@@ -72,8 +72,8 @@ export function MixClipWaveform({
               position: 'absolute',
               left: (outputStart - clip.outputStart) * pxPerSec,
               width: (span.sourceEnd - span.sourceStart) * pxPerSec,
-              top: `calc(${override ? (row * 100) / rows : 0}% - ${override ? (row * captionHeight) / rows : 0}px)`,
-              height: `calc(${100 / rows}% - ${captionHeight / rows}px)`,
+              top: `${(row * 100) / rows}%`,
+              height: `${100 / rows}%`,
               borderTop: override ? `1px solid ${color}` : undefined,
               boxSizing: 'border-box',
               pointerEvents: 'none',
@@ -97,6 +97,7 @@ export function MixClipWaveform({
         )
       })}
       {(clip.sourceOverrides ?? []).map((override) => {
+        const layered = override.stemTrackIds.length <= 3
         const start = Math.max(clip.sourceStart, override.sourceStart)
         const end = Math.min(clip.sourceEnd, override.sourceEnd)
         if (end <= start) return null
@@ -110,8 +111,9 @@ export function MixClipWaveform({
         const width = (end - start) * pxPerSec
         // Names occupy only a metadata strip, never sequential portions of the time range.
         const showNames =
+          layered &&
           width >=
-          35 + members.reduce((sum, member) => sum + Math.max(45, member.name.length * 8 + 12), 0)
+            35 + members.reduce((sum, member) => sum + Math.max(45, member.name.length * 8 + 12), 0)
         return (
           <button
             type="button"
@@ -119,7 +121,7 @@ export function MixClipWaveform({
             title={label}
             aria-label={label}
             className="mix-replacement-range"
-            data-mix-presentation="layered"
+            data-mix-presentation={layered ? 'layered' : 'combined'}
             style={{ left: (start - clip.sourceStart) * pxPerSec, width }}
             onPointerDown={(event) => {
               if (!event.altKey) event.stopPropagation()
@@ -142,11 +144,20 @@ export function MixClipWaveform({
             }}
             onKeyDown={(event) => event.stopPropagation()}
           >
-            <span
-              className="mix-replacement-caption"
-              aria-hidden="true"
-              style={{ top: 'auto', bottom: 0 }}
-            >
+            {!layered && (
+              <svg
+                className="mix-illustrative-wave"
+                viewBox="0 0 240 28"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {Array.from({ length: 60 }, (_, i) => {
+                  const h = 3 + Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.21)) * 23
+                  return <path key={i} d={`M${i * 4 + 2} ${14 - h / 2}v${h}`} />
+                })}
+              </svg>
+            )}
+            <span className="mix-replacement-caption" aria-hidden="true">
               {width >= 120 && <small>{t('waveform.mixReplaceShort')}</small>}
               <span className="mix-participant-tags">
                 {members.map((member) => (
