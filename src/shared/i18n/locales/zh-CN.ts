@@ -259,7 +259,7 @@ export const simplifiedChineseResources = {
   waveform: {
     timelinePan: '水平滚动时间线',
     effects: '效果',
-    normalize: '响度标准化',
+    normalize: '人声均衡',
     volumeShort: '音量',
     gain: '增益',
     gainName: '{{name}} 增益',

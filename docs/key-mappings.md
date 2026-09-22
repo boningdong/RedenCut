@@ -142,7 +142,7 @@ Time edits originate on Mix and synchronize child material; child redactions sur
 The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.
 
 Linked masters show an explicit Mix role, member count and expandable child hierarchy. Right-click a track header or press Shift+F10 while it is focused for Delete Track and collapse/expand commands; unlinking remains a separate management action. The visible × beside the track name also removes the track through the same removal flow, without activating it.
-At most six independent tracks can be linked. Linked master rows are taller (108 px versus ordinary 92 px; linked children remain 44 px), with waveforms filling the available region below the clip label. Replacement captions share the top clip-label strip. One through three selected sources permanently show separate source-colored waveform rows filling the area below; four through six retain the compact actual processed Mix waveform with source-color dots and a count. This threshold uses selected sources, not the number of linked tracks. Processing completion and Normalize must not replace them with a single master-colored waveform. These source rows identify routed material; Normalize still affects the audible complete Mix.
+At most six independent tracks can be linked. Linked master rows are taller (108 px versus ordinary 92 px; linked children remain 44 px), with waveforms filling the available region below the clip label. Replacement captions share the top clip-label strip. One through three selected sources permanently show separate source-colored waveform rows filling the area below; four through six retain the compact actual processed Mix waveform with source-color dots and a count. This threshold uses selected sources, not the number of linked tracks. Processing completion and Auto Level must not replace them with a single master-colored waveform. These source rows identify routed material; Auto Level still affects the audible complete Mix.
 Replacement labels show source names when they fit, otherwise source-color dots and a participant count; clicking the replacement selects its visible interval.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
 Applied-replacement edge handles adjust its audio coverage; Left/Right changes an edge by 10 ms, Shift by 100 ms, and Escape cancels a drag.
@@ -173,8 +173,9 @@ The track header uses a six-column grid with 26 px control rows: Sync, Mute, Sol
 Volume and Gain use transparent A2 surfaces, setting indicators and hover/focus feedback.
 Click a level region to open its anchored editor; a completed slider gesture commits one undo item, while Escape or an outside click discards an uncommitted slider gesture. Gain also accepts a numeric dB entry: Enter or blur commits a valid value once, invalid or out-of-range input reverts, and Escape cancels the numeric draft.
 Gain is a post-effect adjustment in dB; Volume retains the output percentage control.
-Effects shows an icon and dropdown arrow; any enabled effect highlights the trigger and Normalize exposes a persistent checked menu item.
-Normalize balances speech levels on the composed track, including replacement audio; disabling it preserves settings and source recordings.
+The speech-leveling effect is labeled Auto Level in English and 人声均衡 in Simplified Chinese.
+Effects shows an icon and dropdown arrow; any enabled effect highlights the trigger and Auto Level exposes a persistent checked menu item.
+Auto Level balances speech levels on the composed track, including replacement audio; disabling it preserves settings and source recordings.
 Playback preparation announces its pending state in the transport; processing errors surface through the existing player error path.
 
 Volume and Gain sliders audition their current value during a drag without saving each movement.

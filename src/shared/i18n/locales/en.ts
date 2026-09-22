@@ -277,7 +277,7 @@ export const englishResources = {
   waveform: {
     timelinePan: 'Pan timeline',
     effects: 'Effects',
-    normalize: 'Normalize',
+    normalize: 'Auto Level',
     volumeShort: 'Vol',
     gain: 'Gain',
     gainName: '{{name}} gain',

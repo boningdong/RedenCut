@@ -81,7 +81,7 @@ it('keeps Normalize checked on reopening and updates effect highlighting when di
   expect(button.querySelector('.track-effects-symbol')?.textContent).toBe('fx')
   expect(button.querySelectorAll('svg')).toHaveLength(1)
   fireEvent.click(button)
-  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Normalize' }))
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Auto Level' }))
   expect(button.getAttribute('aria-pressed')).toBe('true')
   fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
   fireEvent.click(button)
