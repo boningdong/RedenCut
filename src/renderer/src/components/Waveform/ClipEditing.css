@@ -523,7 +523,7 @@
 .mix-participant-count {
   flex-shrink: 0;
 }
-.mix-illustrative-wave {
+.mix-combined-wave {
   position: absolute;
   top: 19px;
   left: 0;
@@ -532,12 +532,6 @@
   color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-primary));
   pointer-events: none;
-}
-.mix-illustrative-wave path {
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  opacity: 1;
 }
 
 .crossfade-popover.source-override-popover {

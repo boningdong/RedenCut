@@ -103,7 +103,29 @@ test.each([3, 4, 6])(
           expect(evidence[0].color).not.toEqual(evidence[1].color)
         } else {
           expect(await ui.page.locator('[data-mix-presentation="combined"]').count()).toBe(1)
-          const wave = await ui.page.locator('.mix-illustrative-wave').boundingBox()
+          const combined = ui.page.locator('.mix-combined-wave canvas')
+          await expect.poll(() => combined.getAttribute('data-waveform-ready')).toBe('true')
+          const painted = await combined.evaluate((canvas: HTMLCanvasElement) => {
+            const { data } = canvas
+              .getContext('2d')!
+              .getImageData(0, 0, canvas.width, canvas.height)
+            const y = Math.floor(canvas.height / 2)
+            let longest = 0,
+              run = 0,
+              ink = 0
+            for (let x = 0; x < canvas.width; x++) {
+              // Ignore faint antialiasing fringes between adjacent 1.5 px bars.
+              if (data[(y * canvas.width + x) * 4 + 3] > 128) {
+                run++
+                ink++
+              } else run = 0
+              longest = Math.max(longest, run)
+            }
+            return { longest: longest / devicePixelRatio, ink }
+          })
+          expect(painted.ink).toBeGreaterThan(10)
+          expect(painted.longest).toBeLessThanOrEqual(3)
+          const wave = await ui.page.locator('.mix-combined-wave').boundingBox()
           expect(wave!.y).toBeGreaterThanOrEqual(caption!.y + caption!.height)
           expect(wave!.y + wave!.height).toBeCloseTo(range!.y + range!.height, 0)
           expect(await ui.page.locator('.mix-participant-count').innerText()).toBe(

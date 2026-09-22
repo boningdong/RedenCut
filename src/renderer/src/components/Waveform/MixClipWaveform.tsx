@@ -1,7 +1,7 @@
 import { useTranslation } from '../../i18n/useTranslation'
 import type { AudioSourceId, Clip, Track } from '@shared/ProjectTypes'
 import { resolveSourceSpans } from '@shared/SourceRouting'
-import { trackPresentationColor } from '../../themes/trackColors'
+import { TRACK_COLORS, trackPresentationColor } from '../../themes/trackColors'
 import { CanvasWaveform } from './CanvasWaveform'
 import type { WaveformDataProvider } from './WaveformDataProvider'
 import { calculateVisibleWaveformRange } from './waveformRange'
@@ -109,6 +109,17 @@ export function MixClipWaveform({
           .map((id) => tracks.find((track) => track.id === id))
           .filter((track): track is Track => !!track)
         const width = (end - start) * pxPerSec
+        const outputStart = clip.outputStart + start - clip.sourceStart
+        const combinedVisible =
+          !layered &&
+          calculateVisibleWaveformRange({
+            outputStart,
+            sourceStart: outputStart,
+            sourceEnd: outputStart + end - start,
+            pxPerSec,
+            viewportStartPx: viewport.scrollLeft,
+            viewportWidthPx: viewport.width,
+          })
         // Names occupy only a metadata strip, never sequential portions of the time range.
         const showNames =
           layered &&
@@ -145,17 +156,26 @@ export function MixClipWaveform({
             onKeyDown={(event) => event.stopPropagation()}
           >
             {!layered && (
-              <svg
-                className="mix-illustrative-wave"
-                viewBox="0 0 240 28"
-                preserveAspectRatio="none"
+              <div
+                className="mix-combined-wave"
                 aria-hidden="true"
+                data-waveform-updating={waveformUpdating || !displayProvider ? true : undefined}
               >
-                {Array.from({ length: 60 }, (_, i) => {
-                  const h = 3 + Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.21)) * 23
-                  return <path key={i} d={`M${i * 4 + 2} ${14 - h / 2}v${h}`} />
-                })}
-              </svg>
+                {displayProvider && combinedVisible && (
+                  <CanvasWaveform
+                    provider={displayProvider}
+                    sourceStartSeconds={combinedVisible.sourceStartSeconds}
+                    sourceEndSeconds={combinedVisible.sourceEndSeconds}
+                    leftInClipPx={combinedVisible.leftInClipPx}
+                    widthPx={combinedVisible.widthPx}
+                    amplitudeScale={waveformScale}
+                    gain={waveformGain ?? 1}
+                    topPx={0}
+                    color={TRACK_COLORS[3]}
+                    muted={clip.muted}
+                  />
+                )}
+              </div>
             )}
             <span className="mix-replacement-caption" aria-hidden="true">
               {width >= 120 && <small>{t('waveform.mixReplaceShort')}</small>}

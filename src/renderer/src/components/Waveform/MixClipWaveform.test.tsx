@@ -139,8 +139,23 @@ it.each([4, 5, 6])('keeps %i selected sources in the original compact presentati
   const { container } = setup(6, 40, false, count, {} as WaveformDataProvider)
   expect(container.querySelector('[data-mix-presentation="combined"]')).not.toBeNull()
   expect(container.querySelectorAll('[data-source-override]')).toHaveLength(0)
-  expect(container.querySelectorAll('.mix-illustrative-wave')).toHaveLength(1)
+  expect(container.querySelectorAll('.mix-combined-wave [data-canvas-start]')).toHaveLength(1)
   expect(container.querySelectorAll('.mix-participant')).toHaveLength(count)
   expect(screen.getByText(`${count} sources`)).toBeTruthy()
+  expect(
+    container
+      .querySelector('.mix-combined-wave [data-canvas-start]')
+      ?.getAttribute('data-canvas-start'),
+  ).toBe('6')
+  expect(container.querySelector('svg')).toBeNull()
   expect(container.querySelectorAll('[data-processed-waveform]')).toHaveLength(2)
+})
+
+it('does not invent a combined waveform while processed audio is unavailable', () => {
+  const { container } = setup(6, 40, false, 4)
+  expect(container.querySelector('.mix-combined-wave [data-canvas-start]')).toBeNull()
+  expect(
+    container.querySelector('.mix-combined-wave')?.getAttribute('data-waveform-updating'),
+  ).toBe('true')
+  expect(container.querySelector('svg')).toBeNull()
 })

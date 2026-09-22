@@ -62,4 +62,4 @@ Audio output is covered separately by existing container E2Es; AI listening is n
 If a changed feature requires audio-content or transcription verification, that requirement remains BLOCKED until its capability is available.
 Do not silently replace it with the baseline's UI-only check.
 
-Additional replacement layout checks: metadata is above the waveform and rows fill the remaining height. Four and six selected sources retain the original compact illustrative waveform, all source-color dots and the source count, including after Normalize, resize and project reopen. Six linked tracks with only two selected sources still use two real rows.
+Additional replacement layout checks: metadata is above the waveform and rows fill the remaining height. Four and six selected sources show the actual processed Mix waveform with the same fixed pixel bar width/spacing as other tracks, all source-color dots and the source count, including after Normalize, resize and project reopen. Assert painted bars do not stretch with interval width; no synthetic SVG waveform is permitted. Six linked tracks with only two selected sources still use two real rows.
