@@ -2,6 +2,13 @@
   padding: 8px 9px;
   gap: 5px;
 }
+.track-header:not([data-linked-child='true']):has(.mix-members) {
+  padding-block: 4px;
+  gap: 4px;
+}
+.track-header .mix-members {
+  flex-shrink: 0;
+}
 .track-header .track-controls {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

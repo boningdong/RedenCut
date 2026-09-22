@@ -269,11 +269,6 @@
   text-overflow: ellipsis;
 }
 
-/* Linked masters are taller; children retain their compact hierarchy. */
-.track-header:has(.mix-members) {
-  gap: 2px;
-  padding-block: 4px;
-}
 .mix-role {
   flex-shrink: 0;
   font-size: 8px;
