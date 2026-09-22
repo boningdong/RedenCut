@@ -150,6 +150,7 @@ test.each([3, 4, 6])(
       await ui.call('browser_click', { target: 'button:text-is("Save")' })
       await ui.restart()
       await ui.call('redencut_prepare_dialog', { request: { purpose: 'open-project', selection } })
+      await ui.call('browser_click', { target: '.project-name' })
       await ui.call('browser_click', { target: 'button:text-is("Open Project")' })
       await observe('reopened-source-layers')
       await ui.call('redencut_stop', { discardUnsaved: true })

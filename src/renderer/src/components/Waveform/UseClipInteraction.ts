@@ -9,6 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import type { Clip, Track } from '@shared/ProjectTypes'
+import { linkedMasterForTrack } from '../../domain/MixLinkEdits'
 import { planClipPlacement } from '../../domain/TimelinePlacement'
 import { trimClip } from '../../domain/TimelineEdits'
 import { useEditorStore } from '../../stores/editor.store'
@@ -94,6 +95,7 @@ export function useClipInteraction({
         }
         const hitIds: string[] = []
         for (const lane of lanes()) {
+          if (linkedMasterForTrack(active.tracks, lane.dataset.lane ?? '')) continue
           const rect = lane.getBoundingClientRect()
           if (rect.bottom < box.top || rect.top > box.top + box.height) continue
           const from = (box.left - rect.left) / active.scale

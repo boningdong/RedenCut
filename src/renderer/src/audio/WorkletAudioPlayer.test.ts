@@ -145,7 +145,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     const samples = provider()
     const prepare = vi.fn(async () => samples)
     const dispose = vi.fn(async () => {})
-    const player = new WorkletAudioPlayer({ prepare, dispose })
+    const player = new WorkletAudioPlayer({ retainTracks: async () => {}, prepare, dispose })
     const original = {
       ...track('normalized'),
       effects: [
@@ -180,7 +180,8 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
       resolve = done
     })
     const prepare = vi.fn(() => pending)
-    const player = new WorkletAudioPlayer({ prepare, dispose: async () => {} })
+    const retainTracks = vi.fn(async (_ids: readonly string[]) => {})
+    const player = new WorkletAudioPlayer({ retainTracks, prepare, dispose: async () => {} })
     const original = {
       ...track('normalized'),
       effects: [
@@ -197,6 +198,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
     const playing = player.play()
     await vi.waitFor(() => expect(prepare).toHaveBeenCalled())
     player.setTracks([{ ...original, effects: [] }])
+    expect(retainTracks).toHaveBeenLastCalledWith([])
     await vi.waitFor(() => expect(FakeNode.instances).toHaveLength(1))
     const obsolete = provider()
     resolve(obsolete)
@@ -209,7 +211,11 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
   it('rejects processed read failures and disposes while normalization is pending', async () => {
     const failed = provider()
     vi.mocked(failed.readFrames).mockRejectedValue(new Error('processed read failed'))
-    const player = new WorkletAudioPlayer({ prepare: async () => failed, dispose: async () => {} })
+    const player = new WorkletAudioPlayer({
+      retainTracks: async () => {},
+      prepare: async () => failed,
+      dispose: async () => {},
+    })
     const normalized = {
       ...track('normalized'),
       effects: [
@@ -232,7 +238,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
         }),
     )
     const dispose = vi.fn(async () => {})
-    const pendingPlayer = new WorkletAudioPlayer({ prepare, dispose })
+    const pendingPlayer = new WorkletAudioPlayer({ retainTracks: async () => {}, prepare, dispose })
     pendingPlayer.setTracks([normalized])
     const playing = pendingPlayer.play()
     await vi.waitFor(() => expect(prepare).toHaveBeenCalled())
@@ -246,6 +252,7 @@ describe('WorkletAudioPlayer bounded scheduling', () => {
 
   it('surfaces preparation failure without creating a dry queue', async () => {
     const player = new WorkletAudioPlayer({
+      retainTracks: async () => {},
       prepare: async () => {
         throw new Error('failed preparation')
       },

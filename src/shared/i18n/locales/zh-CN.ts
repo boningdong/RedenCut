@@ -227,6 +227,15 @@ export const simplifiedChineseResources = {
     close: '关闭',
   },
   app: {
+    editorUnavailable: '编辑器暂时不可用',
+    editorUnavailableDetail: '编辑器不可用时，无法保存尚未保存的更改。仍要关闭吗？',
+    closeWithoutSaving: '不保存并关闭',
+
+    newProject: '新建项目',
+    closeProject: '关闭项目',
+    fileMenu: '文件',
+    notSavedProject: '未保存为项目',
+
     languageLabel: '语言',
     followSystem: '跟随系统',
     english: 'English',
@@ -544,7 +553,8 @@ export const simplifiedChineseResources = {
     transcriptFirst: '转写在前',
   },
   dialogs: {
-    resetSpeakerNames: '重新分析将重置自定义说话人名称。是否继续？',
+    resetSpeakerNames:
+      '重新分析将替换这些录音的说话人身份，当前说话人名称、颜色和关联需要重新设置。是否继续？',
     importAudio: '导入音频',
     audioFiles: '音频文件',
     projectFiles: '{{appName}} 项目',

@@ -129,8 +129,10 @@ export function TrackHeader({
             className="track-name"
             disabled={readOnly}
             title={t('waveform.rename', { name: track.name })}
-            onDoubleClick={() => setEditing(true)}
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setNameInput(track.name)
+              setEditing(true)
+            }}
           >
             {track.name}
           </button>

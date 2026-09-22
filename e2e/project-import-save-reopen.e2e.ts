@@ -147,6 +147,7 @@ test('imported short audio survives project save and a full application restart'
       ...identity,
       request: { purpose: 'open-project', selection },
     })
+    await call('browser_click', { ...identity, target: '.project-name' })
     await call('browser_click', { ...identity, target: 'button:text-is("Open Project")' })
     const reopenedTrack = await readyTrack()
 

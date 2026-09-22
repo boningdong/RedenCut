@@ -207,3 +207,53 @@ describe('application lifecycle', () => {
     expect(active.shutdown).toHaveBeenCalledOnce()
   })
 })
+
+describe('quit protection', () => {
+  it('waits for the save decision before shutdown, coalesces quit, and leaves the app alive on cancel', async () => {
+    const app = new FakeApp()
+    const decision = deferred<boolean>()
+    const active = { ...runtime(), canShutdown: vi.fn(() => decision.promise) }
+    startApplicationLifecycle({ app, initialize: async () => active })
+    app.ready.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const event = { preventDefault: vi.fn() }
+    app.emit('before-quit', event)
+    app.emit('before-quit', event)
+    expect(active.canShutdown).toHaveBeenCalledTimes(1)
+    expect(active.shutdown).not.toHaveBeenCalled()
+    decision.resolve(false)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(active.shutdown).not.toHaveBeenCalled()
+    expect(app.quit).not.toHaveBeenCalled()
+    app.emit('second-instance', {}, ['/tmp/Next.redencut'])
+    await vi.waitFor(() => expect(active.forwardProject).toHaveBeenCalledWith('/tmp/Next.redencut'))
+  })
+  it('shuts down only after the renderer confirms departure', async () => {
+    const app = new FakeApp()
+    const active = { ...runtime(), canShutdown: vi.fn(async () => true) }
+    startApplicationLifecycle({ app, initialize: async () => active })
+    app.ready.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    app.emit('before-quit', { preventDefault: vi.fn() })
+    await vi.waitFor(() => expect(app.quit).toHaveBeenCalledTimes(1))
+    expect(active.canShutdown).toHaveBeenCalledTimes(1)
+    expect(active.shutdown).toHaveBeenCalledTimes(1)
+  })
+})
+
+it.each(['throw', 'reject'])('finishes an approved quit after a shutdown %s', async (mode) => {
+  const app = new FakeApp()
+  const failure = new Error('cleanup failed')
+  const active = { ...runtime(), canShutdown: vi.fn(async () => true) }
+  active.shutdown.mockImplementation(() => {
+    if (mode === 'throw') throw failure
+    return Promise.reject(failure)
+  })
+  const reportDiagnostic = vi.fn()
+  startApplicationLifecycle({ app, initialize: async () => active, reportDiagnostic })
+  app.ready.resolve()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  app.emit('before-quit', { preventDefault: vi.fn() })
+  await vi.waitFor(() => expect(app.quit).toHaveBeenCalledTimes(1))
+  expect(reportDiagnostic).toHaveBeenCalledWith(failure)
+})

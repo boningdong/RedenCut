@@ -19,6 +19,7 @@ test.each(['transcript-editing-high-precision.redencut', 'transcript-editing.red
         await ui.call('redencut_prepare_dialog', {
           request: { purpose: 'open-project', selection: { type: 'project', name } },
         })
+        await ui.call('browser_click', { target: '.project-name' })
         await ui.call('browser_click', { target: 'button:text-is("Open Project")' })
         await expect
           .poll(() => ui.page.locator('[data-acoustic-editable="true"]').count(), {

@@ -346,3 +346,52 @@ it('menu arrows skip disabled commands and Escape restores focus without editing
   expect(document.activeElement).toBe(container.querySelector('.audio-panel-view'))
   expect(useTimelineStore.getState().undoStack).toHaveLength(0)
 })
+
+it.each(['Escape', 'outside'])(
+  'keeps range editing after context-menu dismissal via %s',
+  async (dismiss) => {
+    const { deleteSelection } = await import('../../actions/timelineActions')
+    const { clip } = setup()
+    act(() =>
+      useEditorStore
+        .getState()
+        .setSelection({ origin: 'timeline', start: 1, end: 2, trackId: 'one' }),
+    )
+    fireEvent.contextMenu(clip, { clientX: 60, clientY: 50 })
+    if (dismiss === 'Escape') fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    else fireEvent.pointerDown(document.body)
+    expect(useTimelineStore.getState().selectedClipIds).toEqual([])
+    act(() => deleteSelection())
+    expect(useTimelineStore.getState().tracks[0].clips).toHaveLength(1)
+    expect(useTimelineStore.getState().tracks[0].clips[0].redactions).toMatchObject([
+      { sourceStart: 1, sourceEnd: 2 },
+    ])
+  },
+)
+
+it('marquee excludes linked children and moves the Mix with its synchronized source', () => {
+  const { container } = setup()
+  act(() => {
+    const tracks = useTimelineStore.getState().tracks
+    useTimelineStore.setState({
+      tracks: [
+        tracks[0],
+        { ...tracks[1], clips: [{ ...tracks[0].clips[0], id: 'child', trackId: 'two' }] },
+      ],
+    })
+    useTimelineStore.getState().setMixLink('one', ['two'])
+  })
+  const lane = container.querySelector('[data-lane="one"]')!
+  fireEvent.pointerDown(lane, { button: 0, clientX: 250, clientY: 80 })
+  fireEvent.pointerMove(lane, { clientX: 10, clientY: 150 })
+  fireEvent.pointerUp(lane, { clientX: 10, clientY: 150 })
+  expect(useTimelineStore.getState().selectedClipIds).toEqual(['a'])
+  const clip = container.querySelector('[data-clip-id="a"]')!
+  fireEvent.pointerDown(clip, { button: 0, clientX: 40, clientY: 50 })
+  fireEvent.pointerMove(clip, { clientX: 120, clientY: 50 })
+  fireEvent.pointerUp(clip, { clientX: 120, clientY: 50 })
+  expect(useTimelineStore.getState().tracks[0].clips[0].outputStart).toBeGreaterThan(0)
+  expect(useTimelineStore.getState().tracks[1].clips[0].outputStart).toBe(
+    useTimelineStore.getState().tracks[0].clips[0].outputStart,
+  )
+})

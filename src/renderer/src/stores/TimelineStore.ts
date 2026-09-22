@@ -476,14 +476,14 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!Number.isFinite(gainDb) || gainDb < -24 || gainDb > 24) return
     const track = get().tracks.find((entry) => entry.id === trackId)
     if (!track || (track.gainDb ?? 0) === gainDb) return
-    commitTrackAudioSettings(trackId, { gainDb }, 'Adjust track gain')
+    commitTrackSettings(trackId, { gainDb }, 'Adjust track gain')
   },
 
   setTrackVolume(trackId, volume) {
     if (!Number.isFinite(volume) || volume < 0 || volume > 1) return
     const track = get().tracks.find((entry) => entry.id === trackId)
     if (!track || track.volume === volume) return
-    commitTrackAudioSettings(trackId, { volume }, 'Adjust track volume')
+    commitTrackSettings(trackId, { volume }, 'Adjust track volume')
   },
 
   toggleTrackNormalize(trackId) {
@@ -503,18 +503,14 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
             params: { ...NORMALIZE_DEFAULTS },
           },
         ]
-    commitTrackAudioSettings(trackId, { effects }, 'Toggle track normalization')
+    commitTrackSettings(trackId, { effects }, 'Toggle track normalization')
   },
 
   // ── updateTrack ─────────────────────────────────────────────────────────────
   updateTrack(trackId, patch) {
     if (linkedMasterForTrack(get().tracks, trackId)) return
     if (patch.mixLink !== undefined) return
-    if (!get().tracks.some((track) => track.id === trackId)) return
-    set((s) => ({
-      tracks: s.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)),
-    }))
-    markTimelineEdited()
+    commitTrackSettings(trackId, patch, 'Update track')
   },
 
   // ── redactRange ───────────────────────────────────────────────────────────────
@@ -1168,16 +1164,20 @@ function addRedactions(clips: Clip[], startTime: number, endTime: number, trackI
 }
 
 /** Level gestures submit a single completed value so history is independent of pointer event count. */
-function commitTrackAudioSettings(
+function commitTrackSettings(
   trackId: string,
-  patch: Partial<Pick<Track, 'volume' | 'gainDb' | 'effects'>>,
+  patch: Partial<Omit<Track, 'id' | 'clips'>>,
   label: string,
 ): void {
   const state = useTimelineStore.getState()
   if (linkedMasterForTrack(state.tracks, trackId)) return
   if (!state.tracks.some((track) => track.id === trackId)) return
+  const tracks = state.tracks.map((track) =>
+    track.id === trackId ? { ...track, ...patch } : track,
+  )
+  if (tracksEqual(state.tracks, tracks)) return
   useTimelineStore.setState({
-    tracks: state.tracks.map((track) => (track.id === trackId ? { ...track, ...patch } : track)),
+    tracks,
     undoStack: [...state.undoStack, { before: cloneTracks(state.tracks), label }],
     redoStack: [],
   })

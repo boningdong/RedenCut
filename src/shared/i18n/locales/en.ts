@@ -245,6 +245,16 @@ export const englishResources = {
     close: 'Close',
   },
   app: {
+    editorUnavailable: 'The editor is unavailable',
+    editorUnavailableDetail:
+      'Unsaved changes cannot be saved while the editor is unavailable. Close anyway?',
+    closeWithoutSaving: 'Close without saving',
+
+    newProject: 'New Project',
+    closeProject: 'Close Project',
+    fileMenu: 'File',
+    notSavedProject: 'Not saved as a project',
+
     languageLabel: 'Language',
     followSystem: 'Follow System',
     english: 'English',
@@ -579,7 +589,8 @@ export const englishResources = {
     transcriptFirst: 'Transcript first',
   },
   dialogs: {
-    resetSpeakerNames: 'Re-analysis will reset your custom speaker names. Continue?',
+    resetSpeakerNames:
+      'Re-analysis will replace speaker identities for these recordings. Current speaker names, colors and associations will need to be set again. Continue?',
     importAudio: 'Import Audio',
     audioFiles: 'Audio Files',
     projectFiles: '{{appName}} Project',

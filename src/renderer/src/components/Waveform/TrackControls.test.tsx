@@ -233,3 +233,37 @@ it('clears an audition when a drag returns to its original gain without creating
   expect(onCommit).not.toHaveBeenCalled()
   expect(onCancelPreview).toHaveBeenCalledOnce()
 })
+
+it('opens the current track name after undoing a rename', async () => {
+  const { TrackHeader } = await import('./TrackHeader')
+  const { useTimelineStore } = await import('../../stores/TimelineStore')
+  useTimelineStore.getState().loadFromProject(
+    [],
+    [
+      {
+        id: 'voice',
+        name: 'Original',
+        color: '#aaa',
+        clips: [],
+        effects: [],
+        muted: false,
+        solo: false,
+        volume: 1,
+      },
+    ],
+  )
+  function Header() {
+    const track = useTimelineStore((state) => state.tracks[0])
+    return <TrackHeader track={track} onRemove={() => {}} />
+  }
+  render(<Header />)
+  fireEvent.click(screen.getByRole('button', { name: 'Original' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Renamed' } })
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+  await act(() => useTimelineStore.getState().undo())
+  fireEvent.click(screen.getByRole('button', { name: 'Original' }))
+  expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('Original')
+  fireEvent.blur(screen.getByRole('textbox'))
+  expect(useTimelineStore.getState().tracks[0].name).toBe('Original')
+  expect(useTimelineStore.getState().redoStack).toHaveLength(1)
+})

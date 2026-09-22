@@ -43,18 +43,18 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
       selectedRange.end > clip.outputStart
         ? selectedRange
         : null
-    focusTimeline()
+    // Keep the menu's return focus in Audio without replacing the current edit selection.
+    event.currentTarget.closest<HTMLElement>('.audio-panel-view')?.focus({ preventScroll: true })
     const ids = clip
       ? state.selectedClipIds.includes(clip.id)
         ? state.selectedClipIds
         : [clip.id]
       : []
-    if (clip) {
+    const selectContextClips = () => {
+      focusTimeline()
       state.setSelectedTrackId(trackId)
-      state.setSelectedClipIds(ids, clip.id)
+      state.setSelectedClipIds(ids, clip?.id)
     }
-    if (selectedRange?.origin !== 'transcript')
-      useEditorStore.getState().setSelection(selectedRange)
     const clips = state.tracks.flatMap((track) => track.clips).filter((c) => ids.includes(c.id))
     const valid = () =>
       useTimelineStore.getState().tracks === state.tracks &&
@@ -66,6 +66,8 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
         label: t('waveform.redactRange'),
         action: () => {
           if (!valid()) return
+          focusTimeline()
+          state.setSelectedClipIds([])
           useTimelineStore.getState().redactRange(trackId, range.start, range.end)
           useEditorStore.getState().setSelection(null)
         },
@@ -83,8 +85,9 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
           time <= clip.outputStart ||
           time >= clip.outputStart + clip.sourceEnd - clip.sourceStart,
         action: () => {
-          if (valid())
-            useTimelineStore.getState().splitAt(getAudioPlayerInstance()?.getCurrentTime() ?? -1)
+          if (!valid()) return
+          selectContextClips()
+          useTimelineStore.getState().splitAt(getAudioPlayerInstance()?.getCurrentTime() ?? -1)
         },
       })
       const muted = clips.every((c: Clip) => c.muted)
@@ -94,7 +97,9 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
           `waveform.${muted ? (clips.length > 1 ? 'unmuteClips' : 'unmuteClip') : clips.length > 1 ? 'muteClips' : 'muteClip'}`,
         ),
         action: () => {
-          if (valid()) useTimelineStore.getState().setClipsMuted(ids, !muted)
+          if (!valid()) return
+          selectContextClips()
+          useTimelineStore.getState().setClipsMuted(ids, !muted)
         },
       })
       for (const [key, action] of [
@@ -107,7 +112,9 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
           label: t(`waveform.${key}`),
           separator: key === 'copyClips',
           action: () => {
-            if (valid() && !action()) onFailure()
+            if (!valid()) return
+            selectContextClips()
+            if (!action()) onFailure()
           },
         })
       }
@@ -118,6 +125,7 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
       disabled: !useTimelineClipboardStore.getState().contents,
       action: () => {
         if (!valid()) return
+        focusTimeline()
         useTimelineStore.getState().setSelectedTrackId(trackId)
         if (!pasteClips()) onFailure()
       },
@@ -129,6 +137,7 @@ export function useTimelineContextMenu(focusTimeline: () => void, onFailure: () 
         separator: true,
         action: () => {
           if (!valid()) return
+          selectContextClips()
           useTimelineStore.getState().removeClips(ids)
           useEditorStore.getState().setSelection(null)
         },

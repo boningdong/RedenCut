@@ -1,3 +1,4 @@
+import { hasSpeakerRerunImpact } from '../../shared/SpeakerRerunImpact'
 import { planSpeechTasks, type SpeechTaskSelection } from '../../shared/SpeechTaskPlanner'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { SpeechAnalysisJobRequest } from '../../shared/ipc.types'
@@ -54,7 +55,8 @@ export function createSpeechBatchHandler({
           request.tasks?.text === 'replace' ||
           request.tasks?.speakers === 'replace') &&
         !request.confirmSpeakerLabelReset &&
-        project.speakerLabelOverrides.some((override) => override.audioSourceId === id)
+        (hasSpeakerRerunImpact(project.speakerIdentities, new Set([id])) ||
+          project.speakerLabelOverrides.some((override) => override.audioSourceId === id))
       )
         throw new PublicIpcError('invalid-request')
       const guard = controller.captureBackgroundSpeechGuard(request, id)

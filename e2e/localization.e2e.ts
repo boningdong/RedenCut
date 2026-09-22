@@ -29,7 +29,7 @@ test('language switches preserve imported audio and survive an application resta
     await checkSidebar('Models & dependencies', 'settings-sidebar-english')
     await ui.call('browser_click', { target: 'dialog button[aria-label="Close"]' })
     await expect
-      .poll(() => ui.page.getByRole('button', { name: 'Open Project', exact: true }).count())
+      .poll(() => ui.page.getByRole('button', { name: 'Save', exact: true }).count())
       .toBe(1)
     await ui.call('redencut_prepare_dialog', {
       request: {
@@ -72,7 +72,7 @@ test('language switches preserve imported audio and survive an application resta
     await ui.call('browser_select_option', { target: 'select', values: ['en'] })
     await ui.call('browser_click', { target: 'dialog button[aria-label="Close"]' })
     await expect
-      .poll(() => ui.page.getByRole('button', { name: 'Open Project', exact: true }).count())
+      .poll(() => ui.page.getByRole('button', { name: 'Save', exact: true }).count())
       .toBe(1)
     await ui.call('redencut_prepare_dialog', {
       request: {
@@ -80,6 +80,7 @@ test('language switches preserve imported audio and survive an application resta
         selection: { type: 'project', name: 'localized-audio.redencut' },
       },
     })
+    await ui.call('browser_click', { target: '.project-name' })
     await ui.call('browser_click', { target: 'button:text-is("Open Project")' })
     await expect
       .poll(() => ui.page.locator('.waveform-clip canvas').count(), { timeout: 40_000 })

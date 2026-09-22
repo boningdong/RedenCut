@@ -161,6 +161,7 @@ test('split and drag survive save and reopen as visible clips with audible playb
       .toContain('edited-audio')
     await ui.restart()
     await ui.call('redencut_prepare_dialog', { request: { purpose: 'open-project', selection } })
+    await ui.call('browser_click', { target: '.project-name' })
     await ui.call('browser_click', { target: 'button:text-is("Open Project")' })
     await drawnWaveforms(ui.page, 2)
     const reopened = await layout(ui.page)

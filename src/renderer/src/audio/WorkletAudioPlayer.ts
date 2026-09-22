@@ -46,7 +46,7 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
   constructor(
     private readonly preparation: Pick<
       PreparedTrackProvider,
-      'prepare' | 'dispose'
+      'prepare' | 'dispose' | 'retainTracks'
     > = new PreparedTrackProvider(),
   ) {}
   private context: AudioContext | null = null
@@ -109,6 +109,11 @@ export class WorkletAudioPlayer implements RenderAudioPlayer {
       return
     }
     this.renderPlan = buildAudioRenderPlan(tracks, this.mode)
+    void this.preparation
+      .retainTracks(
+        this.renderPlan.tracks.filter((track) => track.normalize).map((track) => track.trackId),
+      )
+      .catch((error) => this.emitError(error))
     const nextDuration = this.renderPlan.durationFrames / SAMPLE_RATE
     if (nextDuration !== this.duration) {
       this.duration = nextDuration

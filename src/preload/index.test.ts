@@ -99,3 +99,18 @@ test('prepared audio progress forwards its session-scoped request and unwraps th
   expect(await mocks.api!.preparedAudio.progress(request)).toEqual(progress)
   expect(ipcRenderer.invoke).toHaveBeenLastCalledWith('effects:progress', request)
 })
+
+test('retains native commands and close requests sent before React mounts', () => {
+  expect(mocks.listeners.has('project:command')).toBe(true)
+  expect(mocks.listeners.has('project:close-request')).toBe(true)
+  mocks.listeners.get('project:command')!({}, 'open')
+  mocks.listeners.get('project:close-request')!({}, { requestId: 'early-close' })
+  const command = vi.fn()
+  const close = vi.fn()
+  const stopCommand = mocks.api!.on.projectCommand(command)
+  const stopClose = mocks.api!.on.projectCloseRequest(close)
+  expect(command).toHaveBeenCalledExactlyOnceWith('open')
+  expect(close).toHaveBeenCalledExactlyOnceWith({ requestId: 'early-close' })
+  stopCommand()
+  stopClose()
+})

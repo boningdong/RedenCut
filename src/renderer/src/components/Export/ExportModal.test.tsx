@@ -89,6 +89,12 @@ function result(
 
 describe('ExportModal', () => {
   beforeEach(() => {
+    HTMLDialogElement.prototype.showModal = function () {
+      this.open = true
+    }
+    HTMLDialogElement.prototype.close = function () {
+      this.open = false
+    }
     useLocaleStore.setState({ preference: 'en', resolvedLocale: 'en' })
     const ids = ['export-a', 'export-b']
     vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(
@@ -99,6 +105,33 @@ describe('ExportModal', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('contains editing shortcuts and routes Escape through settled cancellation', async () => {
+    const installed = installApi()
+    const onClose = vi.fn()
+    const background = vi.fn()
+    window.addEventListener('keydown', background)
+    try {
+      render(<ExportModal session={session()} draft={session().draft} onClose={onClose} />)
+      const button = screen.getByRole('button', { name: 'Export' })
+      fireEvent.keyDown(button, { key: 'Delete', code: 'Delete' })
+      expect(background).not.toHaveBeenCalled()
+      expect((screen.getByRole('dialog') as HTMLDialogElement).open).toBe(true)
+      fireEvent.click(button)
+      fireEvent.keyDown(button, { key: 'Escape', code: 'Escape' })
+      expect(installed.cancellations).toHaveLength(1)
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent.keyDown(button, { key: 'Escape', code: 'Escape' })
+      expect(installed.cancellations).toHaveLength(1)
+      await act(async () => {
+        installed.cancellations[0].result.resolve('cancelled')
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+      expect(background).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('keydown', background)
+    }
   })
 
   it('retranslates retained safe errors and never renders unknown private diagnostics', async () => {

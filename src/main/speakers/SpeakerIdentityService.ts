@@ -23,11 +23,8 @@ export function validateSpeakerIdentityChange(
       throw new Error('Person source bindings are immutable')
     if (!isDeepStrictEqual(person, changed)) affected.add(person.id)
   }
-  for (const group of [...current.associations, ...next.associations]) {
-    const before = current.associations.find((candidate) => candidate.id === group.id)
-    const after = next.associations.find((candidate) => candidate.id === group.id)
-    if (!isDeepStrictEqual(before, after)) for (const id of group.memberPersonIds) affected.add(id)
-  }
+  // Associations are presentation metadata; history may restore obsolete memberships
+  // without changing any person's immutable source binding or protected fields.
   for (const person of current.people)
     if (affected.has(person.id) && !isPersonEditable(person, analyses))
       throw new Error('Speaker source is unavailable or needs review')

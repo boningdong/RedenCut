@@ -489,3 +489,62 @@ it('retains a person while another track uses the same source and closes an abse
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Show Alice' })).toBeNull()
 })
+it('lets an association remove a stale member without editing that person', async () => {
+  const value = structuredClone(catalog)
+  value.people[0].binding.analysisRevisionId = '00000000-0000-4000-8000-000000000099' as never
+  value.associations = [
+    {
+      id: 'group',
+      displayName: 'Hosts',
+      color: { mode: 'automatic' },
+      memberPersonIds: ['Alice', 'Bob'],
+    },
+  ]
+  const save = setup(value)
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Hosts' }))
+  const dialog = screen.getByRole('dialog')
+  const remove = within(dialog).getByRole('button', { name: 'Remove Alice' })
+  expect(remove.closest('fieldset')?.disabled).toBe(false)
+  fireEvent.click(remove)
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+  expect(save.mock.calls[0][0].associations).toEqual([])
+  expect(save.mock.calls[0][0].people).toEqual(value.people)
+})
+it('lets a healthy person rename while a historical group member stays unchanged', async () => {
+  const value = structuredClone(catalog)
+  value.people[0].binding.analysisRevisionId = '00000000-0000-4000-8000-000000000099' as never
+  value.associations = [
+    {
+      id: 'group',
+      displayName: 'Hosts',
+      color: { mode: 'automatic' },
+      memberPersonIds: ['Alice', 'Bob'],
+    },
+  ]
+  const save = setup(value)
+  fireEvent.click(screen.getByRole('button', { name: 'Manage people' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Hosts' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Bob' }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('button', { name: 'Rename Alice' }).matches(':disabled')).toBe(
+    true,
+  )
+  const name = within(dialog).getByRole('textbox', { name: 'Name' })
+  expect(name.matches(':disabled')).toBe(false)
+  fireEvent.change(name, { target: { value: 'Robert' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+  expect(save.mock.calls[0][0].people[1].displayName).toBe('Robert')
+  expect(save.mock.calls[0][0].people[0]).toEqual(value.people[0])
+})
+it('does not offer historical people when adding a new association', () => {
+  const value = structuredClone(catalog)
+  value.people[0].binding.analysisRevisionId = '00000000-0000-4000-8000-000000000099' as never
+  setup(value)
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Bob' }))
+  const dialog = screen.getByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add person' }))
+  expect(within(dialog).queryByRole('button', { name: 'Add Alice' })).toBeNull()
+  expect(within(dialog).getByRole('button', { name: 'Add Cara' })).toBeTruthy()
+})

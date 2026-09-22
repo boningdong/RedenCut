@@ -122,7 +122,8 @@ Edits are a draft until Save; Escape, Cancel, or a click outside discards the dr
 Inside an association editor, double-click a member name (or Enter/F2 while focused) to edit it inline.
 Drag a person tag onto another to create an association named after the receiving tag; association tags filter all their members together.
 Manage people presents associations as parent nodes and their people as children.
-People with unavailable or outdated diarization bindings are read-only and cannot be associated.
+People with unavailable or outdated diarization bindings have read-only identity fields and cannot be newly selected for association in the UI; obsolete memberships can be removed, and healthy people in the same association remain editable.
+Undo/Redo may restore historical association metadata without rebinding a person to a newer recognition result.
 Keyboard input inside the editor stays local, including native text undo; saved edits participate in project Undo/Redo.
 
 ## Settings and Onboarding Dialogs
@@ -158,7 +159,7 @@ Removing an overlay restores its entire coverage, which can extend beyond the cl
 
 Right-click a clip for Split at playhead, Mute/Unmute, Copy, Cut, Duplicate, Paste at playhead and Delete.
 A timeline range also exposes Redact selected range on an intersecting clip in its target track; it applies to the range across that track’s intersecting clips, preserving gaps.
-Right-clicking an already selected clip retains multi-selection; other clips become the selection.
+Opening and dismissing a clip context menu preserves the prior edit selection. Choosing a clip command targets the clicked clip, retaining multi-selection when that clip was already selected.
 Right-clicking a blank lane offers Paste at playhead without discarding the existing selection; choosing Paste targets that lane.
 Opening a context menu never seeks the playhead.
 Split requires one selected clip and a playhead strictly inside its bounds.
@@ -184,3 +185,13 @@ Volume and Gain sliders audition their current value during a drag without savin
 Release commits one undoable edit; Escape, pointer cancellation, or closing an unfinished slider edit restores the saved track levels.
 
 Track context menus provide **Fit waveform** (fit the current waveform, including Gain, to 85% of its available height) and **Reset waveform zoom** (unity display scale). These change view state only and do not create edit history. Volume does not change waveform amplitude.
+
+## Project menu and departure
+
+The project name opens New Project, Open Project, Save, Save As and Close Project. The native File menu invokes the same commands, with Cmd/Ctrl+N, Cmd/Ctrl+O, Cmd/Ctrl+S, Cmd/Ctrl+Shift+S and Cmd/Ctrl+W respectively. Save and Export remain visible in the header. Close Project returns to an empty editor without quitting.
+Temporary workspaces show Not saved as a project. Populated temporary workspaces and dirty saved projects require Save/Discard/Cancel before New, Open, Close or application departure. Cancelling the save destination or a failed transition retains the editor. Modal workflows must finish or close before project commands run.
+Native window close and Quit wait for the protected transition before releasing the window or application resources; repeated requests share one pending decision.
+
+Track Name, Mute and Solo edits share chronological Undo/Redo with timeline and level edits. Reopening the rename field reads the current restored name. Marquee selection excludes read-only linked children. Saving unchanged Mix membership closes without an error.
+The focused timeline scrollbar handles its navigation keys and retains unrelated project shortcuts, including Save and Undo/Redo.
+Export is a modal dialog: keyboard input cannot edit the background, Escape follows the export cancellation flow, and closing restores focus.

@@ -114,6 +114,8 @@
 
 ## Speaker Presentation
 
+- Speaker association membership is presentation metadata: cleanup and history restoration preserve immutable source bindings; stale person fields stay protected, and UI association candidates require current analysis.
+
 - Reserve eight audio-track colors in [`trackColors.ts`](../src/shared/trackColors.ts), shared by import and renderer track creation.
 - Resolve speaker colors by source, analysis revision, and speaker identity; do not replace speaker colors with track colors when multiple tracks exist.
 - Anchor the first speaker for a track to its track color by default and allocate secondary colors outside the reserved palette with project-wide collision tracking.
@@ -153,5 +155,12 @@
 - Main owns prepared Float32 PCM and FFmpeg processes behind session-scoped leases; renderer requests use source IDs, track metadata and opaque handles, never file paths.
 - Playback preparation uses the current render mode's exact composition; export uses the edited composition and the identical filter sequence. Prepared audio is regenerated after composition changes, not after post-effect gain or volume changes.
 - Prepared reads are bounded and active-session validated; late results cannot attach to a replaced playback generation. Project closure and player disposal settle preparation and remove owned temporary artifacts.
-- Normalize is speech leveling plus loudness normalization, not speaker separation or a guarantee of identical loudness for simultaneous speakers. Manual positive gain or summing multiple tracks can exceed the per-effect peak ceiling.
+- Auto Level follows the composed track’s active-level reference using streamed PCM preparation; it is not a fixed LUFS target or speaker separation. Manual positive gain or summing multiple tracks can exceed the per-effect peak ceiling.
 - Level gestures and effect toggles use track snapshot history; UI checked/highlight state derives from saved effect state rather than separate booleans.
+
+## Project Commands and Native Departure
+
+- The project-name menu and native File menu route typed commands to the renderer's existing transition queue.
+- Temporary media requires an explicit project destination even when the local draft is clean; derive departure protection from workspace kind and populated content as well as local edits.
+- Native window close and application quit await the protected empty-session transition before teardown. Sender-owned close responses cannot authorize another window; duplicate requests share one decision.
+- Keep project command and close-request types transient; project files remain version 4.

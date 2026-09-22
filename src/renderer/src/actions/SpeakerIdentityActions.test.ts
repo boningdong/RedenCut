@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { RendererSession } from '@shared/session.types'
-import type { SpeakerIdentityCatalog } from '@shared/SpeakerIdentityTypes'
+import type {
+  SpeakerIdentityCatalog,
+  SaveSpeakerIdentitiesRequest,
+} from '@shared/SpeakerIdentityTypes'
 import { useEditorStore } from '../stores/editor.store'
 import { useTimelineStore } from '../stores/TimelineStore'
 import { useEditorHistoryStore } from '../stores/EditorHistoryStore'
@@ -131,4 +134,67 @@ it('can redo after persisted objects return in schema field order', async () => 
   await useTimelineStore.getState().redo()
   expect(useEditorHistoryStore.getState().error).toBeNull()
   expect(useEditorStore.getState().session?.speakerIdentities?.people[0].displayName).toBe('Alice')
+})
+
+it('round-trips historical membership cleanup through renderer undo/redo', async () => {
+  const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const catalog: SpeakerIdentityCatalog = {
+    version: 1,
+    people: [1, 2].map((n) => ({
+      id: `person-${n}`,
+      displayName: `Person ${n}`,
+      color: '#112233',
+      binding: {
+        audioSourceId: id(n) as never,
+        analysisRevisionId: id(n + 10) as never,
+        speakerId: id(n + 20) as never,
+      },
+    })),
+    associations: [
+      {
+        id: 'hosts',
+        displayName: 'Hosts',
+        color: { mode: 'automatic' },
+        memberPersonIds: ['person-1', 'person-2'],
+      },
+    ],
+  }
+  let current = {
+    workspaceToken: 'workspace',
+    revision: 1,
+    speakerIdentities: catalog,
+    speechAnalyses: [],
+    draft: { tracks: [], export: {} },
+  } as unknown as RendererSession
+  useEditorStore.getState().reset()
+  useTimelineStore.getState().reset()
+  useEditorHistoryStore.getState().reset()
+  useEditorStore.getState().loadSession(current)
+  vi.stubGlobal('window', {
+    electronAPI: {
+      speakerIdentity: {
+        save: async (request: SaveSpeakerIdentitiesRequest) => {
+          expect(request.expected).toEqual(current.speakerIdentities)
+          const next = request.next
+          current = { ...current, speakerIdentities: next }
+          return current
+        },
+      },
+    },
+  })
+  try {
+    await saveSpeakerIdentities(catalog, { ...catalog, associations: [] }, async (session) => {
+      useEditorStore.getState().loadSession(session, true)
+    })
+    expect(current.speakerIdentities?.associations).toEqual([])
+    await useTimelineStore.getState().undo()
+    expect(useEditorHistoryStore.getState().error).toBeNull()
+    expect(current.speakerIdentities).toEqual(catalog)
+    await useTimelineStore.getState().redo()
+    expect(useEditorHistoryStore.getState().error).toBeNull()
+    expect(current.speakerIdentities?.associations).toEqual([])
+    expect(current.speakerIdentities?.people).toEqual(catalog.people)
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })

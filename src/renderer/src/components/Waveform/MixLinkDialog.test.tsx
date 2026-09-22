@@ -97,3 +97,22 @@ it('manages existing links without repeating alignment acknowledgment', () => {
   expect((screen.getByText('Save links') as HTMLButtonElement).disabled).toBe(false)
   expect(screen.getByText('Unlink all')).toBeTruthy()
 })
+
+it('closes unchanged links without displaying a failed edit', () => {
+  const linked = { ...mix, mixLink: { stemTrackIds: [child.id] } }
+  function Dialog() {
+    const [open, setOpen] = React.useState(true)
+    return open ? (
+      <MixLinkDialog
+        track={linked}
+        tracks={[linked, child]}
+        onApply={() => false}
+        onClose={() => setOpen(false)}
+      />
+    ) : null
+  }
+  render(<Dialog />)
+  fireEvent.click(screen.getByText('Save links'))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('alert')).toBeNull()
+})

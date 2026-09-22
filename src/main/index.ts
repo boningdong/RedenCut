@@ -1,3 +1,5 @@
+import { installProjectMenu } from './ProjectMenu'
+import { ProjectCloseGuard } from './project/ProjectCloseGuard'
 import { registerPreparedAudioIpc } from './ipc/PreparedAudioIpc'
 import { MediaRecoveryCoordinator } from './project/MediaRecoveryCoordinator'
 import { MediaRecoveryService } from './project/MediaRecoveryService'
@@ -19,7 +21,7 @@ import { AppPreferencesStore } from './preferences/AppPreferencesStore'
 import { registerAppPreferencesIpc } from './ipc/appPreferences.ipc'
 import { WorkspaceLayoutStore } from './preferences/WorkspaceLayoutStore'
 import { registerWorkspaceLayoutIpc } from './ipc/workspaceLayout.ipc'
-import { app, BrowserWindow, protocol } from 'electron'
+import { app, BrowserWindow, protocol, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { createProjectDialogs } from './dialogs/createProjectDialogs'
 import { startApplicationLifecycle } from './applicationLifecycle'
@@ -208,11 +210,73 @@ startApplicationLifecycle({
       ),
     )
 
+    const closeGuard = new ProjectCloseGuard()
+    ipcMain.handle('project:close-response', (event, requestId: unknown, allowed: unknown) =>
+      typeof requestId === 'string' && typeof allowed === 'boolean'
+        ? closeGuard.respond(event.sender.id, requestId, allowed)
+        : false,
+    )
+    let closeAllowed = false
     let window = createWindow()
+    const updateMenu = () =>
+      installProjectMenu(appPreferences.getSnapshot().resolvedLocale, (command) => {
+        void ensureWindow()
+          .then(() => window.webContents.send('project:command', command))
+          .catch(console.error)
+      })
+    appPreferences.subscribe(updateMenu)
+    updateMenu()
+    const protectWindow = () => {
+      window.on('close', (event) => {
+        if (closeAllowed) return
+        event.preventDefault()
+        if (!rendererLoaded) return
+        void closeGuard
+          .request(window.webContents)
+          .then((allowed) => {
+            if (!allowed || window.isDestroyed()) return
+            closeAllowed = true
+            window.close()
+          })
+          .catch(console.error)
+      })
+    }
     let rendererLoaded = false
+    let rendererFailed = false
+    let departure: Promise<boolean> | null = null
+    const requestDeparture = (): Promise<boolean> => {
+      if (!departure)
+        departure = decideDeparture().finally(() => {
+          departure = null
+        })
+      return departure
+    }
+    const decideDeparture = async (): Promise<boolean> => {
+      if (window.isDestroyed()) return true
+      if (rendererFailed || window.webContents.isCrashed()) {
+        const t = translators[appPreferences.getSnapshot().resolvedLocale]
+        const result = await dialog.showMessageBox(window, {
+          type: 'warning',
+          message: t('app.editorUnavailable'),
+          detail: t('app.editorUnavailableDetail'),
+          buttons: [t('common.cancel'), t('app.closeWithoutSaving')],
+          defaultId: 0,
+          cancelId: 0,
+        })
+        return result.response === 1
+      }
+      return rendererLoaded ? closeGuard.request(window.webContents) : false
+    }
     let rendererLoad: Promise<void> = Promise.resolve()
     const observeRendererLoad = () => {
       rendererLoaded = false
+      rendererFailed = false
+      window.webContents.once('did-fail-load', () => {
+        rendererFailed = true
+      })
+      window.webContents.once('render-process-gone', () => {
+        rendererFailed = true
+      })
       removePendingProjectOpensOnSenderDestroyed(pendingOpens, window.webContents)
       rendererLoad = new Promise<void>((resolve) => {
         window.webContents.once('did-finish-load', () => {
@@ -225,6 +289,8 @@ startApplicationLifecycle({
     const ensureWindow = async () => {
       if (window.isDestroyed()) {
         window = createWindow()
+        closeAllowed = false
+        protectWindow()
         observeRendererLoad()
       }
       await rendererLoad
@@ -232,6 +298,7 @@ startApplicationLifecycle({
         throw new Error('Primary window did not finish loading')
     }
     observeRendererLoad()
+    protectWindow()
     app.on('activate', () => {
       void ensureWindow().catch(console.error)
     })
@@ -246,6 +313,12 @@ startApplicationLifecycle({
           throw new Error('Primary window is unavailable')
         const pending = pendingOpens.issue(window.webContents.id, path)
         window.webContents.send('project:pending-open', pending)
+      },
+      canShutdown: async () => {
+        if (window.isDestroyed() || closeAllowed) return true
+        const allowed = await requestDeparture()
+        if (allowed) closeAllowed = true
+        return allowed
       },
       shutdown: async () => {
         await Promise.all([developmentEnvironment?.shutdown(), resources.shutdown()])

@@ -1,3 +1,4 @@
+import type { ProjectCommand, ProjectCloseRequest } from './ProjectCommands'
 import type { PreparedAudioAPI } from './PreparedAudioTypes'
 import type { ProjectOpenProgressEvent } from './AudioPreparationTypes'
 import type {
@@ -153,6 +154,7 @@ export interface IElectronAPI {
     cancel(request: MediaRecoveryRequest): Promise<void>
   }
   project: {
+    respondToClose(requestId: string, allowed: boolean): Promise<boolean>
     initialize(): Promise<RendererSession>
     openStarter(request: OpenProjectRequest, kind: 'sample' | 'empty'): Promise<OpenProjectResult>
     openDialog(request: OpenProjectRequest): Promise<OpenProjectResult>
@@ -192,6 +194,8 @@ export interface IElectronAPI {
     cancelExport(request: CancelSessionJobRequest<ExportJobId>): Promise<ExportCancellationResult>
   }
   on: {
+    projectCommand(callback: (command: ProjectCommand) => void): () => void
+    projectCloseRequest(callback: (request: ProjectCloseRequest) => void): () => void
     projectOpenProgress(callback: (event: ProjectOpenProgressEvent) => void): () => void
     mediaRecoveryChanged(callback: (snapshot: MediaRecoverySnapshot) => void): () => void
 

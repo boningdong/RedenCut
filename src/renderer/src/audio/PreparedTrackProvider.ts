@@ -6,7 +6,7 @@ import { useEditorStore } from '../stores/editor.store'
 
 /** Owns the session lease; queue generations decide whether completed preparation may attach. */
 export class PreparedTrackProvider {
-  private requestId = crypto.randomUUID()
+  private requestIds = new Map<string, string>()
   private session: SessionPrecondition | null = null
   private disposed = false
 
@@ -18,16 +18,24 @@ export class PreparedTrackProvider {
     if (this.disposed) throw new DOMException('Player destroyed', 'AbortError')
     const session = this.currentSession()
     this.session = session
-    const descriptor = await this.withCurrentRevision((current) =>
-      window.electronAPI.preparedAudio.prepare({
+    let requestId = this.requestIds.get(trackId)
+    if (!requestId) {
+      requestId = crypto.randomUUID()
+      this.requestIds.set(trackId, requestId)
+    }
+    const descriptor = await this.withCurrentRevision((current) => {
+      if (this.requestIds.get(trackId) !== requestId)
+        throw new DOMException('Track preparation released', 'AbortError')
+      return window.electronAPI.preparedAudio.prepare({
         ...current,
-        requestId: this.requestId,
+        requestId,
         tracks,
         trackId,
         mode,
-      }),
-    )
-    if (this.disposed) throw new DOMException('Player destroyed', 'AbortError')
+      })
+    })
+    if (this.disposed || this.requestIds.get(trackId) !== requestId)
+      throw new DOMException('Track preparation released', 'AbortError')
     if (
       !descriptor.handle ||
       !Number.isSafeInteger(descriptor.channels) ||
@@ -48,7 +56,7 @@ export class PreparedTrackProvider {
         const chunk = await window.electronAPI.preparedAudio
           .read({
             ...this.currentSession(),
-            requestId: this.requestId,
+            requestId,
             handle: descriptor.handle,
             startFrame,
             frameCount,
@@ -71,10 +79,28 @@ export class PreparedTrackProvider {
     }
   }
 
+  async retainTracks(trackIds: readonly string[]): Promise<void> {
+    const retained = new Set(trackIds)
+    const removed = [...this.requestIds].filter(([trackId]) => !retained.has(trackId))
+    for (const [trackId] of removed) this.requestIds.delete(trackId)
+    if (!this.session) return
+    const session = this.session
+    await Promise.all(
+      removed.map(([, requestId]) =>
+        window.electronAPI.preparedAudio.release({ ...session, requestId }),
+      ),
+    )
+  }
+
   async dispose(): Promise<void> {
     this.disposed = true
     if (this.session)
-      await window.electronAPI.preparedAudio.release({ ...this.session, requestId: this.requestId })
+      await Promise.all(
+        [...this.requestIds.values()].map((requestId) =>
+          window.electronAPI.preparedAudio.release({ ...this.session!, requestId }),
+        ),
+      )
+    this.requestIds.clear()
   }
 
   private async withCurrentRevision<T>(

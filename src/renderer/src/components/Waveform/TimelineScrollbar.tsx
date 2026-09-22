@@ -36,7 +36,24 @@ export function TimelineScrollbar({
         width: viewportWidth,
         maxWidth: `calc(100% - ${headerWidth}px)`,
       }}
-      onKeyDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (
+          !event.metaKey &&
+          !event.ctrlKey &&
+          [
+            'ArrowLeft',
+            'ArrowRight',
+            'ArrowUp',
+            'ArrowDown',
+            'Home',
+            'End',
+            'PageUp',
+            'PageDown',
+            ' ',
+          ].includes(event.key)
+        )
+          event.stopPropagation()
+      }}
       onScroll={(event) => {
         if (viewport.current) viewport.current.scrollLeft = event.currentTarget.scrollLeft
       }}

@@ -54,3 +54,21 @@ describe('undoable track audio settings', () => {
     expect(store().undoStack).toHaveLength(0)
   })
 })
+
+it.each([{ muted: true }, { solo: true }, { name: 'Renamed' }])(
+  'records track patch %j separately and invalidates redo',
+  async (patch) => {
+    store().setTrackGain('t', 6)
+    store().updateTrack('t', patch)
+    expect(store().undoStack).toHaveLength(2)
+    await store().undo()
+    expect(store().tracks[0]).toMatchObject({ name: 'Voice', muted: false, solo: false, gainDb: 6 })
+    await store().redo()
+    expect(store().tracks[0]).toMatchObject(patch)
+    await store().undo()
+    store().updateTrack('t', { name: 'New branch' })
+    expect(store().redoStack).toHaveLength(0)
+    await store().redo()
+    expect(store().tracks[0].name).toBe('New branch')
+  },
+)

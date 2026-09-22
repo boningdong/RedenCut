@@ -134,6 +134,7 @@ test('real speech analysis publishes an editable durable transcript and survives
   await session.call('redencut_prepare_dialog', {
     request: { purpose: 'open-project', selection },
   })
+  await session.call('browser_click', { target: '.project-name' })
   await session.call('browser_click', { target: 'button:text-is("Open Project")' })
   await expect
     .poll(() => session!.page.locator('[data-testid="canonical-transcript"]').innerText(), {

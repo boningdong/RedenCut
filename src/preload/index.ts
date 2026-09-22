@@ -1,3 +1,4 @@
+import type { ProjectCommand, ProjectCloseRequest } from '../shared/ProjectCommands'
 import type { PreparedAudioAPI } from '../shared/PreparedAudioTypes'
 import type { ProjectOpenProgressEvent } from '../shared/AudioPreparationTypes'
 import type { MediaRecoverySnapshot } from '../shared/MediaRecoveryTypes'
@@ -63,6 +64,28 @@ ipcRenderer.on('project:pending-open', (_event, value: PendingProjectOpenEvent) 
   }
   pendingProjectOpenCallbacks.forEach((callback) => void callback(value))
 })
+
+// Native menus may target a recreated window before React has mounted its listeners.
+function bufferedProjectEvents<T>(channel: 'project:command' | 'project:close-request') {
+  const pending: T[] = []
+  const listeners = new Set<(value: T) => void>()
+  ipcRenderer.on(channel, (_event, value: T) => {
+    if (!listeners.size) {
+      pending.push(value)
+      return
+    }
+    listeners.forEach((listener) => listener(value))
+  })
+  return (listener: (value: T) => void) => {
+    listeners.add(listener)
+    pending.splice(0).forEach((value) => listener(value))
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+}
+const projectCommands = bufferedProjectEvents<ProjectCommand>('project:command')
+const projectCloseRequests = bufferedProjectEvents<ProjectCloseRequest>('project:close-request')
 
 const api = {
   resourcesSelectWhisper: (modelId: string) =>
@@ -134,6 +157,8 @@ const api = {
     cancel: (request) => invokeSafe<void>(invoke, 'media-recovery:cancel', request),
   },
   project: {
+    respondToClose: (requestId: string, allowed: boolean) =>
+      invoke('project:close-response', requestId, allowed) as Promise<boolean>,
     openStarter: (request: OpenProjectRequest, kind: 'sample' | 'empty') =>
       invokeSafe<OpenProjectResult>(invoke, 'project:open-starter', request, kind),
     initialize: () => invokeSafe<RendererSession>(invoke, 'project:initialize'),
@@ -190,6 +215,8 @@ const api = {
       invokeSafe<ExportCancellationResult>(invoke, 'render:cancel-export', request),
   },
   on: {
+    projectCommand: projectCommands,
+    projectCloseRequest: projectCloseRequests,
     projectOpenProgress: (callback: (progress: ProjectOpenProgressEvent) => void) => {
       const handler = (_event: IpcRendererEvent, progress: ProjectOpenProgressEvent) =>
         callback(progress)

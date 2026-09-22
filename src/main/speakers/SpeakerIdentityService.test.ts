@@ -23,3 +23,51 @@ it('guards catalog expectations and allows retained stale identities without edi
   rebound.people[0].binding.speakerId = '00000000-0000-4000-8000-000000000004' as never
   expect(() => validateSpeakerIdentityChange(current, current, rebound, [analysis])).toThrow()
 })
+it('allows removing stale association members while preserving binding immutability', () => {
+  const other = {
+    ...analysis,
+    audioSourceId: '00000000-0000-4000-8000-000000000004',
+  } as RendererSpeechAnalysis
+  const current = reconcileSpeakerIdentities(undefined, [analysis, other])
+  current.associations = [
+    {
+      id: 'group',
+      displayName: 'Hosts',
+      color: { mode: 'automatic' },
+      memberPersonIds: current.people.map((p) => p.id),
+    },
+  ]
+  const next = { ...current, associations: [] }
+  expect(validateSpeakerIdentityChange(current, current, next, [other])).toEqual(next)
+  expect(validateSpeakerIdentityChange(next, next, current, [other])).toEqual(current)
+  const renamed = structuredClone(current)
+  renamed.people[1].displayName = 'Healthy host'
+  expect(validateSpeakerIdentityChange(current, current, renamed, [other])).toEqual(renamed)
+  renamed.people[0].displayName = 'Stale host'
+  expect(() => validateSpeakerIdentityChange(current, current, renamed, [other])).toThrow(
+    'unavailable',
+  )
+})
+it('accepts cleanup, historical restoration and repeated cleanup without rebinding people', () => {
+  const other = {
+    ...analysis,
+    audioSourceId: '00000000-0000-4000-8000-000000000004',
+  } as RendererSpeechAnalysis
+  const original = reconcileSpeakerIdentities(undefined, [analysis, other])
+  original.associations = [
+    {
+      id: 'hosts',
+      displayName: 'Hosts',
+      color: { mode: 'automatic' },
+      memberPersonIds: original.people.map((person) => person.id),
+    },
+  ]
+  const cleaned = { ...original, associations: [] }
+  let saved = validateSpeakerIdentityChange(original, original, cleaned, [])
+  expect(saved).toEqual(cleaned)
+  saved = validateSpeakerIdentityChange(saved, cleaned, original, [])
+  expect(saved).toEqual(original)
+  saved = validateSpeakerIdentityChange(saved, original, cleaned, [])
+  expect(saved).toEqual(cleaned)
+  expect(saved.people).toEqual(original.people)
+})

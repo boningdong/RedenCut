@@ -1,3 +1,7 @@
+import { needsProjectSave } from '@shared/ProjectSaveState'
+import type { ProjectCommand } from '@shared/ProjectCommands'
+import { ProjectMenu } from './components/project/ProjectMenu'
+import { hasSpeakerRerunImpact } from '@shared/SpeakerRerunImpact'
 import { useTrackContent } from './hooks/UseTrackContent'
 import { AudioPreparationProgress } from './components/audio-preparation/AudioPreparationProgress'
 import { usePreparationProgressStore } from './stores/PreparationProgressStore'
@@ -463,7 +467,7 @@ export default function App() {
       wasDirty: editor.isDirty,
       localEditRevision: editor.localEditRevision,
     }
-    if (!editor.isDirty)
+    if (!needsProjectSave(current, editor.isDirty))
       return {
         ledger,
         request: {
@@ -645,6 +649,57 @@ export default function App() {
     ],
   )
 
+  const newProject = useCallback(async (): Promise<boolean> => {
+    let switched = false
+    await enqueueOpen({
+      kind: 'starter',
+      starterKind: 'empty',
+      onOutcome: (value) => {
+        switched = value
+      },
+    })
+    return switched
+  }, [enqueueOpen])
+
+  const runProjectCommand = useCallback(
+    (command: ProjectCommand) => {
+      if (importState || document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]'))
+        return
+      const operation =
+        command === 'save'
+          ? save(false)
+          : command === 'save-as'
+            ? save(true)
+            : command === 'open'
+              ? enqueueOpen({ kind: 'manual' })
+              : newProject()
+      void operation.catch((reason: unknown) => setError(normalizePublicError(reason)))
+    },
+    [enqueueOpen, importState, newProject, save],
+  )
+
+  useEffect(() => window.electronAPI.on.projectCommand?.(runProjectCommand), [runProjectCommand])
+  useEffect(
+    () =>
+      window.electronAPI.on.projectCloseRequest?.(({ requestId }) => {
+        void (async () => {
+          let allowed = false
+          try {
+            // Do not destroy an active modal workflow or lose an uncommitted import.
+            if (
+              !importJob.current &&
+              !document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
+            )
+              allowed = await newProject()
+          } catch (reason) {
+            setError(normalizePublicError(reason))
+          }
+          await window.electronAPI.project.respondToClose(requestId, allowed)
+        })()
+      }),
+    [newProject],
+  )
+
   useKeyboardShortcuts({
     onSave: importState ? undefined : () => void save(false),
   })
@@ -743,10 +798,6 @@ export default function App() {
     }
   }, [importState])
 
-  const openProject = useCallback(async () => {
-    await enqueueOpen({ kind: 'manual' })
-  }, [enqueueOpen])
-
   const generateTranscript = useCallback(
     async (
       trackId?: string,
@@ -775,12 +826,14 @@ export default function App() {
         speechDraft.current = draft
         const resetsLabels =
           (tasks.text === 'replace' || tasks.speakers === 'replace') &&
-          useTranscriptStore
-            .getState()
-            .analyses.some(
-              (analysis) =>
-                sourceIds.has(analysis.audioSourceId) && analysis.speakerLabelOverrides.length > 0,
-            )
+          (hasSpeakerRerunImpact(currentSession.speakerIdentities, sourceIds) ||
+            useTranscriptStore
+              .getState()
+              .analyses.some(
+                (analysis) =>
+                  sourceIds.has(analysis.audioSourceId) &&
+                  analysis.speakerLabelOverrides.length > 0,
+              ))
         const confirmSpeakerLabelReset =
           resetsLabels && window.confirm(t('dialogs.resetSpeakerNames'))
         if (resetsLabels && !confirmSpeakerLabelReset) return
@@ -870,34 +923,26 @@ export default function App() {
     >
       <header className="project-header">
         <div className="project-identity">
-          <span
-            className="project-name"
-            title={
+          <ProjectMenu
+            name={
               session?.workspace.kind === 'saved'
                 ? session.workspace.displayName
                 : t('app.untitled')
             }
-          >
-            {session?.workspace.kind === 'saved'
-              ? session.workspace.displayName
-              : t('app.untitled')}
-          </span>
+            disabled={!session || Boolean(importState)}
+            onCommand={runProjectCommand}
+          />
         </div>
         <div className="project-actions">
           <span className="project-save-state">
             <i data-dirty={isDirty} />
-            {isDirty ? t('app.unsaved') : t('app.saved')}
+            {session?.workspace.kind === 'temporary'
+              ? t('app.notSavedProject')
+              : isDirty
+                ? t('app.unsaved')
+                : t('app.saved')}
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={Boolean(importState)}
-            onClick={() =>
-              void openProject().catch((reason: unknown) => setError(normalizePublicError(reason)))
-            }
-          >
-            {t('app.openProject')}
-          </Button>
+
           <Button
             size="sm"
             variant="ghost"
@@ -906,14 +951,7 @@ export default function App() {
           >
             {t('common.save')}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={Boolean(importState)}
-            onClick={() => void save(true)}
-          >
-            {t('app.saveAs')}
-          </Button>
+
           <Button
             size="sm"
             variant="primary"

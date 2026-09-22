@@ -60,9 +60,15 @@ export function SpeakerIdentityEditor({
     target.kind === 'person'
       ? [target.id, ...(originalGroup?.memberPersonIds ?? []), ...selected]
       : [...(originalGroup?.memberPersonIds ?? []), ...selected]
-  const readonly = affected.some((id) => {
-    const p = catalog.people.find((p) => p.id === id)
-    return !p || !isPersonEditable(p, analyses)
+  const readonly =
+    target.kind === 'person' &&
+    !isPersonEditable(
+      catalog.people.find((p) => p.id === target.id)!,
+      analyses,
+    )
+  const hasStaleMembers = selected.some((id) => {
+    const person = catalog.people.find((p) => p.id === id)
+    return !person || !isPersonEditable(person, analyses)
   })
   // Unrelated background additions are retained when committing this draft.
   const touchedIds = new Set([...affected, target.id])
@@ -221,7 +227,7 @@ export function SpeakerIdentityEditor({
   )
   const visibleSelected = selected.filter((id) => {
     const person = draft.people.find((p) => p.id === id)
-    return person && personIsOnTimeline(person, tracks)
+    return person && (personIsOnTimeline(person, tracks) || !isPersonEditable(person, analyses))
   })
   return createPortal(
     <div
@@ -294,6 +300,7 @@ export function SpeakerIdentityEditor({
                 <div className="identity-member-row">
                   <button
                     type="button"
+                    disabled={!isPersonEditable(person, analyses)}
                     aria-label={t('speakerIdentity.color', { name: person.displayName })}
                     aria-expanded={colorMember === id}
                     onClick={() => setColorMember(colorMember === id ? null : id)}
@@ -322,6 +329,7 @@ export function SpeakerIdentityEditor({
                     ) : (
                       <button
                         type="button"
+                        disabled={!isPersonEditable(person, analyses)}
                         aria-label={t('speakerIdentity.rename', { name: person.displayName })}
                         onDoubleClick={() => setRenaming(id)}
                         onKeyDown={(e) => {
@@ -358,6 +366,7 @@ export function SpeakerIdentityEditor({
           <button
             type="button"
             className="identity-add"
+            disabled={hasStaleMembers}
             aria-expanded={adding}
             onClick={() => setAdding(!adding)}
           >

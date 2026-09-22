@@ -285,6 +285,7 @@ function installApi(initial: RendererSession) {
       cancel: vi.fn(async () => {}),
     },
     project: {
+      respondToClose: vi.fn(async () => true),
       initialize: vi.fn(async () => initial),
       openStarter: vi.fn<IElectronAPI['project']['openStarter']>(async () => ({
         outcome: 'stayed',
@@ -325,6 +326,8 @@ function installApi(initial: RendererSession) {
       cancelExport: vi.fn(async () => 'not-found' as const),
     },
     on: {
+      projectCommand: vi.fn<IElectronAPI['on']['projectCommand']>(() => vi.fn()),
+      projectCloseRequest: vi.fn<IElectronAPI['on']['projectCloseRequest']>(() => vi.fn()),
       mediaRecoveryChanged: vi.fn(() => vi.fn()),
       projectOpenProgress: vi.fn((callback) => {
         projectOpenProgress = callback
@@ -379,6 +382,12 @@ async function renderInitialized(initial: RendererSession) {
   return installed
 }
 
+function clickProjectAction(name: string) {
+  if (name === 'Save') return fireEvent.click(screen.getByRole('button', { name }))
+  fireEvent.click(document.querySelector('.project-name')!)
+  return fireEvent.click(screen.getByRole('menuitem', { name }))
+}
+
 describe('App transcription job identity', () => {
   beforeEach(() => {
     usePreparationProgressStore.setState({ active: null, opening: null, importing: null })
@@ -410,7 +419,7 @@ describe('App transcription job identity', () => {
     const header = document.querySelector('.project-header')!
     expect(
       [...header.querySelectorAll('button')].map((button) => button.textContent?.trim()),
-    ).toEqual(['Open Project', 'Save', 'Save As', 'Export'])
+    ).toEqual(['Empty', 'Save', 'Export'])
     expect(header.querySelector('.project-brand')).toBeNull()
   })
 
@@ -533,77 +542,111 @@ describe('App transcription job identity', () => {
     await waitFor(() => expect(api.workspaceLayout.set).toHaveBeenCalled())
   })
 
-  it('resolves the speaker-reset confirmation in the current language at invocation', async () => {
-    const { requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
-    const provenance = {
-      engineId: 'test',
-      engineVersion: '1',
-      modelId: 'test',
-      configHash: '0'.repeat(64),
-      artifactSchemaVersion: 1,
-      createdAt: '2026-01-01T00:00:00.000Z',
-    }
-    act(() =>
-      useTranscriptStore.getState().loadAnalyses([
-        {
-          audioSourceId: SOURCE_A,
-          analysisRevisionId: 'revision' as never,
-          transcript: {
-            id: 'transcript' as never,
-            revision: 1,
-            mode: 'verbatim',
-            units: [],
-            provenance,
-          },
-          alignment: {
-            id: 'alignment' as never,
-            transcriptArtifactId: 'transcript' as never,
-            transcriptRevision: 1,
-            acousticEditUnits: [],
-            provenance,
-          },
-          diarization: { id: 'diarization' as never, turns: [], provenance },
-          speakerAttribution: {
+  it.each(['legacy', 'catalog'])(
+    'confirms %s speaker edits in the current language',
+    async (kind) => {
+      const { requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+      const provenance = {
+        engineId: 'test',
+        engineVersion: '1',
+        modelId: 'test',
+        configHash: '0'.repeat(64),
+        artifactSchemaVersion: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }
+      act(() =>
+        useTranscriptStore.getState().loadAnalyses([
+          {
+            audioSourceId: SOURCE_A,
             analysisRevisionId: 'revision' as never,
-            alignmentArtifactId: 'alignment' as never,
-            diarizationArtifactId: 'diarization' as never,
-            attributions: [],
-            provenance: {
-              algorithmId: 'test',
-              algorithmVersion: '1',
-              configHash: '0'.repeat(64),
-              artifactSchemaVersion: 1,
-              createdAt: '2026-01-01T00:00:00.000Z',
+            transcript: {
+              id: 'transcript' as never,
+              revision: 1,
+              mode: 'verbatim',
+              units: [],
+              provenance,
             },
-          },
-          speakers: [
-            {
-              id: 'speaker' as never,
+            alignment: {
+              id: 'alignment' as never,
+              transcriptArtifactId: 'transcript' as never,
+              transcriptRevision: 1,
+              acousticEditUnits: [],
+              provenance,
+            },
+            diarization: { id: 'diarization' as never, turns: [], provenance },
+            speakerAttribution: {
               analysisRevisionId: 'revision' as never,
-              diarizationLabel: 'SPEAKER_00',
-              defaultDisplayName: 'Speaker 1',
+              alignmentArtifactId: 'alignment' as never,
+              diarizationArtifactId: 'diarization' as never,
+              attributions: [],
+              provenance: {
+                algorithmId: 'test',
+                algorithmVersion: '1',
+                configHash: '0'.repeat(64),
+                artifactSchemaVersion: 1,
+                createdAt: '2026-01-01T00:00:00.000Z',
+              },
             },
-          ],
-          speakerLabelOverrides: [{ speakerId: 'speaker' as never, displayName: 'Custom name' }],
-        },
-      ]),
-    )
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
-    expect(confirm).toHaveBeenLastCalledWith(
-      'Re-analysis will reset your custom speaker names. Continue?',
-    )
-    expect(requests).toHaveLength(0)
-    act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
-    expect(confirm).toHaveBeenLastCalledWith('重新分析将重置自定义说话人名称。是否继续？')
-    expect(requests).toHaveLength(0)
-    confirm.mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
-    await waitFor(() => expect(requests).toHaveLength(1))
-    expect(requests[0].request.confirmSpeakerLabelReset).toBe(true)
-    confirm.mockRestore()
-  })
+            speakers: [
+              {
+                id: 'speaker' as never,
+                analysisRevisionId: 'revision' as never,
+                diarizationLabel: 'SPEAKER_00',
+                defaultDisplayName: 'Speaker 1',
+              },
+            ],
+            speakerLabelOverrides:
+              kind === 'legacy'
+                ? [{ speakerId: 'speaker' as never, displayName: 'Custom name' }]
+                : [],
+          },
+        ]),
+      )
+      if (kind === 'catalog') {
+        const current = useEditorStore.getState().session!
+        act(() =>
+          useEditorStore.setState({
+            session: {
+              ...current,
+              speakerIdentities: {
+                version: 1,
+                people: [
+                  {
+                    id: 'person',
+                    displayName: 'Host',
+                    color: '#112233',
+                    binding: {
+                      audioSourceId: SOURCE_A,
+                      analysisRevisionId: 'revision' as never,
+                      speakerId: 'speaker' as never,
+                    },
+                  },
+                ],
+                associations: [],
+              },
+            },
+          }),
+        )
+      }
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
+      expect(confirm).toHaveBeenLastCalledWith(
+        'Re-analysis will replace speaker identities for these recordings. Current speaker names, colors and associations will need to be set again. Continue?',
+      )
+      expect(requests).toHaveLength(0)
+      act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
+      expect(confirm).toHaveBeenLastCalledWith(
+        '重新分析将替换这些录音的说话人身份，当前说话人名称、颜色和关联需要重新设置。是否继续？',
+      )
+      expect(requests).toHaveLength(0)
+      confirm.mockReturnValue(true)
+      fireEvent.click(screen.getByRole('button', { name: 'Regenerate transcript' }))
+      await waitFor(() => expect(requests).toHaveLength(1))
+      expect(requests[0].request.confirmSpeakerLabelReset).toBe(true)
+      confirm.mockRestore()
+    },
+  )
 
   it('does not dispatch analysis when cancelled during availability lookup', async () => {
     const { api, requests } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
@@ -760,7 +803,7 @@ describe('App transcription job identity', () => {
 
   it.each([
     ['Save button', () => fireEvent.click(screen.getByRole('button', { name: 'Save' }))],
-    ['Save As button', () => fireEvent.click(screen.getByRole('button', { name: 'Save As' }))],
+    ['Save As button', () => clickProjectAction('Save As')],
     ['keyboard Save', () => mocks.keyboardSave?.()],
   ] as const)(
     'shows the same sanitized current-session failure for %s without clearing dirty',
@@ -794,7 +837,7 @@ describe('App transcription job identity', () => {
       if (button === 'Save') api.project.save.mockReturnValueOnce(pending.promise)
       else api.project.saveAs.mockReturnValueOnce(pending.promise)
 
-      fireEvent.click(screen.getByRole('button', { name: button }))
+      clickProjectAction(button)
       act(() => useEditorStore.getState().loadSession(successor))
       pending.resolve(staleSaved)
       await act(async () => Promise.resolve())
@@ -812,7 +855,7 @@ describe('App transcription job identity', () => {
     originalPlayer.seekTo(2)
     act(() => useTimelineStore.getState().setTrackGain('track-1', 3))
     api.project.saveAs.mockResolvedValueOnce(saved)
-    fireEvent.click(screen.getByRole('button', { name: 'Save As' }))
+    clickProjectAction('Save As')
     await waitFor(() => expect(getAudioPlayerInstance()).not.toBe(originalPlayer))
     await waitFor(() => expect(getAudioPlayerInstance()?.getCurrentTime()).toBe(2))
     expect(mocks.players[0].destroy).toHaveBeenCalled()
@@ -876,7 +919,7 @@ describe('App transcription job identity', () => {
       if (button === 'Save') api.project.save.mockReturnValueOnce(pending.promise)
       else api.project.saveAs.mockReturnValueOnce(pending.promise)
 
-      fireEvent.click(screen.getByRole('button', { name: button }))
+      clickProjectAction(button)
       act(() => useEditorStore.getState().loadSession(successor))
       pending.reject(new Error('The operation could not be completed.'))
       await act(async () => Promise.resolve())
@@ -1154,7 +1197,7 @@ describe('App transcription job identity', () => {
       outcome: 'switched',
       session: session(TOKEN_B, 1, SOURCE_B, 'B'),
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
     fireEvent.click(screen.getByRole('button', { name: 'Generate all' }))
     await waitFor(() => expect(requests).toHaveLength(2))
@@ -1211,7 +1254,7 @@ describe('App transcription job identity', () => {
       session: saved,
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
 
     await waitFor(() => expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B))
     expect(screen.getByRole('alert').textContent).toContain('selected project could not be opened')
@@ -1252,7 +1295,7 @@ describe('App transcription job identity', () => {
     const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
     const registration = deferred<void>()
     api.project.openDialog.mockReturnValueOnce(opening.promise)
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledOnce())
     expect(screen.queryByRole('progressbar')).toBeNull()
     const operationId = api.project.openDialog.mock.calls[0][0].operationId
@@ -1296,7 +1339,7 @@ describe('App transcription job identity', () => {
     const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
     api.project.openDialog.mockReturnValueOnce(opening.promise)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await act(async () => {
       await willSwitch()({ transitionId: 'transition-a', workspaceToken: TOKEN_A, revision: 1 })
     })
@@ -1316,7 +1359,7 @@ describe('App transcription job identity', () => {
     const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
     api.project.openDialog.mockReturnValueOnce(opening.promise)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
     expect(api.project.openDialog.mock.calls[0][0]).toMatchObject({
       workspaceToken: TOKEN_A,
@@ -1354,7 +1397,7 @@ describe('App transcription job identity', () => {
     const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
     api.project.openDialog.mockReturnValueOnce(opening.promise)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
     act(() => useTimelineStore.getState().updateTrack('track-2', { name: 'Edit during switch' }))
     const undoCount = useTimelineStore.getState().undoStack.length
@@ -1391,7 +1434,7 @@ describe('App transcription job identity', () => {
     act(() => useTimelineStore.getState().updateTrack('track-1', { name: 'Submitted edit' }))
     const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
     api.project.openDialog.mockReturnValueOnce(opening.promise)
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
     await act(async () => {
       await willSwitch()({
@@ -1440,7 +1483,7 @@ describe('App transcription job identity', () => {
     act(() => useEditorStore.getState().markEdited())
     const opening = deferred<Awaited<ReturnType<IElectronAPI['project']['openDialog']>>>()
     api.project.openDialog.mockReturnValueOnce(opening.promise)
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(api.project.openDialog).toHaveBeenCalledTimes(1))
 
     await act(async () => {
@@ -1466,7 +1509,7 @@ describe('App transcription job identity', () => {
     installed.api.project.openDialog.mockReturnValueOnce(manual.promise)
     installed.api.project.openPending.mockResolvedValueOnce({ outcome: 'switched', session: third })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(installed.api.project.openDialog).toHaveBeenCalledTimes(1))
     const queued = installed.pendingOpen()({ requestId: 'queued-pending', displayName: 'C' })
     expect(installed.api.project.openPending).not.toHaveBeenCalled()
@@ -1495,8 +1538,8 @@ describe('App transcription job identity', () => {
 
     const firstOpen = installed.pendingOpen()({ requestId: 'first-pending', displayName: 'Saved' })
     await waitFor(() => expect(installed.api.project.openPending).toHaveBeenCalledTimes(1))
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
+    clickProjectAction('Open Project')
     expect(installed.api.project.openDialog).not.toHaveBeenCalled()
 
     pending.resolve({ outcome: 'stayed', reason: 'candidate-invalid', session: rollback })
@@ -1525,7 +1568,7 @@ describe('App transcription job identity', () => {
       session: successor,
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Project' }))
+    clickProjectAction('Open Project')
     await waitFor(() => expect(installed.api.project.openDialog).toHaveBeenCalledTimes(1))
     const queued = installed.pendingOpen()({ requestId: 'after-failure', displayName: 'B' })
     failed.reject(new Error('safe open failure'))
@@ -1540,4 +1583,38 @@ describe('App transcription job identity', () => {
     })
     expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_B)
   })
+})
+
+describe('project commands', () => {
+  it('uses the same protected new-project transition for the menu and native close', async () => {
+    const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+    initial.workspace.kind = 'temporary'
+    const { api } = await renderInitialized(initial)
+    const command = api.on.projectCommand.mock.calls[api.on.projectCommand.mock.calls.length - 1][0]
+    act(() => command('new'))
+    await waitFor(() => expect(api.project.openStarter).toHaveBeenCalled())
+    expect(api.project.openStarter.mock.calls[0][0].isDirty).toBe(true)
+    const close =
+      api.on.projectCloseRequest.mock.calls[api.on.projectCloseRequest.mock.calls.length - 1][0]
+    act(() => close({ requestId: 'close-a' }))
+    await waitFor(() => expect(api.project.respondToClose).toHaveBeenCalledWith('close-a', false))
+    expect(useEditorStore.getState().session?.workspaceToken).toBe(TOKEN_A)
+    expect(screen.getByText('Not saved as a project')).toBeTruthy()
+  })
+})
+
+it('keeps native project commands and close requests outside a custom modal workflow', async () => {
+  const { api } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
+  const modal = document.createElement('div')
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+  document.body.appendChild(modal)
+  try {
+    act(() => api.on.projectCommand.mock.calls[0][0]('new'))
+    act(() => api.on.projectCloseRequest.mock.calls[0][0]({ requestId: 'blocked' }))
+    await waitFor(() => expect(api.project.respondToClose).toHaveBeenCalledWith('blocked', false))
+    expect(api.project.openStarter).not.toHaveBeenCalled()
+  } finally {
+    modal.remove()
+  }
 })

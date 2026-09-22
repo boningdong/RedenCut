@@ -32,6 +32,12 @@ interface ActiveExportIdentity extends SessionPrecondition {
 
 export function ExportModal({ session, draft, onClose }: ExportModalProps) {
   const { t } = useTranslation()
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const element = dialog.current!
+    if (!element.open) element.showModal()
+    return () => element.close()
+  }, [])
   const [format, setFormat] = useState<ProjectDraft['export']['format']>('mp3')
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
   const [isCancelling, setIsCancelling] = useState(false)
@@ -152,8 +158,34 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
         : 0
 
   return (
-    <div
+    <dialog
+      ref={dialog}
+      aria-label={t('export.modalTitle')}
+      onCancel={(event) => {
+        event.preventDefault()
+        if (!isCancelling) void handleCancel()
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (
+          event.key !== 'Escape' ||
+          event.defaultPrevented ||
+          event.nativeEvent.isComposing ||
+          (event.target instanceof Element && event.target.closest('select'))
+        )
+          return
+        event.preventDefault()
+        if (!isCancelling) void handleCancel()
+      }}
       style={{
+        margin: 0,
+        border: 0,
+        padding: 0,
+        width: '100vw',
+        height: '100vh',
+        maxWidth: 'none',
+        maxHeight: 'none',
+        color: 'inherit',
         position: 'fixed',
         inset: 0,
         backgroundColor: 'var(--color-scrim)',
@@ -307,7 +339,7 @@ export function ExportModal({ session, draft, onClose }: ExportModalProps) {
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }
 

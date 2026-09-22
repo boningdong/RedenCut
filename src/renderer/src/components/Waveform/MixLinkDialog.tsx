@@ -156,7 +156,10 @@ export function MixLinkDialog({
               (addsSources && !acknowledged) || (affected && !confirmedRemoval) || draft.length > 6
             }
             onClick={() => {
-              if (onApply(draft)) onClose()
+              const existing = track.mixLink?.stemTrackIds ?? []
+              const unchanged =
+                draft.length === existing.length && draft.every((id) => existing.includes(id))
+              if (unchanged || onApply(draft)) onClose()
               else setFailed(true)
             }}
           >
