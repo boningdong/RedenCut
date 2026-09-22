@@ -11,7 +11,7 @@ const declaration = () => ({
 })
 
 test('release declarations describe an editable project package with an icon', () => {
-  assert.equal(validateMacDocumentType(declaration()), 'icon.icns')
+  assert.equal(validateMacDocumentType(declaration()), 'project-document.icns')
 })
 for (const [name, breakDeclaration] of [
   [

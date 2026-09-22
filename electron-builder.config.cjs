@@ -13,6 +13,12 @@ module.exports = {
     target: [{ target: 'dmg', arch: ['arm64'] }],
     category: 'public.app-category.music',
     icon: 'src/main/assets/icons/macos/neon-dark-lavender.icns',
+    extraResources: [
+      {
+        from: 'src/main/assets/icons/macos/project-document.icns',
+        to: 'project-document.icns',
+      },
+    ],
     extendInfo: {
       CFBundleDocumentTypes: [
         {
@@ -22,7 +28,7 @@ module.exports = {
           LSItemContentTypes: [identity.projectType],
           CFBundleTypeExtensions: [identity.projectExtension.slice(1)],
           LSTypeIsPackage: true,
-          CFBundleTypeIconFile: 'icon.icns',
+          CFBundleTypeIconFile: 'project-document.icns',
         },
       ],
       UTExportedTypeDeclarations: [
@@ -33,7 +39,7 @@ module.exports = {
           UTTypeTagSpecification: {
             'public.filename-extension': [identity.projectExtension.slice(1)],
           },
-          UTTypeIconFile: 'icon.icns',
+          UTTypeIconFile: 'project-document.icns',
         },
       ],
     },
