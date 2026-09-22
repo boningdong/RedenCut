@@ -10,12 +10,7 @@ const filename = 'mandarin-short-female.wav'
 
 // Read-only UI observations: displayed time, painted waveforms and ruler-relative geometry.
 async function visibleTime(page: Page): Promise<number> {
-  const text = await page
-    .getByTitle('Skip to start', { exact: true })
-    .locator('..')
-    .locator('span')
-    .first()
-    .innerText()
+  const text = await page.locator('.transport-time > span').innerText()
   const [minutes, seconds] = text.split(':').map(Number)
   if (!Number.isFinite(minutes + seconds)) throw new Error(`VISIBLE_TIME_UNREADABLE: ${text}`)
   return minutes * 60 + seconds
