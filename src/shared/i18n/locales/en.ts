@@ -275,6 +275,7 @@ export const englishResources = {
     darkTheme: 'Switch to dark theme',
   },
   waveform: {
+    timelinePan: 'Pan timeline',
     effects: 'Effects',
     normalize: 'Normalize',
     volumeShort: 'Vol',

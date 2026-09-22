@@ -13,6 +13,7 @@ afterEach(() => {
 })
 function Level() {
   const [value, setValue] = useState(0)
+  const [preview, setPreview] = useState(0)
   const [history, setHistory] = useState<number[]>([])
   return (
     <>
@@ -20,11 +21,14 @@ function Level() {
         kind="gain"
         name="Mix"
         value={value}
+        onPreview={setPreview}
+        onCancelPreview={() => setPreview(value)}
         onCommit={(next) => {
           setHistory([...history, value])
           setValue(next)
         }}
       />
+      <output data-testid="preview">{preview}</output>
       <output data-testid="saved">{value}</output>
       <output data-testid="history">{history.length}</output>
     </>
@@ -74,7 +78,8 @@ it('keeps Normalize checked on reopening and updates effect highlighting when di
   }
   render(<Effects />)
   const button = screen.getByRole('button', { name: 'Effects' })
-  expect(button.querySelectorAll('svg')).toHaveLength(2)
+  expect(button.querySelector('.track-effects-symbol')?.textContent).toBe('fx')
+  expect(button.querySelectorAll('svg')).toHaveLength(1)
   fireEvent.click(button)
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Normalize' }))
   expect(button.getAttribute('aria-pressed')).toBe('true')
@@ -166,4 +171,44 @@ it('commits a valid typed gain when clicking outside the popover', () => {
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(screen.getByTestId('saved').textContent).toBe('-6')
   expect(screen.getByTestId('history').textContent).toBe('1')
+})
+
+it('exposes visible removal without activating the track', async () => {
+  const { TrackHeader } = await import('./TrackHeader')
+  const { useTimelineStore } = await import('../../stores/TimelineStore')
+  const track = {
+    id: 'delete-me',
+    name: 'Guest',
+    color: '#aa6677',
+    clips: [],
+    effects: [],
+    muted: false,
+    solo: false,
+    volume: 1,
+  }
+  useTimelineStore.getState().loadFromProject([], [track])
+  useTimelineStore.setState({ selectedTrackId: null })
+  render(
+    <TrackHeader track={track} onRemove={(id) => useTimelineStore.getState().removeTrack(id)} />,
+  )
+  const activations: Array<string | null> = []
+  const unsubscribe = useTimelineStore.subscribe((state) => activations.push(state.selectedTrackId))
+  fireEvent.click(screen.getByRole('button', { name: 'Remove Guest' }))
+  unsubscribe()
+  expect(activations).not.toContain(track.id)
+  expect(useTimelineStore.getState().tracks).toHaveLength(0)
+  expect(useTimelineStore.getState().selectedTrackId).toBeNull()
+})
+
+it('auditions sliders while dragging without saving and restores sound on cancellation', () => {
+  render(<Level />)
+  fireEvent.click(screen.getByRole('button', { name: 'Mix gain' }))
+  const slider = screen.getByRole('slider')
+  fireEvent.pointerDown(slider)
+  fireEvent.change(slider, { target: { value: '-12' } })
+  expect(screen.getByTestId('preview').textContent).toBe('-12')
+  expect(screen.getByTestId('saved').textContent).toBe('0')
+  expect(screen.getByTestId('history').textContent).toBe('0')
+  fireEvent.keyDown(slider, { key: 'Escape' })
+  expect(screen.getByTestId('preview').textContent).toBe('0')
 })

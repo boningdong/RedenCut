@@ -22,7 +22,7 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
   leftInClipPx,
   widthPx,
   heightPx,
-  topPx = 16,
+  topPx,
   color,
   muted,
 }: CanvasWaveformProps) {
@@ -75,7 +75,8 @@ export const CanvasWaveform = React.memo(function CanvasWaveform({
       height={backingHeight}
       style={{
         position: 'absolute',
-        top: topPx,
+        top: topPx ?? '50%',
+        transform: topPx === undefined ? 'translateY(-50%)' : undefined,
         opacity: muted ? 0.55 : 1,
         left: leftInClipPx,
         width: widthPx,

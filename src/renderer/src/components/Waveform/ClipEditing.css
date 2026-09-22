@@ -529,9 +529,10 @@
 }
 .mix-illustrative-wave {
   position: absolute;
-  inset: 16px 0 1px;
+  top: 50%;
+  left: 0;
   width: 100%;
-  height: calc(100% - 17px);
+  transform: translateY(-50%);
   color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-primary));
   pointer-events: none;

@@ -60,8 +60,8 @@ export function MixClipWaveform({
               position: 'absolute',
               left: (outputStart - clip.outputStart) * pxPerSec,
               width: (span.sourceEnd - span.sourceStart) * pxPerSec,
-              top: override ? 16 + row * (waveformHeight / rows) : 0,
-              height: override ? waveformHeight / rows : waveformHeight + 16,
+              top: `calc(50% - ${waveformHeight / 2}px + ${override ? row * (waveformHeight / rows) : 0}px)`,
+              height: override ? waveformHeight / rows : waveformHeight,
               borderTop: override ? `1px solid ${color}` : undefined,
               boxSizing: 'border-box',
               pointerEvents: 'none',
@@ -76,7 +76,7 @@ export function MixClipWaveform({
               leftInClipPx={visible.leftInClipPx}
               widthPx={visible.widthPx}
               heightPx={override ? waveformHeight / rows - 1 : waveformHeight}
-              topPx={override ? 0 : 16}
+              topPx={0}
               color={color}
               muted={clip.muted}
             />
@@ -134,6 +134,7 @@ export function MixClipWaveform({
             {!layered && (
               <svg
                 className="mix-illustrative-wave"
+                style={{ height: waveformHeight }}
                 viewBox="0 0 240 28"
                 preserveAspectRatio="none"
                 aria-hidden="true"

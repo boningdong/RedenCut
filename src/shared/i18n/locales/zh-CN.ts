@@ -257,6 +257,7 @@ export const simplifiedChineseResources = {
     darkTheme: '切换到深色主题',
   },
   waveform: {
+    timelinePan: '水平滚动时间线',
     effects: '效果',
     normalize: '响度标准化',
     volumeShort: '音量',

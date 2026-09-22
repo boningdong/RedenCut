@@ -42,6 +42,7 @@ Zooming out stops when the full current timeline plus a fixed trailing margin fi
 The margin is one third of the longest imported source duration: one hour of audio gets 20 minutes of blank time, initially 25% of the viewport.
 Moving clips changes the timeline extent but does not enlarge this margin; reopening a project derives the same margin from its source metadata.
 Reaching this overview returns the visible start to zero; additional trailing scroll space remains available for pointer-anchored zoom and dragging clips beyond the visible blank area.
+The horizontal scrollbar stays at the bottom of the audio viewport while tracks scroll vertically; dragging it and horizontal trackpad gestures pan the same timeline.
 Timeline zoom reaches up to 1,000 pixels per second independently of recording duration; exceptionally long timelines lower this ceiling to keep their full extent within browser layout limits.
 Zoom keeps the pointer time anchored for wheel gestures and the viewport center anchored for toolbar buttons.
 At close zoom, the ruler shows fractional-second labels and intermediate ticks, rendering only the visible range.
@@ -141,7 +142,7 @@ Replacement is not Redact and never shortens time by itself; master Redact and c
 Time edits originate on Mix and synchronize child material; child redactions survive unlink, which returns affected replacement ranges to Mix after a warning.
 The Mute and Solo header icons preserve their existing semantics and shortcuts; no new single-letter replacement shortcut is introduced.
 
-Linked masters show an explicit Mix role, member count and expandable child hierarchy. Right-click a track header or press Shift+F10 while it is focused for Delete Track and collapse/expand commands; unlinking remains a separate management action. The track-name row has no action buttons.
+Linked masters show an explicit Mix role, member count and expandable child hierarchy. Right-click a track header or press Shift+F10 while it is focused for Delete Track and collapse/expand commands; unlinking remains a separate management action. The visible × beside the track name also removes the track through the same removal flow, without activating it.
 At most six independent tracks can be linked. Linked master rows are taller (108 px versus ordinary 92 px; linked children remain 44 px), with centered waveforms: intervals using up to three sources use parallel stacked waveforms; intervals using four through six sources use one theme-accent illustrative waveform.
 Replacement labels show at most three names when they fit, otherwise source-color dots and a participant count; clicking the replacement selects its visible interval.
 The floating selector provides numeric start/end bounds and reports mixed settings without preselecting their union; applying explicitly chosen sources replaces the whole selected interval.
@@ -175,3 +176,6 @@ Gain is a post-effect adjustment in dB; Volume retains the output percentage con
 Effects shows an icon and dropdown arrow; any enabled effect highlights the trigger and Normalize exposes a persistent checked menu item.
 Normalize balances speech levels on the composed track, including replacement audio; disabling it preserves settings and source recordings.
 Playback preparation announces its pending state in the transport; processing errors surface through the existing player error path.
+
+Volume and Gain sliders audition their current value during a drag without saving each movement.
+Release commits one undoable edit; Escape, pointer cancellation, or closing an unfinished slider edit restores the saved track levels.

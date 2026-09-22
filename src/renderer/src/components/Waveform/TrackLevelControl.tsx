@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useTranslation } from '../../i18n/useTranslation'
 import { TrackControlPopover } from './TrackControlPopover'
 
@@ -7,11 +7,15 @@ export function TrackLevelControl({
   name,
   value,
   onCommit,
+  onPreview,
+  onCancelPreview,
 }: {
   kind: 'volume' | 'gain'
   name: string
   value: number
   onCommit(value: number): void
+  onPreview?(value: number): void
+  onCancelPreview?(): void
 }) {
   const { t } = useTranslation()
   const anchor = useRef<HTMLButtonElement>(null)
@@ -21,6 +25,15 @@ export function TrackLevelControl({
   const [typed, setTyped] = useState(String(value))
   const typedRef = useRef(String(value))
   const typedDirty = useRef(false)
+  const previewing = useRef(false)
+  const restorePreviewRef = useRef(onCancelPreview)
+  restorePreviewRef.current = onCancelPreview
+  const restorePreview = useCallback(() => {
+    if (!previewing.current) return
+    previewing.current = false
+    restorePreviewRef.current?.()
+  }, [])
+  useEffect(() => restorePreview, [restorePreview])
   const commitTyped = useCallback(() => {
     if (!typedDirty.current) return
     typedDirty.current = false
@@ -38,12 +51,14 @@ export function TrackLevelControl({
   }, [value, onCommit])
   const close = useCallback(() => {
     commitTyped()
+    restorePreview()
     setOpen(false)
-  }, [commitTyped])
+  }, [commitTyped, restorePreview])
   const cancel = useCallback(() => {
     typedDirty.current = false
+    restorePreview()
     setOpen(false)
-  }, [])
+  }, [restorePreview])
   const volume = kind === 'volume'
   const min = volume ? 0 : -24,
     max = volume ? 1 : 24
@@ -52,6 +67,7 @@ export function TrackLevelControl({
     volume ? `${Math.round(level * 100)}%` : `${level > 0 ? '+' : ''}${level} dB`
   const commit = () => {
     if (draftRef.current !== value) onCommit(draftRef.current)
+    previewing.current = false
   }
   return (
     <>
@@ -64,6 +80,10 @@ export function TrackLevelControl({
         aria-expanded={open}
         style={{ '--level': `${((value - min) / (max - min)) * 100}%` } as CSSProperties}
         onClick={() => {
+          if (open) {
+            close()
+            return
+          }
           setDraft(value)
           draftRef.current = value
           setTyped(String(value))
@@ -118,10 +138,13 @@ export function TrackLevelControl({
               draftRef.current = event.currentTarget.valueAsNumber
               setDraft(draftRef.current)
               setTyped(String(draftRef.current))
+              previewing.current = true
+              onPreview?.(draftRef.current)
             }}
             onPointerDown={(event) => event.currentTarget.setPointerCapture?.(event.pointerId)}
             onPointerUp={commit}
             onPointerCancel={() => {
+              restorePreview()
               draftRef.current = value
               setDraft(value)
               setTyped(String(value))

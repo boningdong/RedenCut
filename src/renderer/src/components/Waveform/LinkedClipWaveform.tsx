@@ -85,7 +85,6 @@ export function LinkedClipWaveform({
                 leftInClipPx={visible.leftInClipPx}
                 widthPx={visible.widthPx}
                 heightPx={24}
-                topPx={3}
                 color={color}
                 muted={false}
               />

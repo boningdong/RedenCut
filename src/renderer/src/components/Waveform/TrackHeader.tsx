@@ -1,7 +1,8 @@
 import { useTranslation } from '../../i18n/useTranslation'
 import { trackPresentationColor } from '../../themes/trackColors'
 import { Icon } from '../ui/Icon'
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, type CSSProperties } from 'react'
+import { getAudioPlayerInstance } from '@shared/PlayerTypes'
 import { getNormalizeEffect } from '@shared/TrackEffects'
 import { TrackLevelControl } from './TrackLevelControl'
 import { TrackEffectsMenu } from './TrackEffectsMenu'
@@ -41,6 +42,16 @@ export function TrackHeader({
   const toggleTrackNormalize = useTimelineStore((s) => s.toggleTrackNormalize)
   const [context, setContext] = useState<{ x: number; y: number } | null>(null)
   const closeContext = useCallback(() => setContext(null), [])
+  const restoreTrackPreview = useCallback(() => {
+    getAudioPlayerInstance()?.setTracks(useTimelineStore.getState().tracks)
+  }, [])
+  const previewTrackLevel = (setting: 'gainDb' | 'volume', value: number) => {
+    getAudioPlayerInstance()?.setTracks(
+      useTimelineStore
+        .getState()
+        .tracks.map((item) => (item.id === track.id ? { ...item, [setting]: value } : item)),
+    )
+  }
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState(track.name)
 
@@ -71,18 +82,22 @@ export function TrackHeader({
           setContext({ x: rect.left + 10, y: rect.bottom })
         }
       }}
-      onClickCapture={() => {
+      onClickCapture={(event) => {
+        if ((event.target as HTMLElement).closest('.track-remove')) return
         if (!readOnly) useTimelineStore.getState().setSelectedTrackId(track.id)
       }}
       data-linked-child={readOnly}
       data-active-track={active}
-      style={{
-        borderLeftColor: color,
-        ...(active && {
-          background: `color-mix(in srgb, ${color} 12%, var(--color-bg-secondary))`,
-          boxShadow: `inset 2px 0 ${color}`,
-        }),
-      }}
+      style={
+        {
+          '--track-color': color,
+          borderLeftColor: color,
+          ...(active && {
+            background: `color-mix(in srgb, ${color} 12%, var(--color-bg-secondary))`,
+            boxShadow: `inset 2px 0 ${color}`,
+          }),
+        } as CSSProperties
+      }
     >
       <div className="track-heading">
         <span className="track-color" style={{ background: trackPresentationColor(track.color) }} />
@@ -114,6 +129,19 @@ export function TrackHeader({
           </button>
         )}
         {track.mixLink && <span className="mix-role">{t('waveform.mixMaster')}</span>}
+        <button
+          type="button"
+          className="track-remove"
+          title={t('waveform.removeTrack')}
+          aria-label={t('waveform.remove', { name: track.name })}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove(track.id)
+          }}
+        >
+          <Icon name="close" size={12} />
+        </button>
       </div>
       {readOnly ? (
         <span
@@ -152,6 +180,8 @@ export function TrackHeader({
             kind="volume"
             name={track.name}
             value={track.volume}
+            onPreview={(value) => previewTrackLevel('volume', value)}
+            onCancelPreview={restoreTrackPreview}
             onCommit={(value) => setTrackVolume(track.id, value)}
           />
           <TrackEffectsMenu
@@ -163,6 +193,8 @@ export function TrackHeader({
             kind="gain"
             name={track.name}
             value={track.gainDb ?? 0}
+            onPreview={(value) => previewTrackLevel('gainDb', value)}
+            onCancelPreview={restoreTrackPreview}
             onCommit={(value) => setTrackGain(track.id, value)}
           />
         </div>

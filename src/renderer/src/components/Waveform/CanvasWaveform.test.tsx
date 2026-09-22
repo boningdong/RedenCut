@@ -63,6 +63,17 @@ describe('CanvasWaveform', () => {
     }
   })
 
+  it('centers waveforms in their clip unless an explicit stack offset is provided', () => {
+    const props = waveformProps({ provider: { readRange: () => new Promise(() => {}) } })
+    const { container, rerender } = render(<CanvasWaveform {...props} />)
+    const canvas = container.querySelector('canvas')!
+    expect(canvas.style.top).toBe('50%')
+    expect(canvas.style.transform).toBe('translateY(-50%)')
+    rerender(<CanvasWaveform {...props} topPx={0} />)
+    expect(canvas.style.top).toBe('0px')
+    expect(canvas.style.transform).toBe('')
+  })
+
   it('requests the visible source interval at the device-pixel backing width and draws its buckets', async () => {
     const response = deferred<WaveformBucketRange>()
     const provider: WaveformDataProvider = {

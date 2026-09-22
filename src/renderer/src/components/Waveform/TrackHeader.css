@@ -24,7 +24,9 @@
   position: relative;
   display: flex;
   justify-content: space-between;
-  padding: 0 4px;
+  padding: 0 4px 4px;
+  line-height: 12px;
+  align-items: center;
   border: 0;
   background: transparent;
 }
@@ -32,12 +34,12 @@
   position: absolute;
   content: '';
   height: 2px;
-  bottom: 0;
+  bottom: 5px;
   left: 4px;
   width: calc(100% - 8px);
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--color-accent) 42%, transparent) var(--level),
+    color-mix(in srgb, var(--track-color) 65%, transparent) var(--level),
     var(--color-border) var(--level)
   );
   border-radius: 1px;
@@ -117,13 +119,13 @@
 .track-header .track-level-control[data-kind='gain']::before {
   position: absolute;
   content: '';
-  bottom: -1px;
+  bottom: 4px;
   left: clamp(4px, var(--level), calc(100% - 4px));
   width: 3px;
   height: 4px;
   transform: translateX(-50%);
   border-radius: 1px;
-  background: var(--color-accent);
+  background: var(--track-color);
   z-index: 1;
 }
 .track-gain-entry {
@@ -141,4 +143,21 @@
   color: var(--color-text-primary);
   background: var(--color-bg-elevated);
   font: inherit;
+}
+
+.track-header .track-controls .track-effects-symbol {
+  font:
+    italic 600 12px Georgia,
+    serif;
+  letter-spacing: -1px;
+  padding-right: 1px;
+}
+.track-header .track-remove {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.track-header .track-remove:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border-radius: 3px;
 }

@@ -26,7 +26,9 @@ export function TrackEffectsMenu({
         aria-haspopup="menu"
         onClick={() => setOpen(!open)}
       >
-        <Icon name="sparkles" size={12} />
+        <span className="track-effects-symbol" aria-hidden="true">
+          fx
+        </span>
         <span>{t('waveform.effects')}</span>
         <Icon name="chevron" size={10} />
       </button>

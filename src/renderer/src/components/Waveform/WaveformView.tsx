@@ -1,3 +1,4 @@
+import { TimelineScrollbar } from './TimelineScrollbar'
 import { getMixRangeState, isExactMixReplacement } from './MixRangeState'
 import { RangeSelectionHandles } from './RangeSelectionHandles'
 import { LinkedClipWaveform } from './LinkedClipWaveform'
@@ -597,6 +598,7 @@ export function WaveformView({
           {/* ── Scrollable timeline viewport ──────────────────────────────── */}
           <div
             ref={scrollViewportRef}
+            className="audio-timeline-viewport"
             onScroll={() => setRulerHoverX(null)}
             style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}
           >
@@ -918,6 +920,12 @@ export function WaveformView({
           {t('waveform.addTrack')}
         </button>
       </div>
+      <TimelineScrollbar
+        viewport={scrollViewportRef}
+        contentWidth={duration > 0 ? contentWidth : viewport.width}
+        viewportWidth={viewport.width}
+        headerWidth={HEADER_WIDTH}
+      />
       {mixDialogTrack && (
         <MixLinkDialog
           key={mixDialogTrack.id}
