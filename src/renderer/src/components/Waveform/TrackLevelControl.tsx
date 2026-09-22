@@ -18,7 +18,32 @@ export function TrackLevelControl({
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const draftRef = useRef(value)
-  const close = useCallback(() => setOpen(false), [])
+  const [typed, setTyped] = useState(String(value))
+  const typedRef = useRef(String(value))
+  const typedDirty = useRef(false)
+  const commitTyped = useCallback(() => {
+    if (!typedDirty.current) return
+    typedDirty.current = false
+    const next = typedRef.current.trim() ? Number(typedRef.current) : NaN
+    if (Number.isFinite(next) && next >= -24 && next <= 24) {
+      draftRef.current = next
+      setDraft(next)
+      setTyped(String(next))
+      if (next !== value) onCommit(next)
+    } else {
+      draftRef.current = value
+      setDraft(value)
+      setTyped(String(value))
+    }
+  }, [value, onCommit])
+  const close = useCallback(() => {
+    commitTyped()
+    setOpen(false)
+  }, [commitTyped])
+  const cancel = useCallback(() => {
+    typedDirty.current = false
+    setOpen(false)
+  }, [])
   const volume = kind === 'volume'
   const min = volume ? 0 : -24,
     max = volume ? 1 : 24
@@ -33,6 +58,7 @@ export function TrackLevelControl({
       <button
         ref={anchor}
         className="track-level-control"
+        data-kind={kind}
         aria-label={label}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -40,6 +66,9 @@ export function TrackLevelControl({
         onClick={() => {
           setDraft(value)
           draftRef.current = value
+          setTyped(String(value))
+          typedRef.current = String(value)
+          typedDirty.current = false
           setOpen(!open)
         }}
       >
@@ -47,11 +76,36 @@ export function TrackLevelControl({
         <span>{format(value)}</span>
       </button>
       {open && (
-        <TrackControlPopover anchor={anchor} label={label} onClose={close}>
+        <TrackControlPopover anchor={anchor} label={label} onClose={close} onCancel={cancel}>
           <div className="track-level-heading">
             <span>{label}</span>
             <output>{format(draft)}</output>
           </div>
+          {!volume && (
+            <label className="track-gain-entry">
+              <input
+                type="number"
+                aria-label={label}
+                min={-24}
+                max={24}
+                step="any"
+                value={typed}
+                onChange={(event) => {
+                  typedRef.current = event.currentTarget.value
+                  typedDirty.current = true
+                  setTyped(typedRef.current)
+                }}
+                onBlur={commitTyped}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    commitTyped()
+                  }
+                }}
+              />
+              <span>dB</span>
+            </label>
+          )}
           <input
             type="range"
             aria-label={label}
@@ -63,12 +117,14 @@ export function TrackLevelControl({
             onChange={(event) => {
               draftRef.current = event.currentTarget.valueAsNumber
               setDraft(draftRef.current)
+              setTyped(String(draftRef.current))
             }}
             onPointerDown={(event) => event.currentTarget.setPointerCapture?.(event.pointerId)}
             onPointerUp={commit}
             onPointerCancel={() => {
               draftRef.current = value
               setDraft(value)
+              setTyped(String(value))
             }}
             onKeyUp={(event) => {
               if (
@@ -92,6 +148,7 @@ export function TrackLevelControl({
               onClick={() => {
                 const next = volume ? 1 : 0
                 setDraft(next)
+                setTyped(String(next))
                 draftRef.current = next
                 if (next !== value) onCommit(next)
               }}

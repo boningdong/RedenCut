@@ -7,12 +7,14 @@ export function TrackControlPopover({
   label,
   role = 'dialog',
   onClose,
+  onCancel,
   children,
 }: {
   anchor: RefObject<HTMLButtonElement | null>
   label: string
   role?: 'dialog' | 'menu'
   onClose(): void
+  onCancel?(): void
   children: ReactNode
 }) {
   const panel = useRef<HTMLDivElement>(null)
@@ -44,7 +46,7 @@ export function TrackControlPopover({
         event.stopPropagation()
         if (event.key === 'Escape') {
           event.preventDefault()
-          onClose()
+          ;(onCancel ?? onClose)()
           anchor.current?.focus()
         }
         if (role === 'menu' && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
