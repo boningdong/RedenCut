@@ -73,15 +73,16 @@ export const SpeechWorkerRequestSchema = z
   })
 
 const envelope = { protocolVersion: z.literal(1), jobId: z.string().min(1) }
-export const SpeechWorkerFailureCodeSchema = z.enum([
-  'alignment-segment-mismatch',
-  'alignment-timing-invalid',
-  'alignment-window-too-long',
-  'alignment-model-unavailable',
-  'alignment-inference-failed',
-  'invalid-request',
-  'worker-failed',
-])
+export const SpeechWorkerFailureCodes = {
+  AlignmentSegmentMismatch: 'alignment-segment-mismatch',
+  AlignmentTimingInvalid: 'alignment-timing-invalid',
+  AlignmentWindowTooLong: 'alignment-window-too-long',
+  AlignmentModelUnavailable: 'alignment-model-unavailable',
+  AlignmentInferenceFailed: 'alignment-inference-failed',
+  InvalidRequest: 'invalid-request',
+  WorkerFailed: 'worker-failed',
+} as const
+export const SpeechWorkerFailureCodeSchema = z.enum(SpeechWorkerFailureCodes)
 export type SpeechWorkerFailureCode = z.infer<typeof SpeechWorkerFailureCodeSchema>
 export const WorkerAlignmentUnitSchema = z
   .object({

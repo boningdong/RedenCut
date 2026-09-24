@@ -1,16 +1,37 @@
 import { expect, it } from 'vitest'
 import { ProcessExecutionError } from '../processes/ManagedProcess'
+import { SpeechWorkerFailureCodes } from '../../shared/speechWorker.types'
 import { SpeechWorkerFailure } from './SpeechWorkerClient'
 import { SpeechAnalysisError } from './SpeechAnalysisError'
 import { classifySpeechFailure } from './classifySpeechFailure'
 
 it.each([
-  ['alignment-segment-mismatch', 'speech-alignment-input'],
-  ['alignment-timing-invalid', 'speech-alignment-input'],
-  ['alignment-window-too-long', 'speech-alignment-window'],
-  ['alignment-model-unavailable', 'speech-alignment-model'],
-  ['alignment-inference-failed', 'speech-aligning'],
-] as const)('classifies %s as %s', (code, reason) => {
+  [
+    SpeechWorkerFailureCodes.AlignmentSegmentMismatch,
+    'speech-alignment-input',
+    'speech/alignment-segment-mismatch',
+  ],
+  [
+    SpeechWorkerFailureCodes.AlignmentTimingInvalid,
+    'speech-alignment-input',
+    'speech/alignment-timing-invalid',
+  ],
+  [
+    SpeechWorkerFailureCodes.AlignmentWindowTooLong,
+    'speech-alignment-window',
+    'speech/alignment-window-too-long',
+  ],
+  [
+    SpeechWorkerFailureCodes.AlignmentModelUnavailable,
+    'speech-alignment-model',
+    'speech/alignment-model-unavailable',
+  ],
+  [
+    SpeechWorkerFailureCodes.AlignmentInferenceFailed,
+    'speech-aligning',
+    'speech/alignment-inference-failed',
+  ],
+] as const)('classifies %s as %s', (code, reason, diagnosticCode) => {
   expect(
     classifySpeechFailure(
       new SpeechAnalysisError(
@@ -18,8 +39,8 @@ it.each([
         new SpeechWorkerFailure(code, undefined, '/private/audio'),
       ),
       'aligning',
-    ).reason,
-  ).toBe(reason)
+    ),
+  ).toMatchObject({ reason, code: diagnosticCode })
 })
 
 it('distinguishes a process exit and unknown validation failure', () => {

@@ -1,4 +1,5 @@
 import { hasSpeakerRerunImpact } from '../../shared/SpeakerRerunImpact'
+import { AppLogEvents } from '../../shared/diagnostics.types'
 import { planSpeechTasks, type SpeechTaskSelection } from '../../shared/SpeechTaskPlanner'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { SpeechAnalysisJobRequest } from '../../shared/ipc.types'
@@ -135,7 +136,7 @@ export function createSpeechBatchHandler({
               schemaVersion: 1,
               time: new Date().toISOString(),
               level: 'info',
-              event: 'speech/stage-completed',
+              event: AppLogEvents.SpeechStageCompleted,
               operationId: `${request.jobId}:${batch.audioSourceId}:${batch.phase}`,
               facts: { stage: priorStage },
             })
@@ -144,7 +145,7 @@ export function createSpeechBatchHandler({
             schemaVersion: 1,
             time: new Date().toISOString(),
             level: 'info',
-            event: 'speech/stage-started',
+            event: AppLogEvents.SpeechStageStarted,
             operationId: `${request.jobId}:${batch.audioSourceId}:${batch.phase}`,
             facts: { stage: progress.stage },
           })
@@ -220,7 +221,7 @@ export function createSpeechBatchHandler({
                 schemaVersion: 1,
                 time: new Date().toISOString(),
                 level: 'info',
-                event: 'speech/stage-completed',
+                event: AppLogEvents.SpeechStageCompleted,
                 operationId: `${request.jobId}:${source.audioSourceId}:${lastBatch.phase}`,
                 facts: { stage: 'publishing' },
               })

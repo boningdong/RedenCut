@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
+import { AppLogEvents } from '../../shared/diagnostics.types'
 import { selectWhisperDefinition } from '../resources/WhisperModelSelection'
 import { createSpeechBatchHandler } from './speechBatch.ipc'
 import { TrackSchema } from '../../shared/ProjectTypes'
@@ -225,7 +226,7 @@ export function registerSpeechAnalysisIpc(
                     schemaVersion: 1,
                     time: new Date().toISOString(),
                     level: 'info',
-                    event: 'speech/stage-completed',
+                    event: AppLogEvents.SpeechStageCompleted,
                     operationId: request.jobId,
                     facts: { stage: loggedStage },
                   })
@@ -233,7 +234,7 @@ export function registerSpeechAnalysisIpc(
                   schemaVersion: 1,
                   time: new Date().toISOString(),
                   level: 'info',
-                  event: 'speech/stage-started',
+                  event: AppLogEvents.SpeechStageStarted,
                   operationId: request.jobId,
                   facts: { stage: progress.stage },
                 })
@@ -311,7 +312,7 @@ export function registerSpeechAnalysisIpc(
                   schemaVersion: 1,
                   time: new Date().toISOString(),
                   level: 'info',
-                  event: 'speech/stage-completed',
+                  event: AppLogEvents.SpeechStageCompleted,
                   operationId: request.jobId,
                   facts: { stage: loggedStage },
                 })

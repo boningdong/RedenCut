@@ -2,7 +2,7 @@
 import math
 import unicodedata
 from typing import Any, Dict, List, Optional
-from .failures import AlignmentFailure
+from .failures import AlignmentFailure, WorkerFailureCode
 
 MAX_SEGMENT_SECONDS = 30.0
 CONTEXT_SECONDS = 0.25
@@ -16,7 +16,7 @@ def prepare_segments(text: str, segments: Optional[List[Dict[str, Any]]], durati
     if not segments:
         segments = [{"text": text}]
     if compact("".join(segment["text"] for segment in segments)) != compact(text):
-        raise AlignmentFailure("alignment-segment-mismatch", "Alignment segment text does not match the transcript")
+        raise AlignmentFailure(WorkerFailureCode.ALIGNMENT_SEGMENT_MISMATCH, "Alignment segment text does not match the transcript")
     output = []
     previous_end = 0.0
     for segment in segments:
@@ -25,13 +25,13 @@ def prepare_segments(text: str, segments: Optional[List[Dict[str, Any]]], durati
         start, end = segment.get("sourceStart"), segment.get("sourceEnd")
         if start is None or end is None:
             if len(segments) != 1 or duration > MAX_SEGMENT_SECONDS:
-                raise AlignmentFailure("alignment-window-too-long", "Long audio alignment requires segment timing from transcription", durationSeconds=duration)
+                raise AlignmentFailure(WorkerFailureCode.ALIGNMENT_WINDOW_TOO_LONG, "Long audio alignment requires segment timing from transcription", durationSeconds=duration)
             start, end = 0.0, duration
         if (not all(type(value) in (int, float) and math.isfinite(value) for value in (start, end))
                 or start < 0 or end < start or start < previous_end):
-            raise AlignmentFailure("alignment-timing-invalid", "Alignment segment timing must be finite, ordered and non-overlapping")
+            raise AlignmentFailure(WorkerFailureCode.ALIGNMENT_TIMING_INVALID, "Alignment segment timing must be finite, ordered and non-overlapping")
         if end - start > MAX_SEGMENT_SECONDS:
-            raise AlignmentFailure("alignment-window-too-long", "Alignment search exceeds 30 seconds; finer transcription timing is required", durationSeconds=end-start)
+            raise AlignmentFailure(WorkerFailureCode.ALIGNMENT_WINDOW_TOO_LONG, "Alignment search exceeds 30 seconds; finer transcription timing is required", durationSeconds=end-start)
         # Recognition may describe a truncated final utterance beyond EOF. Its
         # search context can only intersect existing samples, never invent them.
         padding = min(CONTEXT_SECONDS, (MAX_SEGMENT_SECONDS - (end - start)) / 2)
@@ -58,8 +58,8 @@ def partition_units(units: List[Dict[str, Any]], texts: List[str]) -> List[List[
             accumulated += compact(units[cursor]["text"])
             cursor += 1
         if accumulated != target:
-            raise AlignmentFailure("alignment-segment-mismatch", "Alignment segment text does not match canonical transcript units")
+            raise AlignmentFailure(WorkerFailureCode.ALIGNMENT_SEGMENT_MISMATCH, "Alignment segment text does not match canonical transcript units")
         groups.append(group)
     if cursor != len(units):
-        raise AlignmentFailure("alignment-segment-mismatch", "Alignment segments do not cover the canonical transcript")
+        raise AlignmentFailure(WorkerFailureCode.ALIGNMENT_SEGMENT_MISMATCH, "Alignment segments do not cover the canonical transcript")
     return groups

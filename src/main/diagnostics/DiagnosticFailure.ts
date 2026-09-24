@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PublicMessage, PublicReason } from '../../shared/publicMessages'
-import type { AppLogEvent } from '../../shared/diagnostics.types'
+import { AppDiagnosticCodes, AppLogEvents, type AppLogEvent } from '../../shared/diagnostics.types'
 
 export interface AppFailure {
   code: `${string}/${string}`
@@ -29,7 +29,7 @@ export function recordTerminalFailure(
   if (error instanceof DOMException && error.name === 'AbortError') return { reason: 'cancelled' }
   if (context.validation) return { reason: 'invalid-request' }
   const classified = context.classify?.(error) ?? {
-    code: 'app/operation-failed',
+    code: AppDiagnosticCodes.OperationFailed,
     reason: 'operation-failed',
   }
   const diagnosticId = randomUUID()
@@ -38,7 +38,7 @@ export function recordTerminalFailure(
       schemaVersion: 1,
       time: new Date().toISOString(),
       level: 'error',
-      event: 'operation/failed',
+      event: AppLogEvents.OperationFailed,
       operationId: context.operationId,
       diagnosticId,
       facts: { code: classified.code, stage: context.stage ?? 'operation' },

@@ -4,6 +4,8 @@ import { SpeechAnalysisError } from './SpeechAnalysisError'
 import { SpeechWorkerFailure } from './SpeechWorkerClient'
 import { ProcessExecutionError } from '../processes/ManagedProcess'
 import type { AppFailure } from '../diagnostics/DiagnosticFailure'
+import { SpeechWorkerFailureCodes } from '../../shared/speechWorker.types'
+import { AppDiagnosticCodes } from '../../shared/diagnostics.types'
 
 export function classifySpeechFailure(
   error: unknown,
@@ -18,20 +20,21 @@ export function classifySpeechFailure(
     if (current instanceof SpeechWorkerFailure) {
       const code = current.code
       const reason: PublicReason =
-        code === 'alignment-segment-mismatch' || code === 'alignment-timing-invalid'
+        code === SpeechWorkerFailureCodes.AlignmentSegmentMismatch ||
+        code === SpeechWorkerFailureCodes.AlignmentTimingInvalid
           ? 'speech-alignment-input'
-          : code === 'alignment-window-too-long'
+          : code === SpeechWorkerFailureCodes.AlignmentWindowTooLong
             ? 'speech-alignment-window'
-            : code === 'alignment-model-unavailable'
+            : code === SpeechWorkerFailureCodes.AlignmentModelUnavailable
               ? 'speech-alignment-model'
               : (`speech-${stage}` as PublicReason)
       return { code: `speech/${code}`, reason }
     }
     if (current instanceof ProcessExecutionError) {
       if (current.kind === 'process-exit')
-        return { code: 'speech/worker-exit', reason: 'speech-worker-exit' }
+        return { code: AppDiagnosticCodes.SpeechWorkerExit, reason: 'speech-worker-exit' }
       if (current.kind === 'protocol')
-        return { code: 'speech/worker-protocol', reason: 'speech-validating' }
+        return { code: AppDiagnosticCodes.SpeechWorkerProtocol, reason: 'speech-validating' }
     }
     current = current.cause
   }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import {
+  AppLogEvents,
   DiagnosticReportSchema,
   type AppLogEvent,
   type DiagnosticReportPreview,
@@ -40,8 +41,8 @@ export class DiagnosticReport {
   async recentFailure(): Promise<string | null> {
     const events = await this.log.readRecent()
     return (
-      [...events].reverse().find((event) => event.event === 'operation/failed')?.diagnosticId ??
-      null
+      [...events].reverse().find((event) => event.event === AppLogEvents.OperationFailed)
+        ?.diagnosticId ?? null
     )
   }
 
@@ -58,7 +59,7 @@ export class DiagnosticReport {
     const ids = [...new Set(input.diagnosticIds)]
     const failures = all.filter(
       (event) =>
-        event.event === 'operation/failed' &&
+        event.event === AppLogEvents.OperationFailed &&
         event.diagnosticId &&
         ids.includes(event.diagnosticId),
     )

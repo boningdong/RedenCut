@@ -8,6 +8,7 @@ import { recordTerminalFailure } from '../diagnostics/DiagnosticFailure'
 import type { DiagnosticLog } from '../diagnostics/DiagnosticLog'
 import type { AppFailure } from '../diagnostics/DiagnosticFailure'
 import { ReportSaveError } from '../diagnostics/DiagnosticReport'
+import { AppDiagnosticCodes } from '../../shared/diagnostics.types'
 
 type IpcErrorCode = IpcError['code']
 
@@ -47,7 +48,7 @@ export async function toIpcResult<T>(
           ...failureContext,
           classify: (failure) => {
             const classified = failureContext.classify?.(failure) ?? {
-              code: 'app/operation-failed' as const,
+              code: AppDiagnosticCodes.OperationFailed,
               reason: 'operation-failed' as const,
             }
             const stageReason =
