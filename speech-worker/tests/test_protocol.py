@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from redencut_speech_worker.__main__ import run
 from redencut_speech_worker.protocol import ProtocolError, parse_request
+from redencut_speech_worker.failures import AlignmentFailure
 
 
 def request():
@@ -22,6 +23,15 @@ def request():
 
 
 class ProtocolTest(unittest.TestCase):
+    def test_alignment_failure_jsonl_uses_safe_code_and_details(self):
+        output = io.StringIO()
+        with patch("redencut_speech_worker.__main__.align", side_effect=AlignmentFailure(
+            "alignment-segment-mismatch", "/private/audio.wav token=secret")):
+            self.assertEqual(2, run(io.StringIO(json.dumps(request())), output))
+        terminal = json.loads(output.getvalue().splitlines()[-1])
+        self.assertEqual("alignment-segment-mismatch", terminal["code"])
+        self.assertNotIn("/private", json.dumps(terminal))
+        self.assertNotIn("token=", json.dumps(terminal))
     def test_accepts_segment_timing_and_rejects_invalid_ranges(self):
         candidate = request()
         candidate["alignmentSegments"] = [{"text": "hello", "sourceStart": 1, "sourceEnd": 2}]

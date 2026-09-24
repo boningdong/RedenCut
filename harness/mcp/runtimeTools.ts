@@ -14,7 +14,7 @@ export const runtimeTools = [
     schema: z.object({ ...generationSchema.shape, request: HarnessDialogRequestSchema }).strict(),
     readOnly: false,
     description:
-      'Prepare one native-dialog reply before clicking the real UI. request has purpose import-audio with selection {type:file,filename} from e2e/fixtures/audio, or save-project/open-project with selection {type:project,name} within this run, or export-audio with selection {type:export,filename,format} targeting this run’s exports directory (wav/mp3/flac/aac; matching extension; no overwrite), or {type:cancel}. Project names must end in .redencut. Never replaces a pending reply. Restart clears pending replies. No arbitrary filesystem paths.',
+      'Prepare one native-dialog reply before clicking the real UI. request has purpose import-audio with selection {type:file,filename} from e2e/fixtures/audio, save-project/open-project with selection {type:project,name}, export-audio with selection {type:export,filename,format}, or diagnostic-report with selection {type:report,filename} ending in .json. {type:cancel} is available for each purpose. Destinations stay within this run. Never replaces a pending reply. Restart clears pending replies. No arbitrary filesystem paths.',
   },
   {
     name: 'redencut_start',

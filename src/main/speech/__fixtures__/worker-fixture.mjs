@@ -7,7 +7,8 @@ lines.once('line', (line) => {
   const emit = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
   const envelope = { protocolVersion: 1, jobId: request.jobId }
   if (mode === 'worker-error') {
-    emit({ ...envelope, type: 'error', code: 'worker-failed', message: 'model computation failed' })
+    emit({ ...envelope, type: 'error', code: 'alignment-model-unavailable', message: 'model computation failed' })
+    process.exitCode = 2
     return
   }
   if (mode === 'crash') {

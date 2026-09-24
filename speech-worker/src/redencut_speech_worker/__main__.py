@@ -6,6 +6,7 @@ from typing import IO, Any, Dict
 from .alignment import align
 from .diarization import diarize
 from .protocol import ProtocolError, parse_request
+from .failures import AlignmentFailure
 
 MAX_JSONL_MESSAGE_BYTES = 32 * 1024 * 1024
 
@@ -46,10 +47,13 @@ def run(input_stream: IO[str], output: IO[str]) -> int:
         emit(output, {**envelope, "type": "result", "result": result})
         return 0
     except Exception as error:
+        code = (error.code if isinstance(error, AlignmentFailure) else
+                "invalid-request" if isinstance(error, (ProtocolError, json.JSONDecodeError)) else "worker-failed")
         emit(output, {
             "protocolVersion": 1, "jobId": job_id, "type": "error",
-            "code": "invalid-request" if isinstance(error, (ProtocolError, json.JSONDecodeError)) else "worker-failed",
-            "message": str(error) or error.__class__.__name__,
+            "code": code,
+            "message": "The speech worker could not complete this request.",
+            **({"details": error.details} if isinstance(error, AlignmentFailure) else {}),
         })
         return 2
 

@@ -1,6 +1,7 @@
 import type * as Os from 'os'
 import { EventEmitter } from 'events'
 import type { IpcResult } from '../../shared/ipc.types'
+import type { AppLogEvent } from '../../shared/diagnostics.types'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
@@ -62,7 +63,10 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllEnvs())
 
-function setup(services?: Parameters<typeof registerSpeechAnalysisIpc>[3]) {
+function setup(
+  services?: Parameters<typeof registerSpeechAnalysisIpc>[3],
+  failureLog?: { write: (event: AppLogEvent) => Promise<void> },
+) {
   const sources = [
     { id: 'first', fingerprint: { sha256: 'wav-original' } },
     { id: 'second', fingerprint: { sha256: 'm4a-original' }, metadata: { durationSeconds: 300 } },
@@ -92,6 +96,7 @@ function setup(services?: Parameters<typeof registerSpeechAnalysisIpc>[3]) {
     new SessionJobRegistry(),
     diagnostics,
     services,
+    failureLog,
   )
   const sender = Object.assign(new EventEmitter(), {
     id: 1,
@@ -129,6 +134,22 @@ it('generates a second imported M4A source from normalized cached PCM while reta
     expect.any(Function),
   )
   expect(controller.commitSpeechAnalysis).toHaveBeenCalledTimes(2)
+})
+
+it('records one typed single-job failure with its public diagnostic ID', async () => {
+  const failureLog = { write: vi.fn(async (_event: AppLogEvent) => {}) }
+  const { start } = setup(undefined, failureLog)
+  mocks.run.mockImplementation(async (_input, _signal, progress) => {
+    progress({ stage: 'aligning' })
+    throw new Error('/private/model failure')
+  })
+  const result = await start()
+  expect(result).toMatchObject({
+    ok: false,
+    error: { reason: 'speech-aligning', diagnosticId: expect.any(String) },
+  })
+  expect(failureLog.write.mock.calls.filter(([event]) => event.level === 'error')).toHaveLength(1)
+  expect(JSON.stringify(failureLog.write.mock.calls)).not.toContain('/private/')
 })
 
 it('reports a safe actionable preparation failure without private paths', async () => {

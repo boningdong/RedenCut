@@ -30,10 +30,16 @@ export type PublicReason =
   | 'speech-attributing-speakers'
   | 'speech-validating'
   | 'speech-publishing'
+  | 'speech-alignment-input'
+  | 'speech-alignment-window'
+  | 'speech-alignment-model'
+  | 'speech-worker-exit'
+  | 'report-save-failed'
 export type SpeechFailureKind = 'startup' | 'process-exit' | 'protocol'
 export interface PublicMessage {
   failureKind?: SpeechFailureKind
   reason: PublicReason
+  diagnosticId?: string
 }
 export type TranscriptionProgress = {
   stage: 'detecting-silence' | 'starting-transcription' | 'transcribing' | 'parsing-transcript'

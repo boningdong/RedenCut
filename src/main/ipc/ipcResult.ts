@@ -4,6 +4,10 @@ import type { IpcError, IpcResult } from '../../shared/ipc.types'
 import type { SessionPrecondition, WorkspaceToken } from '../../shared/session.types'
 import { ZodError } from 'zod'
 import { SpeechAnalysisError } from '../speech/SpeechAnalysisError'
+import { recordTerminalFailure } from '../diagnostics/DiagnosticFailure'
+import type { DiagnosticLog } from '../diagnostics/DiagnosticLog'
+import type { AppFailure } from '../diagnostics/DiagnosticFailure'
+import { ReportSaveError } from '../diagnostics/DiagnosticReport'
 
 type IpcErrorCode = IpcError['code']
 
@@ -24,17 +28,50 @@ export class PublicIpcError extends Error {
 export async function toIpcResult<T>(
   operation: () => Promise<T> | T,
   diagnosticSink: (error: unknown) => void = console.error,
+  failureContext?: {
+    log: Pick<DiagnosticLog, 'write'>
+    operationId: string
+    stage: string
+    classify?: (error: unknown) => Pick<AppFailure, 'code' | 'reason'>
+  },
 ): Promise<IpcResult<T>> {
   try {
     return { ok: true, value: await operation() }
   } catch (error) {
     diagnosticSink(error)
     const mapped = mapError(error)
+    if (failureContext && mapped.code === 'operation-failed') {
+      const publicFailure = recordTerminalFailure(
+        error,
+        {
+          ...failureContext,
+          classify: (failure) => {
+            const classified = failureContext.classify?.(failure) ?? {
+              code: 'app/operation-failed' as const,
+              reason: 'operation-failed' as const,
+            }
+            const stageReason =
+              error instanceof SpeechAnalysisError ? `speech-${error.stage}` : null
+            return mapped.reason !== 'operation-failed' && mapped.reason !== stageReason
+              ? { ...classified, reason: mapped.reason }
+              : classified
+          },
+        },
+        failureContext.log,
+      )
+      return { ok: false, error: { ...mapped, ...publicFailure } }
+    }
     return { ok: false, error: mapped }
   }
 }
 
 function mapError(error: unknown): IpcError {
+  if (error instanceof ReportSaveError)
+    return {
+      code: 'operation-failed',
+      reason: 'report-save-failed',
+      message: 'The diagnostic report could not be saved.',
+    }
   if (error instanceof RuntimeValidationError)
     return {
       code: 'operation-failed',

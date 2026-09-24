@@ -1,5 +1,23 @@
 import type { TranslationResource } from './en'
 export const simplifiedChineseResources = {
+  diagnostics: {
+    title: '诊断报告',
+    excluded:
+      '保存前可查看下面的完整报告。报告不包含音频、文字稿、工程文件或令牌。只有你主动分享时，报告才会离开这台电脑。',
+    partial: '部分较早的诊断事件已不可用，这份报告不完整。',
+    ids: '诊断编号',
+    eventCount: '{{count}} 条事件',
+    preview: '报告预览',
+    save: '保存报告…',
+    saveAgain: '选择其他位置…',
+    showSaved: '在访达中显示',
+    copyId: '复制编号',
+    loading: '正在准备报告…',
+    export: '导出诊断报告',
+    exportAll: '导出本批次全部故障',
+    openSettings: '打开设置',
+    recent: '导出最近的诊断报告…',
+  },
   preparation: {
     cancelImport: '取消导入',
     opening: '打开项目',
@@ -608,10 +626,9 @@ export const simplifiedChineseResources = {
     'candidate-invalid': '无法打开所选项目。',
     'job-settlement-failed': '无法安全停止后台任务。',
     'switch-unacknowledged': '无法安全停止播放。',
-    'whisper-missing': '受管运行环境中缺少转录引擎，请修复运行环境后重试。',
+    'whisper-missing': '语音识别引擎无法使用。请修复或重新安装应用后重试。',
     'whisper-model-missing': '转录模型尚未就绪。请打开设置，准备语音模型。',
-    'speech-worker-missing':
-      '语音引擎不可用。开发时请运行 npm run runtime:setup；已安装的应用请修复或重新安装。',
+    'speech-worker-missing': '语音处理引擎无法使用。请修复或重新安装应用后重试。',
     'speech-language-unsupported': '文字对齐目前支持中文和英文。此录音使用了暂不支持的语言。',
     'speech-models-missing': '请在设置 → 模型与依赖中准备所需模型，然后重试。',
     'workspace-invalid': '工作区设置无效，已使用默认布局。',
@@ -625,10 +642,16 @@ export const simplifiedChineseResources = {
     'speaker-color-reserved': '此颜色已保留给音频轨道。请选择其他颜色。',
     'speech-preparing-audio': '无法为语音分析准备音频。请重新导入此轨道后重试。',
     'speech-transcribing': '语音识别失败。请重试；如问题仍然存在，请检查本地 Whisper 安装和模型。',
-    'speech-aligning': '语音对齐失败。请重试；如问题仍然存在，请检查已安装的对齐模型。',
+    'speech-aligning': '语音对齐未完成。请导出诊断报告，帮助我们定位原因。',
+    'speech-alignment-input':
+      '初步文字识别已完成，但识别出的文字和时间片段无法对应，暂时不能把文字准确定位到音频。请重新识别；若再次出现，请导出诊断报告。',
+    'speech-alignment-window': '录音中有一段识别结果过长，当前无法完成对齐。请导出诊断报告。',
+    'speech-alignment-model': '声音对齐模型无法使用。请到设置中验证模型，然后重试。',
+    'speech-worker-exit': '语音处理意外中断。请重试；若再次发生，请导出诊断报告。',
+    'report-save-failed': '诊断报告未能保存。请选择其他位置重试。',
     'speech-diarizing': '说话人检测失败。请重试；如问题仍然存在，请检查已安装的说话人检测模型。',
     'speech-attributing-speakers': '说话人归属分析失败。请对此轨道重新运行语音分析。',
-    'speech-validating': '语音分析返回了无效结果。请对此轨道重新运行语音分析。',
+    'speech-validating': '语音分析结果无效。请导出诊断报告。',
     'speech-publishing': '无法保存语音分析。请检查可用磁盘空间后重试。',
   },
 } as const satisfies TranslationResource

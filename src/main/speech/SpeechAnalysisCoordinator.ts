@@ -84,6 +84,7 @@ export class SpeechAnalysisCoordinator {
       onProgress,
     )
     signal.throwIfAborted()
+    onProgress({ stage: 'validating' })
     if (!result.diarization || result.diarization.status === 'skipped-disabled' || result.alignment)
       throw new Error('Speech worker returned an unexpected diarization branch')
     return this.completeDiarization(artifact, result.diarization, onProgress)
@@ -160,6 +161,7 @@ export class SpeechAnalysisCoordinator {
       onProgress,
     )
     signal.throwIfAborted()
+    onProgress({ stage: 'validating' })
     if (!workerResult.alignment || (phase && workerResult.diarization))
       throw new Error('Speech worker returned an unexpected alignment branch')
     const alignmentId = this.createId()
@@ -206,7 +208,6 @@ export class SpeechAnalysisCoordinator {
       },
     }
     if (phase) {
-      onProgress({ stage: 'validating' })
       return SpeechArtifactSchema.parse({
         ...common,
         diarizationStatus: speakerRecognitionEnabled ? 'pending' : 'skipped-disabled',
@@ -222,7 +223,6 @@ export class SpeechAnalysisCoordinator {
       speakers: [],
     })
     if (diarization.status === 'skipped-disabled') {
-      onProgress({ stage: 'validating' })
       return artifact
     }
     return this.completeDiarization(artifact, diarization, onProgress)

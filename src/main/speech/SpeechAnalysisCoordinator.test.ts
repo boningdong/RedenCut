@@ -80,6 +80,7 @@ describe('SpeechAnalysisCoordinator', () => {
       'transcribing',
       'aligning',
       'diarizing',
+      'validating',
       'attributing-speakers',
       'validating',
     ])

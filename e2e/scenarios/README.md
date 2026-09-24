@@ -16,6 +16,7 @@ Existing [fixed E2Es](../README.md) continue to own deterministic regression ass
 | [Redact preview workflow](redact-preview-workflow.md) | Redact playback or export changes: Preview comparison, default export removal and retained-overlap protection | Docker MCP, prepared dialogs, ordered playback snapshots and FFmpeg/FFprobe output inspection |
 | [Keyboard editing workflow](keyboard-workflow.md) | Shortcut routing, keyboard editing, focus behavior and keyboard-driven save/persistence | Docker MCP with keyboard input, prepared fixture/project dialogs, saved transcript fixture |
 | [Speech analysis workflow](speech-analysis-workflow.md) | Generate and edit a canonical aligned transcript with anonymous speakers | Speech-enabled Docker MCP, provisioned models, prepared audio/project dialogs |
+| [Diagnostic report workflow](diagnostic-report-workflow.md) | Explain a speech failure and preview, save and recover its private report | Docker MCP, disposable project and deterministic failure fixture |
 
 For a feature or behavior fix that can affect visible UI, run the editing baseline, the UI consistency and interaction workflow, and checks for the approved changed behavior.
 Select the UI workflow's applicable state matrix before execution; include a concrete comparison with existing app controls and inspect rendered screenshots.

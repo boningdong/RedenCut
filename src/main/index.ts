@@ -47,6 +47,10 @@ import { SessionJobRegistry } from './project/SessionJobRegistry'
 import { WorkspaceController } from './project/WorkspaceController'
 import { createCacheProtocolHandler } from './protocol/cacheProtocol'
 import { createFileRangeResponse } from './protocol/fileRangeResponse'
+import { DiagnosticLog } from './diagnostics/DiagnosticLog'
+import { DiagnosticReport } from './diagnostics/DiagnosticReport'
+import { registerDiagnosticsIpc } from './ipc/diagnostics.ipc'
+import { HarnessDialogMailbox } from './dialogs/HarnessDialogMailbox'
 
 // Isolation must precede the single-instance lock and all workspace initialization.
 const harnessMode = configureHarnessStartup(app, process.env)
@@ -89,6 +93,12 @@ startApplicationLifecycle({
   },
   initialize: async () => {
     if (process.platform === 'darwin') app.dock?.setIcon(appIcon)
+    const diagnosticLog = await DiagnosticLog.create(app.getPath('logs'))
+    const diagnosticReports = new DiagnosticReport(diagnosticLog, {
+      appVersion: app.getVersion(),
+      platform: process.platform,
+      architecture: process.arch,
+    })
     const appPreferences = new AppPreferencesStore(
       join(app.getPath('userData'), 'app-preferences.json'),
       () => app.getPreferredSystemLanguages(),
@@ -139,6 +149,23 @@ startApplicationLifecycle({
       process.env,
       () => translators[appPreferences.getSnapshot().resolvedLocale],
     )
+    registerDiagnosticsIpc(
+      diagnosticReports,
+      harnessMode
+        ? async () => {
+            const generation = process.env.REDENCUT_HARNESS_GENERATION
+            if (!generation || !/^[1-9]\d*$/.test(generation))
+              throw new Error('INVALID_HARNESS_GENERATION')
+            return new HarnessDialogMailbox(
+              join(
+                process.env.REDENCUT_HARNESS_RUN_DIRECTORY!,
+                `generation-${generation}`,
+                'dialogs',
+              ),
+            ).consume('diagnostic-report')
+          }
+        : undefined,
+    )
     const cleanupWarnings = new CleanupWarningStore()
     const controller = new WorkspaceController(
       undefined,
@@ -184,12 +211,19 @@ startApplicationLifecycle({
     registerAudioIpc(controller, jobs, console.error, dialogs)
     registerPreparedAudioIpc(controller, jobs)
     registerTranscriptIpc(controller, jobs)
-    registerSpeechAnalysisIpc(controller, jobs, console.error, {
-      resources,
-      preferences: appPreferences,
-      runtime,
-      manifestPath,
-    })
+    // The structured boundary records speech causes without printing private Error text.
+    registerSpeechAnalysisIpc(
+      controller,
+      jobs,
+      () => {},
+      {
+        resources,
+        preferences: appPreferences,
+        runtime,
+        manifestPath,
+      },
+      diagnosticLog,
+    )
     registerSpeakerLabelIpc(controller)
     registerSpeakerIdentityIpc(controller)
     registerWorkspaceLayoutIpc(
@@ -219,11 +253,19 @@ startApplicationLifecycle({
     let closeAllowed = false
     let window = createWindow()
     const updateMenu = () =>
-      installProjectMenu(appPreferences.getSnapshot().resolvedLocale, (command) => {
-        void ensureWindow()
-          .then(() => window.webContents.send('project:command', command))
-          .catch(console.error)
-      })
+      installProjectMenu(
+        appPreferences.getSnapshot().resolvedLocale,
+        (command) => {
+          void ensureWindow()
+            .then(() => window.webContents.send('project:command', command))
+            .catch(console.error)
+        },
+        () => {
+          void ensureWindow()
+            .then(() => window.webContents.send('diagnostics:open-recent'))
+            .catch(console.error)
+        },
+      )
     appPreferences.subscribe(updateMenu)
     updateMenu()
     const protectWindow = () => {
@@ -324,6 +366,7 @@ startApplicationLifecycle({
         await Promise.all([developmentEnvironment?.shutdown(), resources.shutdown()])
         await mediaRecovery.shutdown()
         await barrier.shutdown()
+        await diagnosticLog.dispose()
       },
     }
   },

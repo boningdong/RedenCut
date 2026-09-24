@@ -4,6 +4,7 @@ import { englishResources } from './en'
 import { simplifiedChineseResources } from './zh-CN'
 
 const requiredGroups = [
+  'diagnostics',
   'preparation',
   'mediaRecovery',
   'speechTasks',

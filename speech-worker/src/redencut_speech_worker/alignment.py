@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional
 from .alignment_quality import validate_audio_evidence
 from .alignment_recovery import resolve_alignment, retry_local_alignment
 from .alignment_segments import partition_units, prepare_segments
+from .failures import AlignmentFailure
 
 
 def _normalized(text: str) -> str:
@@ -104,12 +105,12 @@ def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, mode
     manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     model = next((item for item in manifest["models"] if item["id"] == model_id), None)
     if model is None or model["capability"] != "alignment":
-        raise ValueError(f"unknown alignment model: {model_id}")
+        raise AlignmentFailure("alignment-model-unavailable", "Unknown alignment model")
     if model_paths is not None and model_id not in model_paths:
-        raise FileNotFoundError(f"managed model not available: {model_id}")
+        raise AlignmentFailure("alignment-model-unavailable", "Managed alignment model not available")
     snapshot = Path(model_paths[model_id]) if model_paths is not None else Path(cache_root) / model["id"] / model["revision"]
     if not snapshot.is_dir():
-        raise FileNotFoundError(f"alignment model is not provisioned: {model_id}")
+        raise AlignmentFailure("alignment-model-unavailable", "Alignment model is not provisioned")
     return {**model, "snapshot": str(snapshot)}
 
 
@@ -122,9 +123,12 @@ def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device:
     windows = prepare_segments(text, segments, len(audio) / 16000)
     if not windows:
         return {"segments": [], "word_segments": []}
-    model, metadata = whisperx.load_align_model(
-        language_code=language, device=device, model_name=model_path, model_cache_only=True,
-    )
+    try:
+        model, metadata = whisperx.load_align_model(
+            language_code=language, device=device, model_name=model_path, model_cache_only=True,
+        )
+    except Exception as error:
+        raise AlignmentFailure("alignment-model-unavailable", "Alignment model could not be loaded") from error
     output = []
     for index, window in enumerate(windows):
         first, last = int(window["start"] * 16000), int(window["end"] * 16000)
@@ -136,10 +140,13 @@ def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device:
             if on_progress is not None:
                 on_progress(100 * (index + 1) / len(windows))
             continue
-        aligned = whisperx.align(
-            [{"start": 0.0, "end": len(clip) / 16000, "text": window["text"]}],
-            model, metadata, clip, device, return_char_alignments=True, interpolate_method="ignore",
-        )
+        try:
+            aligned = whisperx.align(
+                [{"start": 0.0, "end": len(clip) / 16000, "text": window["text"]}],
+                model, metadata, clip, device, return_char_alignments=True, interpolate_method="ignore",
+            )
+        except Exception as error:
+            raise AlignmentFailure("alignment-inference-failed", "Alignment inference failed") from error
         chars = [dict(char) for segment in aligned.get("segments", []) for char in segment.get("chars", [])]
         words = [dict(word) for word in aligned.get("word_segments", [])]
         validate_audio_evidence(chars, clip)

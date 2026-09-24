@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import { expect, it, vi } from 'vitest'
+import type { AppLogEvent } from '../../shared/diagnostics.types'
 import type { WorkspaceController } from '../project/WorkspaceController'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
 import { createSpeechBatchHandler } from './speechBatch.ipc'
@@ -16,7 +17,7 @@ vi.mock('../speech/SpeechArtifactStore', () => ({
     }
   },
 }))
-function setup() {
+function setup(failureLog?: { write: (event: AppLogEvent) => Promise<void> }) {
   const fingerprint = { byteLength: 1, modifiedTimeMs: 0, sha256: 'a'.repeat(64) }
   const sources = ['A', 'B'].map((id) => ({ id, displayName: id, fingerprint }))
   let revision = 2
@@ -81,6 +82,7 @@ function setup() {
     coordinator: coordinator as never,
     prepare: async () => ({ speakerRecognitionEnabled: false, configuration: 'uncalibrated' }),
     diagnosticSink: vi.fn(),
+    failureLog,
   })
   const request = {
     workspaceToken: 'workspace',
@@ -106,6 +108,22 @@ it('processes all unique sources and publishes progress across project revision 
   expect(result.batch.completedCount).toBe(2)
   expect(result.value.revision).toBe(4)
   expect(sender.send.mock.calls.filter(([, event]) => event.session)).toHaveLength(2)
+})
+
+it('assigns distinct diagnostic IDs to two failed sources and records one error each', async () => {
+  const failureLog = { write: vi.fn(async (_event: AppLogEvent) => {}) }
+  const { handler, request, sender, coordinator } = setup(failureLog)
+  coordinator.transcribeAndAlign.mockRejectedValue(new Error('/private/audio.wav'))
+  const result = await handler({ sender } as never, request)
+  expect(result.batch.failures).toHaveLength(2)
+  const ids = result.batch.failures.map(
+    (failure: { error: { diagnosticId?: string } }) => failure.error.diagnosticId,
+  )
+  expect(ids[0]).toBeTruthy()
+  expect(ids[1]).toBeTruthy()
+  expect(ids[0]).not.toBe(ids[1])
+  expect(failureLog.write.mock.calls.filter(([event]) => event.level === 'error')).toHaveLength(2)
+  expect(JSON.stringify(failureLog.write.mock.calls)).not.toContain('/private/')
 })
 it('rejects simultaneous batches in the same workspace', async () => {
   const { handler, request, sender, coordinator } = setup()

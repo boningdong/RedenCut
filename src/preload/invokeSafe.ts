@@ -9,6 +9,12 @@ export function unwrapIpcResult<T>(result: IpcResult<T>): T {
     reason: result.error.reason,
     message: result.error.message,
     ...(result.error.failureKind ? { failureKind: result.error.failureKind } : {}),
+    ...(typeof result.error.diagnosticId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      result.error.diagnosticId,
+    )
+      ? { diagnosticId: result.error.diagnosticId }
+      : {}),
   }
   throw error
 }

@@ -1,4 +1,22 @@
 export const englishResources = {
+  diagnostics: {
+    title: 'Diagnostic report',
+    excluded:
+      'Review the exact report below before saving. Audio, transcript text, project files and tokens are excluded. The report stays on this computer until you choose to share it.',
+    partial: 'Some earlier diagnostic events are no longer available. This report is partial.',
+    ids: 'Diagnostic ID',
+    eventCount: '{{count}} events',
+    preview: 'Report preview',
+    save: 'Save report…',
+    saveAgain: 'Choose another location…',
+    showSaved: 'Show in Finder',
+    copyId: 'Copy ID',
+    loading: 'Preparing report…',
+    export: 'Export diagnostic report',
+    exportAll: 'Export all failed sources',
+    openSettings: 'Open Settings',
+    recent: 'Export recent diagnostic report…',
+  },
   preparation: {
     cancelImport: 'Cancel import',
     opening: 'Opening project',
@@ -648,11 +666,11 @@ export const englishResources = {
     'job-settlement-failed': 'Background work could not be stopped safely.',
     'switch-unacknowledged': 'Playback could not be stopped safely.',
     'whisper-missing':
-      'The transcription engine is missing from the managed runtime. Repair the runtime and retry.',
+      'The speech recognition engine is unavailable. Repair or reinstall the application, then try again.',
     'whisper-model-missing':
       'No transcription model is ready. Open Settings to prepare the speech models.',
     'speech-worker-missing':
-      'The speech engine is unavailable. In development, run npm run runtime:setup; for an installed app, repair or reinstall the application.',
+      'The speech engine is unavailable. Repair or reinstall the application, then try again.',
     'speech-language-unsupported':
       'Text alignment currently supports Chinese and English. This recording uses an unsupported language.',
     'speech-models-missing':
@@ -673,13 +691,22 @@ export const englishResources = {
     'speech-transcribing':
       'Speech recognition failed. Retry; if it persists, check the local Whisper installation and model.',
     'speech-aligning':
-      'Speech alignment failed. Retry; if it persists, check the installed alignment models.',
+      'Speech alignment did not finish. Export a diagnostic report to help us find the cause.',
+    'speech-alignment-input':
+      'Preliminary speech recognition finished, but its words and time segments could not be matched. We cannot accurately place the words in the audio yet. Run recognition again; if this happens again, export a diagnostic report.',
+    'speech-alignment-window':
+      'One recognized section of the recording is too long to align. Export a diagnostic report.',
+    'speech-alignment-model':
+      'The speech alignment model could not be used. Verify the model in Settings, then try again.',
+    'speech-worker-exit':
+      'Speech processing stopped unexpectedly. Try again; if it happens again, export a diagnostic report.',
+    'report-save-failed':
+      'The diagnostic report could not be saved. Choose another location and try again.',
     'speech-diarizing':
       'Speaker detection failed. Retry; if it persists, check the installed speaker detection model.',
     'speech-attributing-speakers':
       'Speaker attribution failed. Retry speech analysis for this track.',
-    'speech-validating':
-      'Speech analysis returned invalid results. Retry speech analysis for this track.',
+    'speech-validating': 'The speech analysis result was invalid. Export a diagnostic report.',
     'speech-publishing':
       'Could not save the speech analysis. Check available disk space and retry.',
   },

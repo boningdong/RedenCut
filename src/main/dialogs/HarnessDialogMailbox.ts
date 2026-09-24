@@ -32,7 +32,11 @@ export class HarnessDialogMailbox {
       if (reply.path) {
         if (!reply.parent || realpathSync(dirname(reply.path)) !== reply.parent)
           throw new Error('DIALOG_PATH_CHANGED')
-        if (purpose !== 'save-project' && purpose !== 'export-audio') {
+        if (
+          purpose !== 'save-project' &&
+          purpose !== 'export-audio' &&
+          purpose !== 'diagnostic-report'
+        ) {
           if (realpathSync(reply.path) !== reply.path) throw new Error('DIALOG_PATH_CHANGED')
           const stat = lstatSync(reply.path)
           if (purpose === 'import-audio' ? !stat.isFile() : !stat.isDirectory())
@@ -40,11 +44,20 @@ export class HarnessDialogMailbox {
         }
       }
       // Recheck destination existence at consumption, not only at preparation.
-      if ((purpose === 'save-project' || purpose === 'export-audio') && reply.path) {
+      if (
+        (purpose === 'save-project' ||
+          purpose === 'export-audio' ||
+          purpose === 'diagnostic-report') &&
+        reply.path
+      ) {
         try {
           lstatSync(reply.path)
           throw new Error(
-            purpose === 'export-audio' ? 'EXPORT_ALREADY_EXISTS' : 'PROJECT_ALREADY_EXISTS',
+            purpose === 'export-audio'
+              ? 'EXPORT_ALREADY_EXISTS'
+              : purpose === 'diagnostic-report'
+                ? 'REPORT_ALREADY_EXISTS'
+                : 'PROJECT_ALREADY_EXISTS',
           )
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error

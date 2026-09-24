@@ -6,6 +6,7 @@ import type { SaveSpeakerIdentitiesRequest } from '../shared/SpeakerIdentityType
 import type { SpeechBatchSummary } from '../shared/speechBatch.types'
 import type { ResourceSnapshot, ResourcePreparation } from '../shared/resources.types'
 import type { PublicMessage } from '../shared/publicMessages'
+import type { DiagnosticReportPreview, DiagnosticSaveResult } from '../shared/diagnostics.types'
 import type {
   AppPreferencesSnapshot,
   ThemeId,
@@ -195,6 +196,15 @@ const api = {
     cancel: (request: CancelSessionJobRequest<SpeechAnalysisJobId>) =>
       invokeSafe<TranscriptionCancellationResult>(invoke, 'speech-analysis:cancel', request),
   },
+  diagnostics: {
+    recentFailure: () => invokeSafe<string | null>(invoke, 'diagnostics:recent-failure'),
+    previewReport: (diagnosticIds: string[]) =>
+      invokeSafe<DiagnosticReportPreview>(invoke, 'diagnostics:preview', { diagnosticIds }),
+    saveReport: (previewId: string) =>
+      invokeSafe<DiagnosticSaveResult>(invoke, 'diagnostics:save', previewId),
+    showSavedReport: (previewId: string) =>
+      invokeSafe<void>(invoke, 'diagnostics:show-saved', previewId),
+  },
   workspaceLayout: {
     get: () => invokeSafe<WorkspaceLayoutReadResult>(invoke, 'workspace-layout:get'),
     set: (layout: WorkspaceLayout) =>
@@ -215,6 +225,11 @@ const api = {
       invokeSafe<ExportCancellationResult>(invoke, 'render:cancel-export', request),
   },
   on: {
+    openRecentDiagnostic: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('diagnostics:open-recent', handler)
+      return () => ipcRenderer.off('diagnostics:open-recent', handler)
+    },
     projectCommand: projectCommands,
     projectCloseRequest: projectCloseRequests,
     projectOpenProgress: (callback: (progress: ProjectOpenProgressEvent) => void) => {

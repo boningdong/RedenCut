@@ -31,7 +31,7 @@ The previous shell provisioning commands remain developer/harness utilities rath
 
 WhisperX is not RedenCut's canonical transcriber in the first version. whisper.cpp produces the canonical best-effort-verbatim text; WhisperX aligns that text and hosts the initial diarization integration.
 
-Speech analysis reads the imported source's validated Float32 PCM cache and prepares one temporary 16 kHz mono PCM WAV for both engines. This supports imported containers such as AAC/M4A even when the local whisper.cpp build cannot read them directly. The temporary WAV is removed on success, failure, or cancellation; artifacts retain the original source identity and fingerprint. Preparation and engine failures display a fixed, stage-specific recovery message, while underlying paths and engine diagnostics remain in the main-process log.
+Speech analysis reads the imported source's validated Float32 PCM cache and prepares one temporary 16 kHz mono PCM WAV for both engines. This supports imported containers such as AAC/M4A even when the local whisper.cpp build cannot read them directly. The temporary WAV is removed on success, failure, or cancellation; artifacts retain the original source identity and fingerprint. Known alignment failures carry stable worker error codes into main, where they map to concise localized reasons and one diagnostic ID per failed source. The application log and user-exported report contain allowlisted stage and code facts, without underlying paths, transcript text, stderr or engine exception messages.
 
 ## Sources of truth
 

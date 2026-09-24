@@ -31,6 +31,8 @@ import { SpeechAnalysisCoordinator } from '../speech/SpeechAnalysisCoordinator'
 import { withSpeechAudio } from '../speech/prepareSpeechAudio'
 import { SpeechAnalysisError, type SpeechFailureStage } from '../speech/SpeechAnalysisError'
 import { SpeechWorkerClient } from '../speech/SpeechWorkerClient'
+import type { DiagnosticLog } from '../diagnostics/DiagnosticLog'
+import { classifySpeechFailure } from '../speech/classifySpeechFailure'
 import { whisperTranscriber } from '../speech/transcriber/whisper'
 import { PublicIpcError, requireJobId, requireSessionPrecondition, toIpcResult } from './ipcResult'
 
@@ -46,6 +48,7 @@ export function registerSpeechAnalysisIpc(
   jobs: SessionJobRegistry,
   diagnosticSink: (error: unknown) => void = console.error,
   services?: SpeechPreparationServices,
+  failureLog?: Pick<DiagnosticLog, 'write'>,
 ): void {
   const workerRoot = services
     ? dirname(services.manifestPath)
@@ -125,6 +128,7 @@ export function registerSpeechAnalysisIpc(
     jobs,
     coordinator,
     diagnosticSink,
+    failureLog,
     prepare: async (tasks) => {
       if (!python() || !existsSync(python()))
         throw new TranscriberUnavailableError('speech-worker-missing')
@@ -209,11 +213,32 @@ export function registerSpeechAnalysisIpc(
           const abortController = new AbortController()
           const run = async () => {
             let stage: SpeechFailureStage = 'preparing-audio'
+            let loggedStage: SpeechProgress['stage'] | null = null
             let configuration = 'uncalibrated'
             const trackProgress = new SpeechStagePolicy(
               measuredSpeechProfiles,
             ).createProgressTracker(source.metadata?.durationSeconds ?? 0, () => configuration)
             const reportProgress = (progress: SpeechProgress) => {
+              if (failureLog && loggedStage !== progress.stage) {
+                if (loggedStage)
+                  void failureLog.write({
+                    schemaVersion: 1,
+                    time: new Date().toISOString(),
+                    level: 'info',
+                    event: 'speech/stage-completed',
+                    operationId: request.jobId,
+                    facts: { stage: loggedStage },
+                  })
+                void failureLog.write({
+                  schemaVersion: 1,
+                  time: new Date().toISOString(),
+                  level: 'info',
+                  event: 'speech/stage-started',
+                  operationId: request.jobId,
+                  facts: { stage: progress.stage },
+                })
+                loggedStage = progress.stage
+              }
               stage = progress.stage
               if (!event.sender.isDestroyed())
                 event.sender.send('speech-analysis:progress', {
@@ -281,6 +306,15 @@ export function registerSpeechAnalysisIpc(
                 artifact,
                 request.draft,
               )
+              if (failureLog && loggedStage)
+                void failureLog.write({
+                  schemaVersion: 1,
+                  time: new Date().toISOString(),
+                  level: 'info',
+                  event: 'speech/stage-completed',
+                  operationId: request.jobId,
+                  facts: { stage: loggedStage },
+                })
               return {
                 jobId: request.jobId,
                 workspaceToken: request.workspaceToken,
@@ -321,6 +355,21 @@ export function registerSpeechAnalysisIpc(
         }
       },
       diagnosticSink,
+      failureLog
+        ? {
+            log: failureLog,
+            operationId:
+              typeof (input as { jobId?: unknown })?.jobId === 'string'
+                ? (input as { jobId: string }).jobId
+                : randomUUID(),
+            stage: 'aligning',
+            classify: (error: unknown) =>
+              classifySpeechFailure(
+                error,
+                error instanceof SpeechAnalysisError ? error.stage : 'aligning',
+              ),
+          }
+        : undefined,
     ),
   )
 

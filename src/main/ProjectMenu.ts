@@ -6,6 +6,7 @@ import { createTranslator } from '../shared/i18n/createTranslator'
 export function installProjectMenu(
   locale: Locale,
   dispatch: (command: ProjectCommand) => void,
+  openRecentDiagnostic?: () => void,
 ): void {
   const t = createTranslator(locale).getFixedT(locale)
   const command = (
@@ -35,6 +36,10 @@ export function installProjectMenu(
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
+    {
+      label: locale === 'zh-CN' ? '帮助' : 'Help',
+      submenu: [{ label: t('diagnostics.recent'), click: () => openRecentDiagnostic?.() }],
+    },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }

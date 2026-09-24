@@ -8,7 +8,19 @@ import {
   SpeechWorkerResponseSchema,
   type SpeechWorkerRequest,
   type SpeechWorkerResult,
+  type SpeechWorkerFailureCode,
 } from '../../shared/speechWorker.types'
+
+export class SpeechWorkerFailure extends Error {
+  constructor(
+    readonly code: SpeechWorkerFailureCode,
+    readonly details: { durationSeconds?: number } | undefined,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'SpeechWorkerFailure'
+  }
+}
 
 interface ClientOptions {
   terminateGraceMs?: number
@@ -68,6 +80,7 @@ export class SpeechWorkerClient {
       throw protocolError('Speech worker input line exceeded maximum size')
     let buffer = Buffer.alloc(0)
     let terminal: SpeechWorkerResult | undefined
+    let workerFailure: SpeechWorkerFailure | undefined
     const operation = manageProcess(
       () =>
         this.options.spawn(
@@ -102,7 +115,7 @@ export class SpeechWorkerClient {
             }
             if (message.jobId !== request.jobId)
               throw protocolError('Speech worker job ID mismatch')
-            if (terminal)
+            if (terminal || workerFailure)
               throw protocolError('Speech worker emitted messages after its terminal result')
             if (message.type === 'progress')
               onProgress?.({
@@ -111,7 +124,11 @@ export class SpeechWorkerClient {
               })
             else if (message.type === 'result') terminal = message.result
             else if (message.type === 'error')
-              throw new Error(`${message.code}: ${message.message}`)
+              workerFailure = new SpeechWorkerFailure(
+                message.code,
+                message.details,
+                message.message,
+              )
           }
           if (buffer.byteLength > this.options.maxLineBytes)
             throw protocolError('Speech worker output line exceeded maximum size')
@@ -125,6 +142,7 @@ export class SpeechWorkerClient {
     }
     const exit = await operation.completed
     const diagnostic = exit.diagnostics ? `\nSpeech worker stderr: ${exit.diagnostics}` : ''
+    if (workerFailure) throw workerFailure
     if (exit.code !== 0)
       throw new ProcessExecutionError(
         'process-exit',

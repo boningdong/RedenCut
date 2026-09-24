@@ -14,6 +14,7 @@ import type { PublicMessage } from '@shared/publicMessages'
 import { normalizePublicError, publicMessage } from './i18n/messages'
 import { useTranslation } from './i18n/useTranslation'
 import { SettingsDialog } from './components/settings/SettingsDialog'
+import { DiagnosticReportDialog } from './components/diagnostics/DiagnosticReportDialog'
 import { OnboardingDialog } from './components/onboarding/OnboardingDialog'
 import { useLocaleStore } from './stores/locale.store'
 import { LocaleNotice } from './components/LocaleNotice'
@@ -111,6 +112,7 @@ export default function App() {
   )
   const [importState, setImportState] = useState<ImportState | null>(null)
   const [error, setError] = useState<PublicMessage | null>(null)
+  const [reportIds, setReportIds] = useState<string[] | null>(null)
   const [showExport, setShowExport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const showOnboarding = useLocaleStore(
@@ -681,6 +683,18 @@ export default function App() {
   useEffect(() => window.electronAPI.on.projectCommand?.(runProjectCommand), [runProjectCommand])
   useEffect(
     () =>
+      window.electronAPI.on.openRecentDiagnostic(() => {
+        void window.electronAPI.diagnostics.recentFailure().then(
+          (id) => {
+            if (id) setReportIds([id])
+          },
+          (reason: unknown) => setError(normalizePublicError(reason)),
+        )
+      }),
+    [],
+  )
+  useEffect(
+    () =>
       window.electronAPI.on.projectCloseRequest?.(({ requestId }) => {
         void (async () => {
           let allowed = false
@@ -974,6 +988,23 @@ export default function App() {
           }}
         >
           {publicMessage(t, error)}
+          {error.diagnosticId && (
+            <>
+              <small>
+                {' '}
+                {t('diagnostics.ids')}: {error.diagnosticId}
+              </small>
+              <Button size="sm" onClick={() => setReportIds([error.diagnosticId!])}>
+                {t('diagnostics.export')}
+              </Button>
+            </>
+          )}
+          {(error.reason === 'speech-alignment-model' ||
+            error.reason === 'speech-models-missing') && (
+            <Button size="sm" onClick={() => setShowSettings(true)}>
+              {t('diagnostics.openSettings')}
+            </Button>
+          )}
         </div>
       )}
       <AudioPreparationProgress
@@ -1020,6 +1051,7 @@ export default function App() {
             isGenerating={isGenerating}
             generatingStatus={generatingStatus}
             onCancel={cancelSpeechAnalysis}
+            onOpenSettings={() => setShowSettings(true)}
           />
         )}
         transport={(workspaceControls) => (
@@ -1031,6 +1063,9 @@ export default function App() {
       />
       <MissingMediaDialog />
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+      {reportIds && (
+        <DiagnosticReportDialog diagnosticIds={reportIds} onClose={() => setReportIds(null)} />
+      )}
       {showOnboarding && (
         <OnboardingDialog
           onStart={async (starterKind) => {

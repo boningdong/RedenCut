@@ -75,6 +75,7 @@ for (const shutdown of ['EOF', 'docker stop']) {
         const bytes = Buffer.from(png.data, 'base64')
         assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
         await writeFile(resolve('.harness-runs/container', runId, 'host-received.png'), bytes)
+        await call('browser_click', { ...identity, target: 'button[aria-label="Close"]' })
         const restarted = (await call('redencut_restart', { ...identity, rebuild: true }))
           .structuredContent
         assert.equal(restarted.generation, started.generation + 1)

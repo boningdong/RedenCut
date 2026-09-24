@@ -41,7 +41,9 @@
 - Bundle English and Simplified Chinese resources in `src/shared/i18n/`; keep the shared translator independent of Electron and Node.js.
 - Use semantic translation keys and whole-message interpolation for application copy, including accessible labels and native dialog text.
 - Retain stable business reasons and safe parameters in error/progress state; translate at presentation time so retained messages follow language changes.
-- Keep raw diagnostics in their diagnostic sink and preserve user-authored names, transcript content, timecodes, project identifiers and file extensions.
+- Main owns a bounded JSONL diagnostic log under Electron's logs path after harness isolation. Record low-volume, schema-allowlisted operation milestones and one terminal error event per reportable failure; never serialize exception messages, paths, transcript text, audio, project contents or credentials. Hash operation correlation IDs before writing. Keep up to five 4 MiB files for at most fourteen days, and let logging failures fall back without failing the user operation.
+- Classify a failure at its terminal process boundary and expose only a stable public reason plus an opaque diagnostic ID over IPC. Preload and renderer allowlist those fields and translate the reason at render time. Cancellation and ordinary validation are not reportable failures. Domains own their diagnostic-code mapping; the generic log and report service do not interpret domain codes.
+- A diagnostic report is a bounded snapshot of selected failure events and their operation milestones. Main owns the exact preview bytes, native save path and reveal action. The user reviews the sanitized JSON before saving, and the application never uploads it. Mark reports partial when selected history has rotated away or size limits trim events.
 - Changing language must not remount the editor, reset playback, restart jobs or alter project revisions.
 
 ## Settings and Resource Preparation

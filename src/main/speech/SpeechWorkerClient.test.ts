@@ -3,7 +3,7 @@ import { EventEmitter } from 'events'
 import { PassThrough, Writable } from 'stream'
 import { describe, expect, it, vi } from 'vitest'
 import { SpeechWorkerRequestSchema } from '../../shared/speechWorker.types'
-import { SpeechWorkerClient } from './SpeechWorkerClient'
+import { SpeechWorkerClient, SpeechWorkerFailure } from './SpeechWorkerClient'
 
 const fixture = join(__dirname, '__fixtures__', 'worker-fixture.mjs')
 const request = SpeechWorkerRequestSchema.parse({
@@ -43,6 +43,8 @@ describe('SpeechWorkerClient', () => {
       .run(request, new AbortController().signal)
       .catch((error) => error)
     expect(error).toBeInstanceOf(Error)
+    expect(error).toBeInstanceOf(SpeechWorkerFailure)
+    expect(error.code).toBe('alignment-model-unavailable')
     expect(error.message).toContain('model computation failed')
     expect(error.kind).not.toBe('protocol')
   })

@@ -1,4 +1,5 @@
 import type { ProjectCommand, ProjectCloseRequest } from './ProjectCommands'
+import type { DiagnosticReportPreview, DiagnosticSaveResult } from './diagnostics.types'
 import type { PreparedAudioAPI } from './PreparedAudioTypes'
 import type { ProjectOpenProgressEvent } from './AudioPreparationTypes'
 import type {
@@ -183,6 +184,12 @@ export interface IElectronAPI {
       request: CancelSessionJobRequest<SpeechAnalysisJobId>,
     ): Promise<TranscriptionCancellationResult>
   }
+  diagnostics: {
+    recentFailure(): Promise<string | null>
+    previewReport(diagnosticIds: string[]): Promise<DiagnosticReportPreview>
+    saveReport(previewId: string): Promise<DiagnosticSaveResult>
+    showSavedReport(previewId: string): Promise<void>
+  }
   speakerIdentity: {
     save(request: SaveSpeakerIdentitiesRequest): Promise<RendererSession>
   }
@@ -194,6 +201,7 @@ export interface IElectronAPI {
     cancelExport(request: CancelSessionJobRequest<ExportJobId>): Promise<ExportCancellationResult>
   }
   on: {
+    openRecentDiagnostic(callback: () => void): () => void
     projectCommand(callback: (command: ProjectCommand) => void): () => void
     projectCloseRequest(callback: (request: ProjectCloseRequest) => void): () => void
     projectOpenProgress(callback: (event: ProjectOpenProgressEvent) => void): () => void

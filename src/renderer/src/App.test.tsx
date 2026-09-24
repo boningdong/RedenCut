@@ -317,6 +317,12 @@ function installApi(initial: RendererSession) {
       }),
       cancel: vi.fn(async () => 'not-found' as const),
     },
+    diagnostics: {
+      recentFailure: vi.fn(async () => null),
+      previewReport: vi.fn(),
+      saveReport: vi.fn(),
+      showSavedReport: vi.fn(),
+    },
     speakerIdentity: { save: vi.fn() },
     speakerLabel: {
       rename: vi.fn(),
@@ -326,6 +332,7 @@ function installApi(initial: RendererSession) {
       cancelExport: vi.fn(async () => 'not-found' as const),
     },
     on: {
+      openRecentDiagnostic: vi.fn(() => vi.fn()),
       projectCommand: vi.fn<IElectronAPI['on']['projectCommand']>(() => vi.fn()),
       projectCloseRequest: vi.fn<IElectronAPI['on']['projectCloseRequest']>(() => vi.fn()),
       mediaRecoveryChanged: vi.fn(() => vi.fn()),
@@ -481,10 +488,12 @@ describe('App transcription job identity', () => {
     const player = getAudioPlayerInstance()
     const before = useEditorStore.getState().session
     fireEvent.click(screen.getByRole('button', { name: 'Generate transcript' }))
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('managed runtime'))
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toContain('speech recognition engine'),
+    )
     act(() => useLocaleStore.setState({ resolvedLocale: 'zh-CN' }))
-    expect(screen.getByRole('alert').textContent).toContain('受管运行环境中缺少转录引擎')
-    expect(screen.getByRole('alert').textContent).toContain('修复运行环境')
+    expect(screen.getByRole('alert').textContent).toContain('语音识别引擎无法使用')
+    expect(screen.getByRole('alert').textContent).toContain('修复或重新安装应用')
     expect(getAudioPlayerInstance()).toBe(player)
     expect(useEditorStore.getState().session).toBe(before)
     expect(requests).toHaveLength(0)

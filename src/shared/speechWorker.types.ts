@@ -73,6 +73,16 @@ export const SpeechWorkerRequestSchema = z
   })
 
 const envelope = { protocolVersion: z.literal(1), jobId: z.string().min(1) }
+export const SpeechWorkerFailureCodeSchema = z.enum([
+  'alignment-segment-mismatch',
+  'alignment-timing-invalid',
+  'alignment-window-too-long',
+  'alignment-model-unavailable',
+  'alignment-inference-failed',
+  'invalid-request',
+  'worker-failed',
+])
+export type SpeechWorkerFailureCode = z.infer<typeof SpeechWorkerFailureCodeSchema>
 export const WorkerAlignmentUnitSchema = z
   .object({
     transcriptUnitIds: z.array(z.string().uuid()).min(1),
@@ -157,8 +167,12 @@ export const SpeechWorkerResponseSchema = z.discriminatedUnion('type', [
     .object({
       ...envelope,
       type: z.literal('error'),
-      code: z.string().min(1),
+      code: SpeechWorkerFailureCodeSchema,
       message: z.string().min(1),
+      details: z
+        .object({ durationSeconds: z.number().finite().nonnegative().optional() })
+        .strict()
+        .optional(),
     })
     .strict(),
 ])

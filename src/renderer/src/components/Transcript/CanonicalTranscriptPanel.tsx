@@ -36,6 +36,7 @@ export function CanonicalTranscriptPanel({
   isGenerating,
   generatingStatus,
   onCancel,
+  onOpenSettings,
   analyses,
 }: TranscriptPanelProps & { analyses: RendererSpeechAnalysis[] }) {
   const { t } = useTranslation()
@@ -289,6 +290,7 @@ export function CanonicalTranscriptPanel({
         status={generatingStatus}
         textReady={allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart !== null)}
         onCancel={onCancel}
+        onOpenSettings={onOpenSettings}
         needsTimingReview={allUnits.some((u) => u.unit.kind === 'speech' && u.outputStart === null)}
       >
         {!isGenerating && analyses.some((analysis) => analysis.diarizationStatus === 'pending') && (

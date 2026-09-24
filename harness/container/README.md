@@ -93,6 +93,8 @@ Container audio-output and basic editing acceptance are covered by the named pro
 
 ## Prepared export destinations
 
+For diagnostic reports, prepare `redencut_prepare_dialog` with `purpose: "diagnostic-report"` and `selection: {type: "report", filename: "diagnostic.json"}` before clicking Save Report. The JSON is retained under `<runDirectory>/reports/`. `{type: "cancel"}` closes the flow without a file. Names must be a single `.json` basename and existing files cannot be overwritten.
+
 Use `redencut_prepare_dialog` with `purpose: "export-audio"` and `selection: {type: "export", filename: "mix.wav", format: "wav"}` before clicking the modal’s Export button.
 Supported formats are `wav`, `mp3`, `flac`, and `aac`; the filename must be a single basename with its matching extension.
 `{type: "cancel"}` cancels without creating an output.

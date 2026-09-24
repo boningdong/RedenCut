@@ -66,6 +66,20 @@ export function prepareDialog(
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       }
+    } else if (request.selection.type === 'report') {
+      const name = filename(request.selection.filename)
+      if (!name.endsWith('.json') || name === '.json') throw new Error('INVALID_REPORT_NAME')
+      const root = join(runDirectory, 'reports')
+      mkdirSync(root, { recursive: true, mode: 0o700 })
+      if (lstatSync(root).isSymbolicLink()) throw new Error('REPORT_ROOT_SYMLINK')
+      contained(runDirectory, root)
+      path = join(realpathSync(root), name)
+      try {
+        lstatSync(path)
+        throw new Error('REPORT_ALREADY_EXISTS')
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
     } else {
       const name = filename(request.selection.name)
       if (!name.endsWith('.redencut') || name === '.redencut')

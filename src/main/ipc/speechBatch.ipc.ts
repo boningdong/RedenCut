@@ -17,6 +17,9 @@ import { measuredSpeechProfiles } from '../speech/measuredSpeechProfiles'
 import { withSpeechAudio } from '../speech/prepareSpeechAudio'
 import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUnavailableError'
 import { PublicIpcError } from './ipcResult'
+import { recordTerminalFailure } from '../diagnostics/DiagnosticFailure'
+import type { DiagnosticLog } from '../diagnostics/DiagnosticLog'
+import { classifySpeechFailure } from '../speech/classifySpeechFailure'
 
 interface SpeechBatchRuntime {
   speakerRecognitionEnabled: boolean
@@ -30,6 +33,7 @@ interface Dependencies {
   coordinator: Pick<SpeechAnalysisCoordinator, 'transcribeAndAlign' | 'identifySpeakers'>
   prepare(tasks?: SpeechTaskSelection): Promise<SpeechBatchRuntime>
   diagnosticSink(error: unknown): void
+  failureLog?: Pick<DiagnosticLog, 'write'>
 }
 
 /** Compose the batch with workspace guards and IPC; the scheduler stays engine-independent. */
@@ -39,6 +43,7 @@ export function createSpeechBatchHandler({
   coordinator,
   prepare,
   diagnosticSink,
+  failureLog,
 }: Dependencies) {
   const active = new Set<string>()
   return async (event: IpcMainInvokeEvent, request: SpeechAnalysisJobRequest) => {
@@ -119,9 +124,31 @@ export function createSpeechBatchHandler({
       abort.signal.throwIfAborted()
       let lastBatch: SpeechBatchProgress | undefined
       const trackers = new Map<string, ReturnType<SpeechStagePolicy['createProgressTracker']>>()
+      const loggedStages = new Map<string, SpeechProgress['stage']>()
       const report = (progress: SpeechProgress, batch: SpeechBatchProgress) => {
         lastBatch = batch
         const key = `${batch.audioSourceId}/${batch.phase}`
+        if (failureLog && loggedStages.get(key) !== progress.stage) {
+          const priorStage = loggedStages.get(key)
+          if (priorStage)
+            void failureLog.write({
+              schemaVersion: 1,
+              time: new Date().toISOString(),
+              level: 'info',
+              event: 'speech/stage-completed',
+              operationId: `${request.jobId}:${batch.audioSourceId}:${batch.phase}`,
+              facts: { stage: priorStage },
+            })
+          loggedStages.set(key, progress.stage)
+          void failureLog.write({
+            schemaVersion: 1,
+            time: new Date().toISOString(),
+            level: 'info',
+            event: 'speech/stage-started',
+            operationId: `${request.jobId}:${batch.audioSourceId}:${batch.phase}`,
+            facts: { stage: progress.stage },
+          })
+        }
         let track = trackers.get(key)
         if (!track) {
           track = new SpeechStagePolicy(measuredSpeechProfiles).createProgressTracker(
@@ -188,6 +215,15 @@ export function createSpeechBatchHandler({
               artifact,
               signal,
             )
+            if (failureLog && lastBatch)
+              void failureLog.write({
+                schemaVersion: 1,
+                time: new Date().toISOString(),
+                level: 'info',
+                event: 'speech/stage-completed',
+                operationId: `${request.jobId}:${source.audioSourceId}:${lastBatch.phase}`,
+                facts: { stage: 'publishing' },
+              })
             // Derive the next expectation from OUR published bytes, never a later competing result.
             context.guard = {
               ...context.guard,
@@ -210,6 +246,18 @@ export function createSpeechBatchHandler({
         },
         publicFailure: (error): PublicMessage => {
           diagnosticSink(error)
+          if (failureLog && lastBatch) {
+            const stage = error instanceof SpeechAnalysisError ? error.stage : 'preparing-audio'
+            return recordTerminalFailure(
+              error,
+              {
+                operationId: `${request.jobId}:${lastBatch.audioSourceId}:${lastBatch.phase}`,
+                stage,
+                classify: (failure) => classifySpeechFailure(failure, stage),
+              },
+              failureLog,
+            )
+          }
           if (error instanceof SpeechAnalysisError)
             return {
               reason: `speech-${error.stage}`,

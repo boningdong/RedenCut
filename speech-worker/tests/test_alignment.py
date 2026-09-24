@@ -2,9 +2,14 @@ import unittest
 from unittest.mock import patch, Mock
 import numpy as np
 import sys
+import tempfile
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
-from redencut_speech_worker.alignment import align, normalize_alignment, run_whisperx_alignment
+from redencut_speech_worker.alignment import align, normalize_alignment, run_whisperx_alignment, load_manifest_model
+from redencut_speech_worker.alignment_segments import partition_units, prepare_segments
+from redencut_speech_worker.failures import AlignmentFailure
 
 
 UNITS = [
@@ -16,6 +21,27 @@ UNITS = [
 
 
 class AlignmentTest(unittest.TestCase):
+    def test_typed_alignment_input_failures(self):
+        with self.assertRaises(AlignmentFailure) as mismatch:
+            partition_units([{"id": "u", "text": "hello", "kind": "speech"}], ["hel", "lo"])
+        self.assertEqual("alignment-segment-mismatch", mismatch.exception.code)
+        with self.assertRaises(AlignmentFailure) as timing:
+            prepare_segments("hello", [{"text": "he", "sourceStart": 2, "sourceEnd": 3},
+                                       {"text": "llo", "sourceStart": 1, "sourceEnd": 2}], 4)
+        self.assertEqual("alignment-timing-invalid", timing.exception.code)
+        with self.assertRaises(AlignmentFailure) as window:
+            prepare_segments("hello", [{"text": "hello", "sourceStart": 0, "sourceEnd": 31}], 31)
+        self.assertEqual("alignment-window-too-long", window.exception.code)
+        self.assertEqual(31, window.exception.details["durationSeconds"])
+
+    def test_missing_alignment_snapshot_is_typed(self):
+        with tempfile.TemporaryDirectory() as root:
+            manifest = Path(root) / "models.json"
+            manifest.write_text(json.dumps({"models": [{"id": "alignment-en", "capability": "alignment", "revision": "v1"}]}))
+            with self.assertRaises(AlignmentFailure) as missing:
+                load_manifest_model(str(manifest), root, "alignment-en")
+            self.assertEqual("alignment-model-unavailable", missing.exception.code)
+
     def validated_alignment(self, audio, score=.9, segments=None):
         fake = SimpleNamespace(load_audio=lambda _: audio,
             load_align_model=Mock(return_value=(object(), {})), align=Mock(return_value={

@@ -31,15 +31,31 @@ const reasonKeys = {
   'speech-attributing-speakers': 'errors.speech-attributing-speakers',
   'speech-validating': 'errors.speech-validating',
   'speech-publishing': 'errors.speech-publishing',
+  'speech-alignment-input': 'errors.speech-alignment-input',
+  'speech-alignment-window': 'errors.speech-alignment-window',
+  'speech-alignment-model': 'errors.speech-alignment-model',
+  'speech-worker-exit': 'errors.speech-worker-exit',
+  'report-save-failed': 'errors.report-save-failed',
 } as const satisfies Record<PublicReason, string>
 /** Whitelist known reasons; never preserve arbitrary Error.message or other private fields. */
 export function normalizePublicError(error: unknown): PublicMessage {
   if (error && typeof error === 'object') {
-    const candidate = error as { reason?: unknown; code?: unknown; failureKind?: unknown }
+    const candidate = error as {
+      reason?: unknown
+      code?: unknown
+      failureKind?: unknown
+      diagnosticId?: unknown
+    }
     const reason = candidate.reason ?? candidate.code
     if (typeof reason === 'string' && Object.prototype.hasOwnProperty.call(reasonKeys, reason))
       return {
         reason: reason as PublicReason,
+        ...(typeof candidate.diagnosticId === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          candidate.diagnosticId,
+        )
+          ? { diagnosticId: candidate.diagnosticId }
+          : {}),
         ...(reason.startsWith('speech-') &&
         (candidate.failureKind === 'startup' ||
           candidate.failureKind === 'process-exit' ||

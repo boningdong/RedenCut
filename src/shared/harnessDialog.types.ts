@@ -24,13 +24,28 @@ export const HarnessDialogRequestSchema = z.discriminatedUnion('purpose', [
       ]),
     })
     .strict(),
+  z
+    .object({
+      purpose: z.literal('diagnostic-report'),
+      selection: z.union([
+        cancel,
+        z.object({ type: z.literal('report'), filename: z.string().min(1) }).strict(),
+      ]),
+    })
+    .strict(),
   z.object({ purpose: z.literal('save-project'), selection: z.union([cancel, project]) }).strict(),
   z.object({ purpose: z.literal('open-project'), selection: z.union([cancel, project]) }).strict(),
 ])
 export type HarnessDialogRequest = z.infer<typeof HarnessDialogRequestSchema>
 export const HarnessDialogReplySchema = z
   .object({
-    purpose: z.enum(['import-audio', 'save-project', 'open-project', 'export-audio']),
+    purpose: z.enum([
+      'import-audio',
+      'save-project',
+      'open-project',
+      'export-audio',
+      'diagnostic-report',
+    ]),
     format: exportFormat.nullable().default(null),
     path: z.string().min(1).nullable(),
     parent: z.string().min(1).nullable().default(null),
