@@ -1,6 +1,6 @@
 import { ElectronSession } from '../../harness/runtime/ElectronSession'
 import { prepareSpeechModelFixture } from './SpeechModelFixture'
-import { appendFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
@@ -25,6 +25,7 @@ export class McpTestSession {
   private launchPreparation: ReturnType<typeof vi.spyOn> | undefined
   private currentPage: Page | undefined
   private identity: { runId: string; generation: number } | undefined
+  private workerRestore: { path: string; contents: string } | undefined
   directory = ''
 
   get page(): Page {
@@ -33,7 +34,12 @@ export class McpTestSession {
   }
 
   async start(
-    options: { keepOnboarding?: boolean; speechModels?: boolean; missingRuntime?: boolean } = {},
+    options: {
+      keepOnboarding?: boolean
+      speechModels?: boolean
+      missingRuntime?: boolean
+      alignmentFault?: 'segment-mismatch'
+    } = {},
   ): Promise<void> {
     if (options.speechModels || options.missingRuntime) {
       const launch = ElectronSession.launch.bind(ElectronSession)
@@ -41,6 +47,19 @@ export class McpTestSession {
         .spyOn(ElectronSession, 'launch')
         .mockImplementation(async (...args) => {
           if (options.speechModels) prepareSpeechModelFixture(args[1].directory)
+          if (options.alignmentFault) {
+            if (!options.speechModels || !existsSync('/test-models'))
+              throw new Error('ALIGNMENT_FAULT_REQUIRES_DISPOSABLE_CONTAINER_MODELS')
+            // The E2E runs inside Docker's private /workspace source copy. Override only
+            // this worker entrypoint so the real Electron UI sees a typed worker failure.
+            const path = resolve('speech-worker/src/redencut_speech_worker/alignment.py')
+            this.workerRestore = { path, contents: readFileSync(path, 'utf8') }
+            appendFileSync(
+              path,
+              '\n\ndef align(request, on_progress=None):\n' +
+                '    raise AlignmentFailure("alignment-segment-mismatch", "fixture fault")\n',
+            )
+          }
           if (!options.missingRuntime) return launch(...args)
           // A genuinely absent runtime under the owned run tests setup guidance in either image.
           // E2E files run serially; restore the environment even if launch fails.
@@ -127,6 +146,10 @@ export class McpTestSession {
         } finally {
           this.observer?.mockRestore()
           this.launchPreparation?.mockRestore()
+          if (this.workerRestore) {
+            writeFileSync(this.workerRestore.path, this.workerRestore.contents)
+            this.workerRestore = undefined
+          }
         }
       }
     }

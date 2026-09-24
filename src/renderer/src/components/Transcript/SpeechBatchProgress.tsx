@@ -62,7 +62,7 @@ export function SpeechBatchProgress({
           </button>
         </div>
         {summary && (
-          <TranscriptProgressDetails>
+          <TranscriptProgressDetails defaultExpanded={summary.failures.length > 0}>
             <p>
               {t(summary.cancelled ? 'transcript.batchCancelled' : 'transcript.batchComplete', {
                 count: summary.sourceCount,

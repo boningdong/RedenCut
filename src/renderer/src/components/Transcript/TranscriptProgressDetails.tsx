@@ -2,9 +2,15 @@ import { useId, useState, type ReactNode } from 'react'
 import { useTranslation } from '../../i18n/useTranslation'
 import { Icon } from '../ui/Icon'
 
-export function TranscriptProgressDetails({ children }: { children: ReactNode }) {
+export function TranscriptProgressDetails({
+  children,
+  defaultExpanded = false,
+}: {
+  children: ReactNode
+  defaultExpanded?: boolean
+}) {
   const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const id = useId()
   return (
     <>
