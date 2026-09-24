@@ -13,6 +13,14 @@
 - Avoid unexplained abbreviations.
 - Use short conventional names only when their meaning is obvious in context.
 
+## Stable Identifiers
+
+- Define error codes, diagnostic event names, IPC channels, persisted state values, and other stable string identifiers as named constants or enums when they are used at multiple call sites or cross module, process, or language boundaries.
+- Keep each definition in the owning domain contract, and reference it from schemas and production callers.
+- Preserve the serialized string values of existing contracts.
+- Tests may use literal values to verify an external contract independently.
+- Do not extract ordinary copy or one-off local strings solely to eliminate literals.
+
 ## Comments
 
 - Explain constraints, decisions, lifecycle details, and non-obvious meaning.
