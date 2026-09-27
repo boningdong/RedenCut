@@ -22,8 +22,8 @@ import {
 //   clip. The managed PCM player reads this list to build its playback plan.
 //
 // Undo model:
-//   Each mutating operation saves a full snapshot of tracks[] before the
-//   change. This is safe because tracks hold metadata only (no audio data).
+//   Completed edits replace changed objects and keep the previous tracks[]
+//   as an undo snapshot. Project input is copied once at the store boundary.
 //   Transcript coverage is derived from these same clip snapshots.
 //
 // Relationship to other stores:
@@ -44,7 +44,6 @@ import {
   isLinkedClip,
   linkedMasterForTrack,
   synchronizeMixEdits,
-  sliceLinkedClip,
 } from '../domain/MixLinkEdits'
 import { planClipPlacement } from '../domain/TimelinePlacement'
 
@@ -55,37 +54,9 @@ function nextId(prefix: string): string {
   return `${prefix}-${++_idCounter}-${Date.now()}`
 }
 
-/** Deep-clone tracks (metadata only — no audio buffers). */
+/** Isolate incoming project metadata before history shares it. */
 function cloneTracks(tracks: Track[]): Track[] {
-  return tracks.map((t) => ({
-    ...t,
-    mixLink: t.mixLink
-      ? {
-          stemTrackIds: [...t.mixLink.stemTrackIds],
-          hiddenSegments: t.mixLink.hiddenSegments?.map((segment) => ({
-            ...segment,
-            clip: sliceLinkedClip(
-              segment.clip,
-              segment.clip.outputStart,
-              segment.clip.outputStart + segment.clip.sourceEnd - segment.clip.sourceStart,
-            ),
-          })),
-        }
-      : undefined,
-    clips: t.clips.map((c) => ({
-      ...c,
-      sourceOverrides: c.sourceOverrides?.map((override) => ({
-        ...override,
-        stemTrackIds: [...override.stemTrackIds],
-      })),
-      effects: [...c.effects],
-      redactions: c.redactions?.map((r) => ({
-        ...r,
-        crossfade: r.crossfade ? { ...r.crossfade } : undefined,
-      })),
-    })),
-    effects: [...t.effects],
-  }))
+  return structuredClone(tracks)
 }
 
 function markTimelineEdited(): void {
@@ -107,7 +78,14 @@ function normalizedSelection(tracks: Track[], ids: string[], primaryId?: string)
 }
 
 function tracksEqual(left: Track[], right: Track[]): boolean {
-  return left === right || JSON.stringify(left) === JSON.stringify(right)
+  return (
+    left === right ||
+    (left.length === right.length &&
+      left.every(
+        (track, index) =>
+          track === right[index] || JSON.stringify(track) === JSON.stringify(right[index]),
+      ))
+  )
 }
 
 // ── History entry ──────────────────────────────────────────────────────────────
@@ -354,7 +332,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   loadFromProject(audioSources, tracks) {
     set({
       audioSources,
-      tracks,
+      tracks: cloneTracks(tracks),
       undoStack: [],
       redoStack: [],
       projectGeneration: get().projectGeneration + 1,
@@ -373,11 +351,12 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   appendImportedTracks(importedTracks) {
     if (importedTracks.length === 0) return
+    const imported = cloneTracks(importedTracks)
     set((state) => {
       const appendMissing = (tracks: Track[]) => {
         const ids = new Set(tracks.map((track) => track.id))
-        const additions = importedTracks.filter((track) => !ids.has(track.id))
-        return additions.length ? [...tracks, ...cloneTracks(additions)] : tracks
+        const additions = imported.filter((track) => !ids.has(track.id))
+        return additions.length ? [...tracks, ...additions] : tracks
       }
       // Import establishes a non-undoable baseline; older clip edits must retain that baseline.
       const rebase = (entry: HistoryEntry): HistoryEntry => ({
@@ -524,7 +503,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     }
 
     // Snapshot before mutation
-    const before = cloneTracks(tracks)
+    const before = tracks
 
     const newClips = addRedactions(track.clips, startTime, endTime, track.id)
     if (
@@ -582,7 +561,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       )
     }
     if (replacement[0] === clip) return
-    const before = cloneTracks(tracks)
+    const before = tracks
     set((state) => ({
       tracks: state.tracks.map((item) =>
         item.id === trackId
@@ -652,7 +631,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!clips.some((c) => c.sourceStart < range.end && c.sourceEnd > range.start)) return true
     const pieces = addRedactions(clips, start, end, trackId)
     if (pieces.every((clip, index) => clip === clips[index])) return true
-    const before = cloneTracks(tracks)
+    const before = tracks
     set((state) => ({
       tracks: state.tracks.map((t) =>
         t.id === trackId
@@ -843,7 +822,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       : state.selectedTrackId
     set((current) => ({
       tracks: next,
-      undoStack: [...current.undoStack, { before: cloneTracks(expected), label }],
+      undoStack: [...current.undoStack, { before: expected, label }],
       redoStack: [],
       ...selection,
       selectedTrackId,
@@ -918,7 +897,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
             : c,
         ),
       })),
-      undoStack: [...s.undoStack, { before: cloneTracks(tracks), label: 'Edit crossfade' }],
+      undoStack: [...s.undoStack, { before: tracks, label: 'Edit crossfade' }],
       redoStack: [],
     }))
     markTimelineEdited()
@@ -969,7 +948,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
             : c,
         ),
       })),
-      undoStack: [...s.undoStack, { before: cloneTracks(tracks), label: 'Edit redaction' }],
+      undoStack: [...s.undoStack, { before: tracks, label: 'Edit redaction' }],
       redoStack: [],
     }))
     markTimelineEdited()
@@ -996,7 +975,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
             : c,
         ),
       })),
-      undoStack: [...s.undoStack, { before: cloneTracks(tracks), label: 'Remove redaction' }],
+      undoStack: [...s.undoStack, { before: tracks, label: 'Remove redaction' }],
       redoStack: [],
       timelineSelection: null,
     }))
@@ -1046,7 +1025,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     set((state) => ({
       undoStack: [
         ...state.undoStack,
-        { before: cloneTracks(state.tracks), label: edit.label, domainEdit: edit },
+        { before: state.tracks, label: edit.label, domainEdit: edit },
       ],
       redoStack: [],
     }))
@@ -1062,7 +1041,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     // Capture current state as a redo entry so we can re-apply this op.
     // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
     const redoEntry: HistoryEntry = {
-      before: cloneTracks(tracks),
+      before: tracks,
       label: entry.label,
     }
 
@@ -1087,7 +1066,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
     // Capture current (pre-redo) state as an undo entry so the user can undo again.
     const undoEntry: HistoryEntry = {
-      before: cloneTracks(tracks),
+      before: tracks,
       label: entry.label,
     }
 
@@ -1178,7 +1157,7 @@ function commitTrackSettings(
   if (tracksEqual(state.tracks, tracks)) return
   useTimelineStore.setState({
     tracks,
-    undoStack: [...state.undoStack, { before: cloneTracks(state.tracks), label }],
+    undoStack: [...state.undoStack, { before: state.tracks, label }],
     redoStack: [],
   })
   markTimelineEdited()

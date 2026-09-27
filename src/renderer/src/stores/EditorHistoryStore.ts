@@ -39,7 +39,7 @@ export const useEditorHistoryStore = create<EditorHistoryState>((set, get) => ({
             ? {
                 undoStack: [
                   ...state.undoStack,
-                  { before: structuredClone(state.tracks), label: edit.label, domainEdit: edit },
+                  { before: state.tracks, label: edit.label, domainEdit: edit },
                 ],
                 redoStack: [],
               }

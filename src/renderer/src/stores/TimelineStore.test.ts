@@ -776,6 +776,60 @@ describe('occurrence-scoped transcript muting', () => {
   })
 })
 
+describe('copy-on-write timeline history', () => {
+  beforeEach(resetAll)
+
+  it('shares unchanged tracks with history and restores the exact prior snapshot', () => {
+    const source = managedSource(601, 20)
+    tl().initFromAudioSource(source)
+    tl().addTrack('Unchanged')
+    const before = tl().tracks
+    const untouched = before[1]
+    tl().redactRange(before[0].id, 2, 4)
+    const edited = tl().tracks
+    expect(tl().undoStack[tl().undoStack.length - 1]?.before).toBe(before)
+    expect(edited[1]).toBe(untouched)
+    expect(before[0].clips[0].redactions).toBeUndefined()
+    void tl().undo()
+    expect(tl().tracks).toBe(before)
+    expect(tl().redoStack[tl().redoStack.length - 1]?.before).toBe(edited)
+    void tl().redo()
+    expect(tl().tracks).toBe(edited)
+  })
+
+  it('copies project input once before sharing it with history', () => {
+    const source = managedSource(602, 20)
+    tl().initFromAudioSource(source)
+    const incoming = structuredClone(tl().tracks)
+    tl().loadFromProject([source], incoming)
+    const loaded = tl().tracks
+    expect(loaded).not.toBe(incoming)
+    expect(loaded[0]).not.toBe(incoming[0])
+    incoming[0].clips[0].sourceEnd = 5
+    expect(loaded[0].clips[0].sourceEnd).toBe(20)
+    tl().redactRange(loaded[0].id, 2, 4)
+    void tl().undo()
+    expect(tl().tracks[0].clips[0].sourceEnd).toBe(20)
+  })
+
+  it('reuses one isolated imported track across the live state and rebased snapshots', () => {
+    const source = managedSource(603, 20)
+    tl().initFromAudioSource(source)
+    tl().redactRange(tl().tracks[0].id, 2, 4)
+    const imported = structuredClone(tl().tracks[0])
+    imported.id = 'imported-track'
+    imported.clips[0].trackId = imported.id
+    tl().appendImportedTracks([imported])
+    const live = tl().tracks[1]
+    expect(live).not.toBe(imported)
+    expect(tl().undoStack[0].before[1]).toBe(live)
+    imported.clips[0].sourceEnd = 5
+    void tl().undo()
+    expect(tl().tracks[1]).toBe(live)
+    expect(tl().tracks[1].clips[0].sourceEnd).toBe(20)
+  })
+})
+
 it('atomically redacts continuous sibling clips, retains other occurrences and undoes once', () => {
   const original = {
     id: 'one',

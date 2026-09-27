@@ -109,6 +109,7 @@ it('previews a boundary drag without mutating history; commits once and undoes o
 it.each(['Escape', 'pointercancel', 'lostpointercapture'])(
   'cancels a drag with %s without creating an edit',
   (cancel) => {
+    const original = state().tracks[0].clips[0]
     render(<View />)
     const handle = screen.getByRole('button', { name: 'Adjust redaction start' })
     fireEvent.pointerDown(handle, { button: 0, clientX: 100 })
@@ -117,7 +118,7 @@ it.each(['Escape', 'pointercancel', 'lostpointercapture'])(
     else if (cancel === 'pointercancel') fireEvent.pointerCancel(handle)
     else fireEvent.lostPointerCapture(handle)
     fireEvent.pointerUp(handle)
-    expect(state().tracks[0].clips[0]).toBe(clip)
+    expect(state().tracks[0].clips[0]).toBe(original)
     expect(state().undoStack).toHaveLength(0)
     expect(document.querySelector('.clip-redaction')?.getAttribute('data-source-start')).toBe('12')
   },
