@@ -699,12 +699,15 @@ export default function App() {
         void (async () => {
           let allowed = false
           try {
-            // Do not destroy an active modal workflow or lose an uncommitted import.
-            if (
-              !importJob.current &&
-              !document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
-            )
-              allowed = await newProject()
+            const current = useEditorStore.getState()
+            // A clean session needs no project transition; onboarding and settings may be open.
+            // Unsaved work still uses the guarded transition and must not interrupt a modal.
+            if (!importJob.current) {
+              if (!current.session || !needsProjectSave(current.session, current.isDirty))
+                allowed = true
+              else if (!document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]'))
+                allowed = await newProject()
+            }
           } catch (reason) {
             setError(normalizePublicError(reason))
           }

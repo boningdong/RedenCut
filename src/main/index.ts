@@ -271,8 +271,9 @@ startApplicationLifecycle({
     const protectWindow = () => {
       window.on('close', (event) => {
         if (closeAllowed) return
-        event.preventDefault()
+        // No renderer project can have unsaved edits before its first load completes.
         if (!rendererLoaded) return
+        event.preventDefault()
         void closeGuard
           .request(window.webContents)
           .then((allowed) => {
@@ -307,7 +308,7 @@ startApplicationLifecycle({
         })
         return result.response === 1
       }
-      return rendererLoaded ? closeGuard.request(window.webContents) : false
+      return rendererLoaded ? closeGuard.request(window.webContents) : true
     }
     let rendererLoad: Promise<void> = Promise.resolve()
     const observeRendererLoad = () => {

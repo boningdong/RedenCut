@@ -51,6 +51,12 @@ test('runs real isolated RedenCut, rebuilds the UI session on restart, and retai
     expect(clicked.isError, JSON.stringify(clicked.content)).not.toBe(true)
     const screen = await runtime.callUiTool('browser_take_screenshot', { type: 'png' }, identity)
     expect(screen.content.some((item) => item.type === 'image')).toBe(true)
+    const closeSettings = await runtime.callUiTool(
+      'browser_click',
+      { target: 'button[aria-label="Close"]' },
+      identity,
+    )
+    expect(closeSettings.isError, JSON.stringify(closeSettings.content)).not.toBe(true)
     const second = await runtime.restart({ rebuild: true })
     expect(second.state).toBe('ready')
     expect(second.runId).toBe(first.runId)

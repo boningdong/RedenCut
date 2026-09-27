@@ -1612,7 +1612,7 @@ describe('project commands', () => {
   })
 })
 
-it('keeps native project commands and close requests outside a custom modal workflow', async () => {
+it('allows a clean native close while keeping project commands outside a custom modal workflow', async () => {
   const { api } = await renderInitialized(session(TOKEN_A, 1, SOURCE_A, 'A'))
   const modal = document.createElement('div')
   modal.setAttribute('role', 'dialog')
@@ -1621,7 +1621,24 @@ it('keeps native project commands and close requests outside a custom modal work
   try {
     act(() => api.on.projectCommand.mock.calls[0][0]('new'))
     act(() => api.on.projectCloseRequest.mock.calls[0][0]({ requestId: 'blocked' }))
-    await waitFor(() => expect(api.project.respondToClose).toHaveBeenCalledWith('blocked', false))
+    await waitFor(() => expect(api.project.respondToClose).toHaveBeenCalledWith('blocked', true))
+    expect(api.project.openStarter).not.toHaveBeenCalled()
+  } finally {
+    modal.remove()
+  }
+})
+
+it('keeps unsaved work protected while a custom modal is open', async () => {
+  const initial = session(TOKEN_A, 1, SOURCE_A, 'A')
+  initial.workspace.kind = 'temporary'
+  const { api } = await renderInitialized(initial)
+  const modal = document.createElement('div')
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+  document.body.appendChild(modal)
+  try {
+    act(() => api.on.projectCloseRequest.mock.calls[0][0]({ requestId: 'unsaved' }))
+    await waitFor(() => expect(api.project.respondToClose).toHaveBeenCalledWith('unsaved', false))
     expect(api.project.openStarter).not.toHaveBeenCalled()
   } finally {
     modal.remove()

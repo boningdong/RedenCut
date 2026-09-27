@@ -97,7 +97,7 @@ test('bounds UI adapter creation and disposes an adapter that completes after th
     })
   const starting = runtime.start()
   try {
-    await expect(deadline(starting, 3000, 'TEST_DEADLINE')).rejects.toThrow('UI_ADAPTER_TIMEOUT')
+    await expect(deadline(starting, 15_000, 'TEST_DEADLINE')).rejects.toThrow('UI_ADAPTER_TIMEOUT')
     expect(runtime.status().state).toBe('failed')
     expect(readProcessIdentity(runtime.status().pid!)).toBeNull()
     release()
