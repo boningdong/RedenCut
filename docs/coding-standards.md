@@ -13,6 +13,13 @@
 - Avoid unexplained abbreviations.
 - Use short conventional names only when their meaning is obvious in context.
 
+## Developer Command Interfaces
+
+- Give related developer workflows one documented public entrypoint, with explicit action and target names.
+- Keep the entrypoint focused on dispatch; put substantial actions in modules or directories named for their responsibilities.
+- Make prerequisites, downloads, and test scope clear. Do not hide build or setup work behind a `run` command.
+- After updating callers, tests, and documentation, remove superseded commands unless compatibility is required.
+
 ## Stable Identifiers
 
 - Define error codes, diagnostic event names, IPC channels, persisted state values, and other stable string identifiers as named constants or enums when they are used at multiple call sites or cross module, process, or language boundaries.
