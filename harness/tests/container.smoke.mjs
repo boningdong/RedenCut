@@ -13,7 +13,7 @@ for (const shutdown of ['EOF', 'docker stop']) {
     { timeout: 180_000 },
     async () => {
       const name = `redencut-smoke-${randomUUID()}`
-      const transport = new EofOnlyTransport('sh', [resolve('harness/container/run.sh')], {
+      const transport = new EofOnlyTransport('sh', [resolve('harness/container/docker-harness.sh'), 'mcp'], {
         ...process.env,
         REDENCUT_CONTAINER_NAME: name,
       })

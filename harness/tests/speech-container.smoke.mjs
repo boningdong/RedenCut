@@ -16,7 +16,7 @@ test('provision resolves the current user token and mounts it read-only', async 
   await writeFile(token, 'not-a-real-token')
   await writeFile(fakeDocker, '#!/bin/sh\nprintf \'%s\\n\' "$@"\n', { mode: 0o755 })
 
-  const result = spawnSync('sh', ['harness/container/run-speech.sh', 'provision'], {
+  const result = spawnSync('sh', ['harness/container/docker-harness.sh', 'models', 'install'], {
     cwd: repository,
     encoding: 'utf8',
     env: {

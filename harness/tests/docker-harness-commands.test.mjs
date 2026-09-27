@@ -97,3 +97,34 @@ test('source validation rejects stale speech dependencies', () => {
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /SPEECH_IMAGE_STALE/)
 })
+
+test('models install mounts a token read-only without printing its contents', () => {
+  const f = fixture()
+  const home = join(f.root, 'developer home')
+  const token = join(home, '.cache', 'huggingface', 'token')
+  mkdirSync(resolve(token, '..'), { recursive: true })
+  writeFileSync(token, 'private-test-token')
+  const result = f.run(['models', 'install'], { HOME: home, HF_HOME: '', HF_TOKEN_PATH: '' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(f.calls().at(-1), /target=\/run\/secrets\/hf_token,readonly/)
+  assert.match(f.calls().at(-1), /source=.*developer home/)
+  assert.doesNotMatch(result.stdout + result.stderr + f.calls().join(''), /private-test-token/)
+})
+
+test('models check requires no token and MCP defaults to base image', () => {
+  const f = fixture()
+  assert.equal(f.run(['models', 'check'], { HF_TOKEN_PATH: join(f.root, 'missing') }).status, 0)
+  assert.doesNotMatch(f.calls().at(-1), /hf_token/)
+  assert.equal(f.run(['mcp']).status, 0)
+  assert.match(f.calls().at(-1), /<redencut-harness:local><node><--import><tsx><harness\/server.ts>/)
+  assert.equal(f.run(['mcp', 'speech']).status, 0)
+  assert.match(f.calls().at(-1), /<redencut-harness-speech:local><node><--import><tsx><harness\/server.ts>/)
+})
+
+test('models install rejects an unavailable token before Docker', () => {
+  const f = fixture()
+  const result = f.run(['models', 'install'], { HOME: f.root, HF_HOME: '', HF_TOKEN_PATH: '' })
+  assert.equal(result.status, 20)
+  assert.match(result.stderr, /HF_TOKEN_UNAVAILABLE/)
+  assert.throws(() => f.calls(), /ENOENT/)
+})
