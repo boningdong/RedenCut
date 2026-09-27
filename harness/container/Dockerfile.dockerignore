@@ -3,5 +3,11 @@
 !package-lock.json
 !harness/
 !harness/container/
-!harness/container/entrypoint.sh
-!harness/container/supervise.mjs
+!harness/container/build/
+!harness/container/build/audio/
+!harness/container/build/audio/BuildAudioRuntime.sh
+!harness/container/build/audio/WriteAudioManifest.mjs
+!harness/container/lifecycle/
+!harness/container/lifecycle/Entrypoint.sh
+!harness/container/lifecycle/StartAudio.sh
+!harness/container/lifecycle/SuperviseCommand.mjs

@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && uv sync --python 3.11.16 --frozen --no-dev \
     && mkdir -p /models \
     && chown -R node:node /opt/redencut-speech-worker /models
-COPY harness/container/WriteSpeechManifest.mjs /tmp/WriteSpeechManifest.mjs
+COPY harness/container/build/speech/WriteSpeechManifest.mjs /tmp/WriteSpeechManifest.mjs
 RUN node /tmp/WriteSpeechManifest.mjs
 
 ENV PATH="/opt/redencut-runtime/speech-env/bin:/opt/redencut-runtime/bin:${PATH}"

@@ -3,6 +3,14 @@
 Runs the existing RedenCut MCP server, Runtime, Playwright and Electron inside a Linux container with an Xvfb virtual display and private PulseAudio virtual output.
 The host AI communicates through Docker stdin/stdout; there is no second CDP connection, published port, host display connection, or AI-client registration performed by these scripts.
 
+## Script organization
+
+`docker-harness.sh` is the public command entrypoint; the Dockerfiles and this README stay beside it.
+Host command modules live in `build/`, `run/`, `test/`, `models/`, and `mcp/`, with shared configuration in `config/`.
+Image construction helpers live in `build/audio/` and `build/speech/`: they compile tools and write runtime manifests, without downloading model weights.
+Container startup and shutdown helpers live in `lifecycle/`: `Entrypoint.sh` prepares the source snapshot and virtual display, `StartAudio.sh` starts virtual audio, and `SuperviseCommand.mjs` manages the requested command's lifetime.
+These internal helpers are called by Dockerfiles or container startup; use the public entrypoint for user commands.
+
 ## Build
 
 From the repository/worktree root, with Docker Engine running:
