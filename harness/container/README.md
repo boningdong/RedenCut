@@ -8,10 +8,12 @@ The host AI communicates through Docker stdin/stdout; there is no second CDP con
 From the repository/worktree root, with Docker Engine running:
 
 ```sh
-docker build -f harness/container/Dockerfile -t redencut-harness:local .
+sh harness/container/docker-harness.sh build base
+sh harness/container/docker-harness.sh build speech
 ```
 
-The launcher uses the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
+`build speech` first rebuilds the base image, then builds the speech layer from that exact base tag. Neither build downloads model weights.
+The commands use the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
 The image uses the repository's Node version and lockfile, installing Linux-native dependencies rather than reusing Mac `node_modules`.
 The image includes Noto CJK fonts so Simplified Chinese UI acceptance can inspect rendered glyphs.
 The audio harness builds pinned FFmpeg 7.1.5 and LAME 3.100 sources into `/opt/redencut-runtime`, with GPL/nonfree features and automatic system codec discovery disabled.
@@ -20,21 +22,34 @@ This minimal Linux runtime supports audio UI regression; it does not certify the
 Debian packages are installed from the configured repositories at build time, so rebuilding without cache is not a bit-for-bit reproducibility guarantee.
 Only dependency manifests and container build/startup/supervisor files are copied into the audio image; product source code and Git metadata are not uploaded to a registry or baked into the image.
 Rebuild after dependency manifests or container image configuration change; ordinary source changes do not need an image rebuild.
-The entrypoint rejects dependency manifest drift instead of silently running an old dependency set.
+The entrypoint rejects Node dependency manifest drift. Speech runs also reject stale Python dependency lockfiles while using the current checkout's worker source and model manifest.
 
 ## Run tests
 
 ```sh
-sh harness/container/run.sh npm run test:harness:all
+sh harness/container/docker-harness.sh test harness
 node --test harness/tests/container.smoke.mjs
-sh harness/container/run.sh npm run test:e2e
+sh harness/container/docker-harness.sh test e2e-base
+sh harness/container/docker-harness.sh test e2e-speech --models /absolute/path/to/app/models
+sh harness/container/docker-harness.sh test e2e-all --models /absolute/path/to/app/models
 ```
 
-The first command runs the existing full normal/fault suite inside the virtual display.
+`test harness` runs the existing full normal/fault suite inside the base image's virtual display.
 Fault tests deliberately crash or terminate isolated processes; no host Electron is launched.
-The second runs an MCP client on the host against the real container server, including screenshot delivery, rebuild/restart, and cleanup.
+The `node --test` command runs an MCP client on the host against the real container server, including screenshot delivery, rebuild/restart, and cleanup.
 It requires the host project's npm dependencies to be installed.
-The third command runs the [product E2Es](../../e2e/README.md): import/save/reopen, split/drag/save/reopen, and play/pause/seek/resume with the supplied short audio fixture.
+`e2e-base` runs the [product E2Es](../../e2e/README.md) that need only the base image, including missing speech setup feedback. `e2e-speech` runs real speech and speech fault cases. `e2e-all` runs both sets in the speech image. The speech suites require an existing application model fixture and never download it.
+
+For a one-off command, use `sh harness/container/docker-harness.sh run base -- COMMAND [ARG...]` or `run speech [--models ABSOLUTE_DIRECTORY] -- COMMAND [ARG...]`. `run` requires a built image and does not build one; container startup compiles the current application source snapshot.
+
+## Speech model volume
+
+```sh
+sh harness/container/docker-harness.sh models install
+sh harness/container/docker-harness.sh models check
+```
+
+`models install` may download the manifest-listed weights into the named Docker `/models` volume and requires a readable Hugging Face token file. `models check` is an offline preflight of that volume and does not mount a token. Both require the speech image built from the current Python dependency lockfiles. See [speech models and dependencies](../../docs/speech-models-and-dependencies.md) for the model sources and access requirements.
 
 ## Virtual audio (container only)
 
@@ -48,11 +63,11 @@ Recorder cleanup is bounded and retained output lives in each test run's evidenc
 
 ## MCP entry
 
-Use `sh` as the MCP command with the absolute path to `harness/container/run.sh` as its sole argument.
+Use `sh` as the MCP command with the absolute path to `harness/container/docker-harness.sh` followed by `mcp` (and optionally `speech --models ABSOLUTE_DIRECTORY`).
 Do not allocate a TTY or wrap the MCP entry in a noisy npm command.
 The launcher resolves the checkout from its own path, so the client's current directory does not choose the source checkout.
 The default server command remains `node --import tsx harness/server.ts`; the tool catalog is unchanged.
-Initial builds and diagnostics go to stderr, reserving stdout for MCP messages.
+Diagnostics go to stderr, reserving stdout for MCP messages. Build images explicitly before configuring the client.
 AI-client configuration is a separate explicit step; successfully testing this entry does not install or register it in an AI client.
 
 ## Files and lifetime
@@ -75,7 +90,7 @@ Run IDs identify evidence; container PIDs must never be used to signal processes
 
 `--rm` removes the container and anonymous dependency/output volumes after exit; retained host evidence is not deleted automatically.
 Images and build cache remain reusable; no broad Docker prune is performed.
-`REDENCUT_HARNESS_IMAGE` overrides the image tag and `REDENCUT_CONTAINER_NAME` optionally gives a specific container name.
+`REDENCUT_HARNESS_IMAGE` and `REDENCUT_SPEECH_IMAGE` override the respective image tags. `REDENCUT_CONTAINER_NAME` optionally gives a specific container name.
 Containers have the label `dev.redencut.harness=container` for scoped inspection.
 
 ## Scope and security
@@ -105,8 +120,8 @@ This file inspection verifies produced media and is separate from live audio rec
 
 ## Real speech E2E model fixture
 
-The two real speech E2Es require an already provisioned application model directory containing valid model markers and pinned model files.
-Set `REDENCUT_TEST_MODEL_FIXTURE=/absolute/path/to/app/models` when running `run.sh` with the speech image.
+Speech E2Es require an already provisioned application model directory containing valid model markers and pinned model files.
+Pass it with `--models /absolute/path/to/app/models` on `test e2e-speech` or `test e2e-all`.
 The launcher mounts only this directory read-only at `/test-models`; the tests link it into their disposable user-data directory and the application verifies its contents normally.
 No token, account profile, download, or modification of the original model directory is involved.
 A missing fixture is an explicit test prerequisite failure, not a skipped or simulated speech success.
@@ -115,7 +130,7 @@ Use the audio-only image to exercise missing-Python setup feedback and the speec
 ## Managed diarization fixtures
 
 The app resolves diarization independently of its downloaded Whisper/alignment models.
-`run.sh` mounts the current checkout's `.runtime/models` read-only at `/managed-models` when it exists and sets `REDENCUT_MODELS_ROOT` explicitly.
+The runner mounts the current checkout's `.runtime/models` read-only at `/managed-models` when it exists and sets `REDENCUT_MODELS_ROOT` explicitly.
 Use `REDENCUT_TEST_MANAGED_MODEL_FIXTURE` to select another already verified managed models directory.
 No acquisition or authorization occurs during UI acceptance; missing models remain visibly unavailable.
-The existing `REDENCUT_TEST_MODEL_FIXTURE` still supplies downloaded Whisper/alignment models for real speech E2Es.
+The `--models` directory supplies downloaded Whisper/alignment models for real speech E2Es at `/test-models`. It is separate from the persistent `/models` Docker volume used by `models install` and `models check`. Installing into `/models` does not prepare `/test-models` or `.runtime/models`.

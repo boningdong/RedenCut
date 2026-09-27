@@ -38,7 +38,7 @@ Use `transcript-editing.redencut` instead for older recognition and low-confiden
 The fixed E2E performs the copy automatically and runs both projects:
 
 ```sh
-sh harness/container/run.sh npm run test:e2e -- transcript-fixture
+sh harness/container/docker-harness.sh run base -- npm run test:e2e:base -- transcript-fixture
 ```
 
 `harness/tests/transcriptFixture.test.ts` validates project/artifact schemas, source and artifact hashes, references and audio bounds.

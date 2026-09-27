@@ -12,11 +12,11 @@ Agent reports and their supporting evidence stay in the runtime's artifact direc
 Run from the repository root using the [Docker harness](../harness/container/README.md):
 
 ```sh
-docker build -f harness/container/Dockerfile -t redencut-harness:local .
-sh harness/container/run.sh npm run test:e2e
+sh harness/container/docker-harness.sh build base
+sh harness/container/docker-harness.sh test e2e-base
 ```
 
-`npm run test:e2e` directly launches Electron on the machine executing it; use the container wrapper to avoid host windows.
+`npm run test:e2e:base` directly launches Electron on the machine executing it; use the container wrapper to avoid host windows.
 The import/save/reopen scenario imports `fixtures/audio/mandarin-short-female.wav`, saves a new `.redencut` project, fully restarts Electron and reopens the saved project.
 It verifies track/clip/source identities, duration against independent FFprobe output, waveform drawing readiness and SHA-256 of copied media and original input.
 The first imported track is named `Track 1`; the original filename is stored on the audio source.
@@ -37,14 +37,14 @@ No new MCP methods or product state interfaces were added.
 
 ```sh
 # New editing and playback flows only (Docker required)
-sh harness/container/run.sh npm run test:e2e -- editing-playback
+sh harness/container/docker-harness.sh run base -- npm run test:e2e:base -- editing-playback
 
 # Original import/save/reopen only (Docker recommended)
-sh harness/container/run.sh npm run test:e2e -- project-import-save-reopen
+sh harness/container/docker-harness.sh run base -- npm run test:e2e:base -- project-import-save-reopen
 
 # Original flow on the host; this WILL show a native Electron window
 npm run build
-npm run test:e2e -- project-import-save-reopen
+npm run test:e2e:base -- project-import-save-reopen
 ```
 
 Each run retains screenshots, `ui-actions.jsonl`, WAV recordings, capture logs and successful observation reports under `.harness-runs/container/<runId>/`.
@@ -74,18 +74,18 @@ Unprepared or unsupported dialogs fail explicitly and are recorded in diagnostic
 
 ## Localization
 
-Run `sh harness/container/run.sh npm run test:e2e -- localization` with an image built from the current dependency manifests.
+Run `sh harness/container/docker-harness.sh run base -- npm run test:e2e:base -- localization` with an image built from the current dependency manifests.
 The flow imports audio, switches to Simplified Chinese, saves, fully restarts, verifies the retained language choice, switches back to English, and reopens the saved project.
 It uses MCP for actions and only visible DOM observations for assertions; screenshots stay in the run directory.
 The [localization agent scenario](scenarios/localization-workflow.md) adds adaptive playback, edit-state, modal, and minimum-window checks to the editing baseline.
 Chinese font rendering is covered in the Linux container; system-owned native picker controls and actual macOS window/font behavior remain separate manual checks.
 
-Run `sh harness/container/run.sh npm run test:harness -- ipcErrorBridge` to verify rejected IPC descriptors across the real Electron contextBridge.
+Run `sh harness/container/docker-harness.sh run base -- npm run test:harness -- ipcErrorBridge` to verify rejected IPC descriptors across the real Electron contextBridge.
 This isolated boundary regression uses the built application preload and checks that safe reason/code/message fields survive while diagnostic fields are excluded; it complements the UI workflow.
 
 ## Existing transcript editing without models
 
 The [saved transcript fixture](fixtures/projects/README.md) packages real recognition/alignment/speaker results and their audio as a portable project.
-Run `sh harness/container/run.sh npm run test:e2e -- transcript-fixture` to verify opening, mouse text selection, redaction, undo/redo, save and full restart without generating speech.
+Run `sh harness/container/docker-harness.sh run base -- npm run test:e2e:base -- transcript-fixture` to verify opening, mouse text selection, redaction, undo/redo, save and full restart without generating speech.
 Each run receives a disposable copy; the repository fixture is never opened for editing.
 This complements the real-model speech-analysis tests and does not replace them.

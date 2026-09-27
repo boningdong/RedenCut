@@ -1,6 +1,6 @@
 # Docker Harness Entrypoints Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task by task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Give developers one clear Docker harness command for building, running, testing, model installation, and MCP use.
 
@@ -34,21 +34,21 @@
 
 **Interfaces:** Dispatcher invokes private action scripts with the remaining arguments. Config defines repository, image tags, Docker executable, model volume, and error helpers. Run accepts `base|speech [--models ABSOLUTE_DIRECTORY] -- COMMAND [ARG...]`; build accepts `base|speech`.
 
-- [ ] Write command tests using a fake Docker binary: usage failures, build order and selected base tag, run mounts, explicit image, missing image guidance, and paths with spaces.
-- [ ] Run the command tests and confirm they fail on the absent entrypoint.
-- [ ] Implement dispatcher, config, build, and run actions; preserve container mounts, labels, name, and environment from the old runner.
-- [ ] Run the command tests and confirm they pass.
+- [x] Write command tests using a fake Docker binary: usage failures, build order and selected base tag, run mounts, explicit image, missing image guidance, and paths with spaces.
+- [x] Run the command tests and confirm they fail on the absent entrypoint.
+- [x] Implement dispatcher, config, build, and run actions; preserve container mounts, labels, name, and environment from the old runner.
+- [x] Run the command tests and confirm they pass.
 
 ### Task 2: Named suites and speech source correctness
 
-**Files:** Create `harness/container/test/RunSuites.sh`; modify `vitest.e2e.config.ts`, `package.json`, `e2e/diagnostics-failure.e2e.ts`, `e2e/support/McpTestSession.ts`, `harness/container/entrypoint.sh`; create `e2e/diagnostics-missing-runtime.e2e.ts` and focused classification tests.
+**Files:** Create `harness/container/test/RunSuites.sh`; modify `vitest.e2e.config.ts`, `package.json`, `e2e/diagnostics-failure.e2e.ts`, `e2e/support/McpTestSession.ts`, `harness/container/entrypoint.sh`; create `e2e/diagnostics-speech.e2e.ts` and focused classification tests.
 
 **Interfaces:** `test harness|e2e-base|e2e-speech|e2e-all [--models ABSOLUTE_DIRECTORY]` maps to the correct image and npm suite. Speech worker and model manifest resolve from `/workspace/speech-worker`; image dependency lockfiles are checked against `/source`.
 
-- [ ] Write failing suite-selection and stale-image tests, including fixture rejection and active worker path.
-- [ ] Run them to observe failure.
-- [ ] Split the mixed diagnostics file, add explicit base/speech/all Vitest modes, and implement the test action and speech source validation.
-- [ ] Run focused tests and typecheck.
+- [x] Write failing suite-selection and stale-image tests, including fixture rejection and active worker path.
+- [x] Run them to observe failure.
+- [x] Split the mixed diagnostics file, add explicit base/speech/all Vitest modes, and implement the test action and speech source validation.
+- [x] Run focused tests and typecheck.
 
 ### Task 3: Models and MCP actions
 
@@ -56,17 +56,17 @@
 
 **Interfaces:** `models install|check`; `mcp [base|speech] [--models ABSOLUTE_DIRECTORY]` delegates to run with the MCP server command.
 
-- [ ] Write failing fake-Docker tests for token resolution, offline check, MCP default/selection, and invalid options.
-- [ ] Run them to observe failure.
-- [ ] Implement models and MCP actions; migrate smoke tests.
-- [ ] Run focused command and smoke tests that do not require Docker.
+- [x] Write failing fake-Docker tests for token resolution, offline check, MCP default/selection, and invalid options.
+- [x] Run them to observe failure.
+- [x] Implement models and MCP actions; migrate smoke tests.
+- [x] Run focused command and smoke tests that do not require Docker.
 
 ### Task 4: Migration and verification
 
 **Files:** Delete `harness/container/run.sh`, `harness/container/run-speech.sh`; modify active docs, error messages, and package scripts.
 
-- [ ] Update all active callers and documentation to the new commands; document the three model stores and exact suite scopes.
-- [ ] Remove old wrappers and npm aliases; search active files for stale references.
-- [ ] Run shell syntax checks, command tests, formatting, `npm run check`, and relevant runtime/release tests.
-- [ ] Build both images and run harness/base E2E, speech E2E when the fixture exists, and host MCP smoke; record any environmental blocker accurately.
-- [ ] Review the branch and resolve material findings before final handoff.
+- [x] Update all active callers and documentation to the new commands; document the three model stores and exact suite scopes.
+- [x] Remove old wrappers and npm aliases; search active files for stale references.
+- [x] Run shell syntax checks, command tests, formatting, `npm run check`, and relevant runtime/release tests.
+- [x] Build both images and run harness/base E2E, speech E2E when the fixture exists, and host MCP smoke; record any environmental blocker accurately.
+- [x] Review the branch and resolve material findings before final handoff.

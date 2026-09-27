@@ -17,7 +17,7 @@
 
 - Give related developer workflows one documented public entrypoint, with explicit action and target names.
 - Keep the entrypoint focused on dispatch; put substantial actions in modules or directories named for their responsibilities.
-- Make prerequisites, downloads, and test scope clear. Do not hide build or setup work behind a `run` command.
+- Make prerequisites, downloads, and test scope clear. Do not implicitly build images or provision persistent resources from a `run` command; document any compilation required at startup.
 - After updating callers, tests, and documentation, remove superseded commands unless compatibility is required.
 
 ## Stable Identifiers

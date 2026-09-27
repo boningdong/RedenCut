@@ -39,4 +39,3 @@ test('missing speech setup explains the prerequisite and opens Settings', async 
   await session.call('browser_snapshot')
   await session.screenshot('speech-setup-settings')
 }, 90_000)
-

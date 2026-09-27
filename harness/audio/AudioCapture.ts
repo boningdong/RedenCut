@@ -12,7 +12,7 @@ export function requireContainerAudio(env: NodeJS.ProcessEnv = process.env): voi
     env.PULSE_SINK !== 'redencut_test'
   )
     throw new Error(
-      'CONTAINER_AUDIO_REQUIRED: run with Docker: sh harness/container/run.sh npm run test:e2e',
+      'CONTAINER_AUDIO_REQUIRED: run with Docker: sh harness/container/docker-harness.sh test e2e-base',
     )
 }
 

@@ -25,8 +25,7 @@ if [ "$target" = speech ]; then
   [ -n "$models" ] || { echo 'MODEL_FIXTURE_REQUIRED: pass --models ABSOLUTE_DIRECTORY.' >&2; exit 1; }
   case "$models" in /*) ;; *) usage_error "$usage" ;; esac
   [ -d "$models" ] || { echo "MODEL_FIXTURE_REQUIRED: $models is not a directory." >&2; exit 1; }
-  marker=$(find "$models" -name installation.json -type f -print -quit)
-  [ -n "$marker" ] || { echo 'MODEL_FIXTURE_INVALID: no installed app model marker found.' >&2; exit 1; }
+  node "$harness_root/test/ValidateAppModels.mjs" "$models" "$repository/speech-worker/models.json"
   exec sh "$harness_root/run/RunContainer.sh" speech --models "$models" -- npm run "$npm_script"
 fi
 exec sh "$harness_root/run/RunContainer.sh" base -- npm run "$npm_script"

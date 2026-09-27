@@ -91,11 +91,28 @@ test('real track occurrences align locally and follow clip movement and undo', a
     const one = await timeline.getByText('1s', { exact: true }).boundingBox()
     const second = await ui.page.locator('canvas').nth(1).boundingBox()
     if (!zero || !one || !second) throw new Error('VISIBLE_TIMELINE_GEOMETRY_MISSING')
+    const dragX = second.x + 20
+    const dragY = await ui.page.evaluate(
+      ({ x, top, bottom, clipId }) => {
+        for (let y = Math.ceil(top) + 2; y < Math.min(bottom, innerHeight); y += 3) {
+          if (
+            document
+              .elementFromPoint(x, y)
+              ?.closest('.waveform-clip')
+              ?.getAttribute('data-clip-id') === clipId
+          )
+            return y
+        }
+        return null
+      },
+      { x: dragX, top: second.y, bottom: second.y + second.height, clipId: movedClipId },
+    )
+    if (dragY === null) throw new Error('SECOND_CLIP_NOT_VISIBLE_FOR_DRAG')
     await ui.call('browser_mouse_drag_xy', {
-      startX: second.x + 20,
-      startY: second.y + second.height / 2,
-      endX: second.x + 20 + 5 * (one.x - zero.x),
-      endY: second.y + second.height / 2,
+      startX: dragX,
+      startY: dragY,
+      endX: dragX + 5 * (one.x - zero.x),
+      endY: dragY,
     })
     await expect
       .poll(async () => Number(await movedSpeech.first().getAttribute('data-output-start')))

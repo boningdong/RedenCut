@@ -209,12 +209,12 @@ Linux ARM64 has no compatible `torchcodec` wheel in this stack. The worker must 
 Current developer commands are:
 
 ```sh
-npm run speech:docker:build
-npm run speech:docker:provision
-npm run speech:docker:preflight
+sh harness/container/docker-harness.sh build speech
+sh harness/container/docker-harness.sh models install
+sh harness/container/docker-harness.sh models check
 ```
 
-Only `speech:docker:provision` forwards the read-only Hugging Face token. `speech:docker:preflight` verifies the persistent model volume without credentials or downloads.
+`models install` downloads the manifest-listed weights into the persistent Docker `/models` volume and mounts the Hugging Face token read-only. `models check` verifies that volume without credentials or downloads. Neither command prepares the separate `/test-models` application fixture needed by speech E2Es.
 
 For native macOS development, dependency installation and model provisioning are also explicit:
 
