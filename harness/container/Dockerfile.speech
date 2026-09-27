@@ -30,6 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && uv sync --python 3.11.16 --frozen --no-dev --no-install-project
 COPY speech-worker/src /opt/redencut-speech-worker/src
 COPY speech-worker/models.json /opt/redencut-speech-worker/models.json
+COPY harness/container/config/VerifySpeechSource.sh /opt/redencut-verify-speech-source.sh
 RUN --mount=type=cache,target=/root/.cache/uv \
     cd /opt/redencut-speech-worker \
     && uv sync --python 3.11.16 --frozen --no-dev \

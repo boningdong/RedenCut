@@ -50,8 +50,9 @@ export class McpTestSession {
           if (options.alignmentFault) {
             if (!options.speechModels || !existsSync('/test-models'))
               throw new Error('ALIGNMENT_FAULT_REQUIRES_DISPOSABLE_CONTAINER_MODELS')
-            // The E2E runs inside Docker's private /workspace source copy. Override only
-            // this worker entrypoint so the real Electron UI sees a typed worker failure.
+            if (process.env.REDENCUT_SPEECH_WORKER_ROOT !== resolve('speech-worker'))
+              throw new Error('ALIGNMENT_FAULT_TARGET_MISMATCH')
+            // Override the active worker in Docker's private source copy.
             const path = resolve('speech-worker/src/redencut_speech_worker/alignment.py')
             this.workerRestore = { path, contents: readFileSync(path, 'utf8') }
             appendFileSync(

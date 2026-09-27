@@ -6,6 +6,9 @@ if ! (cd /source && sha256sum --check --status /opt/redencut-dependencies.sha256
   echo 'DEPENDENCY_IMAGE_STALE: rebuild the harness image after package changes.' >&2
   exit 1
 fi
+if [ "${REDENCUT_REQUIRE_SPEECH_SOURCE:-}" = 1 ]; then
+  sh /opt/redencut-verify-speech-source.sh /source/speech-worker /opt/redencut-speech-worker
+fi
 # electron-vite writes temporary config files beside the source configuration.
 # Snapshot into the container layer rather than making the host checkout writable.
 snapshot=$(mktemp /tmp/redencut-source.XXXXXX.tar)
