@@ -51,12 +51,33 @@ describe('timeline editing state', () => {
     const next = [
       { ...expected[0], clips: expected[0].clips.map((item) => ({ ...item, muted: true })) },
     ]
-    expect(state().commitTracks(expected, next, 'Mute selection', ['one', 'two'])).toBe(true)
+    expect(state().commitStructuralEdit(expected, next, 'Mute selection', ['one', 'two'])).toBe(
+      true,
+    )
     expect(state().undoStack).toHaveLength(1)
     expect(state().selectedClipIds).toEqual(['one', 'two'])
-    expect(state().commitTracks(expected, makeTracks(), 'stale')).toBe(false)
-    expect(state().commitTracks(state().tracks, state().tracks, 'same')).toBe(false)
+    expect(state().commitStructuralEdit(expected, makeTracks(), 'stale')).toBe(false)
+    expect(state().commitStructuralEdit(state().tracks, state().tracks, 'same')).toBe(false)
     expect(state().undoStack).toHaveLength(1)
+  })
+
+  it('invalidates redo after either a redaction or a track setting edit', () => {
+    state().setClipsMuted(['one'], true)
+    void state().undo()
+    expect(state().redoStack).toHaveLength(1)
+
+    state().redactRange('track', 0.25, 0.75)
+    expect(state().undoStack).toHaveLength(1)
+    expect(state().redoStack).toHaveLength(0)
+    void state().undo()
+    expect(state().tracks[0].clips[0].redactions).toBeUndefined()
+    expect(state().redoStack).toHaveLength(1)
+
+    state().setTrackVolume('track', 0.5)
+    expect(state().undoStack).toHaveLength(1)
+    expect(state().redoStack).toHaveLength(0)
+    void state().undo()
+    expect(state().tracks[0].volume).toBe(1)
   })
 
   it('syncs the selected track to the primary clip after a guarded cross-track commit', () => {
@@ -75,7 +96,7 @@ describe('timeline editing state', () => {
       { ...expected[0], clips: expected[0].clips.slice(1) },
       { ...expected[1], clips: [{ ...moving, trackId: 'other', outputStart: 8 }] },
     ]
-    expect(state().commitTracks(expected, next, 'Move clip', ['one'])).toBe(true)
+    expect(state().commitStructuralEdit(expected, next, 'Move clip', ['one'])).toBe(true)
     expect(state().selectedTrackId).toBe('other')
   })
 

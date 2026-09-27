@@ -205,7 +205,7 @@ export function useClipInteraction({
       if (active.moved && active.next && !active.next.invalid) {
         useTimelineStore
           .getState()
-          .commitTracks(
+          .commitStructuralEdit(
             active.tracks,
             active.next.tracks,
             active.kind === 'move' ? 'Move clips' : 'Trim clip',
@@ -347,7 +347,7 @@ export function useClipInteraction({
       time + delta,
       source.metadata.durationSeconds,
     )
-    if (next) state.commitTracks(state.tracks, next, 'Trim clip', [clip.id])
+    if (next) state.commitStructuralEdit(state.tracks, next, 'Trim clip', [clip.id])
   }
   const isActive = useCallback(() => gesture.current !== null, [])
   return { preview, marquee, begin, clickClip, consumeClick, trimKey, isActive }

@@ -221,7 +221,7 @@ function placeClipboardContents(
       )
     }
   }
-  return timeline.commitTracks(expected, next, label, planned.clipIds, true)
+  return timeline.commitStructuralEdit(expected, next, label, planned.clipIds, true)
 }
 
 export function copyClips(): boolean {

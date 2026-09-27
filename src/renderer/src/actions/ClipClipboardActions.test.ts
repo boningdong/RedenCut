@@ -261,7 +261,7 @@ it('copies hidden linked topology so pasted Mix can reveal the original sources'
   const state = () => useTimelineStore.getState()
   state().setMixLink('mix', ['stem'])
   const before = state().tracks
-  state().commitTracks(
+  state().commitStructuralEdit(
     before,
     before.map((t) => (t.id === 'mix' ? { ...t, clips: [{ ...t.clips[0], sourceEnd: 5 }] } : t)),
     'trim',
@@ -273,7 +273,7 @@ it('copies hidden linked topology so pasted Mix can reveal the original sources'
   expect(pasteClips()).toBe(true)
   const pasted = state().tracks
   expect(
-    state().commitTracks(
+    state().commitStructuralEdit(
       pasted,
       pasted.map((t) => (t.id === 'mix' ? { ...t, clips: [{ ...t.clips[0], sourceEnd: 11 }] } : t)),
       'reveal',

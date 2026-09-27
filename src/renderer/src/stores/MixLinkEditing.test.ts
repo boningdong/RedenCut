@@ -79,7 +79,7 @@ it('refuses gaps and overlaps in selected sources', () => {
 it('trims child timing while retaining hidden redactions', () => {
   state().setMixLink('mix', ['stem'])
   const before = state().tracks
-  state().commitTracks(before, trimClip(before, 'mix-clip', 'start', 3, 10)!, 'trim')
+  state().commitStructuralEdit(before, trimClip(before, 'mix-clip', 'start', 3, 10)!, 'trim')
   expect(state().tracks[1].clips[0]).toMatchObject({
     sourceStart: 3,
     outputStart: 3,
@@ -98,16 +98,16 @@ it('removes a master without destroying children and restores both with undo', a
 it('extends a trimmed child again using its retained source metadata', () => {
   state().setMixLink('mix', ['stem'])
   let before = state().tracks
-  state().commitTracks(before, trimClip(before, 'mix-clip', 'start', 3, 10)!, 'trim')
+  state().commitStructuralEdit(before, trimClip(before, 'mix-clip', 'start', 3, 10)!, 'trim')
   before = state().tracks
-  state().commitTracks(before, trimClip(before, 'mix-clip', 'start', 1, 10)!, 'extend')
+  state().commitStructuralEdit(before, trimClip(before, 'mix-clip', 'start', 1, 10)!, 'extend')
   expect(state().tracks[1].clips[0]).toMatchObject({ sourceStart: 1, outputStart: 1 })
 })
 it('rejects direct snapshot mutation of linked children', () => {
   state().setMixLink('mix', ['stem'])
   const before = state().tracks
   const next = before.map((t) => (t.id === 'stem' ? { ...t, clips: [] } : t))
-  expect(state().commitTracks(before, next, 'delete child')).toBe(false)
+  expect(state().commitStructuralEdit(before, next, 'delete child')).toBe(false)
   expect(state().tracks).toBe(before)
 })
 it('rejects a replacement over ambiguous overlapping child coverage', () => {
@@ -129,7 +129,7 @@ it('preserves hidden override bounds at the outside of a split', () => {
   state().setMixLink('mix', ['stem'])
   state().replaceMixSources('mix', 0, 8, ['stem'])
   const before = state().tracks
-  state().commitTracks(before, trimClip(before, 'mix-clip', 'start', 2, 10)!, 'trim')
+  state().commitStructuralEdit(before, trimClip(before, 'mix-clip', 'start', 2, 10)!, 'trim')
   state().setSelectedClipId('mix-clip')
   state().splitAt(5)
   expect(state().tracks[0].clips[0].sourceOverrides?.[0]).toMatchObject({
@@ -152,13 +152,13 @@ it('reveals exact child topology after trim, JSON reload and move', () => {
   ]
   state().setMixLink('mix', ['stem'])
   let before = state().tracks
-  state().commitTracks(before, trimClip(before, 'mix-clip', 'end', 4, 10)!, 'trim')
+  state().commitStructuralEdit(before, trimClip(before, 'mix-clip', 'end', 4, 10)!, 'trim')
   state().loadFromProject([], JSON.parse(JSON.stringify(state().tracks)))
   state().moveClip('mix-clip', 30)
   before = state().tracks
-  expect(state().commitTracks(before, trimClip(before, 'mix-clip', 'end', 40, 10)!, 'reveal')).toBe(
-    true,
-  )
+  expect(
+    state().commitStructuralEdit(before, trimClip(before, 'mix-clip', 'end', 40, 10)!, 'reveal'),
+  ).toBe(true)
   expect(
     state().tracks[1].clips.map((c) => [
       c.audioSourceId,
@@ -202,12 +202,12 @@ it('normalizes a spanning child into unique occurrence IDs across pre-edited mas
   ])
   expect(new Set(children.map((c) => c.id)).size).toBe(children.length)
   const before = state().tracks
-  state().commitTracks(before, trimClip(before, 'mix-second', 'end', 12, 10)!, 'trim')
+  state().commitStructuralEdit(before, trimClip(before, 'mix-second', 'end', 12, 10)!, 'trim')
   const hidden = state().tracks[0].mixLink?.hiddenSegments?.[0]
   expect(hidden?.clip.id).toBe(state().tracks[1].clips[1].id)
   state().loadFromProject([], JSON.parse(JSON.stringify(state().tracks)))
   const trimmed = state().tracks
-  state().commitTracks(trimmed, trimClip(trimmed, 'mix-second', 'end', 15, 10)!, 'reveal')
+  state().commitStructuralEdit(trimmed, trimClip(trimmed, 'mix-second', 'end', 15, 10)!, 'reveal')
   expect(state().tracks[1].clips.map((c) => [c.sourceStart, c.sourceEnd, c.outputStart])).toEqual([
     [0, 5, 0],
     [5, 10, 10],

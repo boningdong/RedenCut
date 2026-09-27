@@ -24,7 +24,7 @@ it('undoes identity and track operations in their actual order without restoring
   let name = 'Renamed'
   useTimelineStore
     .getState()
-    .commitTracks(
+    .commitStructuralEdit(
       useTimelineStore.getState().tracks,
       [{ ...tracks[0], name: 'Changed track' }],
       'Change track',
@@ -96,7 +96,7 @@ it('keeps a completed redo undoable when a clip edit clears its pending redo ent
   const pending = useTimelineStore.getState().redo()
   useTimelineStore
     .getState()
-    .commitTracks(
+    .commitStructuralEdit(
       useTimelineStore.getState().tracks,
       [{ ...tracks[0], name: 'During redo' }],
       'Track edit',

@@ -88,6 +88,29 @@ function tracksEqual(left: Track[], right: Track[]): boolean {
   )
 }
 
+type TimelineSelectionUpdate = Pick<
+  TimelineState,
+  'selectedClipIds' | 'selectedClipId' | 'timelineSelection' | 'selectedTrackId'
+>
+
+/** Finish an already validated edit and record the shared undo/redo transition. */
+function commitTimelineEdit(
+  expected: Track[],
+  next: Track[],
+  label: string,
+  selection?: Partial<TimelineSelectionUpdate>,
+): boolean {
+  if (useTimelineStore.getState().tracks !== expected || tracksEqual(expected, next)) return false
+  useTimelineStore.setState((state) => ({
+    tracks: next,
+    undoStack: [...state.undoStack, { before: expected, label }],
+    redoStack: [],
+    ...selection,
+  }))
+  markTimelineEdited()
+  return true
+}
+
 // ── History entry ──────────────────────────────────────────────────────────────
 
 interface HistoryEntry {
@@ -201,7 +224,7 @@ interface TimelineState {
    * Clips on the same track after the moved clip are reflowed.
    */
   moveClip(clipId: string, newOutputStart: number, newTrackId?: string): void
-  commitTracks(
+  commitStructuralEdit(
     expected: Track[],
     next: Track[],
     label: string,
@@ -418,7 +441,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   setMixLink(mixTrackId, stemTrackIds) {
     const tracks = get().tracks
     const next = changeMixLink(tracks, mixTrackId, stemTrackIds)
-    return next ? get().commitTracks(tracks, next, 'Change Mix sources') : false
+    return next ? get().commitStructuralEdit(tracks, next, 'Change Mix sources') : false
   },
   replaceMixSources(mixTrackId, start, end, stemTrackIds, previousRange) {
     const tracks = get().tracks
@@ -426,12 +449,12 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       ? changeMixSources(tracks, mixTrackId, previousRange.start, previousRange.end)
       : tracks
     const next = restored ? changeMixSources(restored, mixTrackId, start, end, stemTrackIds) : null
-    return next ? get().commitTracks(tracks, next, 'Replace Mix audio') : false
+    return next ? get().commitStructuralEdit(tracks, next, 'Replace Mix audio') : false
   },
   restoreMixSources(mixTrackId, start, end) {
     const tracks = get().tracks
     const next = changeMixSources(tracks, mixTrackId, start, end)
-    return next ? get().commitTracks(tracks, next, 'Restore Mix audio') : false
+    return next ? get().commitStructuralEdit(tracks, next, 'Restore Mix audio') : false
   },
   removeTrack(trackId) {
     const tracks = get().tracks
@@ -447,7 +470,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       )!
     if (removed.mixLink) next = changeMixLink(next, trackId, [])!
     next = next.filter((track) => track.id !== trackId)
-    get().commitTracks(tracks, next, 'Remove track')
+    get().commitStructuralEdit(tracks, next, 'Remove track')
     if (get().selectedTrackId === trackId) set({ selectedTrackId: null })
   },
 
@@ -502,9 +525,6 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       return
     }
 
-    // Snapshot before mutation
-    const before = tracks
-
     const newClips = addRedactions(track.clips, startTime, endTime, track.id)
     if (
       newClips.length === track.clips.length &&
@@ -513,15 +533,8 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       return
     }
 
-    set((s) => ({
-      tracks: s.tracks.map((t) => (t.id === track.id ? { ...t, clips: newClips } : t)),
-      undoStack: [
-        ...s.undoStack,
-        { before, label: `Redact [${startTime.toFixed(1)}–${endTime.toFixed(1)}]` },
-      ],
-      redoStack: [], // any new mutation invalidates the redo future
-    }))
-    markTimelineEdited()
+    const next = tracks.map((item) => (item.id === track.id ? { ...item, clips: newClips } : item))
+    commitTimelineEdit(tracks, next, `Redact [${startTime.toFixed(1)}–${endTime.toFixed(1)}]`)
   },
 
   redactClipRanges(trackId, clipId, ranges) {
@@ -561,22 +574,17 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       )
     }
     if (replacement[0] === clip) return
-    const before = tracks
-    set((state) => ({
-      tracks: state.tracks.map((item) =>
-        item.id === trackId
-          ? {
-              ...item,
-              clips: item.clips.flatMap((candidate) =>
-                candidate.id === clipId ? replacement : [candidate],
-              ),
-            }
-          : item,
-      ),
-      undoStack: [...state.undoStack, { before, label: 'Redact transcript selection' }],
-      redoStack: [],
-    }))
-    markTimelineEdited()
+    const next = tracks.map((item) =>
+      item.id === trackId
+        ? {
+            ...item,
+            clips: item.clips.flatMap((candidate) =>
+              candidate.id === clipId ? replacement : [candidate],
+            ),
+          }
+        : item,
+    )
+    commitTimelineEdit(tracks, next, 'Redact transcript selection')
   },
 
   redactTranscriptRange(trackId, expectedClips, range) {
@@ -631,23 +639,17 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     if (!clips.some((c) => c.sourceStart < range.end && c.sourceEnd > range.start)) return true
     const pieces = addRedactions(clips, start, end, trackId)
     if (pieces.every((clip, index) => clip === clips[index])) return true
-    const before = tracks
-    set((state) => ({
-      tracks: state.tracks.map((t) =>
-        t.id === trackId
-          ? {
-              ...t,
-              clips: t.clips.flatMap((c) =>
-                c.id === clips[0].id ? pieces : targeted.has(c.id) ? [] : [c],
-              ),
-            }
-          : t,
-      ),
-      undoStack: [...state.undoStack, { before, label: 'Redact transcript selection' }],
-      redoStack: [],
-    }))
-    markTimelineEdited()
-    return true
+    const next = tracks.map((item) =>
+      item.id === trackId
+        ? {
+            ...item,
+            clips: item.clips.flatMap((candidate) =>
+              candidate.id === clips[0].id ? pieces : targeted.has(candidate.id) ? [] : [candidate],
+            ),
+          }
+        : item,
+    )
+    return commitTimelineEdit(tracks, next, 'Redact transcript selection')
   },
 
   // ── removeClip ──────────────────────────────────────────────────────────────
@@ -663,7 +665,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       const clips = track.clips.filter((clip) => !removed.has(clip.id))
       return clips.length === track.clips.length ? track : { ...track, clips }
     })
-    get().commitTracks(
+    get().commitStructuralEdit(
       tracks,
       next,
       ids.length === 1 ? `remove clip ${ids[0]}` : 'Remove clips',
@@ -754,7 +756,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         ? { ...t, clips: t.clips.flatMap((c) => (c.id === targetClip!.id ? [left, right] : [c])) }
         : t,
     )
-    get().commitTracks(tracks, next, `split at ${time.toFixed(1)}`, [])
+    get().commitStructuralEdit(tracks, next, `split at ${time.toFixed(1)}`, [])
   },
 
   // ── moveClip ────────────────────────────────────────────────────────────────
@@ -767,10 +769,11 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     const placement = planClipPlacement(tracks, [clipId], clipId, newOutputStart, destId, {
       insert: false,
     })
-    if (placement) get().commitTracks(tracks, placement.tracks, `move clip ${clipId}`, [clipId])
+    if (placement)
+      get().commitStructuralEdit(tracks, placement.tracks, `move clip ${clipId}`, [clipId])
   },
 
-  commitTracks(expected, next, label, selectedIds, synchronized = false) {
+  commitStructuralEdit(expected, next, label, selectedIds, synchronized = false) {
     const state = get()
     if (state.tracks !== expected || tracksEqual(expected, next)) return false
     if (!synchronized) {
@@ -820,15 +823,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       ? (next.find((track) => track.clips.some((clip) => clip.id === selection.selectedClipId))
           ?.id ?? state.selectedTrackId)
       : state.selectedTrackId
-    set((current) => ({
-      tracks: next,
-      undoStack: [...current.undoStack, { before: expected, label }],
-      redoStack: [],
-      ...selection,
-      selectedTrackId,
-    }))
-    markTimelineEdited()
-    return true
+    return commitTimelineEdit(expected, next, label, { ...selection, selectedTrackId })
   },
 
   // ── selectedClipId ──────────────────────────────────────────────────────────
@@ -883,24 +878,24 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       .find((c) => c.id === clipId)
       ?.redactions?.find((r) => r.id === redactionId)
     if (!redaction || JSON.stringify(redaction.crossfade) === JSON.stringify(parsed.data)) return
-    set((s) => ({
-      tracks: tracks.map((t) => ({
-        ...t,
-        clips: t.clips.map((c) =>
-          c.id === clipId
-            ? {
-                ...c,
-                redactions: c.redactions?.map((r) =>
-                  r.id === redactionId ? { ...r, crossfade: { ...parsed.data } } : r,
-                ),
-              }
-            : c,
-        ),
-      })),
-      undoStack: [...s.undoStack, { before: tracks, label: 'Edit crossfade' }],
-      redoStack: [],
-    }))
-    markTimelineEdited()
+    const next = tracks.map((track) =>
+      track.clips.some((clip) => clip.id === clipId)
+        ? {
+            ...track,
+            clips: track.clips.map((clip) =>
+              clip.id === clipId
+                ? {
+                    ...clip,
+                    redactions: clip.redactions?.map((item) =>
+                      item.id === redactionId ? { ...item, crossfade: { ...parsed.data } } : item,
+                    ),
+                  }
+                : clip,
+            ),
+          }
+        : track,
+    )
+    commitTimelineEdit(tracks, next, 'Edit crossfade')
   },
 
   updateRedaction(clipId, redactionId, range, mode = 'resize') {
@@ -934,24 +929,24 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       (range.sourceStart === redaction.sourceStart && range.sourceEnd === redaction.sourceEnd)
     )
       return
-    set((s) => ({
-      tracks: tracks.map((t) => ({
-        ...t,
-        clips: t.clips.map((c) =>
-          c.id === clipId
-            ? {
-                ...c,
-                redactions: c.redactions?.map((r) =>
-                  r.id === redactionId ? { ...r, ...range } : r,
-                ),
-              }
-            : c,
-        ),
-      })),
-      undoStack: [...s.undoStack, { before: tracks, label: 'Edit redaction' }],
-      redoStack: [],
-    }))
-    markTimelineEdited()
+    const next = tracks.map((track) =>
+      track.clips.some((candidate) => candidate.id === clipId)
+        ? {
+            ...track,
+            clips: track.clips.map((candidate) =>
+              candidate.id === clipId
+                ? {
+                    ...candidate,
+                    redactions: candidate.redactions?.map((item) =>
+                      item.id === redactionId ? { ...item, ...range } : item,
+                    ),
+                  }
+                : candidate,
+            ),
+          }
+        : track,
+    )
+    commitTimelineEdit(tracks, next, 'Edit redaction')
   },
 
   removeRedaction(clipId, redactionId) {
@@ -963,23 +958,22 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       )
     )
       return
-    set((s) => ({
-      tracks: tracks.map((t) => ({
-        ...t,
-        clips: t.clips.map((c) =>
-          c.id === clipId
-            ? {
-                ...c,
-                redactions: c.redactions?.filter((r) => r.id !== redactionId),
-              }
-            : c,
-        ),
-      })),
-      undoStack: [...s.undoStack, { before: tracks, label: 'Remove redaction' }],
-      redoStack: [],
-      timelineSelection: null,
-    }))
-    markTimelineEdited()
+    const next = tracks.map((track) =>
+      track.clips.some((clip) => clip.id === clipId)
+        ? {
+            ...track,
+            clips: track.clips.map((clip) =>
+              clip.id === clipId
+                ? {
+                    ...clip,
+                    redactions: clip.redactions?.filter((item) => item.id !== redactionId),
+                  }
+                : clip,
+            ),
+          }
+        : track,
+    )
+    commitTimelineEdit(tracks, next, 'Remove redaction', { timelineSelection: null })
   },
 
   setClipMuted(clipId, muted) {
@@ -1004,7 +998,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         ),
       }
     })
-    get().commitTracks(tracks, next, muted ? 'Mute clips' : 'Unmute clips')
+    get().commitStructuralEdit(tracks, next, muted ? 'Mute clips' : 'Unmute clips')
   },
 
   setSnappingEnabled(enabled) {
@@ -1154,11 +1148,5 @@ function commitTrackSettings(
   const tracks = state.tracks.map((track) =>
     track.id === trackId ? { ...track, ...patch } : track,
   )
-  if (tracksEqual(state.tracks, tracks)) return
-  useTimelineStore.setState({
-    tracks,
-    undoStack: [...state.undoStack, { before: state.tracks, label }],
-    redoStack: [],
-  })
-  markTimelineEdited()
+  commitTimelineEdit(state.tracks, tracks, label)
 }
