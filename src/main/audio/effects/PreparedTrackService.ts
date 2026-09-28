@@ -1,3 +1,4 @@
+import { collectHelperLogs } from '../../processes/HelperLogCollector'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdtemp, open, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -232,6 +233,7 @@ export class PreparedTrackService {
       ],
       { stdio: ['ignore', 'pipe', 'pipe'], env: runtimeEnvironment(process.env) },
     )
+    collectHelperLogs(child, { source: 'ffmpeg', component: 'audio-effects' })
     let diagnostic = ''
     const abort = () => {
       child.kill('SIGKILL')

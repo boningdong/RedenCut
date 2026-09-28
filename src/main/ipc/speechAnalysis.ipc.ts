@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { resolveModelsPath } from '../resources/ModelsPath'
 import { z } from 'zod'
 import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
@@ -48,7 +49,7 @@ interface SpeechPreparationServices {
 export function registerSpeechAnalysisIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
-  diagnosticSink: (error: unknown) => void = console.error,
+  diagnosticSink: (error: unknown) => void = appLogger.reportError,
   services?: SpeechPreparationServices,
   failureLog?: Pick<DiagnosticLog, 'write'>,
 ): void {

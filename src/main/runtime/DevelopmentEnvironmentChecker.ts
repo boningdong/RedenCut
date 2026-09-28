@@ -1,13 +1,11 @@
 import { dirname, join, relative } from 'node:path'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import { executeLogged as execute } from '../processes/LoggedCommand'
 import type {
   DevelopmentEnvironment,
   DevelopmentCheck,
 } from '../../shared/developmentEnvironment.types'
 import type { AppRuntimeLocator } from './AppRuntimeLocator'
 import { offlineEnvironment } from '../speech/inferenceEnvironment'
-const execute = promisify(execFile)
 type Probe = (file: string, args: string[], signal: AbortSignal) => Promise<void>
 /** Read-only checks: installation stays an explicit developer terminal action. */
 export class DevelopmentEnvironmentChecker {

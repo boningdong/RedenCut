@@ -12,13 +12,13 @@ vi.mock('electron', () => ({
 }))
 import { installProjectMenu } from './ProjectMenu'
 
-it('places recent diagnostic report under localized Help', () => {
+it('places diagnostic collection under localized Help', () => {
   const open = vi.fn()
   installProjectMenu('zh-CN', vi.fn(), open)
   const help = mocks.template.find((item) => (item as { label?: string }).label === '帮助') as {
     submenu: Array<{ label: string; click: () => void }>
   }
-  expect(help.submenu[0].label).toContain('最近')
+  expect(help.submenu[0].label).toBe('收集诊断信息…')
   help.submenu[0].click()
   expect(open).toHaveBeenCalledOnce()
 })

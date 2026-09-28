@@ -114,7 +114,7 @@ export class SpeechAnalysisCoordinator {
     onProgress({ stage: 'transcribing' })
     const transcription: TranscriptionResult = await this.transcriber.transcribe(
       input.audioPath,
-      { language: input.language, model: input.transcriptionModel },
+      { language: input.language, model: input.transcriptionModel, operationId: input.jobId },
       signal,
       (progress) => {
         if (!signal.aborted && progress.stage === 'transcribing')

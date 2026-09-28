@@ -1,3 +1,5 @@
+import { collectHelperLogs } from './HelperLogCollector'
+import type { AppLogContext } from '../logging/AppLogger'
 import type { EventEmitter } from 'events'
 
 interface ProcessStream extends EventEmitter {
@@ -10,6 +12,8 @@ interface ManagedChild extends EventEmitter {
   kill(signal?: NodeJS.Signals | number): boolean
 }
 interface ProcessOptions {
+  helper?: AppLogContext
+  logFormat?: 'python' | 'text'
   onStdout?: (chunk: Buffer) => void
   onStderr?: (chunk: Buffer) => void
   terminateGraceMs?: number
@@ -47,6 +51,9 @@ export function manageProcess<T extends ManagedChild>(
     Object.assign(failure, { kind: 'startup' })
     return { completed: Promise.reject(failure), fail: () => {} }
   }
+  const collector = options.helper
+    ? collectHelperLogs(child, options.helper, options.logFormat)
+    : undefined
   let fail!: (error: unknown) => void
   const completed = new Promise<ProcessExit>((resolve, reject) => {
     let settled = false
@@ -70,6 +77,7 @@ export function manageProcess<T extends ManagedChild>(
     const finish = (code: number | null, exitSignal: NodeJS.Signals | null) => {
       if (settled) return
       settled = true
+      collector?.finish()
       clearTimeout(killTimer)
       clearTimeout(drainTimer)
       signal.removeEventListener('abort', abort)

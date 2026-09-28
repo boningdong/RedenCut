@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { ProjectFileSchema } from '../../shared/ProjectTypes'
@@ -64,7 +65,7 @@ export function registerPreparedAudioIpc(
           for (const [leaseId, lease] of leases) {
             if (lease.pool === pool) {
               leases.delete(leaseId)
-              void lease.dispose().catch(console.error)
+              void lease.dispose().catch(appLogger.reportError)
             }
           }
           event.sender.removeListener('destroyed', onDestroyed)
@@ -73,7 +74,7 @@ export function registerPreparedAudioIpc(
           return result
         }
         const onDestroyed = () => {
-          void dispose().catch(console.error)
+          void dispose().catch(appLogger.reportError)
         }
         unregister = jobs.register(
           { kind: 'effects', ...request, senderId: event.sender.id, jobId: `pool-${randomUUID()}` },
@@ -86,7 +87,7 @@ export function registerPreparedAudioIpc(
       const selectedPlan = { ...plan, tracks: [track] }
       let lease = leases.get(key)
       if (lease && lease.service.key !== preparedAudioKey(selectedPlan, sources)) {
-        void lease.dispose().catch(console.error)
+        void lease.dispose().catch(appLogger.reportError)
         lease = undefined
       }
       if (!lease) {
@@ -140,7 +141,7 @@ export function registerPreparedAudioIpc(
       if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
         throw new PublicIpcError('stale-session')
       return result
-    }, console.error),
+    }, appLogger.reportError),
   )
   ipcMain.handle('effects:read', (event, input: unknown) =>
     toIpcResult(async () => {
@@ -170,7 +171,7 @@ export function registerPreparedAudioIpc(
       if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
         throw new PublicIpcError('stale-session')
       return result
-    }, console.error),
+    }, appLogger.reportError),
   )
   ipcMain.handle('effects:waveform', (event, input: unknown) =>
     toIpcResult(async () => {
@@ -200,7 +201,7 @@ export function registerPreparedAudioIpc(
       if (leases.get(key) !== lease || controller.workspace !== lease.workspace)
         throw new PublicIpcError('stale-session')
       return result
-    }, console.error),
+    }, appLogger.reportError),
   )
   ipcMain.handle('effects:progress', (event, input: unknown) =>
     toIpcResult(async () => {
@@ -213,7 +214,7 @@ export function registerPreparedAudioIpc(
       const lease = leases.get(key)
       if (!lease || controller.workspace !== lease.workspace) return null
       return lease.service.progress()
-    }, console.error),
+    }, appLogger.reportError),
   )
   ipcMain.handle('effects:release', (event, input: unknown) =>
     toIpcResult(async () => {
@@ -225,6 +226,6 @@ export function registerPreparedAudioIpc(
         requireJobId(candidate.requestId),
       )
       await leases.get(key)?.dispose()
-    }, console.error),
+    }, appLogger.reportError),
   )
 }

@@ -15,6 +15,7 @@
     "**/*.ts",
     "../src/shared/**/*",
     "../src/main/dialogs/HarnessDialogMailbox.ts",
+    "../src/main/diagnostics/DiagnosticZipTestSupport.ts",
     "../e2e/**/*.ts"
   ]
 }

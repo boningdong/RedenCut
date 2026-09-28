@@ -1,3 +1,4 @@
+import { appLogger } from './logging/AppLogger'
 import { extname } from 'path'
 import { APP_FILE_EXT } from '../shared/constants'
 
@@ -37,7 +38,7 @@ export function startApplicationLifecycle({
   app,
   preparePrimary,
   initialize,
-  reportDiagnostic = console.error,
+  reportDiagnostic = appLogger.reportError,
 }: ApplicationLifecycleDependencies): boolean {
   if (!app.requestSingleInstanceLock()) {
     app.quit()

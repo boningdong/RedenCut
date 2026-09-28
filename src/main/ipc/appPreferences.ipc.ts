@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { BrowserWindow, ipcMain } from 'electron'
 import {
   LocalePreferenceSchema,
@@ -10,7 +11,7 @@ import { toIpcResult } from './ipcResult'
 
 export function registerAppPreferencesIpc(
   store: AppPreferencesStore,
-  diagnosticSink: (error: unknown) => void = console.error,
+  diagnosticSink: (error: unknown) => void = appLogger.reportError,
 ): void {
   ipcMain.handle('app-preferences:get', () => toIpcResult(() => store.read(), diagnosticSink))
   store.subscribe((snapshot) => {

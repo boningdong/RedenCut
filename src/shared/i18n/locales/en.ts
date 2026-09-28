@@ -1,21 +1,30 @@
 export const englishResources = {
   diagnostics: {
-    title: 'Diagnostic report',
-    excluded:
-      'Review the exact report below before saving. Audio, transcript text, project files and tokens are excluded. The report stays on this computer until you choose to share it.',
-    partial: 'Some earlier diagnostic events are no longer available. This report is partial.',
+    title: 'Diagnostics',
+    description: 'Collect recent application events and logs to help investigate a problem.',
+    privacy:
+      'Review the collected files before sharing. Audio, transcript text and project files are excluded. Common secrets and private paths are redacted; third-party log text may still contain personal information. Files stay on this computer until you share them.',
     ids: 'Diagnostic ID',
-    eventCount: '{{count}} events',
-    preview: 'Report preview',
-    save: 'Save report…',
+    size: 'Collected files: {{count}} KiB',
+    coverage: 'Includes retained log history.',
+    save: 'Save diagnostic bundle…',
+    saving: 'Saving…',
     saveAgain: 'Choose another location…',
     showSaved: 'Show in Finder',
     copyId: 'Copy ID',
-    loading: 'Preparing report…',
+    loading: 'Collecting diagnostics…',
     export: 'Export diagnostic report',
     exportAll: 'Export all failed sources',
     openSettings: 'Open Settings',
-    recent: 'Export recent diagnostic report…',
+    recent: 'Collect diagnostics…',
+    collect: 'Collect diagnostics…',
+    collectAgain: 'Collect again',
+    inspect: 'Inspect collected files',
+    historyMissing: 'Some requested failure history is no longer available.',
+    logsUnavailable: 'Some log files could not be collected.',
+    invalidRecords: 'Incomplete or invalid log records were omitted.',
+    logLosses: 'Some messages were dropped, shortened or could not be written.',
+    incompleteCounters: 'Log loss counters are incomplete; zero does not guarantee complete logs.',
   },
   preparation: {
     cancelImport: 'Cancel import',
@@ -123,6 +132,7 @@ export const englishResources = {
     person: 'Person',
   },
   settings: {
+    diagnostics: 'Diagnostics',
     devModelAssets: 'Development model assets',
     devModelHelp:
       'Prepared by the model setup command. The app verifies and loads these files locally.',

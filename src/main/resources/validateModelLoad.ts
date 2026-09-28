@@ -1,13 +1,11 @@
 import { offlineEnvironment } from '../speech/inferenceEnvironment'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import { executeLogged as execute } from '../processes/LoggedCommand'
 import { writeFile, rm, mkdtemp } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import type { ModelDefinition } from '../../shared/modelManifest.schema'
 import type { AppRuntimeLocator } from '../runtime/AppRuntimeLocator'
-const execute = promisify(execFile)
 
 export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: string) {
   const validate = async (

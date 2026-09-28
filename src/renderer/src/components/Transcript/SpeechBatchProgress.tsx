@@ -115,7 +115,12 @@ export function SpeechBatchProgress({
         )}
       </div>
       {reportIds && (
-        <DiagnosticReportDialog diagnosticIds={reportIds} onClose={() => setReportIds(null)} />
+        <DiagnosticReportDialog
+          request={
+            reportIds.length ? { kind: 'failure', diagnosticIds: reportIds } : { kind: 'recent' }
+          }
+          onClose={() => setReportIds(null)}
+        />
       )}
     </>
   )

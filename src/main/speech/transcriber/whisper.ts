@@ -60,7 +60,11 @@ interface WhisperJson {
  * internal timestamp coordinate system starts at the real speech onset rather
  * than at position 0 of the file.
  */
-async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal): Promise<number> {
+async function detectLeadingSilence(
+  audioFilePath: string,
+  signal: AbortSignal,
+  operationId?: string,
+): Promise<number> {
   throwIfAborted(signal)
   let ffmpegPath: string
   try {
@@ -107,6 +111,7 @@ async function detectLeadingSilence(audioFilePath: string, signal: AbortSignal):
   }
 
   const operation = manageProcess(launch, signal, {
+    helper: { source: 'ffmpeg', component: 'leading-silence', operationId },
     onStderr: (chunk) => {
       if (decision === undefined) consume(decoder.write(chunk))
       if (decision !== undefined) operation.fail(new Error('Leading silence decision complete'))
@@ -185,7 +190,11 @@ export class WhisperTranscriber implements ITranscriber {
       // whisper always starts its first timestamp at 0 (the chunk window start),
       // so without this offset the first words appear to start at 0 s even when
       // there is several seconds of silence before any speech.
-      const leadingSilenceMs = await detectLeadingSilence(audioFilePath, signal)
+      const leadingSilenceMs = await detectLeadingSilence(
+        audioFilePath,
+        signal,
+        options.operationId,
+      )
 
       throwIfAborted(signal)
       onProgress?.({ stage: 'starting-transcription' })
@@ -223,6 +232,11 @@ export class WhisperTranscriber implements ITranscriber {
         () => spawn(binary, args, { env: offlineEnvironment(process.env) }),
         signal,
         {
+          helper: {
+            source: 'whisper',
+            component: 'transcription',
+            operationId: options.operationId,
+          },
           onStderr: (chunk) => {
             const text = progressTail + chunk.toString('utf8')
             let consumed = 0

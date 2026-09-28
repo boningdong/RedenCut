@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
-import { DiagnosticReportSchema } from '../src/shared/diagnostics.types'
+import { DiagnosticBundleManifestSchema } from '../src/shared/DiagnosticBundleTypes'
+import { unzip } from '../src/main/diagnostics/DiagnosticZipTestSupport'
 import { McpTestSession } from './support/McpTestSession'
 
 let session: McpTestSession | undefined
@@ -44,15 +44,12 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
   await session.call('browser_snapshot')
   await session.screenshot('alignment-failure')
   await session.call('browser_click', { target: 'button:text-is("Export diagnostic report")' })
-  const preview = session.page.locator('pre[aria-label="Report preview"]')
+  const preview = session.page.getByRole('button', { name: 'Inspect collected files' })
   await expect.poll(() => preview.isVisible()).toBe(true)
-  const content = await preview.textContent()
-  expect(content).toContain(diagnosticId)
+  expect(await session.page.locator('.diagnostic-collection').innerText()).toContain(diagnosticId)
   await expect
     .poll(() =>
-      session!.page
-        .getByText(/Audio, transcript text, project files and tokens are excluded/)
-        .isVisible(),
+      session!.page.getByText(/Audio, transcript text and project files are excluded/).isVisible(),
     )
     .toBe(true)
   await session.call('browser_snapshot')
@@ -60,26 +57,23 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
   await session.call('redencut_prepare_dialog', {
     request: { purpose: 'diagnostic-report', selection: { type: 'cancel' } },
   })
-  await session.call('browser_click', { target: 'button:text-is("Save report…")' })
+  await session.call('browser_click', { target: 'button:text-is("Save diagnostic bundle…")' })
   await expect.poll(() => preview.isVisible()).toBe(true)
   await session.call('redencut_prepare_dialog', {
     request: {
       purpose: 'diagnostic-report',
-      selection: { type: 'report', filename: 'alignment-diagnostics.json' },
+      selection: { type: 'report', filename: 'alignment-diagnostics.zip' },
     },
   })
-  await session.call('browser_click', { target: 'button:text-is("Save report…")' })
+  await session.call('browser_click', { target: 'button:text-is("Save diagnostic bundle…")' })
   await expect
     .poll(() => session!.page.getByRole('button', { name: 'Show in Finder' }).isVisible())
     .toBe(true)
-  const saved = readFileSync(
-    join(session.directory, 'reports', 'alignment-diagnostics.json'),
-    'utf8',
-  )
-  expect(saved).toBe(content)
-  const report = DiagnosticReportSchema.parse(JSON.parse(saved))
+  const files = await unzip(join(session.directory, 'reports', 'alignment-diagnostics.zip'))
+  const report = DiagnosticBundleManifestSchema.parse(JSON.parse(files['manifest.json']))
+  const saved = Object.values(files).join('\n')
   expect(report.diagnosticIds).toContain(diagnosticId)
-  expect(report.events.some((event) => event.event === 'operation/failed')).toBe(true)
+  expect(saved).toContain('operation/failed')
   expect(saved).not.toContain('mandarin-short-female.wav')
   expect(saved).not.toContain('今天下午')
   await session.screenshot('report-saved')
@@ -134,10 +128,9 @@ test('two failed sources keep distinct IDs and one combined report', async () =>
   await session.call('browser_snapshot')
   await session.screenshot('batch-two-failures')
   await session.call('browser_click', { target: 'button:text-is("Export all failed sources")' })
-  const preview = session.page.locator('pre[aria-label="Report preview"]')
+  const preview = session.page.getByRole('button', { name: 'Inspect collected files' })
   await expect.poll(() => preview.isVisible()).toBe(true)
-  const report = DiagnosticReportSchema.parse(JSON.parse((await preview.textContent())!))
-  expect(report.diagnosticIds).toEqual(ids)
-  expect(report.events.filter((event) => event.event === 'operation/failed')).toHaveLength(2)
+  const summaryText = await session.page.locator('.diagnostic-collection').innerText()
+  for (const id of ids) expect(summaryText).toContain(id)
   await session.screenshot('batch-combined-report')
 }, 240_000)

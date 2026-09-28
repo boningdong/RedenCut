@@ -1,4 +1,14 @@
-import { appendFile, mkdir, open, readdir, readFile, rename, stat, unlink } from 'node:fs/promises'
+import {
+  appendFile,
+  copyFile,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  rename,
+  stat,
+  unlink,
+} from 'node:fs/promises'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { AppLogEventSchema, type AppLogEvent } from '../../shared/diagnostics.types'
@@ -95,6 +105,21 @@ export class DiagnosticLog {
       this.warnFallback()
       return []
     }
+  }
+
+  snapshot(destination: string): Promise<string[]> {
+    const job = this.queue.then(async () => {
+      await mkdir(destination, { recursive: true, mode: 0o700 })
+      await this.prune()
+      const files = await this.logFiles()
+      for (const name of files) await copyFile(join(this.directory, name), join(destination, name))
+      return files
+    })
+    this.queue = job.then(
+      () => {},
+      () => this.warnFallback(),
+    )
+    return job
   }
 
   async dispose(): Promise<void> {

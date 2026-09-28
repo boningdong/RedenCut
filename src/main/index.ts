@@ -1,3 +1,5 @@
+import { DiagnosticChannels } from '../shared/DiagnosticBundleTypes'
+import { appLogger } from './logging/AppLogger'
 import { installProjectMenu } from './ProjectMenu'
 import { ProjectCloseGuard } from './project/ProjectCloseGuard'
 import { registerPreparedAudioIpc } from './ipc/PreparedAudioIpc'
@@ -94,17 +96,22 @@ startApplicationLifecycle({
   },
   initialize: async () => {
     if (process.platform === 'darwin') app.dock?.setIcon(appIcon)
+    await appLogger.initialize(app.getPath('logs'))
     const diagnosticLog = await DiagnosticLog.create(app.getPath('logs'))
-    const diagnosticReports = new DiagnosticReport(diagnosticLog, {
-      appVersion: app.getVersion(),
-      platform: process.platform,
-      architecture: process.arch,
-    })
+    const diagnosticReports = new DiagnosticReport(
+      diagnosticLog,
+      {
+        appVersion: app.getVersion(),
+        platform: process.platform,
+        architecture: process.arch,
+      },
+      { messages: appLogger.writer, root: join(app.getPath('userData'), 'diagnostic-snapshots') },
+    )
     const appPreferences = new AppPreferencesStore(
       join(app.getPath('userData'), 'app-preferences.json'),
       () => app.getPreferredSystemLanguages(),
     )
-    await appPreferences.read().catch(console.error)
+    await appPreferences.read().catch(appLogger.reportError)
     registerAppPreferencesIpc(appPreferences)
     const runtime = new AppRuntimeLocator({
       packaged: app.isPackaged,
@@ -119,7 +126,7 @@ startApplicationLifecycle({
     // Retire only the app-owned credential. The developer's HF CLI login is untouched.
     await rm(join(app.getPath('userData'), 'secrets', 'huggingface.token'), { force: true }).catch(
       () => {
-        console.warn('Could not remove the retired application credential file.')
+        appLogger.warn('Could not remove the retired application credential file.')
       },
     )
     const developmentEnvironment = app.isPackaged
@@ -171,6 +178,7 @@ startApplicationLifecycle({
             ).consume('diagnostic-report')
           }
         : undefined,
+      () => appPreferences.getSnapshot().resolvedLocale,
     )
     const cleanupWarnings = new CleanupWarningStore()
     const controller = new WorkspaceController(
@@ -211,10 +219,10 @@ startApplicationLifecycle({
       pendingOpens,
       barrier,
       mutations,
-      console.error,
+      appLogger.reportError,
       dialogs,
     )
-    registerAudioIpc(controller, jobs, console.error, dialogs)
+    registerAudioIpc(controller, jobs, appLogger.reportError, dialogs)
     registerPreparedAudioIpc(controller, jobs)
     registerTranscriptIpc(controller, jobs)
     // The structured boundary records speech causes without printing private Error text.
@@ -238,7 +246,7 @@ startApplicationLifecycle({
     registerRenderIpc(
       controller,
       jobs,
-      console.error,
+      appLogger.reportError,
       new ExportCoordinator({ cleanupWarningSink: cleanupWarnings }),
       dialogs,
     )
@@ -264,12 +272,12 @@ startApplicationLifecycle({
         (command) => {
           void ensureWindow()
             .then(() => window.webContents.send('project:command', command))
-            .catch(console.error)
+            .catch(appLogger.reportError)
         },
         () => {
           void ensureWindow()
-            .then(() => window.webContents.send('diagnostics:open-recent'))
-            .catch(console.error)
+            .then(() => window.webContents.send(DiagnosticChannels.Open))
+            .catch(appLogger.reportError)
         },
       )
     appPreferences.subscribe(updateMenu)
@@ -287,7 +295,7 @@ startApplicationLifecycle({
             closeAllowed = true
             window.close()
           })
-          .catch(console.error)
+          .catch(appLogger.reportError)
       })
     }
     let rendererLoaded = false
@@ -349,7 +357,7 @@ startApplicationLifecycle({
     observeRendererLoad()
     protectWindow()
     app.on('activate', () => {
-      void ensureWindow().catch(console.error)
+      void ensureWindow().catch(appLogger.reportError)
     })
     return {
       ensureWindow,
@@ -373,7 +381,9 @@ startApplicationLifecycle({
         await Promise.all([developmentEnvironment?.shutdown(), resources.shutdown()])
         await mediaRecovery.shutdown()
         await barrier.shutdown()
+        await diagnosticReports.dispose()
         await diagnosticLog.dispose()
+        await appLogger.dispose()
       },
     }
   },

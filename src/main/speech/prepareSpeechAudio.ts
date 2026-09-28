@@ -40,7 +40,7 @@ async function normalize(
         getFfmpegPath(),
         [
           '-v',
-          'error',
+          'warning',
           '-nostdin',
           '-f',
           'f32le',
@@ -61,6 +61,7 @@ async function normalize(
         { stdio: ['ignore', 'ignore', 'pipe'] },
       ),
     signal,
+    { helper: { source: 'ffmpeg', component: 'speech-audio' } },
   )
   const exit = await operation.completed
   if (exit.code !== 0)

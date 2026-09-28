@@ -1,3 +1,4 @@
+import type { DiagnosticCollectionRequest } from './DiagnosticBundleTypes'
 import type { ProjectCommand, ProjectCloseRequest } from './ProjectCommands'
 import type { DiagnosticReportPreview, DiagnosticSaveResult } from './diagnostics.types'
 import type { PreparedAudioAPI } from './PreparedAudioTypes'
@@ -185,10 +186,11 @@ export interface IElectronAPI {
     ): Promise<TranscriptionCancellationResult>
   }
   diagnostics: {
-    recentFailure(): Promise<string | null>
-    previewReport(diagnosticIds: string[]): Promise<DiagnosticReportPreview>
+    previewReport(request: DiagnosticCollectionRequest): Promise<DiagnosticReportPreview>
     saveReport(previewId: string): Promise<DiagnosticSaveResult>
     showSavedReport(previewId: string): Promise<void>
+    inspectReport(previewId: string): Promise<void>
+    releaseReport(previewId: string): Promise<void>
   }
   speakerIdentity: {
     save(request: SaveSpeakerIdentitiesRequest): Promise<RendererSession>

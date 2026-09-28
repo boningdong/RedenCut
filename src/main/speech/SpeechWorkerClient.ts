@@ -97,6 +97,8 @@ export class SpeechWorkerClient {
         ),
       signal,
       {
+        helper: { source: 'python', component: 'speech-worker', operationId: request.jobId },
+        logFormat: 'python',
         terminateGraceMs: this.options.terminateGraceMs,
         onStdout: (chunk) => {
           buffer = Buffer.concat([buffer, chunk])

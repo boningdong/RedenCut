@@ -684,12 +684,7 @@ export default function App() {
   useEffect(
     () =>
       window.electronAPI.on.openRecentDiagnostic(() => {
-        void window.electronAPI.diagnostics.recentFailure().then(
-          (id) => {
-            if (id) setReportIds([id])
-          },
-          (reason: unknown) => setError(normalizePublicError(reason)),
-        )
+        setReportIds([])
       }),
     [],
   )
@@ -1067,7 +1062,12 @@ export default function App() {
       <MissingMediaDialog />
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
       {reportIds && (
-        <DiagnosticReportDialog diagnosticIds={reportIds} onClose={() => setReportIds(null)} />
+        <DiagnosticReportDialog
+          request={
+            reportIds.length ? { kind: 'failure', diagnosticIds: reportIds } : { kind: 'recent' }
+          }
+          onClose={() => setReportIds(null)}
+        />
       )}
       {showOnboarding && (
         <OnboardingDialog

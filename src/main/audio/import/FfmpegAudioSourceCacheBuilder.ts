@@ -1,3 +1,4 @@
+import { collectHelperLogs } from '../../processes/HelperLogCollector'
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
 import { once } from 'events'
@@ -117,7 +118,7 @@ export class FfmpegAudioSourceCacheBuilder {
         getFfmpegPath(),
         [
           '-v',
-          'error',
+          'warning',
           '-i',
           request.sourcePath,
           '-f',
@@ -132,6 +133,7 @@ export class FfmpegAudioSourceCacheBuilder {
         ],
         { stdio: ['ignore', 'pipe', 'pipe'], env: runtimeEnvironment(process.env) },
       )
+      collectHelperLogs(child, { source: 'ffmpeg', component: 'audio-import' })
       child.once('error', recordFailure)
       child.stdout.once('error', recordFailure)
       child.stderr.once('error', recordFailure)

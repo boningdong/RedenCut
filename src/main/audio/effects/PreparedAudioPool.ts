@@ -1,3 +1,4 @@
+import { appLogger } from '../../logging/AppLogger'
 import { createHash } from 'node:crypto'
 import type { AudioRenderPlan } from '../../../shared/audio/AudioRenderPlan'
 import type { AudioSource, AudioSourceId } from '../../../shared/ProjectTypes'
@@ -100,7 +101,7 @@ export class PreparedAudioPool {
           }
         },
         () => {
-          void this.retire(created).catch(console.error)
+          void this.retire(created).catch(appLogger.reportError)
         },
       )
     }

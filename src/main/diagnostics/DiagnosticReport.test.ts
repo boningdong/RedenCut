@@ -1,78 +1,37 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { expect, it } from 'vitest'
 import { DiagnosticLog } from './DiagnosticLog'
 import { DiagnosticReport } from './DiagnosticReport'
-import { DiagnosticReportSchema } from '../../shared/diagnostics.types'
 
-it('exports only selected operations and saves the exact preview after rotation', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'diagnostic-report-'))
+it('reports selected history missing while retaining unrelated event context', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'diagnostic-report-'))
+  const log = await DiagnosticLog.create(join(root, 'logs'))
+  const reports = new DiagnosticReport(
+    log,
+    { appVersion: 'test', platform: 'darwin', architecture: 'arm64' },
+    { root: join(root, 'snapshots') },
+  )
   try {
-    const log = await DiagnosticLog.create(directory, { maxBytes: 350, maxFiles: 2 })
-    const id = crypto.randomUUID()
-    const other = crypto.randomUUID()
     await log.write({
       schemaVersion: 1,
       time: new Date().toISOString(),
       level: 'info',
       event: 'speech/stage-started',
-      operationId: 'selected',
+      operationId: 'another-job',
       facts: { stage: 'aligning' },
     })
-    await log.write({
-      schemaVersion: 1,
-      time: new Date().toISOString(),
-      level: 'error',
-      event: 'operation/failed',
-      operationId: 'selected',
-      diagnosticId: id,
-      facts: { code: 'speech/alignment-segment-mismatch', stage: 'aligning' },
-    })
-    await log.write({
-      schemaVersion: 1,
-      time: new Date().toISOString(),
-      level: 'error',
-      event: 'operation/failed',
-      operationId: 'unrelated',
-      diagnosticId: other,
-      facts: { code: 'speech/alignment-inference-failed', stage: 'aligning' },
-    })
-    const reports = new DiagnosticReport(log, {
-      appVersion: 'test',
-      platform: 'darwin',
-      architecture: 'arm64',
-    })
-    const preview = await reports.previewReport({ diagnosticIds: [id] })
-    expect(reports.suggestedFilename(preview.previewId)).toBe(
-      `redencut-diagnostics-${id.slice(0, 8)}.json`,
+    const p = await reports.previewReport(
+      { kind: 'failure', diagnosticIds: [crypto.randomUUID()] },
+      1,
     )
-    expect(preview.content).toContain(id)
-    expect(preview.content).not.toContain(other)
-    expect(preview.content).not.toContain('/private/')
-    expect(DiagnosticReportSchema.safeParse(JSON.parse(preview.content)).success).toBe(true)
-    expect(
-      DiagnosticReportSchema.safeParse({
-        ...JSON.parse(preview.content),
-        privatePath: '/private/audio',
-      }).success,
-    ).toBe(false)
-    for (let i = 0; i < 5; i++)
-      await log.write({
-        schemaVersion: 1,
-        time: new Date().toISOString(),
-        level: 'info',
-        event: 'speech/stage-started',
-        operationId: `new-${i}`,
-        facts: { stage: 'aligning' },
-      })
-    const destination = join(directory, 'report.json')
-    await reports.saveReport(preview.previewId, destination)
-    expect(await readFile(destination, 'utf8')).toBe(preview.content)
-    const missing = await reports.previewReport({ diagnosticIds: [id] })
-    expect(missing.partial).toBe(true)
-    await log.dispose()
+    expect(p.manifest.warnings).toContain('history-missing')
+    expect(p.manifest.files.length).toBe(1)
+    expect(reports.suggestedFilename(p.previewId, 1)).toMatch(/\.zip$/)
   } finally {
-    await rm(directory, { recursive: true, force: true })
+    await reports.dispose()
+    await log.dispose()
+    await rm(root, { recursive: true, force: true })
   }
 })

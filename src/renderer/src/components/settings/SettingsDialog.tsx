@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '../../i18n/useTranslation'
 import { PreferencesDialog } from './PreferencesDialog'
+import { DiagnosticsSettings } from './DiagnosticsSettings'
 import { GeneralSettings } from './GeneralSettings'
 import { ThemeSettings } from './ThemeSettings'
 import { SpeechResourcesSettings } from './SpeechResourcesSettings'
@@ -8,13 +9,13 @@ import { Icon } from '../ui/Icon'
 import { LocaleNotice } from '../LocaleNotice'
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<'general' | 'theme' | 'resources'>('general')
+  const [tab, setTab] = useState<'general' | 'theme' | 'resources' | 'diagnostics'>('general')
   return (
     <PreferencesDialog className="settings" label={t('settings.title')} onClose={onClose}>
       <div className="settings-layout">
         <nav className="settings-nav">
           <h3>{t('settings.title')}</h3>
-          {(['general', 'theme', 'resources'] as const).map((id) => (
+          {(['general', 'theme', 'resources', 'diagnostics'] as const).map((id) => (
             <button key={id} data-value={id} aria-current={tab === id} onClick={() => setTab(id)}>
               <Icon name={id === 'general' ? 'globe' : id === 'theme' ? 'palette' : 'wave'} />
               {t(`settings.${id}`)}
@@ -36,6 +37,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <GeneralSettings />
             ) : tab === 'theme' ? (
               <ThemeSettings />
+            ) : tab === 'diagnostics' ? (
+              <DiagnosticsSettings />
             ) : (
               <SpeechResourcesSettings />
             )}

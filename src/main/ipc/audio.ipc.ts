@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { randomUUID } from 'crypto'
 import { basename } from 'path'
 import { BrowserWindow, ipcMain } from 'electron'
@@ -17,7 +18,7 @@ type DiagnosticSink = (error: unknown) => void
 export function registerAudioIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
-  diagnosticSink: DiagnosticSink = console.error,
+  diagnosticSink: DiagnosticSink = appLogger.reportError,
   dialogs: ProjectDialogs = nativeProjectDialogs,
 ): void {
   const selections = new Map<

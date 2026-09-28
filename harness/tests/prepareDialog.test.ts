@@ -143,22 +143,22 @@ test('export destinations are run-owned, format-bound, single-use and never over
   expect(() => mailbox.consume('export-audio', 'wav')).toThrow('EXPORT_ALREADY_EXISTS')
   expect(() => prepareDialog(root, run, 1, request)).toThrow('EXPORT_ALREADY_EXISTS')
 })
-test('diagnostic reports use a run-owned JSON destination and allow quiet cancellation', () => {
+test('diagnostic reports use a run-owned ZIP destination and allow quiet cancellation', () => {
   const { root, run, mailbox } = setup()
   prepareDialog(root, run, 1, { purpose: 'diagnostic-report', selection: { type: 'cancel' } })
   expect(mailbox.consume('diagnostic-report')).toBeNull()
   const request = {
     purpose: 'diagnostic-report',
-    selection: { type: 'report', filename: 'diagnostic.json' },
+    selection: { type: 'report', filename: 'diagnostic.zip' },
   } as const
   prepareDialog(root, run, 1, request)
-  expect(mailbox.consume('diagnostic-report')).toBe(join(run, 'reports/diagnostic.json'))
-  writeFileSync(join(run, 'reports/diagnostic.json'), '{}')
+  expect(mailbox.consume('diagnostic-report')).toBe(join(run, 'reports/diagnostic.zip'))
+  writeFileSync(join(run, 'reports/diagnostic.zip'), '{}')
   expect(() => prepareDialog(root, run, 1, request)).toThrow('REPORT_ALREADY_EXISTS')
   expect(() =>
     prepareDialog(root, run, 1, {
       purpose: 'diagnostic-report',
-      selection: { type: 'report', filename: '../private.json' },
+      selection: { type: 'report', filename: '../private.zip' },
     }),
   ).toThrow()
 })

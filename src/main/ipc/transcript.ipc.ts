@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { ipcMain } from 'electron'
 import type {
   CancelSessionJobRequest,
@@ -20,7 +21,7 @@ type DiagnosticSink = (error: unknown) => void
 export function registerTranscriptIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
-  diagnosticSink: DiagnosticSink = console.error,
+  diagnosticSink: DiagnosticSink = appLogger.reportError,
 ): void {
   const coordinator = new TranscriptionCoordinator({
     async transcribe(path, options, signal, onProgress) {

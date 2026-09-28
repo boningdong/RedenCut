@@ -1344,3 +1344,17 @@ html[data-theme='light'] .preferences-dialog {
 .whisper-selector {
   flex-shrink: 0;
 }
+
+.diagnostic-collection {
+  display: grid;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.diagnostic-collection p {
+  margin: 0;
+}
+.diagnostic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

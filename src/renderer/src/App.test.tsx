@@ -318,7 +318,8 @@ function installApi(initial: RendererSession) {
       cancel: vi.fn(async () => 'not-found' as const),
     },
     diagnostics: {
-      recentFailure: vi.fn(async () => null),
+      inspectReport: vi.fn(),
+      releaseReport: vi.fn(),
       previewReport: vi.fn(),
       saveReport: vi.fn(),
       showSavedReport: vi.fn(),

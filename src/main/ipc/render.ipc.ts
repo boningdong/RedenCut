@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { BrowserWindow, ipcMain } from 'electron'
 import { nativeProjectDialogs } from '../dialogs/nativeProjectDialogs'
 import type { ProjectDialogs } from '../dialogs/ProjectDialogs'
@@ -20,7 +21,7 @@ type DiagnosticSink = (error: unknown) => void
 export function registerRenderIpc(
   controller: WorkspaceController,
   jobs: SessionJobRegistry,
-  diagnosticSink: DiagnosticSink = console.error,
+  diagnosticSink: DiagnosticSink = appLogger.reportError,
   coordinator = new ExportCoordinator(),
   dialogs: ProjectDialogs = nativeProjectDialogs,
 ): void {

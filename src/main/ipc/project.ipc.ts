@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { BrowserWindow, ipcMain } from 'electron'
 import { nativeProjectDialogs } from '../dialogs/nativeProjectDialogs'
 import type { ProjectDialogs } from '../dialogs/ProjectDialogs'
@@ -21,7 +22,7 @@ export function registerProjectIpc(
   pendingOpens: PendingProjectOpenRegistry,
   switchBarrier: SessionSwitchBarrier,
   mutations: ProjectMutationCoordinator,
-  diagnosticSink: DiagnosticSink = console.error,
+  diagnosticSink: DiagnosticSink = appLogger.reportError,
   dialogs: ProjectDialogs = nativeProjectDialogs,
 ): void {
   ipcMain.handle('project:initialize', () =>

@@ -1,3 +1,4 @@
+import { appLogger } from '../logging/AppLogger'
 import { RuntimeValidationError } from '../runtime/RuntimeValidator'
 import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUnavailableError'
 import type { IpcError, IpcResult } from '../../shared/ipc.types'
@@ -28,7 +29,7 @@ export class PublicIpcError extends Error {
 
 export async function toIpcResult<T>(
   operation: () => Promise<T> | T,
-  diagnosticSink: (error: unknown) => void = console.error,
+  diagnosticSink: (error: unknown) => void = appLogger.reportError,
   failureContext?: {
     log: Pick<DiagnosticLog, 'write'>
     operationId: string

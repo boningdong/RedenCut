@@ -17,6 +17,8 @@ export type TranscriptionJobId = string & { readonly __brand: 'TranscriptionJobI
 export type TranscriptionCancellationResult = 'cancelled' | 'not-found'
 
 export interface TranscribeOptions {
+  /** Diagnostic correlation only; never forwarded as engine input. */
+  operationId?: string
   /**
    * BCP-47 language code, e.g. "en", "zh", "es".
    * If omitted, the engine auto-detects the language.

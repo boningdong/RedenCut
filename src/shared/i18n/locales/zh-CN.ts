@@ -1,22 +1,31 @@
 import type { TranslationResource } from './en'
 export const simplifiedChineseResources = {
   diagnostics: {
-    title: '诊断报告',
-    excluded:
-      '保存前可查看下面的完整报告。报告不包含音频、文字稿、工程文件或令牌。只有你主动分享时，报告才会离开这台电脑。',
-    partial: '部分较早的诊断事件已不可用，这份报告不完整。',
+    title: '诊断',
+    description: '收集最近的应用事件和日志，帮助排查问题。',
+    privacy:
+      '分享前请查看收集的文件。不会打包音频、文字稿或工程文件。常见凭据和私人路径会被隐藏，但第三方日志可能仍包含个人信息。只有你主动分享时，文件才会离开这台电脑。',
     ids: '诊断编号',
-    eventCount: '{{count}} 条事件',
-    preview: '报告预览',
-    save: '保存报告…',
+    size: '收集文件：{{count}} KiB',
+    coverage: '包含仍保留的日志历史。',
+    save: '保存诊断包…',
+    saving: '正在保存…',
     saveAgain: '选择其他位置…',
     showSaved: '在访达中显示',
     copyId: '复制编号',
-    loading: '正在准备报告…',
+    loading: '正在收集诊断信息…',
     export: '导出诊断报告',
     exportAll: '导出本批次全部故障',
     openSettings: '打开设置',
-    recent: '导出最近的诊断报告…',
+    recent: '收集诊断信息…',
+    collect: '收集诊断信息…',
+    collectAgain: '重新收集',
+    inspect: '查看收集的文件',
+    historyMissing: '部分请求的故障历史已不可用。',
+    logsUnavailable: '部分日志文件无法收集。',
+    invalidRecords: '已略过不完整或无效的日志记录。',
+    logLosses: '部分消息被丢弃、截短或未能写入。',
+    incompleteCounters: '日志丢失计数不完整；零不代表日志完整。',
   },
   preparation: {
     cancelImport: '取消导入',
@@ -121,6 +130,7 @@ export const simplifiedChineseResources = {
     person: '人物',
   },
   settings: {
+    diagnostics: '诊断',
     devModelAssets: '开发模型资源',
     devModelHelp: '由模型准备命令安装，应用在本地验证并加载这些文件。',
     devModelSetup:

@@ -1,8 +1,10 @@
 from contextlib import redirect_stdout
 import json
+import logging
 import sys
 from typing import IO, Any, Dict
 
+from .logging_setup import configure_logging
 from .alignment import align
 from .diarization import diarize
 from .protocol import ProtocolError, parse_request
@@ -17,6 +19,7 @@ def emit(output: IO[str], value: Dict[str, Any]) -> None:
 
 
 def run(input_stream: IO[str], output: IO[str]) -> int:
+    configure_logging()
     job_id = "unknown"
     try:
         line = input_stream.readline(MAX_JSONL_MESSAGE_BYTES + 1)
@@ -47,6 +50,7 @@ def run(input_stream: IO[str], output: IO[str]) -> int:
         emit(output, {**envelope, "type": "result", "result": result})
         return 0
     except Exception as error:
+        logging.getLogger("speech-worker").exception("Speech worker request failed")
         code = (error.code if isinstance(error, AlignmentFailure) else
                 WorkerFailureCode.INVALID_REQUEST if isinstance(error, (ProtocolError, json.JSONDecodeError)) else WorkerFailureCode.WORKER_FAILED)
         emit(output, {

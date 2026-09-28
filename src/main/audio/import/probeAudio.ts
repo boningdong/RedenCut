@@ -1,3 +1,4 @@
+import { collectHelperLogs } from '../../processes/HelperLogCollector'
 import { RuntimeValidationError } from '../../runtime/RuntimeValidator'
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
@@ -48,7 +49,7 @@ export async function probeAudio(
   try {
     child = dependencies.spawn(
       getFfprobePath(),
-      ['-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', filePath],
+      ['-v', 'warning', '-print_format', 'json', '-show_streams', '-show_format', filePath],
       { stdio: ['ignore', 'pipe', 'pipe'], env: runtimeEnvironment(process.env) },
     )
   } catch (error) {
@@ -58,6 +59,7 @@ export async function probeAudio(
     })
   }
 
+  collectHelperLogs(child, { source: 'ffprobe', component: 'audio-probe' })
   let stdout = ''
   let stderr = ''
   let firstFailure: unknown = null

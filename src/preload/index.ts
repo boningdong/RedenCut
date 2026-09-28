@@ -1,3 +1,7 @@
+import {
+  DiagnosticChannels,
+  type DiagnosticCollectionRequest,
+} from '../shared/DiagnosticBundleTypes'
 import type { ProjectCommand, ProjectCloseRequest } from '../shared/ProjectCommands'
 import type { PreparedAudioAPI } from '../shared/PreparedAudioTypes'
 import type { ProjectOpenProgressEvent } from '../shared/AudioPreparationTypes'
@@ -197,13 +201,14 @@ const api = {
       invokeSafe<TranscriptionCancellationResult>(invoke, 'speech-analysis:cancel', request),
   },
   diagnostics: {
-    recentFailure: () => invokeSafe<string | null>(invoke, 'diagnostics:recent-failure'),
-    previewReport: (diagnosticIds: string[]) =>
-      invokeSafe<DiagnosticReportPreview>(invoke, 'diagnostics:preview', { diagnosticIds }),
+    inspectReport: (id: string) => invokeSafe<void>(invoke, DiagnosticChannels.Inspect, id),
+    releaseReport: (id: string) => invokeSafe<void>(invoke, DiagnosticChannels.Release, id),
+    previewReport: (request: DiagnosticCollectionRequest) =>
+      invokeSafe<DiagnosticReportPreview>(invoke, DiagnosticChannels.Preview, request),
     saveReport: (previewId: string) =>
-      invokeSafe<DiagnosticSaveResult>(invoke, 'diagnostics:save', previewId),
+      invokeSafe<DiagnosticSaveResult>(invoke, DiagnosticChannels.Save, previewId),
     showSavedReport: (previewId: string) =>
-      invokeSafe<void>(invoke, 'diagnostics:show-saved', previewId),
+      invokeSafe<void>(invoke, DiagnosticChannels.ShowSaved, previewId),
   },
   workspaceLayout: {
     get: () => invokeSafe<WorkspaceLayoutReadResult>(invoke, 'workspace-layout:get'),
@@ -227,8 +232,8 @@ const api = {
   on: {
     openRecentDiagnostic: (callback: () => void) => {
       const handler = () => callback()
-      ipcRenderer.on('diagnostics:open-recent', handler)
-      return () => ipcRenderer.off('diagnostics:open-recent', handler)
+      ipcRenderer.on(DiagnosticChannels.Open, handler)
+      return () => ipcRenderer.off(DiagnosticChannels.Open, handler)
     },
     projectCommand: projectCommands,
     projectCloseRequest: projectCloseRequests,

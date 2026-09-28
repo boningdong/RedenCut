@@ -1,3 +1,4 @@
+import { collectHelperLogs } from '../../processes/HelperLogCollector'
 import { runtimeEnvironment } from '../../runtime/RuntimeEnvironment'
 import { spawn } from 'child_process'
 import { buildAudioRenderPlan } from '../../../shared/audio/AudioRenderPlanBuilder'
@@ -400,6 +401,11 @@ async function waitForSuccessfulClose(
   identity: ExportIdentity,
   onProgress: (progress: RenderProgressEvent) => void,
 ): Promise<void> {
+  collectHelperLogs(child, {
+    source: 'ffmpeg',
+    component: 'audio-export',
+    operationId: identity.jobId,
+  })
   let killed = false
   let closed = false
   let firstFailure: unknown = null

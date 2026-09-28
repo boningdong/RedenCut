@@ -68,7 +68,7 @@ export function prepareDialog(
       }
     } else if (request.selection.type === 'report') {
       const name = filename(request.selection.filename)
-      if (!name.endsWith('.json') || name === '.json') throw new Error('INVALID_REPORT_NAME')
+      if (!name.endsWith('.zip') || name === '.zip') throw new Error('INVALID_REPORT_NAME')
       const root = join(runDirectory, 'reports')
       mkdirSync(root, { recursive: true, mode: 0o700 })
       if (lstatSync(root).isSymbolicLink()) throw new Error('REPORT_ROOT_SYMLINK')
