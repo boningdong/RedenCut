@@ -1345,16 +1345,209 @@ html[data-theme='light'] .preferences-dialog {
   flex-shrink: 0;
 }
 
-.diagnostic-collection {
-  display: grid;
-  gap: 12px;
+.preferences-dialog.settings:has([data-value='diagnostics'][aria-current='true']) {
+  height: 502px;
+}
+.preferences-dialog .settings-main:has(.diagnostic-collection) > .modal-heading {
+  margin-bottom: 18px;
+}
+
+.preferences-dialog .diagnostics-scroll {
+  display: flex;
+  flex-direction: column;
+}
+.preferences-dialog .diagnostic-collection {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0;
+  min-height: 340px;
   overflow-wrap: anywhere;
 }
-.diagnostic-collection p {
-  margin: 0;
+.preferences-dialog .diagnostic-intro {
+  color: var(--secondary);
+  margin-bottom: 24px;
+  max-width: 46ch;
 }
-.diagnostic-actions {
+.preferences-dialog .diagnostic-included h3 {
+  font-size: 12px;
+  color: var(--secondary);
+  margin-bottom: 12px;
+}
+.preferences-dialog .diagnostic-included > div {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--secondary);
+}
+.preferences-dialog .diagnostic-included svg {
+  color: var(--muted);
+}
+.preferences-dialog .diagnostic-result {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.preferences-dialog .diagnostic-result-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--subtle);
+}
+.preferences-dialog .diagnostic-result-heading svg {
+  color: var(--green);
+}
+.preferences-dialog .diagnostic-result-heading strong {
+  font-weight: 550;
+}
+.preferences-dialog .diagnostic-result-heading > span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+.preferences-dialog .diagnostic-metadata {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 14px 16px;
+  margin: 0;
+  font-size: 12px;
+}
+.preferences-dialog .diagnostic-metadata dt {
+  color: var(--muted);
+}
+.preferences-dialog .diagnostic-metadata dd {
+  margin: 0;
+  color: var(--secondary);
+}
+.preferences-dialog .diagnostic-files {
+  border-top: 1px solid var(--subtle);
+  padding: 11px 16px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.preferences-dialog .diagnostic-collection summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--secondary);
+}
+.preferences-dialog .diagnostic-file {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+}
+.preferences-dialog .diagnostic-file > span:last-child {
+  color: var(--muted);
+  text-align: right;
+  min-width: 0;
+}
+.preferences-dialog .diagnostic-privacy {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 24px 0;
+}
+.preferences-dialog .diagnostic-privacy details {
+  margin-top: 7px;
+}
+.preferences-dialog .diagnostic-privacy details p {
+  margin-top: 8px;
+}
+.preferences-dialog .diagnostic-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+  margin-top: auto;
+  border-top: 1px solid var(--subtle);
+}
+.preferences-dialog .diagnostic-primary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+  min-width: 0;
+}
+.preferences-dialog .diagnostic-actions button {
+  white-space: nowrap;
+}
+.preferences-dialog .diagnostic-actions button.diagnostic-secondary {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+.preferences-dialog .diagnostic-actions button.diagnostic-secondary:hover:not(:disabled) {
+  background: var(--raised);
+}
+.preferences-dialog .diagnostic-actions button.primary {
+  background: var(--fill);
+  border-color: var(--fill);
+  color: white;
+}
+.preferences-dialog .diagnostic-actions button.primary:hover:not(:disabled) {
+  background: var(--fill);
+  filter: brightness(1.09);
+}
+.preferences-dialog .diagnostic-actions button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.preferences-dialog .diagnostic-error,
+.preferences-dialog .diagnostic-warning {
+  color: var(--danger);
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.preferences-dialog .diagnostic-saved {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  font-size: 12px;
+  color: var(--green);
+  margin-bottom: 14px;
+}
+.preferences-dialog button.diagnostic-saved-link,
+.preferences-dialog button.diagnostic-saved-link:hover:not(:disabled) {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  font-size: inherit;
+}
+.preferences-dialog button.diagnostic-saved-link:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.preferences-dialog button.diagnostic-saved-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.preferences-dialog button.diagnostic-saved-link:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+@media (max-width: 570px) {
+  .preferences-dialog .diagnostic-result-heading {
+    flex-wrap: wrap;
+  }
+  .preferences-dialog .diagnostic-result-heading > span {
+    width: 100%;
+    margin-left: 28px;
+  }
+  .preferences-dialog .diagnostic-file {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .preferences-dialog .diagnostic-file > span:last-child {
+    text-align: left;
+  }
 }

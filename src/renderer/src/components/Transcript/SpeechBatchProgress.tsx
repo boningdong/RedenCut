@@ -4,8 +4,6 @@ import { useTranslation } from '../../i18n/useTranslation'
 import { publicMessage } from '../../i18n/messages'
 import { SpeechProgressStatus } from './SpeechProgressStatus'
 import { TranscriptProgressDetails } from './TranscriptProgressDetails'
-import { useState } from 'react'
-import { DiagnosticReportDialog } from '../diagnostics/DiagnosticReportDialog'
 import { Button } from '../ui/Button'
 
 export function SpeechBatchProgress({
@@ -15,6 +13,7 @@ export function SpeechBatchProgress({
   needsTimingReview = false,
   onCancel,
   onOpenSettings,
+  onOpenDiagnostics,
 }: {
   isGenerating: boolean
   status: SpeechProgress | TranscriptionProgress | null
@@ -22,13 +21,13 @@ export function SpeechBatchProgress({
   needsTimingReview?: boolean
   onCancel?: () => void
   onOpenSettings?: () => void
+  onOpenDiagnostics?: (diagnosticIds: string[]) => void
 }) {
   const { t } = useTranslation()
   const progress = useSpeechBatchStore((state) => state.progress)
   const cancelled = useSpeechBatchStore((state) => state.cancelled)
   const summary = useSpeechBatchStore((state) => state.summary)
   const dismiss = useSpeechBatchStore((state) => state.dismissSummary)
-  const [reportIds, setReportIds] = useState<string[] | null>(null)
   if (isGenerating)
     return (
       <SpeechProgressStatus
@@ -85,7 +84,10 @@ export function SpeechBatchProgress({
                       {' '}
                       {t('diagnostics.ids')}: {failure.error.diagnosticId}
                     </small>
-                    <Button size="sm" onClick={() => setReportIds([failure.error.diagnosticId!])}>
+                    <Button
+                      size="sm"
+                      onClick={() => onOpenDiagnostics?.([failure.error.diagnosticId!])}
+                    >
                       {t('diagnostics.export')}
                     </Button>
                   </>
@@ -101,7 +103,7 @@ export function SpeechBatchProgress({
               <Button
                 size="sm"
                 onClick={() =>
-                  setReportIds(
+                  onOpenDiagnostics?.(
                     summary.failures.flatMap((failure) =>
                       failure.error.diagnosticId ? [failure.error.diagnosticId] : [],
                     ),
@@ -114,14 +116,6 @@ export function SpeechBatchProgress({
           </TranscriptProgressDetails>
         )}
       </div>
-      {reportIds && (
-        <DiagnosticReportDialog
-          request={
-            reportIds.length ? { kind: 'failure', diagnosticIds: reportIds } : { kind: 'recent' }
-          }
-          onClose={() => setReportIds(null)}
-        />
-      )}
     </>
   )
 }

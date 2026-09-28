@@ -75,3 +75,33 @@ it('keeps a compact dismissible success with counts in collapsed details', () =>
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss analysis status' }))
   expect(screen.queryByRole('status')).toBeNull()
 })
+
+it('routes failure export to the app-owned Diagnostics page instead of opening another dialog', () => {
+  useSpeechBatchStore.getState().finish({
+    sourceCount: 1,
+    completedCount: 0,
+    reusedCount: 0,
+    cancelled: false,
+    failures: [
+      {
+        audioSourceId: 'source' as never,
+        displayName: 'Voice.wav',
+        phase: 'text',
+        error: { reason: 'operation-failed', diagnosticId: 'failure-id' },
+      },
+    ],
+  })
+  HTMLDialogElement.prototype.showModal = vi.fn()
+  HTMLDialogElement.prototype.close = vi.fn()
+  Object.defineProperty(window, 'electronAPI', {
+    configurable: true,
+    value: {
+      diagnostics: { previewReport: vi.fn(() => new Promise(() => {})), releaseReport: vi.fn() },
+    },
+  })
+  const open = vi.fn()
+  render(<SpeechBatchProgress isGenerating={false} status={null} onOpenDiagnostics={open} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Export diagnostic report' }))
+  expect(open).toHaveBeenCalledWith(['failure-id'])
+  expect(document.querySelector('dialog')).toBeNull()
+})

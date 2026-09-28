@@ -14,7 +14,6 @@ import type { PublicMessage } from '@shared/publicMessages'
 import { normalizePublicError, publicMessage } from './i18n/messages'
 import { useTranslation } from './i18n/useTranslation'
 import { SettingsDialog } from './components/settings/SettingsDialog'
-import { DiagnosticReportDialog } from './components/diagnostics/DiagnosticReportDialog'
 import { OnboardingDialog } from './components/onboarding/OnboardingDialog'
 import { useLocaleStore } from './stores/locale.store'
 import { LocaleNotice } from './components/LocaleNotice'
@@ -115,6 +114,7 @@ export default function App() {
   const [reportIds, setReportIds] = useState<string[] | null>(null)
   const [showExport, setShowExport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsNavigationId, setSettingsNavigationId] = useState(0)
   const showOnboarding = useLocaleStore(
     (state) => state.hydrated && state.onboardingDisposition === 'pending',
   )
@@ -685,6 +685,8 @@ export default function App() {
     () =>
       window.electronAPI.on.openRecentDiagnostic(() => {
         setReportIds([])
+        setSettingsNavigationId((value) => value + 1)
+        setShowSettings(true)
       }),
     [],
   )
@@ -992,7 +994,13 @@ export default function App() {
                 {' '}
                 {t('diagnostics.ids')}: {error.diagnosticId}
               </small>
-              <Button size="sm" onClick={() => setReportIds([error.diagnosticId!])}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setReportIds([error.diagnosticId!])
+                  setShowSettings(true)
+                }}
+              >
                 {t('diagnostics.export')}
               </Button>
             </>
@@ -1050,6 +1058,11 @@ export default function App() {
             generatingStatus={generatingStatus}
             onCancel={cancelSpeechAnalysis}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenDiagnostics={(ids) => {
+              setReportIds(ids)
+              setSettingsNavigationId((value) => value + 1)
+              setShowSettings(true)
+            }}
           />
         )}
         transport={(workspaceControls) => (
@@ -1060,13 +1073,18 @@ export default function App() {
         )}
       />
       <MissingMediaDialog />
-      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
-      {reportIds && (
-        <DiagnosticReportDialog
-          request={
-            reportIds.length ? { kind: 'failure', diagnosticIds: reportIds } : { kind: 'recent' }
+      {showSettings && (
+        <SettingsDialog
+          navigationId={settingsNavigationId}
+          initialTab={reportIds ? 'diagnostics' : 'general'}
+          diagnosticsRequest={
+            reportIds?.length ? { kind: 'failure', diagnosticIds: reportIds } : { kind: 'recent' }
           }
-          onClose={() => setReportIds(null)}
+          autoCollect={Boolean(reportIds?.length)}
+          onClose={() => {
+            setShowSettings(false)
+            setReportIds(null)
+          }}
         />
       )}
       {showOnboarding && (

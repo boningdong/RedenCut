@@ -56,6 +56,7 @@ export interface TranscriptPanelProps {
   isGenerating: boolean
   onCancel?: () => void
   onOpenSettings?: () => void
+  onOpenDiagnostics?: (diagnosticIds: string[]) => void
   /** Status message during generation. */
   generatingStatus: SpeechProgress | TranscriptionProgress | null
 }
@@ -77,6 +78,7 @@ function LegacyTranscriptPanel({
   generatingStatus,
   onCancel,
   onOpenSettings,
+  onOpenDiagnostics,
 }: TranscriptPanelProps) {
   const { t } = useTranslation()
   const currentTime = usePlaybackStore((s) => s.currentTime)
@@ -521,6 +523,7 @@ function LegacyTranscriptPanel({
         status={generatingStatus}
         onCancel={onCancel}
         onOpenSettings={onOpenSettings}
+        onOpenDiagnostics={onOpenDiagnostics}
       />
     </div>
   )

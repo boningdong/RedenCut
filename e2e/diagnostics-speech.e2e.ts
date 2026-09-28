@@ -44,7 +44,7 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
   await session.call('browser_snapshot')
   await session.screenshot('alignment-failure')
   await session.call('browser_click', { target: 'button:text-is("Export diagnostic report")' })
-  const preview = session.page.getByRole('button', { name: 'Inspect collected files' })
+  const preview = session.page.getByRole('button', { name: 'Review files' })
   await expect.poll(() => preview.isVisible()).toBe(true)
   expect(await session.page.locator('.diagnostic-collection').innerText()).toContain(diagnosticId)
   await expect
@@ -57,7 +57,7 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
   await session.call('redencut_prepare_dialog', {
     request: { purpose: 'diagnostic-report', selection: { type: 'cancel' } },
   })
-  await session.call('browser_click', { target: 'button:text-is("Save diagnostic bundle…")' })
+  await session.call('browser_click', { target: 'button:text-is("Save bundle…")' })
   await expect.poll(() => preview.isVisible()).toBe(true)
   await session.call('redencut_prepare_dialog', {
     request: {
@@ -65,7 +65,7 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
       selection: { type: 'report', filename: 'alignment-diagnostics.zip' },
     },
   })
-  await session.call('browser_click', { target: 'button:text-is("Save diagnostic bundle…")' })
+  await session.call('browser_click', { target: 'button:text-is("Save bundle…")' })
   await expect
     .poll(() => session!.page.getByRole('button', { name: 'Show in Finder' }).isVisible())
     .toBe(true)
@@ -77,7 +77,7 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
   expect(saved).not.toContain('mandarin-short-female.wav')
   expect(saved).not.toContain('今天下午')
   await session.screenshot('report-saved')
-  await session.call('browser_click', { target: 'dialog button:text-is("Close")' })
+  await session.call('browser_click', { target: 'dialog button[aria-label="Close"]' })
   await session.call('browser_click', { target: 'button[aria-label="Settings"]' })
   await session.call('browser_select_option', { target: 'dialog select', values: ['zh-CN'] })
   await session.call('browser_click', { target: 'dialog button[aria-label="关闭"]' })
@@ -128,7 +128,7 @@ test('two failed sources keep distinct IDs and one combined report', async () =>
   await session.call('browser_snapshot')
   await session.screenshot('batch-two-failures')
   await session.call('browser_click', { target: 'button:text-is("Export all failed sources")' })
-  const preview = session.page.getByRole('button', { name: 'Inspect collected files' })
+  const preview = session.page.getByRole('button', { name: 'Review files' })
   await expect.poll(() => preview.isVisible()).toBe(true)
   const summaryText = await session.page.locator('.diagnostic-collection').innerText()
   for (const id of ids) expect(summaryText).toContain(id)

@@ -1,6 +1,10 @@
 import type { CSSProperties } from 'react'
 
 const paths = {
+  activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  monitor: 'M4 3h16a1 1 0 0 1 1 1v12H3V4a1 1 0 0 1 1-1M8 21h8M12 16v5',
+  file: 'M14 2H4v20h16V8l-6-6M14 2v6h6M8 13h8M8 17h6',
+  circleCheck: 'M22 12a10 10 0 1 1-6-9m6 1L12 14l-3-3',
   hierarchy:
     'M4.5 3h15A1.5 1.5 0 0 1 21 4.5v1A1.5 1.5 0 0 1 19.5 7h-15A1.5 1.5 0 0 1 3 5.5v-1A1.5 1.5 0 0 1 4.5 3ZM6 7v11a2 2 0 0 0 2 2h3M6 13h5M12.5 11h7a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-7a1.5 1.5 0 0 1-1.5-1.5v-1a1.5 1.5 0 0 1 1.5-1.5ZM12.5 18h7a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-7a1.5 1.5 0 0 1-1.5-1.5v-1a1.5 1.5 0 0 1 1.5-1.5Z',
   headphones: 'M3 14v-3a9 9 0 0 1 18 0v3M3 13h4v8H3zM17 13h4v8h-4z',
