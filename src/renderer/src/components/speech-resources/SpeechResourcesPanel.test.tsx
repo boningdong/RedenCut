@@ -138,7 +138,7 @@ it('shows development instructions, blocks model downloads, and unlocks after va
   )
   expect(screen.getByText(/Prepare the tools needed by each model above/)).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: 'Install guide' })[1])
-  expect(screen.getByText('npm run runtime:setup')).toBeTruthy()
+  expect(screen.getByText('npm run setup:runtime')).toBeTruthy()
   fireEvent.click(screen.getAllByRole('button', { name: 'Validate' })[1])
   await waitFor(() =>
     expect((screen.getByRole('button', { name: 'Download' }) as HTMLButtonElement).disabled).toBe(
@@ -391,7 +391,7 @@ it('shows missing managed models in Runtime and refreshes after CLI setup', asyn
   useResourcesStore.setState({ snapshot: { ...snapshot, development }, refresh })
   render(<SpeechResourcesPanel />)
   expect(screen.getByText('.runtime/models/diarization/pinned')).toBeTruthy()
-  expect(screen.getByText('npm run runtime:setup')).toBeTruthy()
+  expect(screen.getByText('npm run setup:models')).toBeTruthy()
   expect(screen.queryByText('Hugging Face')).toBeNull()
   fireEvent.click(screen.getAllByRole('button', { name: 'Validate' })[2])
   await waitFor(() =>

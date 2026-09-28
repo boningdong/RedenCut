@@ -5,8 +5,12 @@ import { cp, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { validateManagedDiarization } from './runtime/ManagedDiarizationModel.mjs'
+import { require as tsRequire } from 'tsx/cjs/api'
+
+import { validateManagedDiarization } from './models/ValidateDiarization.mjs'
 import { loadDiarizationModel } from './runtime/ManagedModelManifest.mjs'
+
+const { resolveModelsPath } = tsRequire('../src/main/resources/ModelsPath.ts', import.meta.url)
 
 const defaultRepository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const diarizationNoticeFiles = [
@@ -96,16 +100,22 @@ export async function stageManagedModelResources({
   repository = defaultRepository,
   staging,
   manifestPath = join(repository, 'speech-worker', 'models.json'),
-  modelsRoot = join(repository, '.runtime', 'models'),
+  modelsPath,
+  environment = process.env,
 }) {
   const model = await loadDiarizationModel(manifestPath)
-  const source = join(modelsRoot, 'diarization', model.revision)
+  const source = join(
+    resolveModelsPath({ modelsPath, environment }),
+    model.capability,
+    model.id,
+    model.revision,
+  )
   try {
     await validateManagedDiarization(source, model)
   } catch (error) {
     throw new Error(`Required managed diarization model is absent or invalid: ${error.message}`)
   }
-  const destination = join(staging, 'models', 'diarization', model.revision)
+  const destination = join(staging, 'models', model.capability, model.id, model.revision)
   await mkdir(destination, { recursive: true })
   for (const file of [...model.files.map(({ path }) => path), 'installation.json']) {
     await mkdir(dirname(join(destination, file)), { recursive: true })
@@ -127,12 +137,16 @@ export async function stageManagedModelResources({
   return { model, destination }
 }
 
-function parseArguments(args) {
+export function parseArguments(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 2) {
-    if (!['--resources-dir', '--bundle'].includes(args[index]) || !args[index + 1])
+    if (
+      !['--resources-dir', '--bundle', '--models-path'].includes(args[index]) ||
+      !args[index + 1] ||
+      args[index + 1].startsWith('--')
+    )
       throw new Error(
-        'Usage: npm run runtime:stage -- --resources-dir NEW_DIRECTORY [--bundle RUNTIME_BUNDLE]',
+        'Usage: npm run runtime:stage -- --resources-dir NEW_DIRECTORY [--bundle RUNTIME_BUNDLE] [--models-path MODELS_DIRECTORY]',
       )
     options[args[index]] = args[index + 1]
   }
@@ -165,7 +179,6 @@ export async function stageReleaseResources(args = process.argv.slice(2)) {
         bundle,
         '--runtime-root',
         join(staging, 'runtime'),
-        '--skip-models',
       ],
       { stdio: 'inherit' },
     )
@@ -177,7 +190,11 @@ export async function stageReleaseResources(args = process.argv.slice(2)) {
       join(defaultRepository, 'speech-worker/models.json'),
       join(staging, 'speech-worker/models.json'),
     )
-    await stageManagedModelResources({ repository: defaultRepository, staging })
+    await stageManagedModelResources({
+      repository: defaultRepository,
+      staging,
+      modelsPath: options['--models-path'],
+    })
     const notices = join(staging, 'third-party-notices')
     await mkdir(notices, { recursive: true })
     for (const name of ['LICENSE', 'LICENSES.chromium.html'])

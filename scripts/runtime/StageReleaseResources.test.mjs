@@ -7,6 +7,7 @@ import test from 'node:test'
 
 import {
   stageManagedModelResources,
+  parseArguments,
   validateDiarizationNotices,
 } from '../StageReleaseResources.mjs'
 
@@ -49,7 +50,7 @@ test('release staging fails when the required managed model is absent', async ()
     stageManagedModelResources({
       repository: process.cwd(),
       staging: join(root, 'staging'),
-      modelsRoot: root,
+      modelsPath: root,
     }),
     /required managed diarization model/i,
   )
@@ -57,32 +58,35 @@ test('release staging fails when the required managed model is absent', async ()
 
 test('release staging rejects an installation with corrupt allowlisted model content', async () => {
   const root = await mkdtemp(join(tmpdir(), 'redencut-release-test-'))
-  const revision = 'revision'
-  const modelRoot = join(root, '.runtime/models/diarization', revision)
+  const model = {
+    id: 'diarization-default',
+    capability: 'diarization',
+    repository: 'example/model',
+    revision: 'revision',
+    files: [{ path: 'config.yaml', size: 1, sha256: '0'.repeat(64) }],
+  }
+  const modelRoot = join(root, 'shared-models/diarization/diarization-default', model.revision)
   await mkdir(modelRoot, { recursive: true })
+  const manifestPath = join(root, 'models.json')
+  await writeFile(manifestPath, JSON.stringify({ models: [model] }))
+  await writeFile(join(modelRoot, 'config.yaml'), 'x')
   await writeFile(
-    join(root, 'speech-worker-models.json'),
+    join(modelRoot, 'installation.json'),
     JSON.stringify({
-      models: [
-        {
-          id: 'diarization-default',
-          capability: 'diarization',
-          repository: 'example/model',
-          revision,
-          files: [{ path: 'config.yaml', size: 1, sha256: '0'.repeat(64) }],
-        },
-      ],
+      id: model.id,
+      repository: model.repository,
+      revision: model.revision,
+      files: model.files,
     }),
   )
-  await writeFile(join(modelRoot, 'installation.json'), '{}')
   await assert.rejects(
     stageManagedModelResources({
       repository: root,
       staging: join(root, 'staging'),
-      manifestPath: join(root, 'speech-worker-models.json'),
-      modelsRoot: join(root, '.runtime/models'),
+      manifestPath,
+      modelsPath: join(root, 'shared-models'),
     }),
-    /managed diarization|installation/i,
+    /SHA-256 mismatch/,
   )
 })
 
@@ -102,7 +106,7 @@ test('release staging copies only verified allowlisted model files and notices',
     revision,
     files: [file],
   }
-  const modelRoot = join(root, '.runtime/models/diarization', revision)
+  const modelRoot = join(root, 'shared-models/diarization/diarization-default', revision)
   await mkdir(dirname(join(modelRoot, file.path)), { recursive: true })
   await writeFile(join(modelRoot, file.path), contents)
   await writeFile(
@@ -117,16 +121,42 @@ test('release staging copies only verified allowlisted model files and notices',
     repository: root,
     staging,
     manifestPath,
-    modelsRoot: join(root, '.runtime/models'),
+    modelsPath: join(root, 'shared-models'),
   })
   assert.equal(
-    await readFile(join(staging, 'models/diarization', revision, file.path), 'utf8'),
+    await readFile(
+      join(staging, 'models/diarization/diarization-default', revision, file.path),
+      'utf8',
+    ),
     contents,
   )
-  assert.deepEqual((await readdir(join(staging, 'models/diarization', revision))).sort(), [
-    'installation.json',
-    'weights',
-  ])
+  const environmentStaging = join(root, 'environment-staging')
+  await stageManagedModelResources({
+    repository: root,
+    staging: environmentStaging,
+    manifestPath,
+    environment: { REDENCUT_MODELS_PATH: join(root, 'shared-models') },
+  })
+  assert.equal(
+    await readFile(
+      join(environmentStaging, 'models/diarization/diarization-default', revision, file.path),
+      'utf8',
+    ),
+    contents,
+  )
+  const explicitStaging = join(root, 'explicit-staging')
+  await stageManagedModelResources({
+    repository: root,
+    staging: explicitStaging,
+    manifestPath,
+    modelsPath: join(root, 'shared-models'),
+    environment: { REDENCUT_MODELS_PATH: join(root, 'absent-models') },
+  })
+
+  assert.deepEqual(
+    (await readdir(join(staging, 'models/diarization/diarization-default', revision))).sort(),
+    ['installation.json', 'weights'],
+  )
   assert.equal(
     await readFile(
       join(
@@ -155,7 +185,7 @@ test('release staging refuses missing or tampered model notice materials', async
     revision,
     files: [file],
   }
-  const modelRoot = join(root, '.runtime/models/diarization', revision)
+  const modelRoot = join(root, 'shared-models/diarization/diarization-default', revision)
   await mkdir(dirname(join(modelRoot, file.path)), { recursive: true })
   await writeFile(join(modelRoot, file.path), contents)
   await writeFile(
@@ -171,7 +201,7 @@ test('release staging refuses missing or tampered model notice materials', async
       repository: root,
       staging: join(root, 'missing-staging'),
       manifestPath,
-      modelsRoot: join(root, '.runtime/models'),
+      modelsPath: join(root, 'shared-models'),
     }),
     /notice.*SOURCE|SOURCE.*notice/i,
   )
@@ -182,7 +212,7 @@ test('release staging refuses missing or tampered model notice materials', async
       repository: root,
       staging: join(root, 'tampered-staging'),
       manifestPath,
-      modelsRoot: join(root, '.runtime/models'),
+      modelsPath: join(root, 'shared-models'),
     }),
     /model card.*(size|hash)|upstream.*README/i,
   )
@@ -203,4 +233,17 @@ test('release staging refuses extraneous files in model notice materials', async
     validateDiarizationNotices(notices, model),
     /unexpected.*notice|notice.*token/i,
   )
+})
+
+test('release staging accepts a shared model path and rejects missing path values', () => {
+  assert.deepEqual(parseArguments(['--resources-dir', '/release', '--models-path', '/shared']), {
+    '--resources-dir': '/release',
+    '--models-path': '/shared',
+  })
+  for (const args of [
+    ['--resources-dir', '/release', '--models-path'],
+    ['--resources-dir', '/release', '--models-path', '--bundle'],
+    ['--resources-dir', '/release', '--models-root', '/old'],
+  ])
+    assert.throws(() => parseArguments(args), /Usage/)
 })

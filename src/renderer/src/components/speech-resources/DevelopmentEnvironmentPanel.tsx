@@ -111,7 +111,7 @@ export function DevelopmentEnvironmentPanel() {
               {guide === 'tools' && (
                 <div className="dev-guide">
                   <p>{t('settings.devRunAtRoot')}</p>
-                  <code>npm run runtime:setup</code>
+                  <code>npm run setup:runtime</code>
                   <p>{t('settings.devToolReturn')}</p>
                 </div>
               )}
@@ -126,7 +126,7 @@ export function DevelopmentEnvironmentPanel() {
                 <div className="dev-guide">
                   <b>{t('settings.devSetup')}</b>
                   <p>{t('settings.devRunAtRoot')}</p>
-                  <code>npm run runtime:setup</code>
+                  <code>npm run setup:runtime</code>
                   <p>{t('settings.devSetupHelp')}</p>
                   <p>{t('settings.devReturn')}</p>
                 </div>
@@ -161,7 +161,7 @@ export function DevelopmentEnvironmentPanel() {
                 {model.status !== 'ready' && model.status !== 'checking' && (
                   <div className="dev-guide">
                     <p>{t('settings.devModelSetup')}</p>
-                    <code>npm run runtime:setup</code>
+                    <code>{model.setupCommand ?? 'npm run setup:models'}</code>
                   </div>
                 )}
                 <div className="dev-block-footer">

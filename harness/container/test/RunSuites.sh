@@ -2,7 +2,7 @@
 set -eu
 . "$(dirname -- "$0")/../config/HarnessEnvironment.sh"
 
-usage='docker-harness.sh test {harness|e2e-base|e2e-speech|e2e-all} [--models ABSOLUTE_DIRECTORY]'
+usage='docker-harness.sh test {harness|e2e-base|e2e-speech|e2e-all} [--models-path DIRECTORY]'
 [ "$#" -ge 1 ] || usage_error "$usage"
 suite=$1
 shift
@@ -15,17 +15,22 @@ case "$suite" in
 esac
 
 models=''
-if [ "${1:-}" = --models ]; then
-  [ "$target" = speech ] && [ "$#" -eq 2 ] || usage_error "$usage"
+if [ "${1:-}" = --models-path ]; then
+  [ "$#" -eq 2 ] || usage_error "$usage"
   models=$2
   shift 2
 fi
 [ "$#" -eq 0 ] || usage_error "$usage"
-if [ "$target" = speech ]; then
-  [ -n "$models" ] || { echo 'MODEL_FIXTURE_REQUIRED: pass --models ABSOLUTE_DIRECTORY.' >&2; exit 1; }
-  case "$models" in /*) ;; *) usage_error "$usage" ;; esac
-  [ -d "$models" ] || { echo "MODEL_FIXTURE_REQUIRED: $models is not a directory." >&2; exit 1; }
-  node "$harness_root/test/ValidateAppModels.mjs" "$models" "$repository/speech-worker/models.json"
-  exec sh "$harness_root/run/RunContainer.sh" speech --models "$models" -- npm run "$npm_script"
+explicit_models=${models:-${REDENCUT_MODELS_PATH:-}}
+models=$(resolve_models_path "$models")
+if [ -n "$explicit_models" ] && [ ! -d "$models" ]; then
+  echo "MODELS_PATH_MISSING: $models; install models with 'npm run setup:models -- --models-path DIRECTORY' or select an existing directory." >&2
+  exit 1
 fi
-exec sh "$harness_root/run/RunContainer.sh" base -- npm run "$npm_script"
+if [ "$target" = speech ]; then
+  node --import tsx "$repository/scripts/models/Models.ts" check --set default --models-path "$models"
+fi
+if [ -d "$models" ]; then
+  exec sh "$harness_root/run/RunContainer.sh" "$target" --models-path "$models" -- npm run "$npm_script"
+fi
+exec sh "$harness_root/run/RunContainer.sh" "$target" -- npm run "$npm_script"

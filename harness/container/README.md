@@ -6,7 +6,7 @@ The host AI communicates through Docker stdin/stdout; there is no second CDP con
 ## Script organization
 
 `docker-harness.sh` is the public command entrypoint; the Dockerfiles and this README stay beside it.
-Host command modules live in `build/`, `run/`, `test/`, `models/`, and `mcp/`, with shared configuration in `config/`.
+Host command modules live in `build/`, `run/`, `test/`, and `mcp/`, with shared configuration in `config/`.
 Image construction helpers live in `build/audio/` and `build/speech/`: they compile tools and write runtime manifests, without downloading model weights.
 Container startup and shutdown helpers live in `lifecycle/`: `Entrypoint.sh` prepares the source snapshot and virtual display, `StartAudio.sh` starts virtual audio, and `SuperviseCommand.mjs` manages the requested command's lifetime.
 These internal helpers are called by Dockerfiles or container startup; use the public entrypoint for user commands.
@@ -38,8 +38,8 @@ The entrypoint rejects Node dependency manifest drift. Speech runs also reject s
 sh harness/container/docker-harness.sh test harness
 node --test harness/tests/container.smoke.mjs
 sh harness/container/docker-harness.sh test e2e-base
-sh harness/container/docker-harness.sh test e2e-speech --models /absolute/path/to/app/models
-sh harness/container/docker-harness.sh test e2e-all --models /absolute/path/to/app/models
+sh harness/container/docker-harness.sh test e2e-speech --models-path /absolute/path/to/app/models
+sh harness/container/docker-harness.sh test e2e-all --models-path /absolute/path/to/app/models
 ```
 
 `test harness` runs the existing full normal/fault suite inside the base image's virtual display.
@@ -48,16 +48,38 @@ The `node --test` command runs an MCP client on the host against the real contai
 It requires the host project's npm dependencies to be installed.
 `e2e-base` runs the [product E2Es](../../e2e/README.md) that need only the base image, including missing speech setup feedback. `e2e-speech` runs real speech and speech fault cases. `e2e-all` runs both sets in the speech image. The speech suites require an existing application model fixture and never download it.
 
-For a one-off command, use `sh harness/container/docker-harness.sh run base -- COMMAND [ARG...]` or `run speech [--models ABSOLUTE_DIRECTORY] -- COMMAND [ARG...]`. `run` requires a built image and does not build one; container startup compiles the current application source snapshot.
+For a one-off command, use `sh harness/container/docker-harness.sh run base -- COMMAND [ARG...]` or `run speech [--models-path DIRECTORY] -- COMMAND [ARG...]`. `run` requires a built image and does not build one; container startup compiles the current application source snapshot.
 
-## Speech model volume
+## Shared host models
+
+Prepare model files on the host before running speech tests:
 
 ```sh
-sh harness/container/docker-harness.sh models install
-sh harness/container/docker-harness.sh models check
+npm run setup:runtime
+npm run setup:models
+npm run check:models
+sh harness/container/docker-harness.sh test e2e-speech
 ```
 
-`models install` may download the manifest-listed weights into the named Docker `/models` volume and requires a readable Hugging Face token file. `models check` is an offline preflight of that volume and does not mount a token. Both require the speech image built from the current Python dependency lockfiles. See [speech models and dependencies](../../docs/speech-models-and-dependencies.md) for the model sources and access requirements.
+`setup:runtime` prepares native tools and Python dependencies only.
+`setup:models` prepares Small Whisper, English/Chinese alignment and diarization in the common `<capability>/<id>/<revision>/` layout.
+`check:models` checks the installation markers and file hashes offline; it does not download or require inference runtime loading.
+Use `--set text` for Whisper and alignment, `--model ID` for one manifest model, or `--import-from OLD_ROOT` to migrate matching older files through validation.
+Hugging Face authorization is needed only to acquire gated models; inference and packaged users do not authenticate.
+See [speech models and dependencies](../../docs/speech-models-and-dependencies.md) for sources and access requirements.
+
+`run`, `mcp`, and `test` resolve host models in this order:
+
+| Priority | Model path source |
+| --- | --- |
+| 1 | Explicit `--models-path DIRECTORY` |
+| 2 | `REDENCUT_MODELS_PATH` |
+| 3 | Platform RedenCut application models directory; macOS: `~/Library/Application Support/RedenCut/models` |
+
+An existing directory is mounted read-only at `/models`, with `REDENCUT_MODELS_PATH=/models` inside the container.
+There is no Docker model volume or model acquisition action.
+An absent default directory can start `run`/`mcp` so the app displays missing-resource guidance; an explicitly supplied missing directory fails with setup instructions.
+Speech suites check the default model set before Docker starts and fail if any required installation or digest is invalid.
 
 ## Virtual audio (container only)
 
@@ -71,7 +93,7 @@ Recorder cleanup is bounded and retained output lives in each test run's evidenc
 
 ## MCP entry
 
-Use `sh` as the MCP command with the absolute path to `harness/container/docker-harness.sh` followed by `mcp` (and optionally `speech --models ABSOLUTE_DIRECTORY`).
+Use `sh` as the MCP command with the absolute path to `harness/container/docker-harness.sh` followed by `mcp` (and optionally `speech --models-path DIRECTORY`).
 Do not allocate a TTY or wrap the MCP entry in a noisy npm command.
 The launcher resolves the checkout from its own path, so the client's current directory does not choose the source checkout.
 The default server command remains `node --import tsx harness/server.ts`; the tool catalog is unchanged.
@@ -87,6 +109,7 @@ AI-client configuration is a separate explicit step; successfully testing this e
 | Checkout's Git common directory | Same absolute path as host | Read-only, for linked-worktree provenance |
 | Image's Linux dependencies | `/workspace/node_modules` | Private anonymous volume per container |
 | Build output | `/workspace/out` | Private anonymous volume per container |
+| Resolved host application model directory, when present | `/models` | Read-only shared bind mount; never downloaded or modified by tests |
 | Host `.harness-runs/container/` | `/workspace/.harness-runs` | Writable retained evidence |
 
 The launcher snapshots and builds current source at startup because electron-vite writes temporary config files beside its configuration.
@@ -126,19 +149,12 @@ Preparation and consumption reject existing outputs, symlink parent changes and 
 To inspect an actual export, wait for the UI’s Done confirmation, then read only that run-owned output using FFprobe/FFmpeg.
 This file inspection verifies produced media and is separate from live audio recording, which MCP does not expose.
 
-## Real speech E2E model fixture
+## Real speech E2E models
 
-Speech E2Es require an already provisioned application model directory containing valid model markers and pinned model files.
-Pass it with `--models /absolute/path/to/app/models` on `test e2e-speech` or `test e2e-all`.
-The launcher mounts only this directory read-only at `/test-models`; the tests link it into their disposable user-data directory and the application verifies its contents normally.
+Speech E2Es require the default set: recommended Small Whisper, all English/Chinese alignment models, and diarization for speaker scenarios.
+Use `test e2e-speech` or `test e2e-all` with the default shared directory, or pass `--models-path /absolute/path/to/app/models`.
+The common model CLI verifies manifest identities, `installation.json` and file hashes before launching Docker; application readiness is still validated normally during the test.
+Models remain at `/models` across isolated test user-data directories, without per-run symlinks.
 No token, account profile, download, or modification of the original model directory is involved.
-A missing fixture is an explicit test prerequisite failure, not a skipped or simulated speech success.
+A missing or invalid model set is an explicit test prerequisite failure, not a skipped or simulated speech success.
 Use the audio-only image to exercise missing-Python setup feedback and the speech image for complete real-model E2Es.
-
-## Managed diarization fixtures
-
-The app resolves diarization independently of its downloaded Whisper/alignment models.
-The runner mounts the current checkout's `.runtime/models` read-only at `/managed-models` when it exists and sets `REDENCUT_MODELS_ROOT` explicitly.
-Use `REDENCUT_TEST_MANAGED_MODEL_FIXTURE` to select another already verified managed models directory.
-No acquisition or authorization occurs during UI acceptance; missing models remain visibly unavailable.
-The `--models` directory supplies downloaded Whisper/alignment models for real speech E2Es at `/test-models`. It is separate from the persistent `/models` Docker volume used by `models install` and `models check`. Installing into `/models` does not prepare `/test-models` or `.runtime/models`.

@@ -18,6 +18,7 @@ export interface ManagedModelState {
   id: string
   revision: string
   path: string
+  setupCommand?: string
   status: 'missing' | 'checking' | 'ready' | 'invalid'
   error?: string
 }

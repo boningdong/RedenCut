@@ -41,14 +41,14 @@ export class McpTestSession {
       alignmentFault?: 'segment-mismatch'
     } = {},
   ): Promise<void> {
-    if (options.speechModels || options.missingRuntime) {
+    {
       const launch = ElectronSession.launch.bind(ElectronSession)
       this.launchPreparation = vi
         .spyOn(ElectronSession, 'launch')
         .mockImplementation(async (...args) => {
-          if (options.speechModels) prepareSpeechModelFixture(args[1].directory)
+          if (options.speechModels) prepareSpeechModelFixture()
           if (options.alignmentFault) {
-            if (!options.speechModels || !existsSync('/test-models'))
+            if (!options.speechModels || !existsSync('/models'))
               throw new Error('ALIGNMENT_FAULT_REQUIRES_DISPOSABLE_CONTAINER_MODELS')
             if (process.env.REDENCUT_SPEECH_WORKER_ROOT !== resolve('speech-worker'))
               throw new Error('ALIGNMENT_FAULT_TARGET_MISMATCH')
@@ -61,16 +61,23 @@ export class McpTestSession {
                 '    raise AlignmentFailure("alignment-segment-mismatch", "fixture fault")\n',
             )
           }
-          if (!options.missingRuntime) return launch(...args)
           // A genuinely absent runtime under the owned run tests setup guidance in either image.
           // E2E files run serially; restore the environment even if launch fails.
           const previousRoot = process.env.REDENCUT_RUNTIME_ROOT
-          process.env.REDENCUT_RUNTIME_ROOT = join(args[1].directory, 'missing-runtime')
+          const previousModels = process.env.REDENCUT_MODELS_PATH
+          // Non-speech cases retain their missing-model fixture even in the full speech image.
+          process.env.REDENCUT_MODELS_PATH = options.speechModels
+            ? '/models'
+            : join(args[1].directory, 'missing-models')
+          if (options.missingRuntime)
+            process.env.REDENCUT_RUNTIME_ROOT = join(args[1].directory, 'missing-runtime')
           try {
             return await launch(...args)
           } finally {
             if (previousRoot === undefined) delete process.env.REDENCUT_RUNTIME_ROOT
             else process.env.REDENCUT_RUNTIME_ROOT = previousRoot
+            if (previousModels === undefined) delete process.env.REDENCUT_MODELS_PATH
+            else process.env.REDENCUT_MODELS_PATH = previousModels
           }
         })
     }

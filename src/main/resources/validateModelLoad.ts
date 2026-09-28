@@ -25,7 +25,7 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
     for (const key of Object.keys(env))
       if (/TOKEN|SECRET|PASSWORD/i.test(key)) delete (env as NodeJS.ProcessEnv)[key]
     env.HF_HUB_DISABLE_IMPLICIT_TOKEN = '1'
-    if (model.capability !== 'transcription') {
+    if (!['transcription', 'transcription-smoke'].includes(model.capability)) {
       const scratch = await mkdtemp(join(tmpdir(), 'redencut-model-load-'))
       try {
         await execute(
@@ -82,9 +82,13 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
     preflight: async (models: ModelDefinition[], signal: AbortSignal): Promise<void> => {
       signal.throwIfAborted()
       runtime.getFfmpegPath()
-      if (models.some((model) => model.capability === 'transcription'))
+      if (
+        models.some((model) => ['transcription', 'transcription-smoke'].includes(model.capability))
+      )
         runtime.getWhisperExecutablePath()
-      if (models.some((model) => model.capability !== 'transcription')) {
+      if (
+        models.some((model) => !['transcription', 'transcription-smoke'].includes(model.capability))
+      ) {
         const env: NodeJS.ProcessEnv = offlineEnvironment({
           ...process.env,
           HF_HUB_OFFLINE: '1',

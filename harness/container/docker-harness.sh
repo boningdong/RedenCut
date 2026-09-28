@@ -9,25 +9,21 @@ case "$action" in
     cat <<'EOF'
 Usage: docker-harness.sh ACTION ...
   build base|speech                 Build image(s); speech builds base first.
-  run base|speech [--models DIR] -- COMMAND [ARG...]  Use a built image; compile checkout at startup.
-  test harness|e2e-base|e2e-speech|e2e-all [--models DIR]
-  models install|check              Install may download; check is offline.
-  mcp [base|speech] [--models DIR]  Serve MCP over stdio.
+  run base|speech [--models-path DIR] -- COMMAND [ARG...]  Use a built image; compile checkout at startup.
+  test harness|e2e-base|e2e-speech|e2e-all [--models-path DIR]
+  mcp [base|speech] [--models-path DIR]  Serve MCP over stdio.
 
-Model stores are distinct:
-  /models          persistent Docker volume used by models install/check
-  /test-models     read-only app fixture supplied by --models for speech E2Es
-  .runtime/models  optional checkout-managed diarization fixture
+Models resolve from --models-path, REDENCUT_MODELS_PATH, then the platform app models directory.
+Existing host models mount read-only at /models; install with 'npm run setup:models --'.
 EOF
     exit 0
     ;;
   build) exec sh "$root/build/BuildImages.sh" "$@" ;;
   run) exec sh "$root/run/RunContainer.sh" "$@" ;;
   test) exec sh "$root/test/RunSuites.sh" "$@" ;;
-  models) exec sh "$root/models/ManageModels.sh" "$@" ;;
   mcp) exec sh "$root/mcp/ServeMcp.sh" "$@" ;;
   *)
-    echo 'Usage: docker-harness.sh {build|run|test|models|mcp} ...' >&2
+    echo 'Usage: docker-harness.sh {build|run|test|mcp} ...' >&2
     exit 64
     ;;
 esac

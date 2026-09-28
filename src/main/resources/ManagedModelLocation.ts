@@ -1,4 +1,5 @@
 import { isAbsolute, join, relative, resolve } from 'node:path'
+import { resolveModelsPath } from './ModelsPath'
 import type { RuntimeLocationOptions } from '../runtime/AppRuntimeLocator'
 
 export interface ManagedModelLocation {
@@ -7,12 +8,13 @@ export interface ManagedModelLocation {
   source: 'development-runtime' | 'bundled'
 }
 
-export function managedModelLocation(options: RuntimeLocationOptions): ManagedModelLocation {
+export function managedModelLocation(
+  options: RuntimeLocationOptions & { userData?: string },
+): ManagedModelLocation {
   const root = resolve(
     options.packaged
       ? join(options.resourcesPath, 'models')
-      : (options.env ?? process.env).REDENCUT_MODELS_ROOT ||
-          join(options.appPath, '.runtime/models'),
+      : resolveModelsPath({ environment: options.env, userData: options.userData }),
   )
   const fromProject = relative(resolve(options.appPath), root)
   return {

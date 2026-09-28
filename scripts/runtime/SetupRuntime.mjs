@@ -1,19 +1,12 @@
 #!/usr/bin/env node
 
-import { dirname, join, parse, resolve } from 'node:path'
-import { mkdtemp, open, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { parse, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { createRuntimeProgress } from './RuntimeProgress.mjs'
 
 import { buildRuntime } from './BuildRuntime.mjs'
 import { installRuntimeGeneration } from './RuntimeInstaller.mjs'
-import { installManagedDiarization } from './ManagedDiarizationModel.mjs'
-import { loadDiarizationModel } from './ManagedModelManifest.mjs'
-import { runManagedPython } from './RunPython.mjs'
-
-const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 export function assertSafeInstallDestination(destination) {
   const resolved = resolve(destination)
@@ -34,136 +27,31 @@ export function parseArguments(arguments_) {
     const argument = arguments_[index]
     if (argument === '--bundle') parsed.bundleRoot = readValue(argument, index++)
     else if (argument === '--runtime-root') parsed.runtimeRoot = readValue(argument, index++)
-    else if (argument === '--models-root') parsed.modelsRoot = readValue(argument, index++)
-    else if (argument === '--import-model') parsed.importModel = readValue(argument, index++)
-    else if (argument === '--models-only') parsed.modelsOnly = true
-    else if (argument === '--skip-models') parsed.skipModels = true
     else throw new Error(`Unknown SetupRuntime argument: ${argument}`)
   }
   return parsed
 }
 
-async function promptHidden(message) {
-  if (!process.stdin.isTTY) return undefined
-  process.stdout.write(message)
-  process.stdin.setRawMode(true)
-  process.stdin.resume()
-  return new Promise((resolvePromise, reject) => {
-    let value = ''
-    const finish = (error) => {
-      process.stdin.off('data', onData)
-      process.stdin.setRawMode(false)
-      process.stdin.pause()
-      process.stdout.write('\n')
-      if (error) reject(error)
-      else resolvePromise(value.trim() || undefined)
-    }
-    const onData = (chunk) => {
-      for (const byte of chunk) {
-        if (byte === 3) return finish(new Error('Credential input cancelled'))
-        if (byte === 10 || byte === 13) return finish()
-        if (byte === 127) value = value.slice(0, -1)
-        else value += String.fromCharCode(byte)
-      }
-    }
-    process.stdin.on('data', onData)
-  })
-}
-
 export async function setupRuntime({
   bundleRoot,
   runtimeRoot,
-  modelsRoot,
-  modelsOnly = false,
-  skipModels = false,
-  importModel,
-  installModel = installManagedDiarization,
-  runPython = runManagedPython,
   environment = process.env,
   onProgress = () => {},
-  pauseProgress = () => {},
 } = {}) {
   runtimeRoot ??= environment.REDENCUT_RUNTIME_ROOT
-  modelsRoot ??= environment.REDENCUT_MODELS_ROOT ?? resolve('.runtime', 'models')
   const destinationRoot = assertSafeInstallDestination(
     runtimeRoot ?? resolve('.runtime', `${process.platform}-${process.arch}`),
   )
-  let runtimeManifest
-  if (!modelsOnly) {
-    const sourceRoot = bundleRoot ? resolve(bundleRoot) : await buildRuntime({ onProgress })
-    if (resolve(sourceRoot) === destinationRoot) {
-      throw new Error('Runtime bundle and installation destination must be different directories')
-    }
-    onProgress({ label: 'Installing and verifying managed runtime' })
-    runtimeManifest = await installRuntimeGeneration({ bundleRoot: sourceRoot, destinationRoot })
+  const sourceRoot = bundleRoot ? resolve(bundleRoot) : await buildRuntime({ onProgress })
+  if (resolve(sourceRoot) === destinationRoot) {
+    throw new Error('Runtime bundle and installation destination must be different directories')
   }
-  const model = await loadDiarizationModel(join(repository, 'speech-worker', 'models.json'))
-  const modelResult = await installModel({
-    modelsRoot,
-    runtimeRoot: destinationRoot,
-    model,
-    skip: skipModels,
-    importModel,
-    onProgress,
-    onCredentialRequired: (message) => {
-      pauseProgress()
-      process.stdout.write(`${message}\n`)
-    },
-    onWarning: (message) => {
-      pauseProgress()
-      process.stderr.write(`Warning: ${message}\n`)
-    },
-    promptForToken: () => promptHidden('Hugging Face read token: '),
-    validateLoad: async (path) => {
-      const cache = await mkdtemp(join(tmpdir(), 'redencut-model-validation-'))
-      let log
-      try {
-        log = await open(join(cache, 'validation.log'), 'w+')
-        const exitCode = await runPython({
-          runtimeRoot: destinationRoot,
-          cwd: cache,
-          stdio: ['ignore', log.fd, log.fd],
-          environment: {
-            ORT_DISABLE_TELEMETRY: '1',
-            MPLCONFIGDIR: join(cache, 'matplotlib'),
-            HF_TOKEN: undefined,
-            HUGGING_FACE_HUB_TOKEN: undefined,
-            HUGGINGFACE_TOKEN: undefined,
-            HF_TOKEN_PATH: undefined,
-            HF_HOME: undefined,
-          },
-          pythonPath: join(repository, 'speech-worker', 'src'),
-          pythonArguments: [
-            '-m',
-            'redencut_speech_worker.validate_model',
-            '--manifest',
-            join(repository, 'speech-worker', 'models.json'),
-            '--model-id',
-            model.id,
-            '--path',
-            path,
-          ],
-        })
-        if (exitCode !== 0) {
-          const { size } = await log.stat()
-          const tail = Buffer.alloc(Math.min(size, 8000))
-          const { bytesRead } = await log.read(
-            tail,
-            0,
-            tail.length,
-            Math.max(0, size - tail.length),
-          )
-          throw new Error(
-            `Offline diarization load validation failed (${exitCode})\n${tail.subarray(0, bytesRead).toString('utf8').trim()}`,
-          )
-        }
-      } finally {
-        await log?.close()
-        await rm(cache, { recursive: true, force: true })
-      }
-    },
+  onProgress({ label: 'Installing and verifying managed runtime' })
+  const runtimeManifest = await installRuntimeGeneration({
+    bundleRoot: sourceRoot,
+    destinationRoot,
   })
-  return { runtimeManifest, model: modelResult }
+  return { runtimeManifest }
 }
 
 async function main() {
@@ -174,7 +62,6 @@ async function main() {
     result = await setupRuntime({
       ...options,
       onProgress: progress.update,
-      pauseProgress: progress.pause,
     })
     progress.finish('Runtime setup complete')
   } catch (error) {
@@ -187,7 +74,6 @@ async function main() {
   }
   if (result.runtimeManifest)
     process.stdout.write(`Installed managed runtime ${result.runtimeManifest.runtimeId}\n`)
-  process.stdout.write(`Managed diarization model: ${result.model.status}\n`)
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) await main()

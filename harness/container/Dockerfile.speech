@@ -43,8 +43,6 @@ ENV PATH="/opt/redencut-runtime/speech-env/bin:/opt/redencut-runtime/bin:${PATH}
 ENV PYTHONPATH="/opt/redencut-speech-worker/src"
 ENV PYTHONNOUSERSITE=1
 ENV REDENCUT_SPEECH_MANIFEST="/opt/redencut-speech-worker/models.json"
-ENV REDENCUT_SPEECH_MODEL_CACHE="/models"
-ENV HF_HOME="/models/.huggingface"
-ENV HF_HUB_CACHE="/models/.huggingface/hub"
+ENV REDENCUT_MODELS_PATH="/models"
 
 USER node

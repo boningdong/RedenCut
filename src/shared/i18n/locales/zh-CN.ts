@@ -122,7 +122,7 @@ export const simplifiedChineseResources = {
   },
   settings: {
     devModelAssets: '开发模型资源',
-    devModelHelp: '由运行环境准备命令安装，应用在本地验证并加载这些文件。',
+    devModelHelp: '由模型准备命令安装，应用在本地验证并加载这些文件。',
     devModelSetup:
       '在项目根目录运行此命令准备或修复模型，然后重新验证。需要时，命令行会引导完成 Hugging Face 访问授权。',
     devModelInvalid: '无效',
@@ -617,7 +617,7 @@ export const simplifiedChineseResources = {
     generic: '出现了问题。',
     openFile: '无法打开 {{filename}}。',
     'runtime-unavailable':
-      '受管运行环境缺失或损坏。开发时请运行 npm run runtime:setup，再到设置中重新验证；已安装的应用请修复或重新安装。',
+      '受管运行环境缺失或损坏。开发时请运行 npm run setup:runtime，再到设置中重新验证；已安装的应用请修复或重新安装。',
     'operation-failed': '无法完成此操作。',
     'stale-session': '此项目会话已失效。',
     cancelled: '操作已取消。',

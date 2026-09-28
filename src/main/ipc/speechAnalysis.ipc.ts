@@ -1,3 +1,4 @@
+import { resolveModelsPath } from '../resources/ModelsPath'
 import { z } from 'zod'
 import { SpeechTaskSelectionSchema } from '../../shared/SpeechTaskPlanner'
 import { AppLogEvents } from '../../shared/diagnostics.types'
@@ -11,7 +12,7 @@ import { TranscriberUnavailableError } from '../speech/transcriber/TranscriberUn
 import { randomUUID } from 'crypto'
 import { existsSync } from 'fs'
 import { join, dirname } from 'path'
-import { homedir, platform, arch, cpus } from 'os'
+import { platform, arch, cpus } from 'os'
 import { ipcMain } from 'electron'
 import type {
   CancelSessionJobRequest,
@@ -75,15 +76,12 @@ export function registerSpeechAnalysisIpc(
     services?.manifestPath ??
     process.env.REDENCUT_SPEECH_MANIFEST ??
     join(workerRoot, 'models.json')
-  const modelCache =
-    process.env.REDENCUT_SPEECH_MODEL_CACHE ??
-    join(homedir(), 'Library', 'Caches', 'RedenCut', 'speech-models')
+  const modelCache = services?.resources.registry.modelsRoot ?? resolveModelsPath()
   const workerEnvironment = () => ({
     ...process.env,
     PATH: dirname(runtime.getFfmpegPath()),
     PYTHONPATH: join(workerRoot, 'src'),
     REDENCUT_SPEECH_MANIFEST: manifest,
-    REDENCUT_SPEECH_MODEL_CACHE: modelCache,
     HF_HUB_OFFLINE: '1',
     TRANSFORMERS_OFFLINE: '1',
   })

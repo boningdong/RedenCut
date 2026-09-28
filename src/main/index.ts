@@ -25,6 +25,7 @@ import { app, BrowserWindow, protocol, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { createProjectDialogs } from './dialogs/createProjectDialogs'
 import { startApplicationLifecycle } from './applicationLifecycle'
+import { resolveModelsPath } from './resources/ModelsPath'
 import { configureHarnessStartup } from './harnessStartup'
 import { routeProjectShortcuts } from './projectShortcutRouting'
 import { ExportCoordinator } from './audio/export/ExportCoordinator'
@@ -132,6 +133,11 @@ startApplicationLifecycle({
           packaged: app.isPackaged,
           resourcesPath: process.resourcesPath,
           appPath: app.isPackaged ? app.getAppPath() : join(__dirname, '../..'),
+          userData: app.isPackaged || harnessMode ? app.getPath('userData') : undefined,
+        }),
+        resolveModelsPath({
+          userData: app.isPackaged || harnessMode ? app.getPath('userData') : undefined,
+          environment: app.isPackaged ? {} : process.env,
         }),
       ),
       new ModelDownloader(),

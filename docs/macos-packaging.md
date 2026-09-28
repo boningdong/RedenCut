@@ -2,8 +2,8 @@
 
 ## Local test builds
 
-Run `npm run package:mac` on an Apple Silicon Mac after `npm ci` and `npm run runtime:setup` have completed.
-The managed runtime and diarization model must already be available under `.runtime/`; packaging does not acquire model credentials or download model weights.
+Run `npm run package:mac` on an Apple Silicon Mac after `npm ci`, `npm run setup:runtime` and `npm run setup:models` have completed.
+The managed runtime must be available under `.runtime/`; the pinned diarization model must be in the shared model directory (default macOS Application Support/RedenCut/models), or explicitly selected with `--models-path`. Packaging validates and copies diarization into application Resources so users need no Hugging Face access request; it does not acquire credentials or download weights.
 Use `npm run package:mac -- --dir` to build the application bundle without a DMG.
 
 The output is `dist-electron/package/RedenCut-<version>-arm64.dmg`, with the application under `dist-electron/package/mac-arm64/RedenCut.app`.

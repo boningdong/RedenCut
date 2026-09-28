@@ -15,7 +15,7 @@ import type {
 import type { ManagedModelState } from '../../shared/developmentEnvironment.types'
 import type { ModelRegistry } from './ModelRegistry'
 import { ModelDownloader } from './ModelDownloader'
-import { resourcePaths } from './resourcePaths'
+import { ModelInstaller } from './ModelInstaller'
 export class ResourceManager {
   private readonly lifetime = new AbortController()
   private resources: ResourceState[]
@@ -126,9 +126,10 @@ export class ResourceManager {
     this.managedState = {
       id: model.id,
       revision: model.revision,
-      path: join(this.registry.managed!.displayRoot, 'diarization', model.revision)
+      path: join(this.registry.managed!.displayRoot, 'diarization', model.id, model.revision)
         .split('\\')
         .join('/'),
+      setupCommand: `npm run setup:models -- --model ${model.id} --models-path '${this.registry.managed!.root.replaceAll("'", "'\\''")}'`,
       status: 'checking',
     }
     state.status = 'verifying'
@@ -178,7 +179,7 @@ export class ResourceManager {
         state.downloadedBytes = state.totalBytes!
         continue
       }
-      const { staging } = resourcePaths(this.registry.root, model)
+      const { staging } = this.registry.paths(model)
       for (const file of model.files) {
         try {
           state.downloadedBytes += Math.min((await stat(join(staging, file.path))).size, file.size)
@@ -307,11 +308,9 @@ export class ResourceManager {
         delete state.error
         this.emit()
         let lastProgress = 0
-        await this.downloader.download(
-          model,
-          resourcePaths(this.registry.root, model).staging,
+        await new ModelInstaller(this.registry, this.downloader).install(model, {
           signal,
-          (bytes) => {
+          progress: (bytes) => {
             state.downloadedBytes = bytes
             state.status = 'downloading'
             if (Date.now() - lastProgress >= 100 || bytes === state.totalBytes) {
@@ -320,17 +319,12 @@ export class ResourceManager {
             }
           },
           token,
-          () => {
+          verifying: () => {
             state.status = 'verifying'
             this.emit()
           },
-        )
-        signal.throwIfAborted()
-        state.status = 'verifying'
-        this.emit()
-        await this.validateLoad(model, resourcePaths(this.registry.root, model).staging, signal)
-        signal.throwIfAborted()
-        await this.registry.publish(model)
+          validateLoad: this.validateLoad,
+        })
         state.status = 'ready'
         this.emit()
       } catch (error) {

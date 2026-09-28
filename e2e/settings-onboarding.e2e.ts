@@ -123,7 +123,7 @@ test('development setup explains missing runtime and validates without starting 
     expect(
       await ui.page
         .locator('.dev-block:nth-child(2)')
-        .getByText('npm run runtime:setup', { exact: true })
+        .getByText('npm run setup:runtime', { exact: true })
         .count(),
     ).toBe(1)
     await ui.screenshot('development-install-guide')

@@ -50,14 +50,14 @@
 
 - Main owns theme IDs, speech feature preferences and onboarding disposition in app-preferences.json, alongside locale preferences.
 - Settings and onboarding share the same renderer speech-resource components and main ResourceManager snapshots.
-- ModelRegistry resolves verified app-managed Whisper/alignment installations and the explicit managed diarization root; no legacy cache or Homebrew model discovery occurs.
+- ModelRegistry resolves the shared capability/model-ID/revision layout using `--models-path`, `REDENCUT_MODELS_PATH`, then the application default; packaged diarization resolves from Resources and packaged user models ignore development overrides. No implicit legacy-cache discovery occurs.
 - ModelDownloader prepares immutable manifest revisions in staging with integrity checks and explicit cancellation/resumption; readiness follows load validation.
-- Diarization is prepared through runtime:setup in development and bundled for release; application IPC never accepts HF credentials or downloads this model.
+- Diarization is prepared through `setup:models` in development and bundled for release; application IPC never accepts HF credentials or downloads this model.
 - CLI credentials are never included in model installations, release assets, project artifacts or ordinary inference workers.
 - AppRuntimeLocator is the single executable-location boundary; development runtime availability does not certify packaged distribution.
 - Non-bundled builds use DevelopmentEnvironmentChecker for read-only executable and Python import checks, exposed in ResourceManager snapshots.
 - Model selection, preparation and cancellation reuse the latest environment result; first access and explicit resource refresh validate the environment. Per-group progress reflects active check keys, not unrelated resource operations.
-- Developer installation is explicit through `npm run runtime:setup`; the app validates the result and blocks model preparation while required runtime checks fail.
+- Developer installation is explicit through `npm run setup:runtime`; the app validates the result and blocks model preparation while required runtime checks fail.
 - uv is only an environment-setup tool; an already usable runtime does not require uv for inference or model preparation.
 - Bundled snapshots omit development setup. Development model status is independently validated and does not change native tool readiness; explicit refresh discovers external CLI installations.
 - Explicit onboarding skip/close and completion persist independently of resources; dialog closure does not cancel preparation.

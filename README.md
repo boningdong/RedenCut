@@ -78,25 +78,22 @@ git clone https://github.com/boningdong/RedenCut.git
 cd RedenCut
 npm ci
 
-# Prepare the audio/Python runtime and optional speaker model.
-npm run runtime:setup
+# Prepare native tools and Python dependencies, then the default speech models.
+npm run setup:runtime
 npm run runtime:check
+npm run setup:models
+npm run check:models
 
 # Start the desktop app.
 npm run dev
 ```
 
-We recommend installing the local AI tools for the full transcript-based editing experience.
-The setup command supplies the native tools, Python dependencies and optional diarization model together.
-Whisper and alignment models are downloaded in the app.
-You can skip AI model downloads and use RedenCut solely for waveform and multitrack audio editing.
-Choose to skip speech preparation during onboarding; transcription, text-based editing, and speaker analysis will remain unavailable until you complete setup.
-You can enable these features later through Settings after preparing the required models.
-
-For text based editing, open **Settings → Models & dependencies**, validate the development environment, and download the text-editing models.
-For optional speaker recognition in development, run `npm run runtime:setup` to prepare the managed model, then validate it under Runtime.
-Release builds include this model and expose only the speaker-recognition toggle.
-The app's model preparation does not install native executables or the Python environment.
+`setup:runtime` installs the native audio/speech tools and Python dependencies; it does not download model weights.
+`setup:models` installs the default model set: Small Whisper, English and Chinese alignment, and speaker diarization.
+The app, model CLI and Docker harness share one model directory, so existing verified installations are reused.
+You can skip speech preparation during onboarding and use waveform and multitrack editing, then prepare resources later through **Settings → Models & dependencies**.
+Settings can download Whisper and alignment models after the runtime is ready; development diarization is acquired through the model CLI.
+Release builds bundle diarization and expose the speaker-recognition switch without an account prompt.
 
 See [speech models and dependencies](docs/speech-models-and-dependencies.md) for managed runtime, model caches, and setup details.
 The app never falls back to a system/Homebrew FFmpeg, an npm static binary, or an unrelated Python environment; a missing or invalid managed runtime produces a setup error.
@@ -135,18 +132,36 @@ Audio decoding, transcription, alignment, speaker analysis, and export run local
 Once the required runtimes and models are installed, normal speech inference uses offline model loading and does not need a cloud transcription service.
 Initial dependency installation and model downloads require internet access.
 
-The setup terminal shows the current phase, an animated activity indicator and elapsed time; downloads with a known size also show byte-based percentages.
-Redirected output uses plain progress lines, and model validation stays quiet unless it fails.
+Hugging Face access is needed only when acquiring gated model files, including development diarization.
+Accept the model's conditions with your own account, then use `hf auth login`, `HF_TOKEN_PATH`, or `HF_TOKEN` for the model CLI.
+Credentials are never passed to inference workers, saved in installations, or requested in Settings or onboarding.
+Already verified models are reused without authentication; packaged users receive the bundled diarization model.
 
-In local development, `npm run runtime:setup` guides you through Hugging Face access when the diarization model is missing.
-Accept the model's conditions with your own account; supply a read token through the CLI's hidden prompt, `HF_TOKEN`, or an existing local HF login.
-Verified models are reused without authentication and stored in `.runtime/models/diarization/<revision>/`, outside Git.
-Use `npm run runtime:setup -- --skip-models` to skip this optional asset, or `--models-only` to prepare it after the native runtime is installed.
-Settings and onboarding show model validation under Runtime; they never request or save HF credentials.
-Packaged releases include the model, so end users only control the speaker-recognition switch.
+### Shared models directory
 
-Download Whisper and alignment models through Settings or onboarding.
-`npm run setup:speech-models` provisions a separate developer worker cache; it does **not** populate the app's managed model library.
+| Command | Resources prepared or checked |
+| --- | --- |
+| `npm run setup:runtime` | Native tools and Python dependencies only |
+| `npm run setup:models` | Default: Small Whisper, English/Chinese alignment, diarization |
+| `npm run setup:models -- --set text` | Small Whisper and English/Chinese alignment |
+| `npm run setup:models -- --model ID` | One manifest-listed model |
+| `npm run check:models` | Offline integrity check of the default set; no downloads |
+
+Choose a directory with `--models-path PATH`, then `REDENCUT_MODELS_PATH`, otherwise the platform's RedenCut application models directory.
+On macOS the default is `~/Library/Application Support/RedenCut/models`; each model lives under `<capability>/<id>/<revision>/` with `installation.json` and verified files.
+The same override works with `npm run dev -- --models-path PATH`, `setup:models`, `check:models`, and the Docker harness.
+An override applies to that invocation and does not change saved app preferences.
+
+```mermaid
+flowchart LR
+  CLI[Model CLI] --> Store[Shared models directory]
+  Store --> App[Development app]
+  Store --> Docker[Docker /models read-only]
+```
+
+To reuse an older model directory, run `npm run setup:models -- --import-from OLD_ROOT`.
+The CLI imports and validates matching manifest revisions into the shared layout; use `--model ID` when importing an individual model's directory.
+Release preparation copies verified diarization into `Resources/models/diarization/<id>/<revision>/`, separate from `Resources/runtime/`; downloadable Whisper and alignment models remain in the application model library.
 
 Model revisions, dependencies, access requirements, and environment details are recorded in [speech models and dependencies](docs/speech-models-and-dependencies.md) and the [model manifest](speech-worker/models.json).
 
@@ -195,7 +210,7 @@ The scripts in [package.json](package.json) are the source of truth for developm
 
 ## Local macOS package
 
-On Apple Silicon, run `npm run package:mac` after preparing the managed runtime and model with `npm run runtime:setup`.
+On Apple Silicon, run `npm run package:mac` after preparing the managed runtime with `npm run setup:runtime` and models with `npm run setup:models`.
 This produces an ad-hoc-signed, unnotarized DMG for manual installation; automatic updates are not included.
 See [macOS packaging](docs/macos-packaging.md) for prerequisites, output paths, signing limitations and validation.
 For tag-triggered GitHub Actions builds and draft publication, see [GitHub Releases](docs/github-releases.md).

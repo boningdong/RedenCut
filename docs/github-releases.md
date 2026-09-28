@@ -95,7 +95,8 @@ The Actions steps reuse local commands:
 
 ```sh
 npm ci
-npm run runtime:setup
+npm run setup:runtime
+npm run setup:models
 npm run release:prepare
 npm run release:draft -- --dry-run
 ```

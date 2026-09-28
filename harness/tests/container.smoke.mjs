@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { test } from 'node:test'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -13,10 +14,15 @@ for (const shutdown of ['EOF', 'docker stop']) {
     { timeout: 180_000 },
     async () => {
       const name = `redencut-smoke-${randomUUID()}`
-      const transport = new EofOnlyTransport('sh', [resolve('harness/container/docker-harness.sh'), 'mcp'], {
-        ...process.env,
-        REDENCUT_CONTAINER_NAME: name,
-      })
+      const models = await mkdtemp(join(tmpdir(), 'redencut-smoke-models-'))
+      const transport = new EofOnlyTransport(
+        'sh',
+        [resolve('harness/container/docker-harness.sh'), 'mcp', '--models-path', models],
+        {
+          ...process.env,
+          REDENCUT_CONTAINER_NAME: name,
+        },
+      )
       const client = new Client({ name: 'redencut-container-acceptance', version: '1.0.0' })
       let runId
       const call = async (name, args = {}) => {
@@ -36,6 +42,16 @@ for (const shutdown of ['EOF', 'docker stop']) {
           execFileSync('docker', ['inspect', name], { encoding: 'utf8' }),
         )[0]
         assert.equal(container.Config.User, 'node')
+        const modelMount = container.Mounts.find((mount) => mount.Destination === '/models')
+        assert.equal(modelMount.Type, 'bind')
+        assert.equal(modelMount.Source, models)
+        assert.equal(modelMount.RW, false)
+        assert.ok(container.Config.Env.includes('REDENCUT_MODELS_PATH=/models'))
+        assert.ok(
+          !container.Mounts.some((mount) =>
+            ['/test-models', '/managed-models'].includes(mount.Destination),
+          ),
+        )
         assert.equal(container.Mounts.find((mount) => mount.Destination === '/source').RW, false)
         const gitDirectory = execFileSync(
           'git',

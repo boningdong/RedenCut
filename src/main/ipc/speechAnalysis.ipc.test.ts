@@ -225,6 +225,7 @@ function deferredPreferences() {
   const services = {
     preferences: { read },
     resources: {
+      registry: { modelsRoot: '/models' },
       getModelPaths: vi.fn(async () => ({
         whisper: '/models/whisper',
         'alignment-zh': '/models/zh',

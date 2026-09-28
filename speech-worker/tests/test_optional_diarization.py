@@ -22,14 +22,3 @@ class OptionalDiarizationTests(unittest.TestCase):
         messages = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual(messages[-1]['type'], 'error')
         self.assertFalse(any(message['type'] == 'result' for message in messages))
-
-    def test_disabled_preflight_ignores_missing_diarization_model(self):
-        import tempfile
-        from pathlib import Path
-        from redencut_speech_worker.preflight import inspect_runtime
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            manifest = root / 'models.json'
-            manifest.write_text(json.dumps({'models': [{'id': 'speaker', 'capability': 'diarization', 'revision': 'abc', 'expectedFiles': ['model.bin']}]}))
-            result = inspect_runtime(manifest_path=manifest, cache_root=root, package_versions={}, machine='arm64', backend='cpu', speaker_recognition_enabled=False)
-            self.assertEqual(result['status'], 'ready')

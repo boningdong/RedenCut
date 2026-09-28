@@ -1,17 +1,28 @@
+import { require as tsRequire } from 'tsx/cjs/api'
+const { resolveModelsPath } = tsRequire('../src/main/resources/ModelsPath.ts', import.meta.url)
 import { lstat, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 // Developer maintenance only. Exit the app first so in-memory state cannot restore cleared data.
-const usage = 'Usage: npm run clear:<onboarding|models> -- [--dry-run] [--user-data-dir PATH]'
+const usage =
+  'Usage: npm run clear:<onboarding|models> -- [--dry-run] [--user-data-dir PATH] [--models-path PATH]'
 async function main() {
   const [mode, ...args] = process.argv.slice(2)
   if (!['onboarding', 'models'].includes(mode)) throw new Error(usage)
   let dryRun = false
+  let modelsPath
   let override
   for (let index = 0; index < args.length; index++) {
     if (args[index] === '--dry-run') dryRun = true
+    else if (
+      args[index] === '--models-path' &&
+      mode === 'models' &&
+      args[index + 1] &&
+      !args[index + 1].startsWith('--')
+    )
+      modelsPath = args[++index]
     else if (
       args[index] === '--user-data-dir' &&
       args[index + 1] &&
@@ -20,8 +31,10 @@ async function main() {
       override = args[++index]
     else throw new Error(usage)
   }
-  // Match Electron's default appData/name layout; the package name is the running app name.
-  const { name } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  // Match the shared application identity used by model preparation and packaging.
+  const { name } = JSON.parse(
+    await readFile(new URL('../src/shared/AppIdentity.json', import.meta.url), 'utf8'),
+  )
   const appData =
     process.platform === 'darwin'
       ? join(homedir(), 'Library', 'Application Support')
@@ -29,12 +42,24 @@ async function main() {
         ? process.env.APPDATA || join(homedir(), 'AppData', 'Roaming')
         : process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
   const root = resolve(override || join(appData, name))
-  const targets = mode === 'models' ? ['models', 'staging'] : ['app-preferences.json']
+  const modelsRoot = resolveModelsPath({ modelsPath, userData: root })
+  if (
+    mode === 'models' &&
+    [resolve('/'), resolve(homedir()), resolve(process.cwd()), root].includes(modelsRoot)
+  )
+    throw new Error('Refusing broad models path')
+  const targets =
+    mode === 'models'
+      ? [
+          modelsRoot,
+          ...(!modelsPath && !process.env.REDENCUT_MODELS_PATH ? [join(root, 'staging')] : []),
+        ]
+      : [join(root, 'app-preferences.json')]
   console.log(`Exit RedenCut before clearing data.\n${dryRun ? 'Preview' : 'Target'}: ${root}`)
   for (const name of targets)
-    console.log(`${mode === 'models' ? 'Remove' : 'Reset onboarding only in'}: ${join(root, name)}`)
+    console.log(`${mode === 'models' ? 'Remove' : 'Reset onboarding only in'}: ${name}`)
   // Refuse indirection so maintenance cannot traverse a linked data directory or preference file.
-  for (const path of [root, ...targets.map((name) => join(root, name))]) {
+  for (const path of [root, ...targets]) {
     try {
       if ((await lstat(path)).isSymbolicLink()) throw new Error(`Refusing symbolic link: ${path}`)
     } catch (error) {
@@ -43,7 +68,7 @@ async function main() {
   }
   if (dryRun) return
   if (mode === 'models') {
-    for (const name of targets) await rm(join(root, name), { recursive: true, force: true })
+    for (const name of targets) await rm(name, { recursive: true, force: true })
   } else {
     const path = join(root, 'app-preferences.json')
     let stored

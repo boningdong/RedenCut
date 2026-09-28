@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtemp } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
 import test from 'node:test'
+
+import { sha256File } from './RuntimeIntegrity.mjs'
 
 import { assertSafeInstallDestination, parseArguments, setupRuntime } from './SetupRuntime.mjs'
 
@@ -16,114 +18,60 @@ test('setup accepts an explicit nested release runtime and rejects broad destruc
   assert.throws(() => assertSafeInstallDestination(process.cwd()), /project root/i)
 })
 
-test('parses the model provisioning flags on the existing runtime setup command', () => {
-  assert.deepEqual(
-    parseArguments([
-      '--models-only',
-      '--models-root',
-      '/models',
-      '--import-model',
-      '/legacy',
-      '--skip-models',
-    ]),
-    { modelsOnly: true, modelsRoot: '/models', importModel: '/legacy', skipModels: true },
-  )
+test('parses only tools setup arguments and rejects retired model flags', () => {
+  assert.deepEqual(parseArguments(['--bundle', '/bundle', '--runtime-root', '/runtime']), {
+    bundleRoot: '/bundle',
+    runtimeRoot: '/runtime',
+  })
+  for (const flag of ['--models-only', '--skip-models', '--models-root', '--import-model'])
+    assert.throws(() => parseArguments([flag]), /Unknown SetupRuntime argument/)
 })
 
 test('rejects missing path flag values before setup can start a build', () => {
-  for (const flag of ['--bundle', '--runtime-root', '--models-root', '--import-model']) {
+  for (const flag of ['--bundle', '--runtime-root']) {
     assert.throws(() => parseArguments([flag]), new RegExp(`${flag} requires`))
-    assert.throws(() => parseArguments([flag, '--models-only']), new RegExp(`${flag} requires`))
+    assert.throws(() => parseArguments([flag, '--runtime-root']), new RegExp(`${flag} requires`))
   }
 })
 
-test('models-only reuses the native runtime path without building or installing it', async () => {
-  const stagingRoot = await mkdtemp(join(tmpdir(), 'redencut-models-only-'))
-  let received
+test('tools setup installs a verified bundle and returns only the runtime manifest', async (context) => {
+  const root = await mkdtemp(join(tmpdir(), 'redencut-tools-setup-'))
+  context.after(() => rm(root, { recursive: true, force: true }))
+  const bundleRoot = join(root, 'bundle')
+  await mkdir(join(bundleRoot, 'bin'), { recursive: true })
+  const files = []
+  for (const name of ['ffmpeg', 'ffprobe']) {
+    const path = join(bundleRoot, 'bin', name)
+    await writeFile(path, '#!/bin/sh\necho runtime\n')
+    await chmod(path, 0o755)
+    files.push({ path: `bin/${name}`, sha256: await sha256File(path) })
+  }
+  const runtimeManifest = {
+    schemaVersion: 1,
+    runtimeId: 'tools-only-runtime',
+    platform: process.platform,
+    arch: process.arch,
+    executables: { ffmpeg: 'bin/ffmpeg', ffprobe: 'bin/ffprobe' },
+    components: [
+      {
+        name: 'ffmpeg',
+        version: '7.1.5',
+        license: 'LGPL-2.1-or-later',
+        sourceUrl: 'https://ffmpeg.org/releases/ffmpeg-7.1.5.tar.xz',
+      },
+    ],
+    files,
+  }
+  await writeFile(join(bundleRoot, 'manifest.json'), JSON.stringify(runtimeManifest))
+  const runtimeRoot = join(root, 'installed')
   const result = await setupRuntime({
-    modelsOnly: true,
-    runtimeRoot: join(stagingRoot, 'runtime'),
-    modelsRoot: join(stagingRoot, 'models'),
-    skipModels: true,
-    installModel: async (options) => {
-      received = options
-      return { status: 'skipped' }
-    },
-  })
-  assert.equal(result.runtimeManifest, undefined)
-  assert.equal(result.model.status, 'skipped')
-  assert.equal(received.skip, true)
-  assert.equal(received.modelsRoot, join(stagingRoot, 'models'))
-})
-
-test('uses explicit runtime and model roots from the environment', async () => {
-  const stagingRoot = await mkdtemp(join(tmpdir(), 'redencut-environment-roots-'))
-  let received
-  await setupRuntime({
-    modelsOnly: true,
-    skipModels: true,
+    bundleRoot,
     environment: {
-      REDENCUT_RUNTIME_ROOT: join(stagingRoot, 'native'),
-      REDENCUT_MODELS_ROOT: join(stagingRoot, 'models'),
-    },
-    installModel: async (options) => {
-      received = options
-      return { status: 'skipped' }
+      REDENCUT_RUNTIME_ROOT: runtimeRoot,
+      REDENCUT_MODELS_PATH: join(root, 'unused-models'),
     },
   })
-  assert.equal(received.modelsRoot, join(stagingRoot, 'models'))
-  assert.equal(received.runtimeRoot, join(stagingRoot, 'native'))
-})
-
-test('offline load validation uses an isolated cwd and child-only environment overrides', async () => {
-  const stagingRoot = await mkdtemp(join(tmpdir(), 'redencut-load-isolation-'))
-  const originalTelemetry = process.env.ORT_DISABLE_TELEMETRY
-  const originalMatplotlib = process.env.MPLCONFIGDIR
-  let invocation
-  await setupRuntime({
-    modelsOnly: true,
-    runtimeRoot: join(stagingRoot, 'runtime'),
-    modelsRoot: join(stagingRoot, 'models'),
-    runPython: async (options) => {
-      invocation = options
-      return 0
-    },
-    installModel: async (options) => {
-      await options.validateLoad(join(stagingRoot, 'staged-model'))
-      return { status: 'installed' }
-    },
-  })
-  assert.notEqual(invocation.cwd, process.cwd())
-  assert.equal(invocation.environment.ORT_DISABLE_TELEMETRY, '1')
-  assert.match(invocation.environment.MPLCONFIGDIR, /redencut-model-validation-/)
-  assert.equal(invocation.environment.HF_TOKEN, undefined)
-  assert.equal(process.env.ORT_DISABLE_TELEMETRY, originalTelemetry)
-  assert.equal(process.env.MPLCONFIGDIR, originalMatplotlib)
-})
-
-test('model validation captures successful output and retains bounded failure diagnostics', async () => {
-  const { writeSync } = await import('node:fs')
-  const stagingRoot = await mkdtemp(join(tmpdir(), 'redencut-quiet-validation-'))
-  for (const exitCode of [0, 1]) {
-    const pending = setupRuntime({
-      modelsOnly: true,
-      runtimeRoot: join(stagingRoot, 'runtime'),
-      runPython: async (options) => {
-        assert.ok(Array.isArray(options.stdio), 'Validation must not inherit terminal output')
-        writeSync(options.stdio[1], 'x'.repeat(9000) + '\nmodel diagnostic\n')
-        return exitCode
-      },
-      installModel: async (options) => {
-        await options.validateLoad(join(stagingRoot, 'model'))
-        return { status: 'installed' }
-      },
-    })
-    if (exitCode === 0) assert.equal((await pending).model.status, 'installed')
-    else
-      await assert.rejects(pending, (error) => {
-        assert.match(error.message, /model diagnostic/)
-        assert.ok(error.message.length < 8200)
-        return true
-      })
-  }
+  assert.deepEqual(result, { runtimeManifest })
+  assert.equal(await readFile(join(runtimeRoot, 'bin/ffmpeg'), 'utf8'), '#!/bin/sh\necho runtime\n')
+  await assert.rejects(setupRuntime({ bundleRoot, runtimeRoot: bundleRoot }), /must be different/)
 })

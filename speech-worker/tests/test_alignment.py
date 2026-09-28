@@ -212,7 +212,7 @@ class AlignmentTest(unittest.TestCase):
             "transcriptUnits": UNITS, "models": {"alignment": "alignment-zh"},
             "config": {"device": "cpu"},
         }
-        with patch.dict("os.environ", {"REDENCUT_SPEECH_MODEL_CACHE": "/models", "REDENCUT_SPEECH_MANIFEST": "/manifest.json"}), \
+        with patch.dict("os.environ", {"REDENCUT_MODELS_PATH": "/models", "REDENCUT_SPEECH_MANIFEST": "/manifest.json"}), \
              patch("redencut_speech_worker.alignment.load_manifest_model", return_value={
                  "id": "alignment-zh", "repository": "repo", "revision": "rev", "snapshot": "/models/alignment-zh/rev"
              }):

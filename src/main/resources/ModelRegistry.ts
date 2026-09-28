@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
@@ -32,14 +32,18 @@ export class ModelRegistry {
   constructor(
     readonly root: string,
     readonly managed?: ManagedModelLocation,
+    readonly modelsRoot = join(root, 'models'),
   ) {}
   managedPath(model: ModelDefinition): string | undefined {
     return this.managed && model.capability === 'diarization'
-      ? join(this.managed.root, 'diarization', model.revision)
+      ? join(this.managed.root, 'diarization', model.id, model.revision)
       : undefined
   }
+  paths(model: ModelDefinition) {
+    return resourcePaths(this.root, model, this.modelsRoot)
+  }
   async resolve(model: ModelDefinition): Promise<string | null> {
-    const installed = this.managedPath(model) ?? resourcePaths(this.root, model).installed
+    const installed = this.managedPath(model) ?? this.paths(model).installed
     try {
       const record = JSON.parse(await readFile(join(installed, 'installation.json'), 'utf8'))
       if (
@@ -66,13 +70,15 @@ export class ModelRegistry {
   }
   async publish(model: ModelDefinition): Promise<string> {
     if (this.managedPath(model)) throw new Error('managed-model-required')
-    const { staging, installed } = resourcePaths(this.root, model)
+    const { staging, installed } = this.paths(model)
     const files: ModelFile[] = []
     for (const file of model.files) {
       const expected = await stagedModelFile(join(staging, file.path), file)
       if (!(await verifyModelFile(join(staging, file.path), expected)))
         throw new Error('integrity-failed')
       files.push(expected)
+      await rm(join(staging, file.path) + '.download.json', { force: true })
+      await rm(join(staging, file.path) + '.integrity.json', { force: true })
     }
     await writeFile(
       join(staging, 'installation.json'),
@@ -84,8 +90,21 @@ export class ModelRegistry {
       }),
     )
     await mkdir(dirname(installed), { recursive: true })
-    await rm(installed, { recursive: true, force: true })
-    await rename(staging, installed)
+    const displaced = installed + '.previous-' + randomUUID()
+    let movedPrevious = false
+    try {
+      await rename(installed, displaced)
+      movedPrevious = true
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    try {
+      await rename(staging, installed)
+    } catch (error) {
+      if (movedPrevious) await rename(displaced, installed)
+      throw error
+    }
+    if (movedPrevious) await rm(displaced, { recursive: true, force: true })
     return installed
   }
 }

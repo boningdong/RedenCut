@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -26,10 +25,27 @@ function fixture() {
       spawnSync('sh', [command, ...args], {
         cwd: repository,
         encoding: 'utf8',
-        env: { ...process.env, REDENCUT_DOCKER_BIN: docker, DOCKER_LOG: log, ...extra },
+        env: {
+          ...process.env,
+          HOME: root,
+          REDENCUT_MODELS_PATH: '',
+          REDENCUT_DOCKER_BIN: docker,
+          DOCKER_LOG: log,
+          ...extra,
+        },
       }),
     calls: () => readFileSync(log, 'utf8').trim().split('\n'),
   }
+}
+
+function assertSharedModels(call, models) {
+  assert.ok(call.includes(`<type=bind,source=${models},target=/models,readonly>`))
+  assert.match(call, /<REDENCUT_MODELS_PATH=\/models>/)
+  assert.doesNotMatch(call, /type=volume,source=.*target=\/models|\/test-models|\/managed-models/)
+  assert.doesNotMatch(
+    call,
+    /REDENCUT_WHISPER_MODEL_DIR|REDENCUT_SPEECH_MODEL_CACHE|REDENCUT_MODELS_ROOT/,
+  )
 }
 
 test('build speech builds base first and passes selected base tag', () => {
@@ -42,19 +58,88 @@ test('build speech builds base first and passes selected base tag', () => {
   assert.match(calls[1], /<build>.*<REDENCUT_HARNESS_BASE=custom-base:dev>.*Dockerfile\.speech/)
 })
 
-test('run speech selects speech image and mounts one model path with spaces', () => {
+test('run uses one readonly model mount and explicit path takes precedence over environment', () => {
   const f = fixture()
   const models = join(f.root, 'app models')
   mkdirSync(models)
-  const result = f.run(['run', 'speech', '--models', models, '--', 'node', '-v'])
+  const result = f.run(['run', 'speech', '--models-path', models, '--', 'node', '-v'], {
+    REDENCUT_MODELS_PATH: join(f.root, 'ignored'),
+  })
   assert.equal(result.status, 0, result.stderr)
-  const calls = f.calls()
-  assert.match(calls.at(-1), /<type=bind,source=.*app models,target=\/test-models,readonly>/)
-  assert.match(calls.at(-1), /<redencut-harness-speech:local><node><-v>/)
-  assert.match(calls.at(-1), /<REDENCUT_SPEECH_WORKER_ROOT=\/workspace\/speech-worker>/)
+  assertSharedModels(f.calls().at(-1), models)
+  assert.match(f.calls().at(-1), /<redencut-harness-speech:local><node><-v>/)
+  assert.match(f.calls().at(-1), /<REDENCUT_SPEECH_WORKER_ROOT=\/workspace\/speech-worker>/)
 })
 
-test('invalid commands fail before Docker is called', () => {
+test('run and MCP use environment model paths in both images', () => {
+  const f = fixture()
+  const models = join(f.root, 'models')
+  mkdirSync(models)
+  for (const args of [['run', 'base', '--', 'true'], ['mcp'], ['mcp', 'speech']]) {
+    const result = f.run(args, { REDENCUT_MODELS_PATH: models })
+    assert.equal(result.status, 0, result.stderr)
+    assertSharedModels(f.calls().at(-1), models)
+  }
+})
+
+test('MCP accepts an explicit path for base and speech', () => {
+  const f = fixture()
+  const models = join(f.root, 'models')
+  mkdirSync(models)
+  for (const target of ['base', 'speech']) {
+    const result = f.run(['mcp', target, '--models-path', models])
+    assert.equal(result.status, 0, result.stderr)
+    assertSharedModels(f.calls().at(-1), models)
+    assert.ok(
+      f
+        .calls()
+        .at(-1)
+        .includes(
+          `<redencut-harness${target === 'speech' ? '-speech' : ''}:local><node><--import><tsx><harness/server.ts>`,
+        ),
+    )
+  }
+})
+
+test('default platform app directory is mounted when present and absence can launch', () => {
+  const f = fixture()
+  const result = f.run(['run', 'base', '--', 'true'])
+  assert.equal(result.status, 0, result.stderr)
+  assert.doesNotMatch(f.calls().at(-1), /target=\/models,/)
+  assert.match(f.calls().at(-1), /REDENCUT_MODELS_PATH=\/models/)
+  const relative =
+    process.platform === 'darwin'
+      ? 'Library/Application Support/RedenCut/models'
+      : process.platform === 'win32'
+        ? 'AppData/Roaming/RedenCut/models'
+        : '.config/RedenCut/models'
+  const models = join(f.root, relative)
+  mkdirSync(models, { recursive: true })
+  const populated = f.run(['run', 'speech', '--', 'true'], { XDG_CONFIG_HOME: '', APPDATA: '' })
+  assert.equal(populated.status, 0, populated.stderr)
+  assertSharedModels(f.calls().at(-1), models)
+})
+
+test('explicit missing paths fail before Docker with installation guidance', () => {
+  const f = fixture()
+  for (const args of [
+    ['run', 'speech', '--models-path', join(f.root, 'missing'), '--', 'true'],
+    ['mcp', '--models-path', join(f.root, 'missing')],
+    ['test', 'e2e-base', '--models-path', join(f.root, 'missing')],
+  ]) {
+    const result = f.run(args)
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /MODELS_PATH_MISSING.*npm run setup:models --/)
+  }
+  for (const args of [['run', 'base', '--', 'true'], ['mcp'], ['test', 'e2e-base']]) {
+    const result = f.run(args, { REDENCUT_MODELS_PATH: join(f.root, 'missing-env') })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /MODELS_PATH_MISSING.*npm run setup:models --/)
+  }
+  assert.throws(() => f.calls(), /ENOENT/)
+})
+
+test('invalid and retired commands fail before Docker is called', () => {
   const f = fixture()
   for (const args of [
     [],
@@ -62,7 +147,8 @@ test('invalid commands fail before Docker is called', () => {
     ['run', 'base', 'node'],
     ['run', 'base', '--models', '/tmp', '--', 'true'],
     ['test', 'unknown'],
-    ['models'],
+    ['models', 'install'],
+    ['models', 'check'],
     ['mcp', 'unknown'],
   ]) {
     const result = f.run(args)
@@ -80,44 +166,59 @@ test('a missing image gives the matching build command', () => {
   assert.match(result.stderr, /HARNESS_IMAGE_MISSING.*build speech/)
 })
 
-test('help names the actions and distinct model stores', () => {
+test('help describes shared model resolution and the host install command', () => {
   const f = fixture()
   const result = f.run(['--help'])
   assert.equal(result.status, 0)
-  assert.match(result.stdout, /build base|build speech/)
-  assert.match(result.stdout, /\/models.*\/test-models.*\.runtime\/models/s)
+  assert.match(result.stdout, /--models-path.*REDENCUT_MODELS_PATH.*platform app models directory/)
+  assert.match(result.stdout, /read-only at \/models/)
+  assert.match(result.stdout, /npm run setup:models --/)
+  assert.doesNotMatch(result.stdout, /models install\|check|\/test-models|\/managed-models/)
   assert.throws(() => f.calls(), /ENOENT/)
 })
 
-test('named E2E suites select the correct image and npm script', () => {
+test('named suites select image and speech uses the common offline default-set check', () => {
   const f = fixture()
   assert.equal(f.run(['test', 'e2e-base']).status, 0)
   assert.match(f.calls().at(-1), /<redencut-harness:local><npm><run><test:e2e:base>/)
   const models = join(f.root, 'models')
-  mkdirSync(join(models, 'transcription-default'), { recursive: true })
-  writeFileSync(join(models, 'transcription-default', 'installation.json'), '{}')
-  writeFileSync(join(f.root, 'node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-  assert.equal(
-    f.run(['test', 'e2e-speech', '--models', models], { PATH: `${f.root}:${process.env.PATH}` })
-      .status,
-    0,
+  const nodeLog = join(f.root, 'node.log')
+  mkdirSync(models)
+  writeFileSync(
+    join(f.root, 'node'),
+    '#!/bin/sh\nif [ "$4" = check ]; then\n  printf "<%s>" "$@" >> "$NODE_LOG"\n  exit "${MODEL_CHECK_STATUS:-0}"\nfi\nexec "$REAL_NODE" "$@"\n',
+    { mode: 0o755 },
   )
-  assert.match(f.calls().at(-1), /<redencut-harness-speech:local><npm><run><test:e2e:speech>/)
-  assert.match(f.calls().at(-1), /target=\/test-models,readonly/)
+  const env = {
+    PATH: `${f.root}:${process.env.PATH}`,
+    REAL_NODE: process.execPath,
+    NODE_LOG: nodeLog,
+    REDENCUT_MODELS_PATH: models,
+  }
+  for (const suite of ['e2e-speech', 'e2e-all']) {
+    const result = f.run(['test', suite], env)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(
+      f.calls().at(-1),
+      new RegExp(
+        `<redencut-harness-speech:local><npm><run><test:${suite.replace('e2e-', 'e2e:')}>`,
+      ),
+    )
+    assertSharedModels(f.calls().at(-1), models)
+  }
+  assert.ok(
+    readFileSync(nodeLog, 'utf8').includes(`<check><--set><default><--models-path><${models}>`),
+  )
+  const before = f.calls().length
+  const rejected = f.run(['test', 'e2e-speech'], { ...env, MODEL_CHECK_STATUS: '1' })
+  assert.notEqual(rejected.status, 0)
+  assert.equal(f.calls().length, before)
 })
 
-test('speech E2E refuses a missing or empty model fixture before Docker', () => {
+test('speech E2E rejects absent models before Docker', () => {
   const f = fixture()
-  const empty = join(f.root, 'empty')
-  mkdirSync(empty)
-  for (const args of [
-    ['test', 'e2e-speech'],
-    ['test', 'e2e-all', '--models', empty],
-  ]) {
-    const result = f.run(args)
-    assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /MODEL_FIXTURE_REQUIRED|MODEL_FIXTURE_INVALID/)
-  }
+  const result = f.run(['test', 'e2e-speech'])
+  assert.notEqual(result.status, 0)
   assert.throws(() => f.calls(), /ENOENT/)
 })
 
@@ -142,66 +243,4 @@ test('source validation rejects stale speech dependencies', () => {
   const manifestResult = spawnSync('sh', [check, source, installed], { encoding: 'utf8' })
   assert.notEqual(manifestResult.status, 0)
   assert.match(manifestResult.stderr, /models\.json/)
-})
-
-test('app model validator checks marker identity and file digest', () => {
-  const root = mkdtempSync(join(tmpdir(), 'redencut-app-models-'))
-  const models = join(root, 'models')
-  const manifest = join(root, 'models.json')
-  const data = Buffer.from('model bytes')
-  const digest = createHash('sha256').update(data).digest('hex')
-  const definition = {
-    id: 'transcription-default',
-    repository: 'example/model',
-    revision: 'abc',
-    capability: 'transcription',
-    files: [{ path: 'model.bin', size: data.length, sha256: digest }],
-  }
-  writeFileSync(manifest, JSON.stringify({ models: [definition] }))
-  const installed = join(models, 'transcription', definition.id, definition.revision)
-  mkdirSync(installed, { recursive: true })
-  writeFileSync(join(installed, 'model.bin'), data)
-  writeFileSync(join(installed, 'installation.json'), JSON.stringify({ ...definition }))
-  const validator = join(repository, 'harness/container/test/ValidateAppModels.mjs')
-  const invoke = () => spawnSync('node', [validator, models, manifest], { encoding: 'utf8' })
-  assert.equal(invoke().status, 0)
-  writeFileSync(join(installed, 'model.bin'), Buffer.from('model bytez'))
-  assert.notEqual(invoke().status, 0)
-})
-
-test('models install mounts a token read-only without printing its contents', () => {
-  const f = fixture()
-  const home = join(f.root, 'developer home')
-  const token = join(home, '.cache', 'huggingface', 'token')
-  mkdirSync(resolve(token, '..'), { recursive: true })
-  writeFileSync(token, 'private-test-token')
-  const result = f.run(['models', 'install'], { HOME: home, HF_HOME: '', HF_TOKEN_PATH: '' })
-  assert.equal(result.status, 0, result.stderr)
-  assert.match(f.calls().at(-1), /target=\/run\/secrets\/hf_token,readonly/)
-  assert.match(f.calls().at(-1), /source=.*developer home/)
-  assert.doesNotMatch(result.stdout + result.stderr + f.calls().join(''), /private-test-token/)
-})
-
-test('models check requires no token and MCP defaults to base image', () => {
-  const f = fixture()
-  assert.equal(f.run(['models', 'check'], { HF_TOKEN_PATH: join(f.root, 'missing') }).status, 0)
-  assert.doesNotMatch(f.calls().at(-1), /hf_token/)
-  assert.equal(f.run(['mcp']).status, 0)
-  assert.match(
-    f.calls().at(-1),
-    /<redencut-harness:local><node><--import><tsx><harness\/server.ts>/,
-  )
-  assert.equal(f.run(['mcp', 'speech']).status, 0)
-  assert.match(
-    f.calls().at(-1),
-    /<redencut-harness-speech:local><node><--import><tsx><harness\/server.ts>/,
-  )
-})
-
-test('models install rejects an unavailable token before Docker', () => {
-  const f = fixture()
-  const result = f.run(['models', 'install'], { HOME: f.root, HF_HOME: '', HF_TOKEN_PATH: '' })
-  assert.equal(result.status, 20)
-  assert.match(result.stderr, /HF_TOKEN_UNAVAILABLE/)
-  assert.throws(() => f.calls(), /ENOENT/)
 })

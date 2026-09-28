@@ -58,6 +58,27 @@ Only the native file selection result is substituted; UI clicks, IPC, FFmpeg, ca
 Inputs are immutable; outputs are retained under `.harness-runs/container/<runId>/`, including `imported.png`, `reopened.png`, per-generation trace/logs and `projects/short-audio.redencut/`.
 Failures retain `e2e-failure.txt` along with whatever evidence was collected before failure.
 
+## Real speech suites
+
+Build the speech image and prepare the shared host model library before running recognition, alignment and speaker scenarios:
+
+```sh
+npm run setup:runtime
+npm run setup:models
+npm run check:models
+sh harness/container/docker-harness.sh build speech
+sh harness/container/docker-harness.sh test e2e-speech
+# Choose another already prepared directory:
+sh harness/container/docker-harness.sh test e2e-all --models-path /absolute/path/to/models
+```
+
+Runtime setup installs native tools and Python dependencies only; model setup prepares the default Small Whisper, English/Chinese alignment and diarization set.
+The harness uses `--models-path`, then `REDENCUT_MODELS_PATH`, then the platform RedenCut application models directory; on macOS this is `~/Library/Application Support/RedenCut/models`.
+It mounts that library read-only at `/models` and performs the common offline installation-marker and digest check before starting speech suites.
+No model downloads or Hugging Face credentials enter E2E runs; gated acquisition happens beforehand through the model CLI.
+`--set text` prepares only transcription/alignment and is insufficient for the full speaker suites.
+See [shared model setup](../docs/speech-models-and-dependencies.md) for single-model installation and import from an older directory.
+
 ## Dialog preparation
 
 Call `redencut_prepare_dialog` with the current `runId`, `generation` and a typed `request`, then click the corresponding UI control:

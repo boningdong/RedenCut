@@ -37,7 +37,7 @@ async function fixture() {
     source: 'development-runtime' as const,
   }
   const registry = new ModelRegistry(root, managed)
-  const installed = join(managed.root, 'diarization', model.revision)
+  const installed = join(managed.root, 'diarization', model.id, model.revision)
   const install = async () => {
     await mkdir(installed, { recursive: true })
     await writeFile(join(installed, 'model.bin'), bytes)
@@ -54,18 +54,24 @@ it('ignores development overrides in packaged builds and exposes relative dev pa
       packaged: true,
       resourcesPath: '/app/resources',
       appPath: '/project',
-      env: { REDENCUT_MODELS_ROOT: '/override' },
+      env: { REDENCUT_MODELS_PATH: '/override' },
     }),
   ).toMatchObject({ root: '/app/resources/models', source: 'bundled' })
-  expect(
-    managedModelLocation({ packaged: false, resourcesPath: '', appPath: '/project', env: {} }),
-  ).toMatchObject({ root: '/project/.runtime/models', displayRoot: '.runtime/models' })
   expect(
     managedModelLocation({
       packaged: false,
       resourcesPath: '',
       appPath: '/project',
-      env: { REDENCUT_MODELS_ROOT: '/opt/models' },
+      userData: '/app/data',
+      env: {},
+    }),
+  ).toMatchObject({ root: '/app/data/models', displayRoot: '/app/data/models' })
+  expect(
+    managedModelLocation({
+      packaged: false,
+      resourcesPath: '',
+      appPath: '/project',
+      env: { REDENCUT_MODELS_PATH: '/opt/models' },
     }).root,
   ).toBe('/opt/models')
 })

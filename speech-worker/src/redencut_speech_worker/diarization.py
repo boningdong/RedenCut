@@ -33,7 +33,7 @@ def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, mode
         raise ValueError(f"unknown diarization model: {model_id}")
     if model_paths is not None and model_id not in model_paths:
         raise FileNotFoundError(f"managed model not available: {model_id}")
-    snapshot = Path(model_paths[model_id]) if model_paths is not None else Path(cache_root) / model["id"] / model["revision"]
+    snapshot = Path(model_paths[model_id]) if model_paths is not None else Path(cache_root) / model["capability"] / model["id"] / model["revision"]
     if not (snapshot / "config.yaml").is_file():
         raise FileNotFoundError(f"diarization model is not provisioned: {model_id}")
     return {**model, "snapshot": str(snapshot)}
@@ -67,7 +67,7 @@ def run_pyannote(*, audio_path: str, device: str, model_path: str, on_progress: 
 def diarize(request: Dict[str, Any], on_progress: Optional[Callable[[], None]] = None) -> Dict[str, Any]:
     model = load_manifest_model(
         os.environ.get("REDENCUT_SPEECH_MANIFEST", "/opt/redencut-speech-worker/models.json"),
-        os.environ.get("REDENCUT_SPEECH_MODEL_CACHE", "/models"),
+        os.environ.get("REDENCUT_MODELS_PATH", "/models"),
         request["models"]["diarization"],
         request.get("modelPaths"),
     )

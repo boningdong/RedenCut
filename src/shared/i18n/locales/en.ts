@@ -125,7 +125,7 @@ export const englishResources = {
   settings: {
     devModelAssets: 'Development model assets',
     devModelHelp:
-      'Prepared by the runtime setup command. The app verifies and loads these files locally.',
+      'Prepared by the model setup command. The app verifies and loads these files locally.',
     devModelSetup:
       'Run this command at the project root to prepare or repair the model, then validate again. The CLI guides Hugging Face access when needed.',
     devModelInvalid: 'Invalid',
@@ -656,7 +656,7 @@ export const englishResources = {
     generic: 'Something went wrong.',
     openFile: 'Could not open {{filename}}.',
     'runtime-unavailable':
-      'The managed runtime is missing or invalid. In development, run npm run runtime:setup, then validate again in Settings. For an installed app, repair or reinstall the application.',
+      'The managed runtime is missing or invalid. In development, run npm run setup:runtime, then validate again in Settings. For an installed app, repair or reinstall the application.',
     'operation-failed': 'The operation could not be completed.',
     'stale-session': 'This project session is no longer current.',
     cancelled: 'The operation was cancelled.',
