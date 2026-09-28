@@ -239,6 +239,7 @@ See [ROADMAP.md](ROADMAP.md) for the broader development plan.
 RedenCut is currently maintained primarily by its main author.
 Feature requests and bug reports are welcome through [Issues](https://github.com/boningdong/RedenCut/issues).
 
+## Bug Report
 To report a problem:
 
 1. Search [open and closed issues](https://github.com/boningdong/RedenCut/issues?q=is%3Aissue) using what you were doing, what went wrong, or the error shown (for example, “import audio hangs” or “export silent”). You do not need to know the feature name. Diagnostic IDs are unique to an occurrence, so use the error text or code when searching for similar problems.

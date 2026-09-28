@@ -24,7 +24,7 @@ export const simplifiedChineseResources = {
     save: '保存诊断包…',
     saving: '正在保存…',
     saveAgain: '选择其他位置…',
-    showSaved: '在访达中显示',
+    showSaved: '在Finder中显示',
     copyId: '复制编号',
     loading: '正在收集诊断信息…',
     export: '导出诊断报告',
