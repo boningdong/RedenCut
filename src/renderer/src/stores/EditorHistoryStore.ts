@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useTimelineStore } from './TimelineStore'
+import { protectTimelineSnapshot } from '../domain/TimelineSnapshot'
 
 export interface DomainHistoryEdit {
   id: string
@@ -39,7 +40,11 @@ export const useEditorHistoryStore = create<EditorHistoryState>((set, get) => ({
             ? {
                 undoStack: [
                   ...state.undoStack,
-                  { before: state.tracks, label: edit.label, domainEdit: edit },
+                  {
+                    before: protectTimelineSnapshot(state.tracks),
+                    label: edit.label,
+                    domainEdit: edit,
+                  },
                 ],
                 redoStack: [],
               }

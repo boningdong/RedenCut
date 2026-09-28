@@ -203,10 +203,13 @@ npm run preview       # Preview the built app
 npm test              # Run unit tests
 npm run typecheck     # Check TypeScript
 npm run check         # Formatting, lint, dead-code checks, types, tests, and build
+npm run profile:timeline # Timeline history retention/comparison benchmark
+npm run profile:waveform # Waveform interaction benchmark
 ```
 
 See [architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), and the [test harness guide](harness/container/README.md) for more detail.
 The scripts in [package.json](package.json) are the source of truth for development commands.
+The timeline benchmark measures history retention and edit comparison, not end-to-end UI latency; see the [CoW performance report](docs/superpowers/reports/2026-09-27-timeline-cow.md).
 
 ## Local macOS package
 

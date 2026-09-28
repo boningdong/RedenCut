@@ -7,6 +7,10 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.performance.ts'],
     disableConsoleIntercept: true,
+    // Heap profiles need GC in the test worker, not only in the parent Vitest process.
+    pool: 'forks',
+    execArgv: ['--expose-gc'],
+    fileParallelism: false,
   },
   resolve: {
     alias: {

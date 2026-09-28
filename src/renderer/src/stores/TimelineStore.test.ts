@@ -779,6 +779,69 @@ describe('occurrence-scoped transcript muting', () => {
 describe('copy-on-write timeline history', () => {
   beforeEach(resetAll)
 
+  it('isolates externally supplied nested settings from later caller mutations', () => {
+    tl().initFromAudioSource(managedSource(604, 20))
+    const trackId = tl().tracks[0].id
+    const effects = [{ id: 'gain', type: 'gain' as const, enabled: true, params: { value: 2 } }]
+    tl().updateTrack(trackId, { effects })
+    tl().setTrackVolume(trackId, 0.5)
+    effects[0].params.value = 99
+    effects[0].enabled = false
+    void tl().undo()
+    expect(tl().tracks[0].effects[0]).toEqual({
+      id: 'gain',
+      type: 'gain',
+      enabled: true,
+      params: { value: 2 },
+    })
+  })
+
+  it('rejects accidental mutation of nested history objects during development', () => {
+    tl().initFromAudioSource(managedSource(605, 20))
+    tl().redactRange(tl().tracks[0].id, 2, 4)
+    const before = tl().tracks
+    tl().setTrackVolume(before[0].id, 0.5)
+    expect(() => {
+      before[0].clips[0].redactions![0].sourceEnd = 19
+    }).toThrow(TypeError)
+    void tl().undo()
+    expect(tl().tracks[0].clips[0].redactions![0].sourceEnd).toBe(4)
+  })
+
+  it('protects imported objects shared by rebased undo and redo snapshots', () => {
+    tl().initFromAudioSource(managedSource(607, 20))
+    tl().redactRange(tl().tracks[0].id, 2, 4)
+    void tl().undo()
+    const imported = structuredClone(tl().tracks[0])
+    imported.id = 'new-track'
+    imported.clips[0].trackId = imported.id
+    tl().appendImportedTracks([imported])
+    const shared = tl().tracks[1]
+    expect(tl().redoStack[0].before[1]).toBe(shared)
+    expect(() => {
+      shared.clips[0].sourceEnd = 1
+    }).toThrow(TypeError)
+    void tl().redo()
+    expect(tl().tracks[1]).toBe(shared)
+    void tl().undo()
+    expect(tl().tracks[1].clips[0].sourceEnd).toBe(20)
+  })
+
+  it('does not record a semantically equal settings edit with a different property order', () => {
+    tl().initFromAudioSource(managedSource(606, 20))
+    const trackId = tl().tracks[0].id
+    tl().updateTrack(trackId, {
+      effects: [{ id: 'gain', type: 'gain', enabled: true, params: { value: 2 } }],
+    })
+    const before = tl().tracks
+    const historyLength = tl().undoStack.length
+    tl().updateTrack(trackId, {
+      effects: [{ params: { value: 2 }, enabled: true, type: 'gain', id: 'gain' }],
+    })
+    expect(tl().tracks).toBe(before)
+    expect(tl().undoStack).toHaveLength(historyLength)
+  })
+
   it('shares unchanged tracks with history and restores the exact prior snapshot', () => {
     const source = managedSource(601, 20)
     tl().initFromAudioSource(source)
@@ -805,6 +868,9 @@ describe('copy-on-write timeline history', () => {
     const loaded = tl().tracks
     expect(loaded).not.toBe(incoming)
     expect(loaded[0]).not.toBe(incoming[0])
+    expect(() => {
+      loaded[0].clips[0].sourceEnd = 5
+    }).toThrow(TypeError)
     incoming[0].clips[0].sourceEnd = 5
     expect(loaded[0].clips[0].sourceEnd).toBe(20)
     tl().redactRange(loaded[0].id, 2, 4)

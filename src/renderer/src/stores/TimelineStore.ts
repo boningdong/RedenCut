@@ -46,6 +46,7 @@ import {
   synchronizeMixEdits,
 } from '../domain/MixLinkEdits'
 import { planClipPlacement } from '../domain/TimelinePlacement'
+import { protectTimelineSnapshot, timelineValuesEqual } from '../domain/TimelineSnapshot'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ function nextId(prefix: string): string {
 
 /** Isolate incoming project metadata before history shares it. */
 function cloneTracks(tracks: Track[]): Track[] {
-  return structuredClone(tracks)
+  return protectTimelineSnapshot(structuredClone(tracks))
 }
 
 function markTimelineEdited(): void {
@@ -77,17 +78,6 @@ function normalizedSelection(tracks: Track[], ids: string[], primaryId?: string)
   }
 }
 
-function tracksEqual(left: Track[], right: Track[]): boolean {
-  return (
-    left === right ||
-    (left.length === right.length &&
-      left.every(
-        (track, index) =>
-          track === right[index] || JSON.stringify(track) === JSON.stringify(right[index]),
-      ))
-  )
-}
-
 type TimelineSelectionUpdate = Pick<
   TimelineState,
   'selectedClipIds' | 'selectedClipId' | 'timelineSelection' | 'selectedTrackId'
@@ -100,7 +90,10 @@ function commitTimelineEdit(
   label: string,
   selection?: Partial<TimelineSelectionUpdate>,
 ): boolean {
-  if (useTimelineStore.getState().tracks !== expected || tracksEqual(expected, next)) return false
+  if (useTimelineStore.getState().tracks !== expected || timelineValuesEqual(expected, next))
+    return false
+  protectTimelineSnapshot(expected)
+  protectTimelineSnapshot(next)
   useTimelineStore.setState((state) => ({
     tracks: next,
     undoStack: [...state.undoStack, { before: expected, label }],
@@ -338,7 +331,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
     set({
       audioSources: [audioSource],
-      tracks: [track],
+      tracks: protectTimelineSnapshot([track]),
       undoStack: [],
       redoStack: [],
       projectGeneration: get().projectGeneration + 1,
@@ -384,10 +377,10 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       // Import establishes a non-undoable baseline; older clip edits must retain that baseline.
       const rebase = (entry: HistoryEntry): HistoryEntry => ({
         ...entry,
-        before: appendMissing(entry.before),
+        before: protectTimelineSnapshot(appendMissing(entry.before)),
       })
       return {
-        tracks: appendMissing(state.tracks),
+        tracks: protectTimelineSnapshot(appendMissing(state.tracks)),
         undoStack: state.undoStack.map(rebase),
         redoStack: state.redoStack.map(rebase),
       }
@@ -433,7 +426,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         })
       }
     }
-    set((s) => ({ tracks: [...s.tracks, track] }))
+    set((s) => ({ tracks: protectTimelineSnapshot([...s.tracks, track]) }))
     markTimelineEdited()
     return trackId
   },
@@ -512,7 +505,8 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   updateTrack(trackId, patch) {
     if (linkedMasterForTrack(get().tracks, trackId)) return
     if (patch.mixLink !== undefined) return
-    commitTrackSettings(trackId, patch, 'Update track')
+    // Settings originate outside the store; callers retain ownership of their nested inputs.
+    commitTrackSettings(trackId, structuredClone(patch), 'Update track')
   },
 
   // ── redactRange ───────────────────────────────────────────────────────────────
@@ -606,7 +600,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
         const current = track.clips.find((x) => x.id === c.id)
         return (
           !current ||
-          JSON.stringify(current) !== JSON.stringify(c) ||
+          !timelineValuesEqual(current, c) ||
           c.audioSourceId !== clips[0].audioSourceId ||
           (i > 0 &&
             (Math.abs(clips[i - 1].sourceEnd - c.sourceStart) > 1e-7 ||
@@ -775,14 +769,17 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
   commitStructuralEdit(expected, next, label, selectedIds, synchronized = false) {
     const state = get()
-    if (state.tracks !== expected || tracksEqual(expected, next)) return false
+    if (state.tracks !== expected || timelineValuesEqual(expected, next)) return false
     if (!synchronized) {
       if (
         expected.some(
           (track) =>
             linkedMasterForTrack(next, track.id) &&
             linkedMasterForTrack(expected, track.id) &&
-            JSON.stringify(track) !== JSON.stringify(next.find((item) => item.id === track.id)),
+            !timelineValuesEqual(
+              track,
+              next.find((item) => item.id === track.id),
+            ),
         )
       )
         return false
@@ -877,7 +874,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       .flatMap((t) => t.clips)
       .find((c) => c.id === clipId)
       ?.redactions?.find((r) => r.id === redactionId)
-    if (!redaction || JSON.stringify(redaction.crossfade) === JSON.stringify(parsed.data)) return
+    if (!redaction || timelineValuesEqual(redaction.crossfade, parsed.data)) return
     const next = tracks.map((track) =>
       track.clips.some((clip) => clip.id === clipId)
         ? {
@@ -1019,7 +1016,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     set((state) => ({
       undoStack: [
         ...state.undoStack,
-        { before: state.tracks, label: edit.label, domainEdit: edit },
+        { before: protectTimelineSnapshot(state.tracks), label: edit.label, domainEdit: edit },
       ],
       redoStack: [],
     }))
@@ -1035,7 +1032,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     // Capture current state as a redo entry so we can re-apply this op.
     // The redo entry's `before` is the state we are about to revert FROM (i.e. current tracks),
     const redoEntry: HistoryEntry = {
-      before: tracks,
+      before: protectTimelineSnapshot(tracks),
       label: entry.label,
     }
 
@@ -1060,7 +1057,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
 
     // Capture current (pre-redo) state as an undo entry so the user can undo again.
     const undoEntry: HistoryEntry = {
-      before: tracks,
+      before: protectTimelineSnapshot(tracks),
       label: entry.label,
     }
 
