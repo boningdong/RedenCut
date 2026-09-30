@@ -1,0 +1,32 @@
+name: Release contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-contracts:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check workflow contracts and developer commands
+        run: npm run test:tooling
+      - name: Test runtime tooling without building a runtime
+        run: npm run test:runtime
+      - name: Test model tooling without downloading models
+        run: npm run test:models
+      - name: Test release tooling without packaging or uploading
+        run: npm run test:release

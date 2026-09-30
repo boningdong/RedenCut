@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { ModelDefinitionSchema, ModelManifestSchema } from '../../shared/modelManifest.schema'
 import { ModelDownloader, fetchModel } from './ModelDownloader'
 import { ModelRegistry } from './ModelRegistry'
+import { ModelInstaller } from './ModelInstaller'
 import { ResourceManager } from './ResourceManager'
 import { resourcePaths } from './resourcePaths'
 const bytes = Buffer.from('a real small model fixture')
@@ -235,6 +236,94 @@ it('refresh invalidates readiness when an installed file is removed', async () =
   await rm(join(resourcePaths(dir, model).installed, 'model.bin'))
   expect((await manager.read()).baseReady).toBe(false)
 })
+
+it.each(
+  (['transcription', 'alignment'] as const).flatMap((capability) =>
+    (['missing', 'paused', 'failed'] as const).map((status) => ({ capability, status })),
+  ),
+)(
+  'refresh discovers an external $capability installation after $status',
+  async ({ capability, status }) => {
+    const dir = await root()
+    const selected = { ...model, id: 'transcription-default', capability }
+    const registry = new ModelRegistry(dir)
+    if (status === 'paused') {
+      const { staging } = registry.paths(selected)
+      await mkdir(staging, { recursive: true })
+      await writeFile(join(staging, 'model.bin'), bytes.subarray(0, 5))
+    }
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new Error('network-error'))
+    const manager = new ResourceManager([selected], registry, new ModelDownloader(fetcher))
+    try {
+      await manager.read()
+      if (status === 'failed') {
+        await manager.prepare('base')
+        await vi.waitFor(async () => {
+          expect((await manager.read()).resources[0].status).toBe('failed')
+        })
+        await manager.cancel()
+      }
+      expect((await manager.read()).resources[0].status).toBe(status)
+      const source = join(dir, 'external-model')
+      await mkdir(source)
+      await writeFile(join(source, 'model.bin'), bytes)
+      await new ModelInstaller(registry).install(selected, {
+        source,
+        signal: new AbortController().signal,
+      })
+      const snapshot = await manager.read()
+      expect(snapshot.resources[0]).toMatchObject({
+        status: 'ready',
+        downloadedBytes: bytes.length,
+        totalBytes: bytes.length,
+      })
+      expect(snapshot.resources[0].error).toBeUndefined()
+      expect(snapshot.baseReady).toBe(true)
+    } finally {
+      await manager.shutdown()
+    }
+  },
+)
+
+it.each(['downloading', 'verifying'] as const)(
+  'refresh preserves active %s preparation',
+  async (status) => {
+    const dir = await root()
+    const registry = new ModelRegistry(dir)
+    const downloader = new ModelDownloader(remote().fetcher)
+    let finish!: () => void
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    if (status === 'downloading') {
+      vi.spyOn(downloader, 'download').mockImplementation(
+        async (_model, _path, _signal, progress) => {
+          progress(5)
+          await pending
+        },
+      )
+    }
+    const validate = vi.fn(async () => pending)
+    const manager = new ResourceManager([model], registry, downloader, validate)
+    try {
+      await manager.prepare('base')
+      await vi.waitFor(async () => {
+        expect((await manager.read()).resources[0].status).toBe(status)
+        if (status === 'verifying') expect(validate).toHaveBeenCalledOnce()
+      })
+      const resolve = vi.spyOn(registry, 'resolve')
+      const snapshot = await manager.read()
+      expect(snapshot.resources[0].status).toBe(status)
+      expect(snapshot.resources[0].downloadedBytes).toBe(
+        status === 'downloading' ? 5 : bytes.length,
+      )
+      expect(resolve).not.toHaveBeenCalled()
+    } finally {
+      finish()
+      await manager.shutdown()
+    }
+  },
+)
 
 it('keeps verified diarization usable without tokens or a runtime recheck', async () => {
   const dir = await root()

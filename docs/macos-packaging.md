@@ -2,9 +2,11 @@
 
 ## Local test builds
 
-Run `npm run package:mac` on an Apple Silicon Mac after `npm ci`, `npm run setup:runtime` and `npm run setup:models` have completed.
+Run `npm run package:mac` on an Apple Silicon Mac after `npm ci`, `npm run setup:runtime` and `npm run setup:models -- --model diarization-default` have completed.
 The managed runtime must be available under `.runtime/`; the pinned diarization model must be in the shared model directory (default macOS Application Support/RedenCut/models), or explicitly selected with `--models-path`. Packaging validates and copies diarization into application Resources so users need no Hugging Face access request; it does not acquire credentials or download weights.
 Use `npm run package:mac -- --dir` to build the application bundle without a DMG.
+For an isolated release preparation, export `REDENCUT_MODELS_PATH="$PWD/.runtime/release-models"` before model installation and packaging.
+Both `package:mac` and `release:prepare` accept `--models-path PATH`, which takes precedence over that environment variable.
 
 The output is `dist-electron/package/RedenCut-<version>-arm64.dmg`, with the application under `dist-electron/package/mac-arm64/RedenCut.app`.
 The version comes from `package.json`; the app ID is `dev.redencut.app`.

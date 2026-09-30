@@ -16,6 +16,8 @@ jobs:
   release:
     runs-on: macos-15
     timeout-minutes: 120
+    env:
+      REDENCUT_MODELS_PATH: ${{ github.workspace }}/.runtime/release-models
     permissions:
       contents: write
     steps:
@@ -55,10 +57,14 @@ jobs:
             command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
           done
           npm ci
-      - name: Build pinned runtime and prepare bundled model
+      - name: Build pinned runtime
+        run: npm run setup:runtime
+      - name: Prepare bundled diarization model
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: npm run runtime:setup
+        run: npm run setup:models -- --model diarization-default
+      - name: Verify bundled diarization model
+        run: npm run check:models -- --model diarization-default
       - name: Test, package and verify release files
         run: npm run release:prepare
       - name: Create or refresh draft release

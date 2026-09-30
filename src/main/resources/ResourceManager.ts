@@ -107,7 +107,14 @@ export class ResourceManager {
       for (const model of this.models) {
         if (this.registry.managedPath(model)) continue
         const state = this.resources.find((r) => r.id === model.id)!
-        if (state.status === 'ready' && !(await this.registry.resolve(model))) {
+        if (state.status !== 'ready' && !refreshEnvironment) continue
+        const installed = await this.registry.resolve(model)
+        if (installed && state.status !== 'ready') {
+          state.status = 'ready'
+          state.downloadedBytes = state.totalBytes!
+          delete state.error
+          changed = true
+        } else if (!installed && state.status === 'ready') {
           state.status = 'missing'
           state.downloadedBytes = 0
           changed = true

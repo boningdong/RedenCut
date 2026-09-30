@@ -4,12 +4,16 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { require as tsRequire } from 'tsx/cjs/api'
 
 import {
   stageManagedModelResources,
   parseArguments,
   validateDiarizationNotices,
 } from '../StageReleaseResources.mjs'
+
+const { ModelInstaller } = tsRequire('../../src/main/resources/ModelInstaller.ts', import.meta.url)
+const { ModelRegistry } = tsRequire('../../src/main/resources/ModelRegistry.ts', import.meta.url)
 
 async function writeNotices(root, model, modelCard = 'upstream model card\n') {
   const notices = join(root, 'speech-worker/licenses/diarization')
@@ -246,4 +250,54 @@ test('release staging accepts a shared model path and rejects missing path value
     ['--resources-dir', '/release', '--models-root', '/old'],
   ])
     assert.throws(() => parseArguments(args), /Usage/)
+})
+
+test('shared installation stages from a custom environment directory with spaces', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'redencut-install-stage-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const contents = Buffer.from('small offline model')
+  const model = {
+    id: 'diarization-default',
+    capability: 'diarization',
+    repository: 'example/model',
+    revision: 'a'.repeat(40),
+    expectedFiles: ['weights.bin'],
+    license: 'CC-BY-4.0',
+    access: 'gated-auto',
+    profiles: [],
+    supportedLanguages: ['en'],
+    files: [
+      {
+        path: 'weights.bin',
+        size: contents.length,
+        sha256: createHash('sha256').update(contents).digest('hex'),
+      },
+    ],
+  }
+  const source = join(root, 'legacy import')
+  await mkdir(source)
+  await writeFile(join(source, 'weights.bin'), contents)
+  const modelsPath = join(root, 'release models')
+  const registry = new ModelRegistry(modelsPath, undefined, modelsPath)
+  await new ModelInstaller(registry).install(model, {
+    source,
+    signal: new AbortController().signal,
+  })
+  await writeNotices(root, model)
+  const manifestPath = join(root, 'models.json')
+  await writeFile(manifestPath, JSON.stringify({ models: [model] }))
+  const staging = join(root, 'staging')
+  await stageManagedModelResources({
+    repository: root,
+    manifestPath,
+    staging,
+    environment: { REDENCUT_MODELS_PATH: modelsPath },
+  })
+  assert.deepEqual(
+    await readFile(
+      join(staging, 'models/diarization/diarization-default', model.revision, 'weights.bin'),
+    ),
+    contents,
+  )
+  assert.ok(await registry.resolve(model), 'staging must preserve the source installation')
 })

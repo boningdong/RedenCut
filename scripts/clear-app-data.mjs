@@ -1,6 +1,6 @@
 import { require as tsRequire } from 'tsx/cjs/api'
 const { resolveModelsPath } = tsRequire('../src/main/resources/ModelsPath.ts', import.meta.url)
-import { lstat, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -8,6 +8,15 @@ import { randomUUID } from 'node:crypto'
 // Developer maintenance only. Exit the app first so in-memory state cannot restore cleared data.
 const usage =
   'Usage: npm run clear:<onboarding|models> -- [--dry-run] [--user-data-dir PATH] [--models-path PATH]'
+async function resolveExistingPath(path) {
+  try {
+    return await realpath(path)
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    return resolve(path)
+  }
+}
+
 async function main() {
   const [mode, ...args] = process.argv.slice(2)
   if (!['onboarding', 'models'].includes(mode)) throw new Error(usage)
@@ -31,9 +40,15 @@ async function main() {
       override = args[++index]
     else throw new Error(usage)
   }
-  // Match the shared application identity used by model preparation and packaging.
+  // Electron development preferences use the package name; shared models use the product identity.
   const { name } = JSON.parse(
-    await readFile(new URL('../src/shared/AppIdentity.json', import.meta.url), 'utf8'),
+    await readFile(
+      new URL(
+        mode === 'onboarding' ? '../package.json' : '../src/shared/AppIdentity.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
   )
   const appData =
     process.platform === 'darwin'
@@ -43,11 +58,6 @@ async function main() {
         : process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
   const root = resolve(override || join(appData, name))
   const modelsRoot = resolveModelsPath({ modelsPath, userData: root })
-  if (
-    mode === 'models' &&
-    [resolve('/'), resolve(homedir()), resolve(process.cwd()), root].includes(modelsRoot)
-  )
-    throw new Error('Refusing broad models path')
   const targets =
     mode === 'models'
       ? [
@@ -64,6 +74,17 @@ async function main() {
       if ((await lstat(path)).isSymbolicLink()) throw new Error(`Refusing symbolic link: ${path}`)
     } catch (error) {
       if (error.code !== 'ENOENT') throw error
+    }
+  }
+  if (mode === 'models') {
+    // Resolve both sides: ancestor links can alias protected directories while
+    // legitimate system links such as macOS /var must remain usable.
+    const protectedPaths = await Promise.all(
+      [resolve('/'), homedir(), process.cwd(), root].map(resolveExistingPath),
+    )
+    for (const target of targets) {
+      if (protectedPaths.includes(await resolveExistingPath(target)))
+        throw new Error('Refusing broad models path')
     }
   }
   if (dryRun) return

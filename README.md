@@ -149,7 +149,7 @@ Already verified models are reused without authentication; packaged users receiv
 
 Choose a directory with `--models-path PATH`, then `REDENCUT_MODELS_PATH`, otherwise the platform's RedenCut application models directory.
 On macOS the default is `~/Library/Application Support/RedenCut/models`; each model lives under `<capability>/<id>/<revision>/` with `installation.json` and verified files.
-The same override works with `npm run dev -- --models-path PATH`, `setup:models`, `check:models`, and the Docker harness.
+The same override works with `npm run dev -- --models-path PATH`, `setup:models`, `check:models`, `package:mac`, `release:prepare`, and the Docker harness.
 An override applies to that invocation and does not change saved app preferences.
 
 ```mermaid

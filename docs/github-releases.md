@@ -27,7 +27,7 @@ The runtime source archives and license material remain inside the app resources
 4. Create a read token that can access that model and store it in **Settings → Secrets and variables → Actions → New repository secret**, named `HF_TOKEN`.
 5. Ensure repository or organization policy permits the workflow's `contents: write` permission to create Release drafts.
 
-`HF_TOKEN` is supplied only to the credential preflight and runtime/model setup steps, not to the packaging or upload steps.
+`HF_TOKEN` is supplied only to the credential preflight and model installation steps, not to runtime preparation, offline model checks, packaging or upload.
 The existing model downloader sends it only to Hugging Face, and resource staging excludes credentials.
 GitHub supplies `GITHUB_TOKEN` automatically; the workflow exposes it as `GH_TOKEN` only to the draft-upload step.
 No personal GitHub token, local `gh` installation, or Apple credential is required for this Actions path.
@@ -35,19 +35,21 @@ No personal GitHub token, local `gh` installation, or Apple credential is requir
 GitHub runner availability, usage limits and billing depend on repository visibility and account settings.
 The workflow asserts ARM64 explicitly so an unexpected runner architecture fails before building.
 
-## Next release: 0.1.0-alpha.2
+## Creating a release tag
 
 Use a clean `main` checkout containing all changes intended for release, after merging and reviewing the packaging branch.
 Do not create the tag from a worktree that still lacks another task's pending changes.
-The failed `v0.1.0-alpha.1` tag points to the earlier commit. Keep that tag unchanged. The current package version is `0.1.0-alpha.2`; create its tag only after the fix commit is on `main`.
+Create the tag from the version recorded in `package.json`, after all intended fixes and the matching lockfile are on `main`.
+Keep existing release tags unchanged.
 
 ```sh
 git switch main
 git pull --ff-only origin main
 git status --short
 # Continue only when the working tree is clean and the intended changes are present.
-git tag -a v0.1.0-alpha.2 -m "RedenCut 0.1.0-alpha.2"
-git push origin v0.1.0-alpha.2
+release_version=$(node -p "require('./package.json').version")
+git tag -a "v$release_version" -m "RedenCut $release_version"
+git push origin "v$release_version"
 ```
 
 Open **Actions → macOS release** and wait for the tagged run to succeed.
@@ -61,16 +63,17 @@ GitHub automatically offers source archives for the tag; users wanting the app s
 ## Subsequent releases
 
 Each published version gets a new version number and a new tag.
-For example, to prepare the next alpha on the release branch or main checkout:
+Set the next unused version on the release branch or main checkout, commit both package files, and merge that change into `main` before tagging.
+For example, when advancing from alpha.4:
 
 ```sh
-npm version 0.1.0-alpha.3 --no-git-tag-version
+npm version 0.1.0-alpha.5 --no-git-tag-version
 git add package.json package-lock.json
-git commit -m "Release 0.1.0-alpha.3"
+git commit -m "Release 0.1.0-alpha.5"
 # Merge the version commit into main if it was prepared on a separate branch.
 git push origin main
-git tag -a v0.1.0-alpha.3 -m "RedenCut 0.1.0-alpha.3"
-git push origin v0.1.0-alpha.3
+git tag -a v0.1.0-alpha.5 -m "RedenCut 0.1.0-alpha.5"
+git push origin v0.1.0-alpha.5
 ```
 
 Before tagging, ensure the checkout is main at the intended release commit and is clean.
@@ -95,18 +98,36 @@ The Actions steps reuse local commands:
 
 ```sh
 npm ci
+export REDENCUT_MODELS_PATH="$PWD/.runtime/release-models"
 npm run setup:runtime
-npm run setup:models
+npm run setup:models -- --model diarization-default
+npm run check:models -- --model diarization-default
 npm run release:prepare
 npm run release:draft -- --dry-run
 ```
 
 Run these on an Apple Silicon Mac from a clean checkout after committing the release scripts.
-`release:prepare` runs runtime checks, the full application checks, runtime and release-script tests, packaging, code-signature verification, disk-image verification, and generates `dist-electron/releases/v<version>/`.
+The workflow supplies `.runtime/release-models` through job-level `REDENCUT_MODELS_PATH`, so installation, offline verification and staging use the same explicit directory across separate Actions steps.
+Local commands use the macOS Application Support model directory if no override is supplied; weights do not need to be moved into `.runtime` to be packaged.
+`release:prepare -- --models-path PATH` overrides the environment for that preparation and forwards the resolved directory to `package:mac`; installation must have prepared the same path.
+Packaging copies verified diarization weights into the app's `Contents/Resources/models/diarization/<id>/<revision>` directory.
+It never downloads model weights.
+
+`release:prepare` runs runtime checks, the full application checks including runtime, release, model and tooling tests, packaging, code-signature verification, disk-image verification, and generates `dist-electron/releases/v<version>/`.
 It rejects source changes observed during preparation and invalidates old release metadata before attempting a rebuild.
 `release:draft -- --dry-run` checks local source identity and artifact checksums and prints the planned command without contacting GitHub or uploading anything.
 Actual `release:draft` execution additionally requires an authenticated GitHub CLI, matching local/remote tags, and repository write access; CI already supplies these.
 A local dry run does not establish that GitHub credentials, hosted-runner builds or uploads work.
+
+## Checks before tagging
+
+`npm run check` includes the dedicated runtime, release, model and developer-tooling suites.
+The Release contracts workflow runs those offline tooling suites on pull requests and pushes to `main`; it does not build a native runtime, download models, package a DMG or upload a release.
+Its tests parse active workflow YAML and validate standalone literal npm script calls against `package.json`.
+Workflow npm entrypoints must remain standalone commands; wrappers, compound commands and dynamic script names fail the guard rather than being silently accepted.
+Release orchestration tests execute the actual workflow npm steps against controlled command substitutes, checking order, shared model paths, credential scope and failure stops.
+Separate temporary-file tests verify real shared-model installation and staging.
+These checks complement a clean macOS release run; they do not certify remote credentials or final DMG installation.
 
 The automated checks do not establish clean-machine installation, Gatekeeper behavior, audible playback, full transcription quality or export UX.
 Run those acceptance checks on the downloaded candidate DMG before publishing.
