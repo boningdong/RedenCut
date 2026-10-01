@@ -1,10 +1,11 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { mkdtemp, mkdir, readFile, rm, writeFile, access } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 const roots: string[] = []
 afterEach(async () => {
+  vi.unstubAllEnvs()
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 async function fixture() {
@@ -29,7 +30,7 @@ function run(root: string, mode: string, ...extra: string[]) {
   return execFileSync(
     process.execPath,
     [resolve('scripts/clear-app-data.mjs'), mode, '--user-data-dir', root, ...extra],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: { ...process.env, REDENCUT_MODELS_PATH: '' } },
   )
 }
 it('resets only onboarding and preserves other preferences and resources', async () => {
@@ -68,4 +69,14 @@ it('preserves malformed preferences instead of resetting the whole file', async 
   await writeFile(join(root, 'app-preferences.json'), '{broken')
   expect(() => run(root, 'onboarding')).toThrow()
   expect(await readFile(join(root, 'app-preferences.json'), 'utf8')).toBe('{broken')
+})
+
+it('isolates fixture cleanup from inherited release model paths', async () => {
+  const root = await fixture()
+  const releaseModels = await fixture()
+  vi.stubEnv('REDENCUT_MODELS_PATH', releaseModels)
+  run(root, 'models')
+  for (const name of ['models', 'staging']) await expect(access(join(root, name))).rejects.toThrow()
+  await expect(readFile(join(releaseModels, 'models', 'keep'), 'utf8')).resolves.toBe('fixture')
+  await expect(readFile(join(releaseModels, 'staging', 'keep'), 'utf8')).resolves.toBe('fixture')
 })

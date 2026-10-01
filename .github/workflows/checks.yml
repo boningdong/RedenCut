@@ -24,6 +24,10 @@ jobs:
         run: npm ci
       - name: Check workflow contracts and developer commands
         run: npm run test:tooling
+      - name: Test maintenance commands with the release model environment
+        env:
+          REDENCUT_MODELS_PATH: ${{ github.workspace }}/.runtime/release-models
+        run: npm run test -- harness/tests/clear-app-data.test.ts
       - name: Test runtime tooling without building a runtime
         run: npm run test:runtime
       - name: Test model tooling without downloading models

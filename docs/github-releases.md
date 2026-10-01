@@ -123,6 +123,7 @@ A local dry run does not establish that GitHub credentials, hosted-runner builds
 
 `npm run check` includes the dedicated runtime, release, model and developer-tooling suites.
 The Release contracts workflow runs those offline tooling suites on pull requests and pushes to `main`; it does not build a native runtime, download models, package a DMG or upload a release.
+Maintenance-command tests also run with the release model-path environment; their subprocesses isolate fixture paths so checks cannot remove the prepared release models.
 Its tests parse active workflow YAML and validate standalone literal npm script calls against `package.json`.
 Workflow npm entrypoints must remain standalone commands; wrappers, compound commands and dynamic script names fail the guard rather than being silently accepted.
 Release orchestration tests execute the actual workflow npm steps against controlled command substitutes, checking order, shared model paths, credential scope and failure stops.
