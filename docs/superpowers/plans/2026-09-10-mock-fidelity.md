@@ -4,7 +4,7 @@ The user approved replacing the inherited editor layout with the approved standa
 
 ## Reference and boundaries
 
-Use [the final mock](../../../ui-mock/2026-09-10/redencut-ui-final.html) as the visual authority.
+The final mock used as the visual authority is archived outside the repository in the enclosing workspace at `mockups/redencut-repository/docs/ui-mock/2026-09-10/redencut-ui-final.html`.
 Keep existing playback, transcript projection, scoped editing, project persistence and user workspace preferences intact.
 Do not implement unsupported demo controls.
 

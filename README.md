@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/assets/icons/macos/vaporwave-dark-pink-cyan.xcassets/AppIcon.appiconset/1024-mac.png" alt="RedenCut icon" width="120" height="120" />
+  <img src="src/assets/icons/designs/vaporwave-dark-pink-cyan-1024.png" alt="RedenCut icon" width="120" height="120" />
 </p>
 
 <h1 align="center">RedenCut</h1>

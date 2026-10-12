@@ -12,10 +12,10 @@ module.exports = {
   mac: {
     target: [{ target: 'dmg', arch: ['arm64'] }],
     category: 'public.app-category.music',
-    icon: 'src/main/assets/icons/macos/neon-dark-lavender.icns',
+    icon: 'src/assets/icons/macos/neon-dark-lavender.icns',
     extraResources: [
       {
-        from: 'src/main/assets/icons/macos/project-document.icns',
+        from: 'src/assets/icons/macos/project-document.icns',
         to: 'project-document.icns',
       },
     ],
