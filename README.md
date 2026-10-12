@@ -13,8 +13,7 @@
   <a href="#features">Features</a> ·
   <a href="#getting-started">Getting started</a> ·
   <a href="#local-speech-analysis">Speech analysis</a> ·
-  <a href="#development">Development</a> ·
-  <a href="ROADMAP.md">Roadmap</a>
+  <a href="#development">Development</a>
 </p>
 
 <p align="center">English</p>
@@ -218,21 +217,10 @@ This produces an ad-hoc-signed, unnotarized DMG for manual installation; automat
 See [macOS packaging](docs/macos-packaging.md) for prerequisites, output paths, signing limitations and validation.
 For tag-triggered GitHub Actions builds and draft publication, see [GitHub Releases](docs/github-releases.md).
 
-## Current limitations and roadmap
+## Current limitations
 
 RedenCut is under active development.
 The current implementation includes the editing and speech features described above, but release readiness and speech quality across representative recordings remain ongoing work.
-
-Upcoming work includes:
-
-- Developer ID signing, notarization, automatic updates, and clean-machine installation verification.
-- File-drop import and further timeline and accessibility polish.
-- Loudness normalization, configurable crossfades, and richer export controls.
-- Assisted filler-word detection and edit-transition review.
-- A plugin system and assisted speech generation.
-
-These are planned capabilities, not features available in the current app.
-See [ROADMAP.md](ROADMAP.md) for the broader development plan.
 
 ## Contributing
 

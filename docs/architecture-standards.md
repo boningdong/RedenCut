@@ -129,7 +129,6 @@
 
 ## Product Evolution
 
-- Track future audio processing, intelligence, and plugin work in [`ROADMAP.md`](../ROADMAP.md), not as speculative interfaces in current architecture standards.
 - Introduce new extension points only through a separately approved design that preserves the process, data, and playback boundaries above.
 
 ## Whisper Model Selection

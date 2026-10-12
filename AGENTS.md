@@ -3,7 +3,7 @@
 ## Project Scope
 
 RedenCut is a minimalist podcast and audio editor built with Electron, React, and TypeScript.
-It targets macOS first and Windows later, with future extensibility tracked in the product roadmap.
+It targets macOS first and Windows later.
 
 ## Documentation Policy
 
@@ -24,7 +24,6 @@ Use the repository's authoritative files instead of duplicating their contents h
 | Architecture standards | [`docs/architecture-standards.md`](docs/architecture-standards.md) |
 | Keyboard interaction contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
 | Agent-driven UI acceptance | [agent-testing skill](.agents/skills/agent-testing/SKILL.md) and [scenario index](e2e/scenarios/README.md) |
-| Product direction | [`ROADMAP.md`](ROADMAP.md) |
 | Shared project model and schemas | [`src/shared/project.types.ts`](src/shared/project.types.ts) |
 | IPC contract | [`src/shared/ipc.types.ts`](src/shared/ipc.types.ts) |
 | Playback abstraction | [`src/shared/player.types.ts`](src/shared/player.types.ts) |
