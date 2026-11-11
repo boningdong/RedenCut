@@ -12,12 +12,9 @@
 <p align="center">
   <a href="#features">Features</a> ·
   <a href="#getting-started">Getting started</a> ·
-  <a href="#local-speech-analysis">Speech analysis</a> ·
-  <a href="#development">Development</a>
+  <a href="#development">Development</a> ·
+  <a href="#help-and-feedback">Bug Report</a>
 </p>
-
-<p align="center">English</p>
-
 > **Development preview:** RedenCut is under active development and currently focuses on macOS.
 
 ## What is RedenCut?
@@ -30,7 +27,7 @@ It combines the audio editing tools you need with local AI that turns recordings
 
 ## Features
 
-- **Transcribe locally.** Turn recordings into text with local AI that automatically detects different speakers and labels their parts of the conversation.
+- **Transcribe locally.** Turn recordings into text with local AI that automatically detects different speakers and labels their parts of the conversation. Transcript-based audio editing currently supports **English and Chinese**.
 - **Edit audio like a document.** Shape your conversation directly in the transcript, using familiar text selections and editing shortcuts.
 - **Organize speakers.** Give speakers names and colors, group them, and filter the transcript to focus on a particular person.
 - **Refine cuts visually.** Adjust where a cut starts and ends on the waveform, bring back audio you’ve cut, and listen to how the edited conversation flows.
@@ -50,20 +47,49 @@ It combines the audio editing tools you need with local AI that turns recordings
 
 ## Getting started
 
-### Availability
+### Availability and download
 
 Development currently focuses on macOS.
 Running the desktop app on Windows or Linux is not actively tested.
+
 Download the latest DMG from the project's GitHub Releases page.
 
-### Run from source on macOS
+### Your first edit
 
-Prerequisites:
+1. Import your recordings into a project.
+2. Generate a transcript for one track or all tracks.
+3. Select unwanted text to "redact" the audio, then listen back and refine the "redact".
+4. Arrange your tracks, save the project, and export your podcast.
 
-- Git and Node.js **24.14.0**, the version pinned in `package.json`, with npm.
+Prepare speech features in **Settings → Models & dependencies** before generating a transcript.
+You can skip speech preparation and use waveform and multitrack editing right away.
+For editing controls and shortcuts, see the [keyboard and editing reference](docs/key-mappings.md).
+
+### Saving and sharing projects
+
+- **Copy and share your project.** Imported recordings, transcripts, and saved edits are kept together in your `.redencut` project. Copy the project to back up or share your work.
+- **Track changes with Git.** Edits and transcripts are stored as readable text files, so version control tools can track changes and sync editing progress with your team.
+- **Recover missing recordings.** If audio is missing when you open a project, RedenCut guides you to find the original files.
+
+### Speech and privacy
+
+Transcription, speaker detection, audio editing, and export all run locally on your computer.
+Initial speech-model downloads require internet access; once prepared, speech processing works offline.
+
+## Development
+
+This section is for developers who want to build, run, or contribute to RedenCut.
+
+### Setup on macOS
+
+#### Prerequisites
+
+- `git` and `node.js 24.14.0`, the version pinned in `package.json`, with `npm`.
 - Apple command-line developer tools, CMake, Ninja and pkg-config for the initial native runtime build.
 - Internet access and disk space for the pinned source archives and Python dependencies.
 - The managed runtime currently targets macOS ARM64; Windows and Intel macOS are not certified by this recipe.
+
+#### Setup commands
 
 ```sh
 git clone https://github.com/boningdong/RedenCut.git
@@ -80,182 +106,86 @@ npm run check:models
 npm run dev
 ```
 
-`setup:runtime` installs the native audio/speech tools and Python dependencies; it does not download model weights.
-`setup:models` installs the default model set: Small Whisper, English and Chinese alignment, and speaker diarization.
-The app, model CLI and Docker harness share one model directory, so existing verified installations are reused.
-You can skip speech preparation during onboarding and use waveform and multitrack editing, then prepare resources later through **Settings → Models & dependencies**.
-Settings can download Whisper and alignment models after the runtime is ready; development diarization is acquired through the model CLI.
-Release builds bundle diarization and expose the speaker-recognition switch without an account prompt.
+`setup:runtime` prepares the native tools and Python dependencies needed for speech processing.
+Once the runtime is ready, there are two ways to prepare models:
 
-See [speech models and dependencies](docs/speech-models-and-dependencies.md) for managed runtime, model caches, and setup details.
-The app never falls back to a system/Homebrew FFmpeg, an npm static binary, or an unrelated Python environment; a missing or invalid managed runtime produces a setup error.
+**Command line — install the default set before launching the app**
 
-### Your first edit
+1. Run `npm run setup:models` to install the default models required for all text editing features, including Whisper Small for transcription, English and Chinese alignment models, and the diarization model for speaker detection.
+2. Run `npm run check:models` to verify the installation, then start the app with `npm run dev`.
 
-1. Create a project and import audio through the file picker.
-2. Generate a transcript for a track, or for all tracks, once speech resources are ready.
-3. Click a word to hear its position, then select unwanted text and press **M** or **Delete** to redact it.
-4. Use **Preview Mode** (on by default) to audition the cuts, and adjust their boundaries on the waveform.
-5. Arrange clips and tracks, save the project, and export your audio.
+> [!NOTE]
+> For text-only setup without speaker detection, add `-- --set text` to both commands.
 
-**Redaction and mute have different effects.**
-Redactions remove selected passages from the export and can be skipped during preview.
-Clip and track mute control audibility; ordinary muted regions and natural gaps retain their timeline placement.
-Export applies redactions even when **Preview Mode** is off.
+**In the app — download or change models after launch**
 
-For a portable project, use managed copies of the source audio.
-Projects that reference external files still need those files to remain available.
+The CLI setup above installs the default models, so you don’t need to download them again in the app.
+Use onboarding or Settings if you want to add or switch models later, or try the setup experience that regular app users see.
 
-## Local speech analysis
+1. Open onboarding on first launch, or **Settings → Models & dependencies** later.
+2. Select and download a Whisper model, and download any missing alignment models.
 
-| Stage | Engine | Purpose |
-| --- | --- | --- |
-| Transcription | whisper.cpp | Produce the transcript from your recording |
-| Word alignment | WhisperX with pinned alignment models | Match transcript words to audio timestamps |
-| Optional speaker separation | pyannote.audio | Assign anonymous speaker labels to speech |
+> [!WARNING]
+> In development, the diarization model must be installed through `setup:models`; onboarding and Settings download only Whisper and alignment models.
 
-The current alignment models cover **English and Chinese**.
-The multilingual transcription model does not imply full editing-pipeline support for every language; broader language support and mixed-language quality still need validation.
-Speaker separation provides editable anonymous labels, not identification of real-world people.
+### Everyday commands
 
-### Downloads and privacy
-
-Audio decoding, transcription, alignment, speaker analysis, and export run locally.
-Once the required runtimes and models are installed, normal speech inference uses offline model loading and does not need a cloud transcription service.
-Initial dependency installation and model downloads require internet access.
-
-Hugging Face access is needed only when acquiring gated model files, including development diarization.
-Accept the model's conditions with your own account, then use `hf auth login`, `HF_TOKEN_PATH`, or `HF_TOKEN` for the model CLI.
-Credentials are never passed to inference workers, saved in installations, or requested in Settings or onboarding.
-Already verified models are reused without authentication; packaged users receive the bundled diarization model.
-
-### Shared models directory
-
-| Command | Resources prepared or checked |
-| --- | --- |
-| `npm run setup:runtime` | Native tools and Python dependencies only |
-| `npm run setup:models` | Default: Small Whisper, English/Chinese alignment, diarization |
-| `npm run setup:models -- --set text` | Small Whisper and English/Chinese alignment |
-| `npm run setup:models -- --model ID` | One manifest-listed model |
-| `npm run check:models` | Offline integrity check of the default set; no downloads |
-
-Choose a directory with `--models-path PATH`, then `REDENCUT_MODELS_PATH`, otherwise the platform's RedenCut application models directory.
-On macOS the default is `~/Library/Application Support/RedenCut/models`; each model lives under `<capability>/<id>/<revision>/` with `installation.json` and verified files.
-The same override works with `npm run dev -- --models-path PATH`, `setup:models`, `check:models`, `package:mac`, `release:prepare`, and the Docker harness.
-An override applies to that invocation and does not change saved app preferences.
-
-```mermaid
-flowchart LR
-  CLI[Model CLI] --> Store[Shared models directory]
-  Store --> App[Development app]
-  Store --> Docker[Docker /models read-only]
-```
-
-To reuse an older model directory, run `npm run setup:models -- --import-from OLD_ROOT`.
-The CLI imports and validates matching manifest revisions into the shared layout; use `--model ID` when importing an individual model's directory.
-Release preparation copies verified diarization into `Resources/models/diarization/<id>/<revision>/`, separate from `Resources/runtime/`; downloadable Whisper and alignment models remain in the application model library.
-
-Model revisions, dependencies, access requirements, and environment details are recorded in [speech models and dependencies](docs/speech-models-and-dependencies.md) and the [model manifest](speech-worker/models.json).
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
-| --- | --- |
-| Space | Play or pause |
-| S | Split the selected clip at the playhead |
-| M | Mute selected clips or redact a waveform/text selection |
-| Delete / Backspace | Remove the selected clip or redaction overlay; redact a range/text selection |
-| ⌘S | Save project |
-| ⌘Z / ⌘⇧Z | Undo / redo |
-| ⌘C / ⌘X / ⌘V | Copy / cut / paste clips when Audio has focus |
-| ⌘D | Duplicate selected clips |
-| ← / → | Seek backward / forward one second |
-| ⇧← / ⇧→ | Seek backward / forward five seconds |
-
-Shortcuts depend on focus and selection.
-See the [full keyboard reference](docs/key-mappings.md) for editing contexts, track routing, and boundary adjustments.
-
-## Development
-
-RedenCut uses **Electron, React, TypeScript, and Zustand**, with FFmpeg for audio processing and a separate Python worker for alignment and speaker analysis.
-
-| Directory | Responsibility |
-| --- | --- |
-| `src/main/` | Native dialogs, projects, audio processing, speech jobs, and managed resources |
-| `src/preload/` | Narrow bridge between Electron and the renderer |
-| `src/renderer/` | Editor UI, timeline interaction, and audio playback |
-| `src/shared/` | Shared types, schemas, and IPC contracts |
-| `speech-worker/` | Python speech worker, locked dependencies, and model manifest |
-| `e2e/` and `harness/` | End-to-end scenarios and the Docker-based test harness |
+Run commands from the repository or worktree root.
 
 ```sh
-# Everyday development
-npm run dev           # Start development
-npm run build         # Build the app code (not a distributable installer)
-npm run preview       # Preview the built app
-
-# Verification
-npm test              # Run unit tests
-npm run typecheck     # Check TypeScript
-npm run check         # Formatting, lint, dead-code checks, types, tests, and build
-
-# Performance investigation
-npm run profile:timeline # Timeline history retention/comparison benchmark
-npm run profile:waveform # Waveform interaction benchmark
+npm run dev       	# Start development
+npm run build     	# Build application code, not an installer
+npm run preview   	# Preview the built application
+npm test          	# Run the default tests once
+npm run test:watch 	# Rerun affected default tests while editing
+npm run check     	# Run the required source, test, tooling, and build checks
 ```
 
-Scripts in `package.json` are grouped in the following order.
-Blank lines separate the groups; the package-specific Prettier configuration preserves them.
-They are developer commands, not commands required by installed-app users.
-JSON does not support comments, so the group descriptions live here.
+`check` validates the codebase; `check:runtime` and `check:models` validate installed resources.
+The complete command definitions live in [package.json](package.json).
 
-| Group | Audience and purpose | Scripts |
+### Script groups
+
+Scripts are ordered by the following responsibilities:
+
+| Group | Commands | Intended use |
 | --- | --- | --- |
-| Development | Public developer entrypoints | `dev`, `build`, `preview` |
-| Resources | Public setup and installed-resource validation | `setup:runtime`, `setup:models`, `check:runtime`, `check:models` |
-| Verification | Public checks and unit-test iteration | `check`, `format`, `format:check`, `lint`, `deadcode`, `typecheck`, `test`, `test:watch` |
-| Focused tests | Components of `check`; also callable for diagnosis | `test:runtime`, `test:models`, `test:release`, `test:tooling` |
-| Performance | Developer benchmarks | `profile:timeline`, `profile:waveform` |
-| Maintenance | Explicit local-data cleanup; exit the app first | `clear:onboarding`, `clear:models` |
-| Distribution | Maintainer packaging and release entrypoints | `package:mac`, `release:prepare`, `release:draft` |
-| Helpers | Lower-level runtime building/staging and direct MCP server entry; normal setup, packaging and Docker entrypoints are preferred | `runtime:build`, `runtime:stage`, `harness:mcp` |
-| Harness runners | Container test runners; use the Docker wrapper | `test:harness`, `test:harness:faults`, `test:harness:all` |
-| Product E2E runners | Container test runners; use the Docker wrapper | `test:e2e:base`, `test:e2e:speech`, `test:e2e:all` |
+| Development | `dev`, `build`, `preview` | Everyday application development |
+| Setup | `setup:runtime`, `setup:models` | Prepare local tools and model files |
+| Validation | `check`, `check:runtime`, `check:models` | Check the codebase or installed resources |
+| Formatting and analysis | `format`, `format:check`, `lint`, `deadcode`, `typecheck` | Individual source-quality checks |
+| Maintenance | `clear:onboarding`, `clear:models` | Explicit local-data cleanup; exit the app first |
+| Distribution | `package:mac`, `release:prepare`, `release:draft` | Maintainer packaging and release entrypoints |
+| Runtime helpers | `runtime:build`, `runtime:stage` | Lower-level building and staging; normal setup and packaging entrypoints are preferred |
+| MCP server | `harness:mcp` | Direct server entry; use the Docker MCP launcher for container acceptance |
+| Performance | `profile:timeline`, `profile:waveform` | Developer benchmarks |
+| Default tests | `test`, `test:watch` | Run once or iterate in watch mode |
+| Tooling tests | `test:runtime`, `test:models`, `test:release`, `test:tooling` | Suites included in `check`, also callable for diagnosis |
+| Harness runners | `test:harness`, `test:harness:faults`, `test:harness:all` | Integration runners normally invoked through Docker |
+| Product E2E runners | `test:e2e:base`, `test:e2e:speech`, `test:e2e:all` | Product runners normally invoked through Docker |
 
-See [architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), and the [test harness guide](harness/container/README.md) for more detail.
-The scripts in [package.json](package.json) are the source of truth for development commands.
+Use the Docker harness for integration and product E2E runners; see the references below for prerequisites and UI acceptance.
 The timeline benchmark measures history retention and edit comparison, not end-to-end UI latency; see the [CoW performance report](docs/superpowers/reports/2026-09-27-timeline-cow.md).
 
-## Local macOS package
+### Technical references
 
-On Apple Silicon, run `npm run package:mac` after preparing the managed runtime with `npm run setup:runtime` and models with `npm run setup:models`.
-This produces an ad-hoc-signed, unnotarized DMG for manual installation; automatic updates are not included.
-See [macOS packaging](docs/macos-packaging.md) for prerequisites, output paths, signing limitations and validation.
-For tag-triggered GitHub Actions builds and draft publication, see [GitHub Releases](docs/github-releases.md).
-
-## Current limitations
-
-RedenCut is under active development.
-The current implementation includes the editing and speech features described above, but release readiness and speech quality across representative recordings remain ongoing work.
+| Topic | Documentation |
+| --- | --- |
+| Architecture and code standards | [Architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), [file organization](docs/file-organization-standards.md) |
+| Speech runtimes, models, and credentials | [Speech models and dependencies](docs/speech-models-and-dependencies.md) |
+| Automated tests and UI acceptance | [Docker harness](harness/container/README.md), [product E2Es](e2e/README.md), [acceptance scenarios](e2e/scenarios/README.md) |
+| Build a macOS package or prepare a release | [macOS packaging](docs/macos-packaging.md), [GitHub Releases](docs/github-releases.md) |
 
 ## Contributing
 
 RedenCut is currently maintained primarily by its main author.
+
+We’re still exploring how community contributions should work. Please email the author before starting so we can agree on the scope. We’re not accepting large pull requests at this time.
+
+## Help and feedback
+
 Feature requests and bug reports are welcome through [Issues](https://github.com/boningdong/RedenCut/issues).
-
-## Bug Report
-To report a problem:
-
-1. Search [open and closed issues](https://github.com/boningdong/RedenCut/issues?q=is%3Aissue) using what you were doing, what went wrong, or the error shown (for example, “import audio hangs” or “export silent”). You do not need to know the feature name. Diagnostic IDs are unique to an occurrence, so use the error text or code when searching for similar problems.
-2. If you can reproduce it, collect diagnostics soon afterward: open **Help → Collect diagnostics…** or **Settings → Diagnostics**, then choose **Collect diagnostics** at the bottom. Both entries open the same Settings page, and this also works without an error message.
-3. Choose **Review files**, review them, then **Save bundle…** to save a ZIP. It contains retained application events, main/helper messages and environment details; older logs may have rotated away. Audio, transcripts and project files are not included. Common secrets and private paths are redacted, but third-party logs can still contain personal information: review before sharing. Nothing is uploaded automatically.
-4. Open a new issue using **Bug report**. Give it a plain title describing the action and symptom, such as “Importing an MP3 stops at 50%”. Describe the steps, what happened, what you expected, and the app/OS versions.
-5. Optionally drag the ZIP and relevant screenshots into the attachment field, wait for GitHub's upload to finish, then submit. If diagnostics are unavailable, report the problem without them. If a similar issue exists, add useful new steps or an attachment there instead of opening a duplicate.
-If an audio sample is needed, use a short recording you have permission to share.
-
-We are not accepting large pull requests at this time.
-If you would like to contribute, please contact the author by email before starting work so we can discuss the scope and direction.
-We are still exploring how community contributions should work, and the contribution process will evolve as the project grows.
+See [reporting a problem](docs/reporting-problems.md) for how to describe a bug and collect optional diagnostic logs.
 
 ## Acknowledgments
 
