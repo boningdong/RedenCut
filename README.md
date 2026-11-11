@@ -18,50 +18,43 @@
 
 <p align="center">English</p>
 
-> **Development preview:** RedenCut currently targets macOS and runs from source.
-> Standalone packaging, runtime bundling, and signing are still in progress.
+> **Development preview:** RedenCut is under active development and currently focuses on macOS.
 
 ## What is RedenCut?
 
-RedenCut is an audio editor specifically designed for podcast editing.
-Import a recording, generate a transcript using on-device AI, select the words you want to remove, and listen back to the edit.
-Use the waveform and multitrack timeline to refine timing, arrange clips, and mix recordings before export.
+RedenCut is a 100% free audio editor specifically designed for podcast editing flows.
 
-Edits are non-destructive: cuts are stored in the project while the source audio stays intact.
-You can restore removed passages, adjust their boundaries, and undo changes as you work.
+It combines the audio editing tools you need with local AI that turns recordings into text on your computer, so you can edit conversations by selecting words.
 
 ![RedenCut editor showing a speaker-labeled transcript and a three-track audio timeline](docs/images/redencut-editor.png)
 
 ## Features
 
-- **Edit through text.** Click words to seek, follow word highlighting during playback, and select passages to redact their audio.
-- **Refine cuts visually.** Move or resize redaction regions on the waveform, restore a passage, and preview playback with redacted sections skipped.
-- **Arrange multiple tracks.** Split, trim, move, copy, paste, and duplicate clips; select multiple clips, snap edges, and insert at a seam.
-- **Control your mix.** Rename tracks, adjust volume, and use mute and solo controls with synchronized playback.
-- **Analyze speech locally.** Generate transcripts with whisper.cpp, align words with WhisperX, and optionally separate speakers with pyannote.audio.
-- **Organize speakers.** Edit speaker names and colors, group people, and filter the transcript by speaker without muting their audio.
-- **Save your workspace.** Keep edits and speech-analysis results in `.redencut` projects, with managed audio copies or external references.
-- **Export finished audio.** Render MP3, WAV, FLAC, or AAC with track mixing, clip gain, and redactions applied.
-- **Make the editor yours.** Choose light or dark themes, switch between English and Simplified Chinese, and resize or reorder the transcript and audio panels.
+- **Transcribe locally.** Turn recordings into text with local AI that automatically detects different speakers and labels their parts of the conversation.
+- **Edit audio like a document.** Shape your conversation directly in the transcript, using familiar text selections and editing shortcuts.
+- **Organize speakers.** Give speakers names and colors, group them, and filter the transcript to focus on a particular person.
+- **Refine cuts visually.** Adjust where a cut starts and ends on the waveform, bring back audio you’ve cut, and listen to how the edited conversation flows.
+- **Arrange multiple tracks.** Split, trim, move, and duplicate clips. Move several clips together and line them up across tracks.
+- **Balance your mix.** Adjust each track’s volume, mute tracks or listen to one on its own, and use Auto Level to balance voice levels.
+- **Save and continue later.** Save your edits and transcripts in a project, then reopen it to pick up where you left off.
+- **Sync editing progress with your team.** Edits and transcripts are stored in readable text files, so teammates can use version control tools like Git to track changes and share progress.
+- **Export your podcast.** Save your finished mix as MP3, WAV, FLAC, or AAC, with your cuts and volume adjustments applied.
+- **Make the editor yours.** Choose a light or dark theme, switch between English and Simplified Chinese, and arrange the transcript and audio panels to suit how you work.
 
-### Supported formats
+### Supported audio formats
 
 | Operation | Formats |
 | --- | --- |
 | Import | WAV, MP3, FLAC, AAC, M4A, OGG, AIFF |
 | Export | MP3, WAV, FLAC, AAC |
-| Project | `.redencut` |
-
-Decoding and encoding use FFmpeg; compatibility with individual files depends on the available codecs and the file itself.
 
 ## Getting started
 
 ### Availability
 
-The current setup is intended for macOS development.
-Windows support is planned; the Linux Docker environment is a development and testing harness, not a supported desktop release.
-
-<!-- TODO before public launch: Add release download links, supported macOS versions and architectures, hardware recommendations, and signed/notarized installation instructions once verified. -->
+Development currently focuses on macOS.
+Running the desktop app on Windows or Linux is not actively tested.
+Download the latest DMG from the project's GitHub Releases page.
 
 ### Run from source on macOS
 
@@ -79,7 +72,7 @@ npm ci
 
 # Prepare native tools and Python dependencies, then the default speech models.
 npm run setup:runtime
-npm run runtime:check
+npm run check:runtime
 npm run setup:models
 npm run check:models
 
@@ -196,15 +189,38 @@ RedenCut uses **Electron, React, TypeScript, and Zustand**, with FFmpeg for audi
 | `e2e/` and `harness/` | End-to-end scenarios and the Docker-based test harness |
 
 ```sh
+# Everyday development
 npm run dev           # Start development
 npm run build         # Build the app code (not a distributable installer)
 npm run preview       # Preview the built app
+
+# Verification
 npm test              # Run unit tests
 npm run typecheck     # Check TypeScript
 npm run check         # Formatting, lint, dead-code checks, types, tests, and build
+
+# Performance investigation
 npm run profile:timeline # Timeline history retention/comparison benchmark
 npm run profile:waveform # Waveform interaction benchmark
 ```
+
+Scripts in `package.json` are grouped in the following order.
+Blank lines separate the groups; the package-specific Prettier configuration preserves them.
+They are developer commands, not commands required by installed-app users.
+JSON does not support comments, so the group descriptions live here.
+
+| Group | Audience and purpose | Scripts |
+| --- | --- | --- |
+| Development | Public developer entrypoints | `dev`, `build`, `preview` |
+| Resources | Public setup and installed-resource validation | `setup:runtime`, `setup:models`, `check:runtime`, `check:models` |
+| Verification | Public checks and unit-test iteration | `check`, `format`, `format:check`, `lint`, `deadcode`, `typecheck`, `test`, `test:watch` |
+| Focused tests | Components of `check`; also callable for diagnosis | `test:runtime`, `test:models`, `test:release`, `test:tooling` |
+| Performance | Developer benchmarks | `profile:timeline`, `profile:waveform` |
+| Maintenance | Explicit local-data cleanup; exit the app first | `clear:onboarding`, `clear:models` |
+| Distribution | Maintainer packaging and release entrypoints | `package:mac`, `release:prepare`, `release:draft` |
+| Helpers | Lower-level runtime building/staging and direct MCP server entry; normal setup, packaging and Docker entrypoints are preferred | `runtime:build`, `runtime:stage`, `harness:mcp` |
+| Harness runners | Container test runners; use the Docker wrapper | `test:harness`, `test:harness:faults`, `test:harness:all` |
+| Product E2E runners | Container test runners; use the Docker wrapper | `test:e2e:base`, `test:e2e:speech`, `test:e2e:all` |
 
 See [architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), and the [test harness guide](harness/container/README.md) for more detail.
 The scripts in [package.json](package.json) are the source of truth for development commands.
