@@ -37,7 +37,7 @@ export async function prepareRelease({
   await mkdir(destination, { recursive: true })
   // A failed new build must never leave an older record eligible for upload.
   await rm(join(destination, 'release.json'), { force: true })
-  await execute('npm', ['run', 'runtime:check'])
+  await execute('npm', ['run', 'check:runtime'])
   await execute('npm', ['run', 'check'])
   await execute('npm', ['run', 'package:mac', '--', '--models-path', modelDirectory])
   const packaged = join(root, 'dist-electron/package')

@@ -92,6 +92,7 @@ Testing UI downloads requires a separate writable disposable model directory; th
 
 ```sh
 npm run setup:runtime
+npm run check:runtime
 npm run setup:models
 npm run check:models
 npm run dev
@@ -105,6 +106,7 @@ sh harness/container/docker-harness.sh test e2e-speech --models-path /absolute/p
 
 | Command or selection | Scope |
 | --- | --- |
+| `check:runtime` | Validate the prepared native runtime, executable loading and managed Python dependencies; no model downloads |
 | `setup:models` / `--set default` | Recommended Whisper small, both alignment models and diarization |
 | `setup:models -- --set text` | Recommended Whisper small and both alignment models; no gated diarization |
 | `setup:models -- --set smoke` | Whisper tiny only |

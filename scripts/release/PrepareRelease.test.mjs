@@ -78,7 +78,7 @@ test('preparation forwards the explicit model path to packaging and produces ver
   })
   assert.deepEqual(
     calls.filter(({ command }) => command === 'npm').map(({ args }) => args[1]),
-    ['runtime:check', 'check', 'package:mac'],
+    ['check:runtime', 'check', 'package:mac'],
   )
   const record = JSON.parse(
     await readFile(join(root, 'dist-electron/releases/v0.1.0-beta/release.json'), 'utf8'),
@@ -136,5 +136,5 @@ test('a failed preparation invalidates old metadata and never reaches packaging'
     /runtime unavailable/,
   )
   await assert.rejects(readFile(join(destination, 'release.json')), { code: 'ENOENT' })
-  assert.deepEqual(calls, ['runtime:check'])
+  assert.deepEqual(calls, ['check:runtime'])
 })

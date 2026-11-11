@@ -35,7 +35,8 @@ A locally built app opening successfully does not establish the first-download e
 
 ## Validation
 
-Run `npm run check` and `npm run test:runtime` for source and runtime regressions.
+Run `npm run check` for source and tooling regressions, including the runtime test suite.
+Run `npm run check:runtime` to validate the prepared native runtime, executable loading and managed Python dependencies.
 After packaging, verify the bundle with `codesign --verify --deep --strict --verbose=2 dist-electron/package/mac-arm64/RedenCut.app` and the disk image with `hdiutil verify dist-electron/package/RedenCut-<version>-arm64.dmg`.
 The packaging script additionally validates the runtime file inventory, executable loading, Python imports and short audio decoding probes from the packaged location.
 

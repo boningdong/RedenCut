@@ -113,7 +113,7 @@ Local commands use the macOS Application Support model directory if no override 
 Packaging copies verified diarization weights into the app's `Contents/Resources/models/diarization/<id>/<revision>` directory.
 It never downloads model weights.
 
-`release:prepare` runs runtime checks, the full application checks including runtime, release, model and tooling tests, packaging, code-signature verification, disk-image verification, and generates `dist-electron/releases/v<version>/`.
+`release:prepare` runs `check:runtime`, the full application checks including runtime, release, model and tooling tests, packaging, code-signature verification, disk-image verification, and generates `dist-electron/releases/v<version>/`.
 It rejects source changes observed during preparation and invalidates old release metadata before attempting a rebuild.
 `release:draft -- --dry-run` checks local source identity and artifact checksums and prints the planned command without contacting GitHub or uploading anything.
 Actual `release:draft` execution additionally requires an authenticated GitHub CLI, matching local/remote tags, and repository write access; CI already supplies these.

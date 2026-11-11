@@ -27,7 +27,7 @@
     "deadcode": "knip",
     "check": "npm run format:check && npm run lint && npm run deadcode && npm run typecheck && npm test && npm run test:runtime && npm run test:release && npm run test:models && npm run test:tooling && npm run build",
     "runtime:build": "node scripts/runtime/BuildRuntime.mjs",
-    "runtime:check": "node scripts/runtime/CheckRuntime.mjs",
+    "check:runtime": "node scripts/runtime/CheckRuntime.mjs",
     "test:runtime": "node --test scripts/runtime/*.test.mjs",
     "runtime:stage": "node scripts/StageReleaseResources.mjs",
     "package:mac": "node scripts/PackageMac.mjs",
