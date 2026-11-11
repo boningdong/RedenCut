@@ -49,7 +49,9 @@ test('typed alignment failure exposes a diagnostic report through the real UI', 
   expect(await session.page.locator('.diagnostic-collection').innerText()).toContain(diagnosticId)
   await expect
     .poll(() =>
-      session!.page.getByText(/Audio, transcript text and project files are excluded/).isVisible(),
+      session!.page
+        .getByText('No audio, transcripts or project files. Nothing is uploaded.')
+        .isVisible(),
     )
     .toBe(true)
   await session.call('browser_snapshot')
