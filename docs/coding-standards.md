@@ -6,6 +6,8 @@
 - Each class represents one clear responsibility.
 - Each module has one named responsibility.
 - Split large units by responsibility, not by arbitrary line counts.
+- Parallel logics should follow the same form.
+- Keep each function at a single level of abstraction.
 
 ## Naming
 
