@@ -1,14 +1,7 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Vitest configuration
-//
-// Targets: pure logic in the renderer and shared layers (Tier 1 tests).
-// No Electron / Node.js / DOM APIs are required by these modules, so we run
-// in the lightweight 'node' environment.
-//
-// Path aliases mirror tsconfig.web.json so that imports like
-//   import { ... } from '@shared/project.types'
-// resolve correctly during test runs.
-// ─────────────────────────────────────────────────────────────────────────────
+// Default unit and component tests across the application and harness helpers.
+// Node is the default environment; individual test files can select a DOM environment.
+// Integration, product E2E, and performance suites use separate configurations.
+// Aliases mirror the application TypeScript configurations.
 
 import { defineConfig } from 'vitest/config'
 import path from 'path'

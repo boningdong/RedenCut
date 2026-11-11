@@ -3,10 +3,11 @@
 ## Local test builds
 
 Run `npm run package:mac` on an Apple Silicon Mac after `npm ci`, `npm run setup:runtime` and `npm run setup:models -- --model diarization-default` have completed.
-The managed runtime must be available under `.runtime/`; the pinned diarization model must be in the shared model directory (default macOS Application Support/RedenCut/models), or explicitly selected with `--models-path`. Packaging validates and copies diarization into application Resources so users need no Hugging Face access request; it does not acquire credentials or download weights.
+The managed runtime is selected by `REDENCUT_RUNTIME_ROOT`, otherwise the checkout’s `.runtime/<platform>-<arch>` directory; the pinned diarization model must be in the shared model directory (default macOS Application Support/RedenCut/models), or explicitly selected with `--models-path`. Packaging validates and copies diarization into application Resources so users need no Hugging Face access request; it does not acquire credentials or download weights.
 Use `npm run package:mac -- --dir` to build the application bundle without a DMG.
 For an isolated release preparation, export `REDENCUT_MODELS_PATH="$PWD/.runtime/release-models"` before model installation and packaging.
 Both `package:mac` and `release:prepare` accept `--models-path PATH`, which takes precedence over that environment variable.
+To reuse a shared runtime for checking and packaging, set `REDENCUT_RUNTIME_ROOT`; see [runtime directory selection](speech-models-and-dependencies.md#runtime-directory).
 
 The output is `dist-electron/package/RedenCut-<version>-arm64.dmg`, with the application under `dist-electron/package/mac-arm64/RedenCut.app`.
 The version comes from `package.json`; the app ID is `dev.redencut.app`.
@@ -35,7 +36,8 @@ A locally built app opening successfully does not establish the first-download e
 
 ## Validation
 
-Run `npm run check` and `npm run test:runtime` for source and runtime regressions.
+Run `npm run check` for source and tooling regressions, including the runtime test suite.
+Run `npm run check:runtime` to validate the prepared native runtime, executable loading and managed Python dependencies.
 After packaging, verify the bundle with `codesign --verify --deep --strict --verbose=2 dist-electron/package/mac-arm64/RedenCut.app` and the disk image with `hdiutil verify dist-electron/package/RedenCut-<version>-arm64.dmg`.
 The packaging script additionally validates the runtime file inventory, executable loading, Python imports and short audio decoding probes from the packaged location.
 
@@ -52,7 +54,7 @@ The Actions workflow reuses this packaging command after preparing the runtime o
 
 The shared `src/shared/AppIdentity.json` supplies application identity and the `.redencut` extension to both runtime constants and the packager.
 The macOS bundle exports `dev.redencut.project`, conforming to `com.apple.package` and `public.content`, and declares RedenCut as its editor and owner.
-Project documents currently reuse the application icon.
+Project documents use the separately bundled `project-document.icns` icon; the application icon is configured independently.
 The project remains a directory on disk; its contents and project schema are unchanged.
 The packager verifies the generated `Info.plist` declaration and referenced document icon before accepting its output.
 

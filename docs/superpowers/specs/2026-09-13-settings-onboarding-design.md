@@ -5,7 +5,7 @@ Status: Architecture and behavior approved in conversation; implementation has n
 
 ## Goal and scope
 
-Implement settings and onboarding in the existing Electron app using the approved [mock](../../ui-mock/2026-09-13/settings-onboarding.html).
+Implement settings and onboarding in the existing Electron app using the approved mock, archived outside the repository in the enclosing workspace at `mockups/redencut-repository/docs/ui-mock/2026-09-13/settings-onboarding.html`.
 Preserve its layout, typography, spacing, themes, control placement and interaction hierarchy except for the logo, which uses the existing application implementation.
 Replace all simulated actions and progress with real operations; omit mock-only controls and notices.
 Keep implementation within existing main/preload/renderer boundaries, Zustand state and shared localization.

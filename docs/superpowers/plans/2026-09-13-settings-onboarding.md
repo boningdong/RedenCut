@@ -13,7 +13,7 @@
 ## Implementation status
 
 Development implementation for Tasks 1–8 is present.
-Automated regression and documentation portions of Task 9 are being recorded in [the implementation report](../../settings-onboarding-implementation.md).
+The separate implementation report has been retired; current resource behavior is maintained in the [speech resource guide](../../speech-models-and-dependencies.md).
 The original checklist below remains the review checklist; unchecked acceptance items are not claims of completed verification.
 Formal acceptance and Task 10 (including FFmpeg rebuilds) are explicitly deferred by the user.
 

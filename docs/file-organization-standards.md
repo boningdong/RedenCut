@@ -6,7 +6,7 @@
 - Use PascalCase (uppercase first letter, capitalized word boundaries) for project-owned TypeScript and JavaScript module filenames, regardless of whether they contain a component, class, hook, store, types or functions: `ClipRedactions.ts`, `TimelineStore.ts`, `UseKeyboardShortcuts.ts`, `ProjectTypes.ts`.
 - Keep conventional test suffixes: `ClipRedactions.test.ts`, `WaveformView.test.tsx`, `TranscriptFixture.e2e.ts`.
 - Preserve ecosystem/tool-required names such as `index.ts`, `vite.config.ts` and `package.json`; this rule does not rename documentation, assets, directories, generated/vendor files or Python modules (which retain snake_case).
-- Apply PascalCase to newly created modules now. Rename existing modules in the dedicated filename refactor after the clip redaction overlay feature is complete; avoid mixing repository-wide renames with feature changes.
+- Apply PascalCase to newly created modules. Rename existing modules in a dedicated mechanical refactor; avoid mixing repository-wide renames with feature changes.
 - Avoid catch-all names such as `misc`, `common`, or `utils` when a specific subsystem or responsibility can be named.
 
 ## Single Responsibility

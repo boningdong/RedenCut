@@ -135,7 +135,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.config.ts'],
+    files: ['*.config.ts', 'vitest.config.*.ts'],
     languageOptions: { globals: globals.node },
     rules: { 'no-console': 'off' },
   },

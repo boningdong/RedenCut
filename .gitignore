@@ -35,3 +35,8 @@ dist-electron/
 .runtime
 .runtime-build/
 .runtime-cache/
+
+# Python bytecode caches
+__pycache__/
+*.pyc
+*.pyo

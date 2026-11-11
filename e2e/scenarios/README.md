@@ -8,7 +8,7 @@ Existing [fixed E2Es](../README.md) continue to own deterministic regression ass
 
 | Scenario | When to run | Required capabilities |
 | --- | --- | --- |
-| [Settings and onboarding workflow](settings-onboarding-workflow.md) | First-run setup, appearance preferences and resource preparation | Docker MCP, snapshots; real downloads additionally require runtimes and appropriate access |
+| [Settings and onboarding workflow](settings-onboarding-workflow.md) | First-run setup, appearance preferences and resource preparation | Docker MCP, snapshots; UI downloads require ready runtimes and network access; developer speaker-model acquisition is a separate CLI check |
 | [Localization workflow](localization-workflow.md) | UI language, preference persistence, and localized editing controls | Docker MCP, prepared fixture/project dialogs, snapshots and screenshots |
 | [Editing workflow](editing-workflow.md) | Baseline for user-visible changes; waveform fit/overflow, effects and replacement display regressions; explicit workflow trials | Docker MCP, prepared fixture/project dialogs, snapshots and screenshots |
 | [UI consistency and interaction workflow](ui-consistency-workflow.md) | Every implementation/fix that can affect visible UI, including backend-driven UI states | Docker MCP, real interactions, screenshots and semantic snapshots |

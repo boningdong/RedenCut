@@ -42,6 +42,23 @@ Whisper is invoked as a native executable; alignment and diarization run in the 
 Prepared inference is offline and does not receive Hugging Face credentials.
 Linux Docker regression and native macOS release verification remain distinct lanes; successful Linux tests do not certify signed macOS distribution.
 
+### Runtime directory
+
+`REDENCUT_RUNTIME_ROOT` selects the installed runtime used by development, `check:runtime`, `runtime:stage`, `package:mac`, and `release:prepare`.
+Without an override, these commands use the checkout's `.runtime/<platform>-<arch>` installation when run from the checkout root.
+An explicit `check:runtime -- --runtime-root PATH` or `runtime:stage -- --bundle PATH` takes precedence over the environment variable.
+Packaging and release preparation inherit the environment variable; no additional runtime argument is required.
+This is separate from `REDENCUT_MODELS_PATH`, which selects model weights.
+
+```sh
+export REDENCUT_RUNTIME_ROOT=/absolute/path/to/shared/runtime
+npm run check:runtime
+npm run package:mac
+```
+
+`runtime:build` creates a new bundle and does not use `REDENCUT_RUNTIME_ROOT`; use its `--bundle-dir` option to choose build output.
+Installed applications always use their bundled runtime rather than developer overrides.
+
 ## Shared directory and path selection
 
 Path precedence is **`--models-path` > `REDENCUT_MODELS_PATH` > application default**.
@@ -92,6 +109,7 @@ Testing UI downloads requires a separate writable disposable model directory; th
 
 ```sh
 npm run setup:runtime
+npm run check:runtime
 npm run setup:models
 npm run check:models
 npm run dev
@@ -105,6 +123,7 @@ sh harness/container/docker-harness.sh test e2e-speech --models-path /absolute/p
 
 | Command or selection | Scope |
 | --- | --- |
+| `check:runtime` | Validate the prepared native runtime, executable loading and managed Python dependencies; no model downloads |
 | `setup:models` / `--set default` | Recommended Whisper small, both alignment models and diarization |
 | `setup:models -- --set text` | Recommended Whisper small and both alignment models; no gated diarization |
 | `setup:models -- --set smoke` | Whisper tiny only |

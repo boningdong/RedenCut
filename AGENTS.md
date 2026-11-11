@@ -3,7 +3,7 @@
 ## Project Scope
 
 RedenCut is a minimalist podcast and audio editor built with Electron, React, and TypeScript.
-It targets macOS first and Windows later, with future extensibility tracked in the product roadmap.
+It targets macOS first and Windows later.
 
 ## Documentation Policy
 
@@ -22,12 +22,11 @@ Use the repository's authoritative files instead of duplicating their contents h
 | Coding and review standards | [`docs/coding-standards.md`](docs/coding-standards.md) |
 | File responsibility, naming and directory organization | [`docs/file-organization-standards.md`](docs/file-organization-standards.md) |
 | Architecture standards | [`docs/architecture-standards.md`](docs/architecture-standards.md) |
-| Keyboard interaction contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
+| Editor interaction and keyboard contract | [`docs/key-mappings.md`](docs/key-mappings.md) |
 | Agent-driven UI acceptance | [agent-testing skill](.agents/skills/agent-testing/SKILL.md) and [scenario index](e2e/scenarios/README.md) |
-| Product direction | [`ROADMAP.md`](ROADMAP.md) |
-| Shared project model and schemas | [`src/shared/project.types.ts`](src/shared/project.types.ts) |
+| Shared project model and schemas | [`src/shared/ProjectTypes.ts`](src/shared/ProjectTypes.ts) |
 | IPC contract | [`src/shared/ipc.types.ts`](src/shared/ipc.types.ts) |
-| Playback abstraction | [`src/shared/player.types.ts`](src/shared/player.types.ts) |
+| Playback abstraction | [`src/shared/PlayerTypes.ts`](src/shared/PlayerTypes.ts) |
 | Transcription abstraction | [`src/shared/transcriber.types.ts`](src/shared/transcriber.types.ts) |
 | App name and project extension | [`src/shared/constants.ts`](src/shared/constants.ts) |
 

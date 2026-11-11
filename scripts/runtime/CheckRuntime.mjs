@@ -160,7 +160,11 @@ async function main() {
     else if (!runtimeRoot && !argument.startsWith('-')) runtimeRoot = argument
     else throw new Error(`Unknown CheckRuntime argument: ${argument}`)
   }
-  const root = resolve(runtimeRoot ?? join('.runtime', `${process.platform}-${process.arch}`))
+  const root = resolve(
+    runtimeRoot ??
+      (process.env.REDENCUT_RUNTIME_ROOT ||
+        join('.runtime', `${process.platform}-${process.arch}`)),
+  )
   const result = await checkRuntime(root)
   const { manifest: _manifest, ...summary } = result
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`)

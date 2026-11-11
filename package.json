@@ -7,38 +7,50 @@
     "dev": "node --import tsx scripts/Dev.ts",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --build --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:harness": "vitest run --config vitest.harness.config.ts",
-    "test:harness:faults": "vitest run --config vitest.harness.config.ts --mode faults",
-    "test:harness:all": "vitest run --config vitest.harness.config.ts --mode all",
-    "test:e2e:base": "vitest run --config vitest.e2e.config.ts --mode base",
-    "test:e2e:speech": "vitest run --config vitest.e2e.config.ts --mode speech",
-    "test:e2e:all": "vitest run --config vitest.e2e.config.ts --mode all",
-    "clear:onboarding": "node scripts/clear-app-data.mjs onboarding",
-    "clear:models": "node scripts/clear-app-data.mjs models",
-    "harness:mcp": "node --import tsx harness/server.ts",
-    "profile:waveform": "node --expose-gc ./node_modules/vitest/vitest.mjs run --config vitest.performance.config.ts src/renderer/src/components/Waveform/waveform.performance.ts",
-    "profile:timeline": "node --expose-gc ./node_modules/vitest/vitest.mjs run --config vitest.performance.config.ts src/renderer/src/domain/TimelineSnapshot.performance.ts",
+
+    "setup:runtime": "node scripts/runtime/SetupRuntime.mjs",
+    "setup:models": "node --import tsx scripts/models/Models.ts install",
+
+    "check": "npm run format:check && npm run lint && npm run deadcode && npm run typecheck && npm test && npm run test:runtime && npm run test:release && npm run test:models && npm run test:tooling && npm run build",
+    "check:runtime": "node scripts/runtime/CheckRuntime.mjs",
+    "check:models": "node --import tsx scripts/models/Models.ts check",
+
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\" \"harness/**/*.{ts,cjs,json}\" \"e2e/**/*.ts\" \"*.{ts,mjs,json}\" \"scripts/**/*.{ts,mjs}\" .prettierrc.json",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\" \"harness/**/*.{ts,cjs,json}\" \"e2e/**/*.ts\" \"*.{ts,mjs,json}\" \"scripts/**/*.{ts,mjs}\" .prettierrc.json",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" \"harness/**/*.ts\" \"e2e/**/*.ts\" \"*.config.ts\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"harness/**/*.ts\" \"e2e/**/*.ts\" \"*.config.ts\" \"vitest.config.*.ts\"",
     "deadcode": "knip",
-    "check": "npm run format:check && npm run lint && npm run deadcode && npm run typecheck && npm test && npm run test:runtime && npm run test:release && npm run test:models && npm run test:tooling && npm run build",
-    "runtime:build": "node scripts/runtime/BuildRuntime.mjs",
-    "runtime:check": "node scripts/runtime/CheckRuntime.mjs",
-    "test:runtime": "node --test scripts/runtime/*.test.mjs",
-    "runtime:stage": "node scripts/StageReleaseResources.mjs",
+    "typecheck": "tsc --build --noEmit",
+
+    "clear:onboarding": "node scripts/clear-app-data.mjs onboarding",
+    "clear:models": "node scripts/clear-app-data.mjs models",
+
     "package:mac": "node scripts/PackageMac.mjs",
     "release:prepare": "node scripts/release/PrepareRelease.mjs",
     "release:draft": "node scripts/release/DraftRelease.mjs",
-    "test:release": "node --test scripts/release/*.test.mjs",
-    "setup:runtime": "node scripts/runtime/SetupRuntime.mjs",
-    "setup:models": "node --import tsx scripts/models/Models.ts install",
-    "check:models": "node --import tsx scripts/models/Models.ts check",
+
+    "runtime:build": "node scripts/runtime/BuildRuntime.mjs",
+    "runtime:stage": "node scripts/StageReleaseResources.mjs",
+
+    "harness:mcp": "node --import tsx harness/server.ts",
+
+    "profile:timeline": "node --expose-gc ./node_modules/vitest/vitest.mjs run --config vitest.config.performance.ts src/renderer/src/domain/TimelineSnapshot.performance.ts",
+    "profile:waveform": "node --expose-gc ./node_modules/vitest/vitest.mjs run --config vitest.config.performance.ts src/renderer/src/components/Waveform/waveform.performance.ts",
+
+    "test": "vitest run",
+    "test:watch": "vitest",
+
+    "test:runtime": "node --test scripts/runtime/*.test.mjs",
     "test:models": "node --import tsx --test scripts/models/*.test.ts scripts/models/*.test.mjs",
-    "test:tooling": "node --test scripts/ci/*.test.mjs scripts/maintenance/*.test.mjs harness/tests/docker-harness-commands.test.mjs"
+    "test:release": "node --test scripts/release/*.test.mjs",
+    "test:tooling": "node --test scripts/ci/*.test.mjs scripts/maintenance/*.test.mjs harness/tests/docker-harness-commands.test.mjs",
+
+    "test:harness": "vitest run --config vitest.config.harness.ts",
+    "test:harness:faults": "vitest run --config vitest.config.harness.ts --mode faults",
+    "test:harness:all": "vitest run --config vitest.config.harness.ts --mode all",
+
+    "test:e2e:base": "vitest run --config vitest.config.e2e.ts --mode base",
+    "test:e2e:speech": "vitest run --config vitest.config.e2e.ts --mode speech",
+    "test:e2e:all": "vitest run --config vitest.config.e2e.ts --mode all"
   },
   "keywords": [],
   "author": "RedenCut contributors",

@@ -102,7 +102,8 @@ The [localization agent scenario](scenarios/localization-workflow.md) adds adapt
 Chinese font rendering is covered in the Linux container; system-owned native picker controls and actual macOS window/font behavior remain separate manual checks.
 
 Run `sh harness/container/docker-harness.sh run base -- npm run test:harness -- ipcErrorBridge` to verify rejected IPC descriptors across the real Electron contextBridge.
-This isolated boundary regression uses the built application preload and checks that safe reason/code/message fields survive while diagnostic fields are excluded; it complements the UI workflow.
+This isolated boundary regression uses the built application preload and checks that safe reason/code/message fields survive while private fields such as `cause` and `internalDiagnostic` are excluded; it complements the UI workflow.
+The preload separately allowlists valid opaque diagnostic IDs; excluding private diagnostic data does not exclude the public ID shown to the user.
 
 ## Existing transcript editing without models
 
