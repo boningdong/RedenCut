@@ -1,13 +1,16 @@
+import childProcess from 'node:child_process'
+import { syncBuiltinESMExports } from 'node:module'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 import { require as tsRequire } from 'tsx/cjs/api'
 
 import {
   stageManagedModelResources,
+  stageReleaseResources,
   parseArguments,
   validateDiarizationNotices,
 } from '../StageReleaseResources.mjs'
@@ -300,4 +303,53 @@ test('shared installation stages from a custom environment directory with spaces
     contents,
   )
   assert.ok(await registry.resolve(model), 'staging must preserve the source installation')
+})
+
+test('release staging passes the selected runtime source to the installer', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'redencut-stage-source-'))
+  const original = childProcess.execFileSync
+  const previousRoot = process.env.REDENCUT_RUNTIME_ROOT
+  t.after(async () => {
+    childProcess.execFileSync = original
+    syncBuiltinESMExports()
+    if (previousRoot === undefined) delete process.env.REDENCUT_RUNTIME_ROOT
+    else process.env.REDENCUT_RUNTIME_ROOT = previousRoot
+    await rm(root, { recursive: true, force: true })
+  })
+  const stop = new Error('stop before installing or copying a runtime')
+  let expectedSource
+  childProcess.execFileSync = (command, args) => {
+    assert.equal(command, process.execPath)
+    assert.equal(args[0], resolve(import.meta.dirname, 'SetupRuntime.mjs'))
+    assert.equal(args[1], '--bundle')
+    assert.equal(args[2], expectedSource)
+    assert.equal(args[3], '--runtime-root')
+    assert.ok(args[4].startsWith(root))
+    throw stop
+  }
+  // Update named built-in imports so the installer boundary is intercepted too.
+  syncBuiltinESMExports()
+  const environmentRoot = join(root, 'environment runtime')
+  const explicitRoot = join(root, 'explicit bundle')
+  const defaultRoot = resolve(
+    import.meta.dirname,
+    '../..',
+    '.runtime',
+    `${process.platform}-${process.arch}`,
+  )
+  for (const [override, args, expected] of [
+    [environmentRoot, [], environmentRoot],
+    [environmentRoot, ['--bundle', explicitRoot], explicitRoot],
+    [undefined, [], defaultRoot],
+    ['', [], defaultRoot],
+  ]) {
+    if (override === undefined) delete process.env.REDENCUT_RUNTIME_ROOT
+    else process.env.REDENCUT_RUNTIME_ROOT = override
+    expectedSource = expected
+    await assert.rejects(
+      stageReleaseResources(['--resources-dir', join(root, 'resources'), ...args]),
+      (error) => error === stop,
+    )
+    assert.deepEqual(await readdir(root), [])
+  }
 })

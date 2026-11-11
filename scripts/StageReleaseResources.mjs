@@ -166,7 +166,8 @@ export async function stageReleaseResources(args = process.argv.slice(2)) {
   }
   const bundle = resolve(
     options['--bundle'] ??
-      join(defaultRepository, '.runtime', `${process.platform}-${process.arch}`),
+      (process.env.REDENCUT_RUNTIME_ROOT ||
+        join(defaultRepository, '.runtime', `${process.platform}-${process.arch}`)),
   )
   const staging = join(dirname(destination), `.redencut-release-${randomUUID()}`)
   await mkdir(staging, { recursive: true })

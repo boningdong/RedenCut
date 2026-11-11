@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
@@ -137,4 +137,42 @@ test('a failed preparation invalidates old metadata and never reaches packaging'
   )
   await assert.rejects(readFile(join(destination, 'release.json')), { code: 'ENOENT' })
   assert.deepEqual(calls, ['check:runtime'])
+})
+
+test('release preparation preserves the runtime override for validation and packaging children', async (t) => {
+  const { prepareRelease } = await import('./PrepareRelease.mjs')
+  const { root } = await fixture(t)
+  const bin = await mkdtemp(join(tmpdir(), 'redencut-release-environment-'))
+  t.after(() => rm(bin, { recursive: true, force: true }))
+  const trace = join(bin, 'trace.jsonl')
+  const npm = join(bin, 'npm')
+  await writeFile(
+    npm,
+    `#!${process.execPath}
+require('node:fs').appendFileSync(process.env.TRACE, JSON.stringify({script: process.argv[3], runtime: process.env.REDENCUT_RUNTIME_ROOT}) + '\\n');
+if (process.argv[3] === 'package:mac') process.exit(2);
+`,
+  )
+  await chmod(npm, 0o755)
+  const runtimeRoot = join(bin, 'shared runtime')
+  await assert.rejects(
+    prepareRelease({
+      root,
+      platform: 'darwin',
+      arch: 'arm64',
+      environment: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        TRACE: trace,
+        REDENCUT_RUNTIME_ROOT: runtimeRoot,
+      },
+    }),
+    /Command failed/,
+  )
+  const calls = (await readFile(trace, 'utf8')).trim().split('\n').map(JSON.parse)
+  assert.deepEqual(
+    calls.map(({ script }) => script),
+    ['check:runtime', 'check', 'package:mac'],
+  )
+  assert.ok(calls.every(({ runtime }) => runtime === runtimeRoot))
 })

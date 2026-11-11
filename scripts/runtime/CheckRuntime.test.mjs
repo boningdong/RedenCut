@@ -1,7 +1,8 @@
+import { spawnSync } from 'node:child_process'
 import assert from 'node:assert/strict'
-import { chmod, mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { checkRuntime } from './CheckRuntime.mjs'
@@ -11,6 +12,7 @@ async function makeRuntime({
   platform = process.platform,
   arch = process.arch,
   working = true,
+  runtimeId = 'check-fixture',
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'redencut-runtime-check-'))
   await mkdir(join(root, 'bin'))
@@ -31,7 +33,7 @@ async function makeRuntime({
     join(root, 'manifest.json'),
     JSON.stringify({
       schemaVersion: 1,
-      runtimeId: 'check-fixture',
+      runtimeId,
       platform,
       arch,
       executables: { ffmpeg: 'bin/ffmpeg', ffprobe: 'bin/ffprobe' },
@@ -79,4 +81,37 @@ test('reports load failures and accepts executable runtimes that load', async ()
   const ready = await checkRuntime(readyRoot)
   assert.equal(ready.status, 'ready')
   assert.equal(ready.runtimeId, 'check-fixture')
+})
+
+test('runtime check CLI selects an explicit path, then environment, then its default', async (t) => {
+  const cwd = await mkdtemp(join(tmpdir(), 'redencut-check-cli-'))
+  const environmentRoot = await makeRuntime({ runtimeId: 'environment-runtime' })
+  const explicitRoot = await makeRuntime({ runtimeId: 'explicit-runtime' })
+  const defaultRoot = await makeRuntime({ runtimeId: 'default-runtime' })
+  t.after(() =>
+    Promise.all(
+      [cwd, environmentRoot, explicitRoot, defaultRoot].map((root) =>
+        rm(root, { recursive: true, force: true }),
+      ),
+    ),
+  )
+  const installedDefault = join(cwd, '.runtime', `${process.platform}-${process.arch}`)
+  await mkdir(join(cwd, '.runtime'))
+  await rename(defaultRoot, installedDefault)
+  const environment = { ...process.env }
+  delete environment.REDENCUT_RUNTIME_ROOT
+  const entry = resolve(import.meta.dirname, 'CheckRuntime.mjs')
+  for (const [args, override, expected] of [
+    [[], environmentRoot, 'environment-runtime'],
+    [['--runtime-root', explicitRoot], environmentRoot, 'explicit-runtime'],
+    [[explicitRoot], environmentRoot, 'explicit-runtime'],
+    [[], undefined, 'default-runtime'],
+    [[], '', 'default-runtime'],
+  ]) {
+    const env = { ...environment }
+    if (override !== undefined) env.REDENCUT_RUNTIME_ROOT = override
+    const result = spawnSync(process.execPath, [entry, ...args], { cwd, env, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    assert.equal(JSON.parse(result.stdout).runtimeId, expected)
+  }
 })

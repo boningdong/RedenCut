@@ -109,6 +109,8 @@ npm run release:draft -- --dry-run
 Run these on an Apple Silicon Mac from a clean checkout after committing the release scripts.
 The workflow supplies `.runtime/release-models` through job-level `REDENCUT_MODELS_PATH`, so installation, offline verification and staging use the same explicit directory across separate Actions steps.
 Local commands use the macOS Application Support model directory if no override is supplied; weights do not need to be moved into `.runtime` to be packaged.
+Local release preparation also inherits `REDENCUT_RUNTIME_ROOT` for runtime validation and packaging; without it, the checkout’s default runtime is used.
+See [runtime directory selection](speech-models-and-dependencies.md#runtime-directory) for shared-runtime usage.
 `release:prepare -- --models-path PATH` overrides the environment for that preparation and forwards the resolved directory to `package:mac`; installation must have prepared the same path.
 Packaging copies verified diarization weights into the app's `Contents/Resources/models/diarization/<id>/<revision>` directory.
 It never downloads model weights.
