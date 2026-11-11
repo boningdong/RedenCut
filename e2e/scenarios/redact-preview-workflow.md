@@ -13,9 +13,12 @@ Create a clearly visible interior redacted interval through supported editing co
 Use actual transcript selection when validating transcript redaction; otherwise select a waveform range and redact it.
 Clicking a clip twice leaves its waveform range selected without selecting the clip object; M then creates an overlay, while M on a selected clip toggles ordinary mute.
 Record the chosen interval from visible ruler/clip geometry and identify the redacted track.
+Use an overlay with crossfade disabled for these baseline timing checks; when checking enabled crossfades, account for their additional output contraction separately.
 Do not confuse track-level Mute, a removed clip's empty gap, or naturally silent source material with a redacted clip interval.
 Choose an interval long enough that before/inside/after observations distinguish a jump from ordinary elapsed playback.
-For each playback checkpoint, capture ordered visible times, Play/Pause state, Preview state and elapsed observation timing from retained tool evidence.
+The ruler and timeline playhead use editing-time coordinates; the transport counter and duration use the current mode’s output time.
+With Preview on, the timeline playhead skips eligible redactions while the output counter advances continuously through the shortened result; do not require the counter to jump.
+For each playback checkpoint, capture ordered playhead positions against the ruler, transport output times, Play/Pause state, Preview state and elapsed observation timing from retained tool evidence.
 Sparse observations that could equally represent ordinary playback are insufficient evidence of a skip.
 Do not infer active playback behavior from moving the paused playhead or from a successful button click alone.
 
@@ -24,18 +27,19 @@ Do not infer active playback behavior from moving the paused playhead or from a 
 | ID | Required observable outcome | Evidence |
 | --- | --- | --- |
 | `redact-setup` | An interior interval is visibly redacted while both adjacent portions remain available; the selected edit affects the intended track. | Before/after waveform and, when used, inline transcript strike; approximate interval and selection context. |
-| `preview-crossing` | With Preview on, playback started before the redacted interval advances to its start and jumps to the interval's end, then continues into retained audio. | Ordered playing-time observations bracketing the jump, redacted bounds and Preview-on state; elapsed timing sufficient to distinguish the jump. |
-| `preview-off` | With Preview off, playback traverses the same redacted interval in ordinary timeline time without the Preview jump and continues afterward. | Playing time observed inside the interval and afterward, Preview-off state, comparison with the same bounds. |
-| `preview-start-inside` | With Preview on and a paused playhead inside the redacted interval, Play seeks to its end and begins advancing through retained audio. | Paused inside position, first playing observation at/after the end and a later advancing observation. |
-| `preview-track-mute` | Track-level Mute alone does not cause Preview to jump across otherwise unredacted timeline material. | Track Mute state, absence of clip redaction in the tested interval, ordinary playing-time progression through it. |
-| `preview-gap` | A visible empty timeline gap between retained portions does not become a redaction skip merely because Preview is on. | Gap geometry and playing time observed inside and after the gap with Preview on. |
-| `preview-overlap` | A second unmuted track containing retained audio over the first track's redacted interval prevents a global skip that would omit that retained material. | Both tracks' overlapping geometry and mute/redaction state, Preview on, playing time inside the overlap and afterward. |
-| `preview-stop` | Pause stops playback after a Preview transition, and two separated observations remain stable; restarting playback resumes predictably from the visible position. | Ordered pause, stable pause and resume time/control observations. |
-| `preview-persist` | Save, fully restart and reopen the project; redacted and retained intervals remain visible. Enable Preview explicitly if needed and confirm the redaction crossing behavior again. | Saved/reopened project name and waveform, both generations, repeated playing-time jump evidence. |
+| `preview-crossing` | With Preview on, playback started before the redacted interval advances to its start and jumps to the interval's end, then continues into retained audio. | Ordered timeline-playhead positions bracketing the skip, redacted bounds, Preview-on state and continuously advancing output time; elapsed timing sufficient to distinguish the skip. |
+| `preview-off` | With Preview off, playback traverses the same redacted interval in ordinary timeline time without the Preview jump and continues afterward. | Timeline playhead and transport time observed inside the interval and afterward, Preview-off state, comparison with the same bounds. |
+| `preview-start-inside` | Seek to a timeline position inside an eligible redaction and enable Preview; the position resolves to retained audio at the redaction end, and Play advances through retained material. Seeking or changing mode may normalize the paused position before Play. | Requested timeline target, Preview state, normalized timeline playhead at the end, then ordered playing positions and advancing output time. Do not require a paused playhead to remain inside skipped time. |
+| `preview-track-mute` | Track-level Mute alone does not cause Preview to jump across otherwise unredacted timeline material. | Track Mute state, absence of clip redaction in the tested interval, ordinary timeline-playhead progression through it, with advancing output time. |
+| `preview-gap` | A visible empty timeline gap between retained portions does not become a redaction skip merely because Preview is on. | Gap geometry, timeline playhead inside and after the gap, and advancing output time with Preview on. |
+| `preview-overlap` | A second unmuted track containing retained audio over the first track's redacted interval prevents a global skip that would omit that retained material. | Both tracks' overlapping geometry and mute/redaction state, Preview on, timeline playhead inside the overlap and afterward, with advancing output time. |
+| `preview-stop` | Pause stops playback after a Preview transition, and two separated observations remain stable; restarting playback resumes predictably from the visible position. | Ordered timeline-playhead and output-counter observations during pause and resume, with the matching controls. |
+| `preview-persist` | Save, fully restart and reopen the project; redacted and retained intervals remain visible. Enable Preview explicitly if needed and confirm the redaction crossing behavior again. | Saved/reopened project name and waveform, both generations, repeated timeline-playhead skip evidence and advancing output-counter observations. |
 
 For overlap setup, position the retained second-track audio to cover the entire candidate skip interval, rather than relying on an ambiguous partial overlap.
 If source silence is additionally used as a variation, disclose how the silent interval was established; waveform appearance alone is not proof of silence.
-No checkpoint passes solely because the playhead reached a later time.
+No checkpoint passes solely because the playhead reached a later time or because the output counter advanced.
+Use ruler geometry to compare the playhead with redaction bounds; comparing the output counter directly with editing-time bounds is invalid.
 Unavailable mandatory evidence remains BLOCKED.
 
 ## Export Checkpoints
@@ -48,7 +52,7 @@ Use separate filenames for each output, never overwrite prior evidence.
 
 | ID | Required observable outcome | Evidence |
 | --- | --- | --- |
-| `export-redact` | With Preview off, default export removes the interior redacted interval and joins the retained prefix and suffix. | Done screenshot, produced filename, measured duration equal to original minus eligible interval, and decoded-content comparison before and after the join. |
+| `export-redact` | With Preview off, default export removes the interior redacted interval and joins the retained prefix and suffix. | Done screenshot, produced filename, measured duration equal to original minus eligible interval with the baseline crossfade disabled, and decoded-content comparison before and after the join. |
 | `export-preview-independent` | Changing Preview does not change the export’s removal policy. | Both actual outputs and their measured durations/decoded-content agreement for the same project. |
 | `export-track-mute` | Track-level mute does not remove timeline duration. | Actual output retains duration and decoded muted region is silent. |
 | `export-gap` | Natural empty gaps remain in exported timeline time. | Gap geometry, actual duration and decoded silence inside gap plus retained material afterward. |
@@ -64,7 +68,7 @@ Keep retries, selection workarounds and timing uncertainty explicit.
 
 ## Scope
 
-Playback checkpoints verify visible progression and controls, not listening or sample-level sound correctness.
+Playback checkpoints verify editing-time playhead movement, output-time progression and controls, not listening or sample-level sound correctness.
 Export checkpoints additionally inspect decoded output content and measured duration.
 The retained second-track region establishes the timeline's reason not to skip; audible output must be verified separately with supported audio capture if the task requires a sound-content claim.
 The current Docker MCP does not expose recorder controls, so required listening/capture claims remain BLOCKED rather than inferred from these observations.

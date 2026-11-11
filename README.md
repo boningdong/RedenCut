@@ -172,6 +172,7 @@ The timeline benchmark measures history retention and edit comparison, not end-t
 | Topic | Documentation |
 | --- | --- |
 | Architecture and code standards | [Architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), [file organization](docs/file-organization-standards.md) |
+| Transcript tasks, reruns, and presentation | [Transcript processing](docs/transcript-processing.md) |
 | Speech runtimes, models, and credentials | [Speech models and dependencies](docs/speech-models-and-dependencies.md) |
 | Automated tests and UI acceptance | [Docker harness](harness/container/README.md), [product E2Es](e2e/README.md), [acceptance scenarios](e2e/scenarios/README.md) |
 | Build a macOS package or prepare a release | [macOS packaging](docs/macos-packaging.md), [GitHub Releases](docs/github-releases.md) |

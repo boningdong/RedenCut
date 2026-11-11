@@ -53,7 +53,7 @@ The Actions workflow reuses this packaging command after preparing the runtime o
 
 The shared `src/shared/AppIdentity.json` supplies application identity and the `.redencut` extension to both runtime constants and the packager.
 The macOS bundle exports `dev.redencut.project`, conforming to `com.apple.package` and `public.content`, and declares RedenCut as its editor and owner.
-Project documents currently reuse the application icon.
+Project documents use the separately bundled `project-document.icns` icon; the application icon is configured independently.
 The project remains a directory on disk; its contents and project schema are unchanged.
 The packager verifies the generated `Info.plist` declaration and referenced document icon before accepting its output.
 

@@ -1,7 +1,15 @@
-# RedenCut Key Mappings
+# Editor Interaction and Keyboard Reference
 
-[`useKeyboardShortcuts.ts`](../src/renderer/src/hooks/useKeyboardShortcuts.ts) implements this keyboard interaction contract.
-Update the implementation and this document together whenever a mapping or its contextual behavior changes.
+This document defines editor behavior, selection and focus rules, and keyboard mappings.
+Use the sections below for the maintained interaction contract; architecture and state ownership live in the [architecture standards](architecture-standards.md).
+
+- **Keyboard and focus:** [shortcuts](#editor-shortcuts), [native menus](#native-menu-routing), [focus rules](#focus-rules).
+- **Audio editing:** [clips and clipboard](#clip-clipboard-and-selection), [audio toolbar](#audio-toolbar), [track levels](#track-levels-and-effects).
+- **Workspace and projects:** [layout](#workspace-layout-controls), [settings and onboarding](#settings-and-onboarding-dialogs), [project commands](#project-menu-and-departure).
+- **Speakers and recordings:** [speaker labels](#speaker-labels), [Mix replacement](#mix-source-replacement).
+
+[`useKeyboardShortcuts.ts`](../src/renderer/src/hooks/useKeyboardShortcuts.ts) implements the editor-level keyboard mappings.
+Update the relevant implementation and this document together whenever an interaction or its contextual behavior changes.
 
 ## Editor Shortcuts
 
@@ -130,6 +138,9 @@ Keyboard input inside the editor stays local, including native text undo; saved 
 
 While a settings or onboarding dialog is open, keyboard input stays within the dialog and does not trigger background editor shortcuts.
 Escape closes settings or explicitly skips onboarding; dialog closure leaves active resource downloads running.
+Theme, language, feature preferences, and explicit onboarding completion/skip persist independently of project edits.
+Sample and empty-project entry use the normal protected project transition flow; the sample contains generated tones, not a speech-quality demonstration.
+The [speech resource guide](speech-models-and-dependencies.md) owns model preparation and the distinction between CLI acquisition and in-app downloads.
 
 ## Mix Source Replacement
 

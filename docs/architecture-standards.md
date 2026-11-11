@@ -22,6 +22,13 @@
 - Identify imported media with stable `AudioSourceId` values; never use filesystem paths as clip or transcript identities.
 - Keep app-wide identity and project-extension values in [`src/shared/constants.ts`](../src/shared/constants.ts).
 
+## Clip Editing
+
+- Pure placement and trimming calculations belong to [`TimelinePlacement.ts`](../src/renderer/src/domain/TimelinePlacement.ts) and [`TimelineEdits.ts`](../src/renderer/src/domain/TimelineEdits.ts); pointer previews belong to [`UseClipInteraction.ts`](../src/renderer/src/components/Waveform/UseClipInteraction.ts).
+- Commit structural clip edits through `TimelineStore.commitStructuralEdit` against the expected track snapshot. Reject stale previews; canceled and unchanged gestures add no history entry.
+- The project-local [`TimelineClipboardStore`](../src/renderer/src/stores/TimelineClipboardStore.ts) resets on project replacement. [`ClipClipboardActions`](../src/renderer/src/actions/ClipClipboardActions.ts) shares original audio sources while assigning independent clip and redaction identities to copies.
+- Keep user-facing placement, trimming, selection, and shortcut behavior in the [editor interaction reference](key-mappings.md#clip-clipboard-and-selection).
+
 ## User Workspace Preferences
 
 - Main owns `workspace-layout.json` under Electron's active `userData` directory; harness userData isolation applies before preference initialization.
@@ -41,13 +48,15 @@
 - Bundle English and Simplified Chinese resources in `src/shared/i18n/`; keep the shared translator independent of Electron and Node.js.
 - Use semantic translation keys and whole-message interpolation for application copy, including accessible labels and native dialog text.
 - Retain stable business reasons and safe parameters in error/progress state; translate at presentation time so retained messages follow language changes.
+- Changing language must not remount the editor, reset playback, restart jobs or alter project revisions.
+
+## Logging and Diagnostics
+
 - Main owns a bounded JSONL diagnostic log under Electron's logs path after harness isolation. Record low-volume, schema-allowlisted operation milestones and one terminal error event per reportable failure; never serialize exception messages, paths, transcript text, audio, project contents or credentials. Hash operation correlation IDs before writing. Keep up to five 4 MiB files for at most fourteen days, and let logging failures fall back without failing the user operation.
 - Classify a failure at its terminal process boundary and expose only a stable public reason plus an opaque diagnostic ID over IPC. Preload and renderer allowlist those fields and translate the reason at render time. Cancellation and ordinary validation are not reportable failures. Domains own their diagnostic-code mapping; the generic log and report service do not interpret domain codes.
 - AppLogger explicitly collects main-process info/warn/error and exception stacks as AppLogMessage records, separate from schema-allowlisted AppLogEvent milestones. Helper stderr is incrementally decoded and bounded; Python structured log envelopes preserve severity, while unstructured output defaults to info. Protocol stdout, binary streams, transcript results and audio data are never redirected into the logger. Redact common credentials and private paths before persistence, but free-text third-party logs cannot be guaranteed anonymous.
 - App message writing is asynchronous: bound serialized records to 16 KiB, queued/in-flight data to 512 KiB with a 128 KiB warning/error reserve, and batch writes on 500 ms or 64 KiB boundaries. Retain at most five 4 MiB files for fourteen days; track drops, truncation and write failures. Shutdown flush has a two-second budget; crashes may lose pending batches.
 - Diagnostics collects all retained event and message logs plus an environment/coverage/loss manifest into a main-owned immutable snapshot, including unrelated retained history when opened from a failure. Help and Settings share collection/inspection/save controls and work without a prior error. Main streams a ZIP into a secure same-directory temporary file and publishes it only after successful completion. Preview access is renderer-owner scoped, capped at two preparations/previews, expires after ten minutes, and uses leases to preserve in-flight save/inspection. The user inspects files before sharing; the application never uploads them. Missing history, invalid records and incomplete counters are disclosed.
-- Changing language must not remount the editor, reset playback, restart jobs or alter project revisions.
-
 ## Settings and Resource Preparation
 
 - Main owns theme IDs, speech feature preferences and onboarding disposition in app-preferences.json, alongside locale preferences.
@@ -92,7 +101,7 @@
 ## Export
 
 - Export removes Redact intervals by default, independently of the interactive Preview toggle.
-- Share interval eligibility and retained-overlap protection through [`redactionTimeline.ts`](../src/shared/RedactionTimeline.ts); do not maintain a second export-specific skip policy.
+- Share interval eligibility and retained-overlap protection through [`RedactionTimeline.ts`](../src/shared/RedactionTimeline.ts); do not maintain a second export-specific skip policy.
 - Contract retained clip positions and export progress by those intervals, preserving natural gaps and ordinary clip/track-mute duration.
 - Share overlay union/complement through `ClipRedactions.ts`; rendering subranges are ephemeral, never persisted clips.
 - Export remains non-destructive; source audio and project clip positions do not change.
@@ -107,11 +116,13 @@
 - Skipped analysis uses source-track presentation without fabricated speaker results; settings changes preserve existing analysis and user overrides.
 - Analysis consumes provisioned resources and never implicitly downloads or authenticates.
 
+The [transcript processing contract](transcript-processing.md) defines task selection, reruns, partial success, and transcript display behavior.
+
 ## Transcript Presentation and Editing
 
 - Derive transcript occurrences from current clips and source acoustic boundaries; source, analysis revision, track, clip and text-unit identities must remain distinct.
 - Recompute output-time relationships from timeline state after moves, splits, mute changes and undo/redo; never persist display overlap as project truth.
-- Keep acoustic selection resolution independent of the Read/Align display mode and never infer source time from text pixel position.
+- Keep acoustic selection resolution independent of the Continuous text / By speaker display mode and never infer source time from text pixel position.
 - Apply canonical text edits to exact clip occurrences using `redactTranscriptRange` or `redactClipRanges`; ambiguous selections must not silently select a track or duplicate clip.
 - Derive text redaction coverage from clip overlays: full coverage strikes text, partial coverage is disclosed, and ordinary mute only dims it.
 - Preserve coarse acoustic boundaries and disclose partial clipped units instead of inventing character timestamps.
