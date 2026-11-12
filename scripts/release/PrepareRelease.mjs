@@ -64,6 +64,7 @@ export async function prepareRelease({
     join(packaged, 'mac-arm64/RedenCut.app'),
   ])
   await execute('hdiutil', ['verify', join(packaged, initial.filename)])
+  if (buildRecord) await verifyBuildRecord({ root, recordPath: buildRecord, platform, arch })
   const final = await readReleaseState(root)
   if (JSON.stringify(final) !== JSON.stringify(initial))
     throw new Error('Source changed during release preparation; rebuild from a stable checkout.')

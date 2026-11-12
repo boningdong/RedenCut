@@ -90,6 +90,7 @@ async function main() {
     )
     const result = await checkRuntime(packagedRuntime)
     if (result.status !== 'ready') throw new Error(`Packaged runtime: ${result.message}`)
+    if (options.buildRecord) await verifyBuildRecord({ recordPath: options.buildRecord })
     console.log(`Packaged runtime verified: ${result.runtimeId}`)
   } finally {
     await rm(temporary, { recursive: true, force: true })

@@ -77,7 +77,19 @@ test('prebuilt release validates compiled files, skips repeated checks, and forw
     calls.filter(({ command }) => command === 'npm').map(({ args }) => args[1]),
     ['check:runtime', 'package:mac'],
   )
-  await writeFile(join(root, 'out/main/index.js'), 'tampered')
+  await assert.rejects(
+    prepareRelease({
+      root,
+      buildRecord: BUILD_RECORD_PATH,
+      platform: 'darwin',
+      arch: 'arm64',
+      run: async (command) => {
+        if (command === 'hdiutil')
+          await writeFile(join(root, 'out/main/index.js'), 'changed during packaging')
+      },
+    }),
+    /checksums/,
+  )
   await assert.rejects(
     prepareRelease({
       root,
