@@ -1,6 +1,6 @@
-// Default unit and component tests across the application and harness helpers.
+// Full application tests (including real-tool integrations) and harness helpers.
 // Node is the default environment; individual test files can select a DOM environment.
-// Integration, product E2E, and performance suites use separate configurations.
+// Headed harness integration, product E2E, and performance suites are separate.
 // Aliases mirror the application TypeScript configurations.
 
 import { defineConfig } from 'vitest/config'
