@@ -51,6 +51,7 @@ npm run test:e2e:base -- project-import-save-reopen
 Each run retains screenshots, `ui-actions.jsonl`, WAV recordings, capture logs and successful observation reports under `.harness-runs/container/<runId>/`.
 Recordings are bounded to 120 seconds of audio; startup and stop have explicit deadlines, and only the owned recorder process is signaled.
 Audio checks use 100 ms RMS windows: at least five windows above 0.002 full-scale RMS for audible output; paused output must remain below 0.0001 after a one-second buffer allowance.
+Track-level gain comparisons record the complete fixture and compare summed window energy, avoiding changes caused by capture-start silence or RMS-window alignment; the expected -12 dB change retains its 0.5 dB tolerance.
 Rendered clip-position tolerances are 0.1–0.15 seconds, derived from visible ruler spacing; the displayed transport time has centisecond precision, and seek assertions account for mouse-coordinate rounding.
 These checks do not certify sample-exact source-position matching, device latency, transcription or host audio hardware.
 
