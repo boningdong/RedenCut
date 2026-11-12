@@ -8,6 +8,7 @@ import { stageReleaseResources } from './StageReleaseResources.mjs'
 import { verifyMacDocumentType } from './release/VerifyMacDocumentType.mjs'
 import { stageSignedMacResources } from './release/StageSignedMacResources.mjs'
 import { checkRuntime } from './runtime/CheckRuntime.mjs'
+import { verifyBuildRecord } from './ci/BuildArtifact.mjs'
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -17,14 +18,32 @@ export function parseArguments(arguments_) {
     const argument = arguments_[index]
     if (argument === '--dir') options.directory = true
     else if (
-      argument === '--models-path' &&
+      ['--models-path', '--build-record'].includes(argument) &&
       arguments_[index + 1] &&
       !arguments_[index + 1].startsWith('--')
     )
-      options.modelsPath = arguments_[++index]
-    else throw new Error('Usage: npm run package:mac -- [--dir] [--models-path MODELS_DIRECTORY]')
+      options[argument === '--models-path' ? 'modelsPath' : 'buildRecord'] = arguments_[++index]
+    else
+      throw new Error(
+        'Usage: npm run package:mac -- [--dir] [--models-path MODELS_DIRECTORY] [--build-record PATH]',
+      )
   }
   return options
+}
+
+export async function prepareApplicationBuild({
+  root = repository,
+  buildRecord,
+  run = execFileSync,
+  verify = verifyBuildRecord,
+} = {}) {
+  if (buildRecord) await verify({ root, recordPath: buildRecord })
+  else
+    run(
+      process.execPath,
+      [join(root, 'node_modules/electron-vite/bin/electron-vite.js'), 'build'],
+      { cwd: root, stdio: 'inherit' },
+    )
 }
 
 async function main() {
@@ -43,14 +62,7 @@ async function main() {
   const temporary = await mkdtemp(join(buildRoot, 'package-'))
   const resources = join(temporary, 'resources')
   try {
-    execFileSync(
-      process.execPath,
-      [join(repository, 'node_modules/electron-vite/bin/electron-vite.js'), 'build'],
-      {
-        cwd: repository,
-        stdio: 'inherit',
-      },
-    )
+    await prepareApplicationBuild({ buildRecord: options.buildRecord })
     const stagingArguments = ['--resources-dir', resources]
     if (options.modelsPath) stagingArguments.push('--models-path', options.modelsPath)
     await stageReleaseResources(stagingArguments)
