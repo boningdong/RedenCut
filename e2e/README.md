@@ -3,6 +3,7 @@
 ## Fixed Tests and Agent Acceptance
 
 The TypeScript E2Es below are deterministic product regressions driven through MCP.
+PR and release CI run the base suite as the User workflows group; automatic speech suites are deferred in [issue #8](https://github.com/boningdong/RedenCut/issues/8).
 [Agent scenarios](scenarios/README.md) complement them with fixed user goals, adaptive UI actions, visible feedback and change-focused exploration; they do not replace automated assertions.
 Use the repository's [agent-testing skill](../.agents/skills/agent-testing/SKILL.md), for example: "Use $agent-testing to verify the editing workflow and the approved behavior changed in this task."
 Agent reports and their supporting evidence stay in the runtime's artifact directory, not in the scenario source folder.

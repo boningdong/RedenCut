@@ -48,6 +48,9 @@ sh harness/container/docker-harness.sh test e2e-all --models-path /absolute/path
 
 `test harness` runs the existing full normal/fault suite inside the base image's virtual display.
 Fault tests deliberately crash or terminate isolated processes; no host Electron is launched.
+For normal harness integrations only, use `sh harness/container/docker-harness.sh run base -- npm run test:harness`.
+For application integrations requiring the managed audio tools, use `sh harness/container/docker-harness.sh run base -- npm run test:integration`.
+PR/release CI runs these two groups and base E2Es, not the full normal/fault shortcut; see [continuous integration](../../docs/continuous-integration.md).
 The `node --test` command runs an MCP client on the host against the real container server, including screenshot delivery, rebuild/restart, and cleanup.
 It requires the host project's npm dependencies to be installed.
 `e2e-base` runs the [product E2Es](../../e2e/README.md) that need only the base image, including missing speech setup feedback. `e2e-speech` runs real speech and speech fault cases. `e2e-all` runs both sets in the speech image. The speech suites require an existing application model fixture and never download it.

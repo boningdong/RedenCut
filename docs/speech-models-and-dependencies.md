@@ -38,6 +38,7 @@ The application resolves verified paths and passes them to the Python worker; th
 
 Model weights are separate from runtime tools.
 `setup:runtime` prepares FFmpeg, FFprobe, whisper-cli, pinned Python and its locked libraries; it does not install model weights or request Hugging Face access.
+Model-free worker unit tests use a separate Python 3.11 environment containing only the locked `unit` dependency group; see [Python unit environment](continuous-integration.md#python-unit-environment).
 Whisper is invoked as a native executable; alignment and diarization run in the managed Python worker with WhisperX, PyTorch and pyannote.audio.
 Prepared inference is offline and does not receive Hugging Face credentials.
 Linux Docker regression and native macOS release verification remain distinct lanes; successful Linux tests do not certify signed macOS distribution.

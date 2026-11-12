@@ -2,8 +2,8 @@
 
 ## Release pipeline
 
-Pushing a `v*` tag runs `.github/workflows/release.yml` on a GitHub-hosted macOS 15 ARM64 runner.
-The workflow checks the tag against `package.json`, the lockfile and the checked-out commit; builds the pinned native runtime; prepares the bundled diarization model; runs validation; builds and verifies the DMG; then creates a GitHub Release **draft**.
+Pushing a `v*` tag runs `.github/workflows/release.yml` and the same reusable checks used for PRs; see [continuous integration](continuous-integration.md).
+After every selected check passes, its release-only job on macOS 15 ARM64 checks the tag, downloads and validates that execution's compiled application, builds the pinned native runtime, prepares the bundled diarization model, packages and verifies the DMG, then creates a GitHub Release **draft**.
 Versions containing a prerelease suffix, including `0.1.0-alpha.2`, are marked as prereleases and are not marked Latest.
 There is no updater, Developer ID signing or Apple notarization in this pipeline.
 
@@ -22,7 +22,7 @@ The runtime source archives and license material remain inside the app resources
 ## One-time repository setup
 
 1. Merge the packaging and release workflow commits into `main` before creating the first release tag.
-2. Enable GitHub Actions for the repository and allow the official `actions/checkout` and `actions/setup-node` actions.
+2. Enable GitHub Actions and permit the pinned actions referenced by the workflows, including checkout, Node setup, artifact upload/download, and uv setup.
 3. On Hugging Face, use the account that has accepted access conditions for [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1).
 4. Create a read token that can access that model and store it in **Settings → Secrets and variables → Actions → New repository secret**, named `HF_TOKEN`.
 5. Ensure repository or organization policy permits the workflow's `contents: write` permission to create Release drafts.
@@ -87,7 +87,8 @@ Missing `HF_TOKEN`, denied model access, source download failures, failing tests
 After correcting a secret or resolving a transient download error, use **Re-run failed jobs** for the same tagged workflow run.
 If code must change, commit the fix and use a new version/tag rather than moving a published tag.
 
-If upload was interrupted, rerunning the job rebuilds the same tagged source and replaces only the existing draft's DMG, checksum and metadata assets; edited draft notes are preserved.
+If upload was interrupted, rerunning the release job reuses the matching compiled artifact, prepares the runtime/model again, repackages, and replaces only the existing draft's DMG, checksum and metadata assets; edited draft notes are preserved.
+Compiled artifacts have seven-day retention; after expiry, rerun all jobs to create a fresh Build artifact for the same tag rather than attempting to download an expired artifact.
 A published Release is never overwritten by the script, including when GitHub release immutability is disabled.
 The first successful build from that tag creates the draft; an existing published version requires a new version.
 Builds are tied to a source commit, but are not claimed to be byte-for-byte reproducible across runner or build-tool updates.
@@ -115,7 +116,8 @@ See [runtime directory selection](speech-models-and-dependencies.md#runtime-dire
 Packaging copies verified diarization weights into the app's `Contents/Resources/models/diarization/<id>/<revision>` directory.
 It never downloads model weights.
 
-`release:prepare` runs `check:runtime`, the full application checks including runtime, release, model and tooling tests, packaging, code-signature verification, disk-image verification, and generates `dist-electron/releases/v<version>/`.
+By default, `release:prepare` runs `check:runtime`, the full application checks including runtime, release, model and tooling tests, packaging, code-signature verification, disk-image verification, and generates `dist-electron/releases/v<version>/`.
+CI passes `--build-record dist-electron/build-record.json`, retaining runtime/package verification while using the shared Build output and not repeating the completed shared checks.
 It rejects source changes observed during preparation and invalidates old release metadata before attempting a rebuild.
 `release:draft -- --dry-run` checks local source identity and artifact checksums and prints the planned command without contacting GitHub or uploading anything.
 Actual `release:draft` execution additionally requires an authenticated GitHub CLI, matching local/remote tags, and repository write access; CI already supplies these.
@@ -124,14 +126,15 @@ A local dry run does not establish that GitHub credentials, hosted-runner builds
 ## Checks before tagging
 
 `npm run check` includes the dedicated runtime, release, model and developer-tooling suites.
-The Release contracts workflow runs those offline tooling suites on pull requests and pushes to `main`; it does not build a native runtime, download models, package a DMG or upload a release.
+The PR and main checks workflow runs those offline tooling suites alongside code quality, application build, unit tests, managed-audio integration tests, and base user workflows; it does not provision speech models, package a DMG or upload a release.
 Maintenance-command tests also run with the release model-path environment; their subprocesses isolate fixture paths so checks cannot remove the prepared release models.
 Its tests parse active workflow YAML and validate standalone literal npm script calls against `package.json`.
-Workflow npm entrypoints must remain standalone commands; wrappers, compound commands and dynamic script names fail the guard rather than being silently accepted.
+Workflow npm entrypoints must remain standalone literal commands or use the documented Docker base wrapper; arbitrary shell composition and dynamic script names fail the guard rather than being silently accepted.
 Release orchestration tests execute the actual workflow npm steps against controlled command substitutes, checking order, shared model paths, credential scope and failure stops.
 Separate temporary-file tests verify real shared-model installation and staging.
 These checks complement a clean macOS release run; they do not certify remote credentials or final DMG installation.
 
-The automated checks do not establish clean-machine installation, Gatekeeper behavior, audible playback, full transcription quality or export UX.
+Docker workflows exercise audible playback and export behavior in Linux, not in the packaged macOS app.
+The automated checks do not establish clean-machine installation, Gatekeeper behavior, packaged-app playback/export UX, or full transcription quality.
 Run those acceptance checks on the downloaded candidate DMG before publishing.
 See [macOS packaging](macos-packaging.md) for the bundle layout and local signing limitations.

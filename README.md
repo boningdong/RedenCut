@@ -160,6 +160,7 @@ Scripts are ordered by the following responsibilities:
 | MCP server | `harness:mcp` | Direct server entry; use the Docker MCP launcher for container acceptance |
 | Performance | `profile:timeline`, `profile:waveform` | Developer benchmarks |
 | Default tests | `test`, `test:watch` | Run once or iterate in watch mode |
+| Selected test groups | `test:unit`, `test:integration`, `test:python` | Runtime-free JS/TS units, managed-audio integrations, and separately prepared Python units |
 | Tooling tests | `test:runtime`, `test:models`, `test:release`, `test:tooling` | Suites included in `check`, also callable for diagnosis |
 | Harness runners | `test:harness`, `test:harness:faults`, `test:harness:all` | Integration runners normally invoked through Docker |
 | Product E2E runners | `test:e2e:base`, `test:e2e:speech`, `test:e2e:all` | Product runners normally invoked through Docker |
@@ -175,6 +176,7 @@ The timeline benchmark measures history retention and edit comparison, not end-t
 | Transcript tasks, reruns, and presentation | [Transcript processing](docs/transcript-processing.md) |
 | Speech runtimes, models, and credentials | [Speech models and dependencies](docs/speech-models-and-dependencies.md) |
 | Automated tests and UI acceptance | [Docker harness](harness/container/README.md), [product E2Es](e2e/README.md), [acceptance scenarios](e2e/scenarios/README.md) |
+| PR and release checks | [Continuous integration](docs/continuous-integration.md) |
 | Build a macOS package or prepare a release | [macOS packaging](docs/macos-packaging.md), [GitHub Releases](docs/github-releases.md) |
 
 ## Contributing
