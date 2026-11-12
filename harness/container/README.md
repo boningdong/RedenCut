@@ -8,6 +8,10 @@ The host AI communicates through Docker stdin/stdout; there is no second CDP con
 `docker-harness.sh` is the public command entrypoint; the Dockerfiles and this README stay beside it.
 Host command modules live in `build/`, `run/`, `test/`, and `mcp/`, with shared configuration in `config/`.
 Image construction helpers live in `build/audio/` and `build/speech/`: they compile tools and write runtime manifests, without downloading model weights.
+`RuntimeLock.mjs` resolves shared dependency records and explicit `platformOverrides.linux` records; Docker and native runtime builds reuse the same checksum-verified downloader.
+Linux compiler recipes retain platform-specific flags, and Python packages remain governed by `speech-worker/uv.lock`.
+The speech image builds native tools before copying worker source, installs locked Python dependencies in a separate cached layer, then installs the worker and bundled sentence data.
+The build and manifest scripts derive dependency versions, source URLs and hashes from the resolved lock; system prerequisites still come from Debian repositories.
 Container startup and shutdown helpers live in `lifecycle/`: `Entrypoint.sh` prepares the source snapshot and virtual display, `StartAudio.sh` starts virtual audio, and `SuperviseCommand.mjs` manages the requested command's lifetime.
 These internal helpers are called by Dockerfiles or container startup; use the public entrypoint for user commands.
 
@@ -24,7 +28,7 @@ sh harness/container/docker-harness.sh build speech
 The commands use the normal Docker CLI and its current context; set `DOCKER_CONTEXT` explicitly if necessary.
 The image uses the repository's Node version and lockfile, installing Linux-native dependencies rather than reusing Mac `node_modules`.
 The image includes Noto CJK fonts so Simplified Chinese UI acceptance can inspect rendered glyphs.
-The audio harness builds pinned FFmpeg 7.1.5 and LAME 3.100 sources into `/opt/redencut-runtime`, with GPL/nonfree features and automatic system codec discovery disabled.
+The audio harness builds FFmpeg and LAME from the Linux-resolved [runtime lock](../../runtime/runtime-lock.json), with GPL/nonfree features and automatic system codec discovery disabled.
 The generated manifest inventories executables, libraries, source archives and license materials; `REDENCUT_RUNTIME_ROOT` selects it explicitly.
 This minimal Linux runtime supports audio UI regression; it does not certify the full macOS Python/speech release runtime.
 Debian packages are installed from the configured repositories at build time, so rebuilding without cache is not a bit-for-bit reproducibility guarantee.
@@ -61,7 +65,7 @@ npm run check:models
 sh harness/container/docker-harness.sh test e2e-speech
 ```
 
-`setup:runtime` prepares native tools and Python dependencies only.
+`setup:runtime` prepares native tools, Python dependencies and bundled sentence data; it does not install model weights.
 `setup:models` prepares Small Whisper, English/Chinese alignment and diarization in the common `<capability>/<id>/<revision>/` layout.
 `check:models` checks the installation markers and file hashes offline; it does not download or require inference runtime loading.
 Use `--set text` for Whisper and alignment, `--model ID` for one manifest model, or `--import-from OLD_ROOT` to migrate matching older files through validation.

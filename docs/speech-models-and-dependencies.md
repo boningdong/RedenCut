@@ -187,3 +187,25 @@ Signing, notarization, clean-machine loading, full third-party inventory and run
 When changing a model or speech dependency, update its manifest or lockfile and this document together.
 Record its role, immutable version, integrity, access conditions, install location, supported platforms and verification scope.
 Model quality, alignment accuracy, speaker quality, representative memory/runtime and cancellation need dedicated acceptance beyond installation readiness.
+
+## Bundled sentence-splitting data
+
+NLTK's `punkt_tab` data is a runtime dependency, separate from installed Python packages and downloadable alignment models.
+The locked upstream archive in `runtime/runtime-lock.json` supplies the English tables used by WhisperX for both English and Chinese alignment.
+Runtime builds stage them under `nltk_data/tokenizers/punkt_tab/english/`, retain the upstream README, and inventory the files with SHA-256 checksums.
+Application Python jobs and developer runtime probes set `NLTK_DATA` to that runtime generation; the worker excludes user/system data directories and checks loading before transcription.
+A missing or invalid bundle returns `alignment-resources-unavailable`, with repair/reinstall guidance instead of an inference failure.
+The worker client preflight delegates to the NLTK check, whose command reports a structured ready/unavailable result; process failures and invalid results retain their own error classifications.
+
+Run `npm run check:runtime -- --models-root /absolute/path/to/models` against a prepared runtime and the existing model installation root to additionally run actual EN/ZH alignment inference with empty caches and network connections/downloads rejected.
+This synthetic-audio probe verifies dependency completeness and inference execution, not speech accuracy.
+When upgrading from the pre-data runtime generation, build into a fresh directory, for example `npm run runtime:build -- --bundle-dir .runtime/build/darwin-arm64-20261011`, then install with `npm run setup:runtime -- --bundle .runtime/build/darwin-arm64-20261011` before staging a release.
+
+## Shared native and Docker build inputs
+
+`runtime/runtime-lock.json` is the authoritative source for native component versions, source archives, hashes, build-tool versions and bundled sentence data.
+`scripts/runtime/RuntimeLock.mjs` resolves platform overrides, and `DownloadRuntimeSource.mjs` implements checksum-verified downloads for both macOS and Linux builders.
+`platformOverrides.linux` explicitly preserves the Linux harness LAME source choice; components without overrides reuse their shared records.
+Platform-specific Python distributions and compiler recipes retain their platform roles; the existing `speech-worker/uv.lock` remains authoritative for Python package resolution, with input hashes checked before either build installs packages.
+Dockerfiles arrange build layers and prerequisites; `harness/container/build/` scripts prepare and compile the resolved dependencies and derive their manifest component records from the same configuration.
+The platform inventory generators remain separate, and Debian system prerequisites are not locked by this runtime source lock.
