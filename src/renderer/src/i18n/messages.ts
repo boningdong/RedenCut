@@ -33,6 +33,7 @@ const reasonKeys = {
   'speech-publishing': 'errors.speech-publishing',
   'speech-alignment-input': 'errors.speech-alignment-input',
   'speech-alignment-window': 'errors.speech-alignment-window',
+  'speech-alignment-resources': 'errors.speech-alignment-resources',
   'speech-alignment-model': 'errors.speech-alignment-model',
   'speech-worker-exit': 'errors.speech-worker-exit',
   'report-save-failed': 'errors.report-save-failed',

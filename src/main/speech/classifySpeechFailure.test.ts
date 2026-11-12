@@ -7,6 +7,11 @@ import { classifySpeechFailure } from './classifySpeechFailure'
 
 it.each([
   [
+    SpeechWorkerFailureCodes.AlignmentResourcesUnavailable,
+    'speech-alignment-resources',
+    'speech/alignment-resources-unavailable',
+  ],
+  [
     SpeechWorkerFailureCodes.AlignmentSegmentMismatch,
     'speech-alignment-input',
     'speech/alignment-segment-mismatch',
@@ -60,4 +65,55 @@ it('distinguishes a process exit and unknown validation failure', () => {
       'aligning',
     ).reason,
   ).toBe('speech-validating')
+})
+
+it('uses the deepest analysis stage when no specific worker reason applies', () => {
+  const error = new SpeechAnalysisError(
+    'transcribing',
+    new SpeechAnalysisError(
+      'diarizing',
+      new SpeechWorkerFailure(SpeechWorkerFailureCodes.WorkerFailed, undefined, 'private'),
+    ),
+  )
+  expect(classifySpeechFailure(error, 'validating')).toEqual({
+    code: 'speech/worker-failed',
+    reason: 'speech-diarizing',
+  })
+})
+
+it('keeps the resource reason regardless of the current stage', () => {
+  const error = new SpeechAnalysisError(
+    'transcribing',
+    new SpeechWorkerFailure(
+      SpeechWorkerFailureCodes.AlignmentResourcesUnavailable,
+      undefined,
+      'private',
+    ),
+  )
+  expect(classifySpeechFailure(error, 'validating')).toEqual({
+    code: 'speech/alignment-resources-unavailable',
+    reason: 'speech-alignment-resources',
+  })
+})
+
+it('continues through an unclassified process error to its cause', () => {
+  const error = new ProcessExecutionError('startup', 'private')
+  error.cause = new SpeechWorkerFailure(
+    SpeechWorkerFailureCodes.AlignmentModelUnavailable,
+    undefined,
+    'private',
+  )
+  expect(classifySpeechFailure(error, 'transcribing')).toEqual({
+    code: 'speech/alignment-model-unavailable',
+    reason: 'speech-alignment-model',
+  })
+})
+
+it('terminates on a cause cycle and keeps the observed stage', () => {
+  const error = new SpeechAnalysisError('publishing', undefined)
+  error.cause = new Error('private', { cause: error })
+  expect(classifySpeechFailure(error, 'validating')).toEqual({
+    code: 'speech/publishing-failed',
+    reason: 'speech-publishing',
+  })
 })

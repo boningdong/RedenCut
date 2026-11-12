@@ -668,6 +668,8 @@ export const simplifiedChineseResources = {
     'speech-alignment-input':
       '初步文字识别已完成，但识别出的文字和时间片段无法对应，暂时不能把文字准确定位到音频。请重新识别；若再次出现，请导出诊断报告。',
     'speech-alignment-window': '录音中有一段识别结果过长，当前无法完成对齐。请导出诊断报告。',
+    'speech-alignment-resources':
+      '声音对齐所需的程序数据缺失或损坏。请修复或重新安装 RedenCut，然后重试。',
     'speech-alignment-model': '声音对齐模型无法使用。请到设置中验证模型，然后重试。',
     'speech-worker-exit': '语音处理意外中断。请重试；若再次发生，请导出诊断报告。',
     'report-save-failed': '诊断报告未能保存。请选择其他位置重试。',
