@@ -1,7 +1,9 @@
 {
   "schemaVersion": 1,
-  "runtimeId": "redencut-darwin-arm64-20260918",
-  "certifiedTargets": ["darwin-arm64"],
+  "runtimeId": "redencut-darwin-arm64-20261011",
+  "certifiedTargets": [
+    "darwin-arm64"
+  ],
   "buildTools": {
     "uv": {
       "version": "0.12.12",
@@ -64,6 +66,15 @@
       "sha256": "3ecbf803a7fdf67229c0edada0830d6bfaea4d10bfb24f0c3f4e607cd1064b42",
       "archive": "av-14.4.0.tar.gz",
       "sourceDirectory": "av-14.4.0"
+    }
+  },
+  "data": {
+    "punktTab": {
+      "version": "550b6625bcef1f2abff2ff770a5a0d272c9c6b2a",
+      "license": "Not specified in upstream metadata; attribution in punkt_tab/README",
+      "url": "https://raw.githubusercontent.com/nltk/nltk_data/550b6625bcef1f2abff2ff770a5a0d272c9c6b2a/packages/tokenizers/punkt_tab.zip",
+      "sha256": "e57f64187974277726a3417ca6f181ec5403676c717672eef6a748a7b20e0106",
+      "archive": "punkt_tab-550b6625.zip"
     }
   }
 }

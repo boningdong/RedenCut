@@ -22,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 import { createDarwinArm64BuildPlan, requireSupportedBuildTarget } from './RuntimeBuildPlan.mjs'
+import { stageNltkData } from './NltkData.mjs'
 import { sha256File } from './RuntimeIntegrity.mjs'
 import { validateRuntimeDirectory } from './RuntimeVerifier.mjs'
 
@@ -603,7 +604,7 @@ async function listFiles(root) {
 }
 
 async function writeManifest(lock, bundleRoot) {
-  const components = Object.entries(lock.sources).map(([name, source]) => ({
+  const components = Object.entries({ ...lock.sources, ...lock.data }).map(([name, source]) => ({
     name,
     version: source.version,
     license: source.license,
@@ -647,7 +648,7 @@ async function validateExistingBundle(lock, bundleRoot, plan, pythonRecipe) {
     throw new Error(`Existing bundle at ${bundleRoot} does not match the locked runtime identity`)
   }
   const components = new Map(manifest.components.map((component) => [component.name, component]))
-  for (const [name, source] of Object.entries(lock.sources)) {
+  for (const [name, source] of Object.entries({ ...lock.sources, ...lock.data })) {
     const component = components.get(name)
     if (
       component?.version !== source.version ||
@@ -724,6 +725,7 @@ export async function buildRuntime({ workDirectory, bundleDirectory, onProgress 
     onProgress({ label: `Extracting ${source.archive}` })
     await extractSource(source, downloadsRoot, sourcesRoot)
   }
+  await downloadAndVerify(lock.data.punktTab, downloadsRoot, onProgress)
   const uvExecutable = await bootstrapUv(lock, workRoot, onProgress)
   const plan = await buildNativeSources(lock, workRoot, onProgress)
 
@@ -745,6 +747,12 @@ export async function buildRuntime({ workDirectory, bundleDirectory, onProgress 
     await copyNativeRuntime(stagingRoot, plan)
     onProgress({ label: 'Installing Python dependencies and building PyAV' })
     await installPythonEnvironment(lock, workRoot, stagingRoot, plan.ffmpeg.prefix, uvExecutable)
+    onProgress({ label: 'Staging bundled NLTK sentence data' })
+    await stageNltkData(
+      join(downloadsRoot, lock.data.punktTab.archive),
+      stagingRoot,
+      lock.data.punktTab,
+    )
     onProgress({ label: 'Packaging and verifying runtime files' })
     await completeBundle(lock, workRoot, stagingRoot, plan, pythonRecipe)
     await replaceBundle(stagingRoot, bundleRoot)
