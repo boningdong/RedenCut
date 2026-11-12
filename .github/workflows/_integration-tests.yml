@@ -1,0 +1,40 @@
+name: Integration tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: Prepare isolated model and evidence directories
+        run: node scripts/ci/CiEnvironment.mjs prepare-docker
+      - name: Build managed audio test environment
+        run: sh harness/container/docker-harness.sh build base
+      - name: Application integrations with managed FFmpeg
+        run: sh harness/container/docker-harness.sh run base --models-path .runtime/ci-models -- npm run test:integration
+      - name: Normal harness integrations without deliberate crashes
+        run: sh harness/container/docker-harness.sh run base --models-path .runtime/ci-models -- npm run test:harness
+      - name: Collect container evidence
+        if: always()
+        run: node scripts/ci/CiEnvironment.mjs collect-docker
+      - name: Retain integration evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: integration-evidence-${{ github.run_attempt }}
+          path: .harness-runs/container/
+          include-hidden-files: true
+          retention-days: 7

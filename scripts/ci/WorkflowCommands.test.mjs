@@ -18,19 +18,22 @@ function npmScripts(shell) {
     if (/^\s*(?:#|$)/.test(line)) continue
     if (/^\s*echo\s+(?:'[^']*'|"[^"$`\\]*")\s*$/.test(line)) continue
     if (!/\bnpm\b/.test(line.split('#')[0])) continue
-    const tokens = line.trim().match(/[^\s]+/g)
-    assert.match(line.trim(), /^npm\s/, 'Workflow npm scripts must use standalone literal commands')
+    const command = line
+      .trim()
+      .replace(/^sh harness\/container\/docker-harness\.sh run base --models-path [\w./-]+ -- /, '')
+    const tokens = command.match(/[^\s]+/g)
+    assert.match(command, /^npm\s/, 'Workflow npm scripts must use standalone literal commands')
     if (['ci', 'install'].includes(tokens[1])) {
       assert.match(
-        line.trim(),
+        command,
         /^npm (?:ci|install)(?:\s+[\w./:@=-]+)*(?:\s+#.*)?$/,
         'Workflow npm scripts must use standalone literal commands',
       )
       continue
     }
     assert.match(
-      line.trim(),
-      /^npm (?:run|run-script) [\w:-]+(?:\s+[\w./:-]+)*(?:\s+#.*)?$/,
+      command,
+      /^npm (?:run|run-script) [\w:-]+(?:\s+[\w./:=-]+)*(?:\s+#.*)?$/,
       'Workflow npm scripts must use standalone literal commands',
     )
     scripts.push(tokens[2])
@@ -46,8 +49,10 @@ echo "npm run removed"
 npm run setup:runtime
 npm run setup:models -- --model diarization-default
 npm run-script check # verify resources
+sh harness/container/docker-harness.sh run base --models-path .runtime/ci-models -- npm run test:integration
+npm run test:unit -- --reporter=junit --outputFile=dist-electron/unit.xml
 `),
-    ['setup:runtime', 'setup:models', 'check'],
+    ['setup:runtime', 'setup:models', 'check', 'test:integration', 'test:unit'],
   )
   for (const command of [
     'npm run "$TASK"',

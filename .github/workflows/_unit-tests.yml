@@ -1,0 +1,69 @@
+name: Unit tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript:
+    name: JavaScript and TypeScript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: Application and harness-helper unit tests
+        run: npm run test:unit -- --reporter=default --reporter=junit --outputFile=dist-electron/test-results/unit.xml
+      - name: Maintenance regression with an inherited release model path
+        env:
+          REDENCUT_MODELS_PATH: ${{ github.workspace }}/.runtime/release-models
+        run: npm run test:unit -- harness/tests/clear-app-data.test.ts
+      - name: Runtime tooling
+        run: npm run test:runtime
+      - name: Model tooling without model acquisition
+        run: npm run test:models
+      - name: Release tooling without packaging
+        run: npm run test:release
+      - name: Developer commands and workflow contracts
+        run: npm run test:tooling
+      - name: Retain test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unit-results-${{ github.run_attempt }}
+          path: dist-electron/test-results/
+          retention-days: 7
+
+  python:
+    name: Python
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+      - name: Read locked tool version and validate Python dependency hashes
+        id: versions
+        run: node scripts/ci/CiEnvironment.mjs versions
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: ${{ steps.versions.outputs.uv }}
+          enable-cache: true
+          cache-dependency-glob: speech-worker/uv.lock
+      - name: Install only model-free unit dependencies
+        run: uv sync --project speech-worker --locked --only-group unit --python 3.11
+      - name: Worker unit tests
+        env:
+          REDENCUT_TEST_PYTHON: ${{ github.workspace }}/speech-worker/.venv/bin/python
+        run: npm run test:python
