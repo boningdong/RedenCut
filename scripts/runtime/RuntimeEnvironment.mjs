@@ -19,3 +19,33 @@ export function createManagedPythonEnvironment(runtimeRoot, sourceEnvironment = 
   environment.NLTK_DATA = join(runtimeRoot, 'nltk_data')
   return environment
 }
+
+/**
+ * Developer-only environment for offline alignment checks, not application inference.
+ * The caller supplies a fresh temporary directory and separately blocks network access.
+ */
+export function createOfflineAlignmentCheckEnvironment(
+  runtimeRoot,
+  temporaryDirectory,
+  sourceEnvironment = process.env,
+) {
+  const environment = createManagedPythonEnvironment(runtimeRoot, sourceEnvironment)
+  for (const key of Object.keys(environment)) {
+    if (
+      /^(HF_|HUGGINGFACE_|TRANSFORMERS_|PYTORCH_)/.test(key) ||
+      /TOKEN|SECRET|PASSWORD/i.test(key)
+    )
+      delete environment[key]
+  }
+  return {
+    ...environment,
+    HOME: temporaryDirectory,
+    HF_HOME: join(temporaryDirectory, 'hf'),
+    XDG_CACHE_HOME: join(temporaryDirectory, 'cache'),
+    TORCH_HOME: join(temporaryDirectory, 'torch'),
+    HF_HUB_OFFLINE: '1',
+    TRANSFORMERS_OFFLINE: '1',
+    HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
+    MPLCONFIGDIR: join(temporaryDirectory, 'matplotlib'),
+  }
+}

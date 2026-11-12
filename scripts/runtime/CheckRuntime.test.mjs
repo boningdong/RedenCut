@@ -115,3 +115,32 @@ test('runtime check CLI selects an explicit path, then environment, then its def
     assert.equal(JSON.parse(result.stdout).runtimeId, expected)
   }
 })
+
+test('can verify integrity without loading executables', async (t) => {
+  const root = await makeRuntime({ working: false })
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const result = await checkRuntime(root, { loadExecutables: false })
+  assert.equal(result.status, 'ready')
+  assert.equal(result.manifest.runtimeId, 'check-fixture')
+})
+
+test('CLI reports a failed base check without attempting optional alignment', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'redencut-check-missing-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const result = spawnSync(
+    process.execPath,
+    [
+      resolve(import.meta.dirname, 'CheckRuntime.mjs'),
+      '--runtime-root',
+      join(root, 'missing-runtime'),
+      '--models-root',
+      join(root, 'missing-models'),
+    ],
+    { encoding: 'utf8' },
+  )
+  assert.equal(result.status, 1, result.stderr)
+  const summary = JSON.parse(result.stdout)
+  assert.equal(summary.status, 'missing')
+  assert.equal('manifest' in summary, false)
+  assert.equal('alignmentOffline' in summary, false)
+})
