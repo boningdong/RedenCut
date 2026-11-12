@@ -14,7 +14,7 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
     signal: AbortSignal,
   ): Promise<void> => {
     const env = offlineEnvironment({
-      ...process.env,
+      ...runtime.getSpeechEnvironment(),
       HF_HUB_OFFLINE: '1',
       TRANSFORMERS_OFFLINE: '1',
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
@@ -88,7 +88,7 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
         models.some((model) => !['transcription', 'transcription-smoke'].includes(model.capability))
       ) {
         const env: NodeJS.ProcessEnv = offlineEnvironment({
-          ...process.env,
+          ...runtime.getSpeechEnvironment(),
           HF_HUB_OFFLINE: '1',
           TRANSFORMERS_OFFLINE: '1',
           PYTHONPATH: '',

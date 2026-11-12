@@ -16,5 +16,6 @@ export function createManagedPythonEnvironment(runtimeRoot, sourceEnvironment = 
   environment.PYTHONNOUSERSITE = '1'
   environment.PYTHONDONTWRITEBYTECODE = '1'
   environment.PATH = join(runtimeRoot, 'bin')
+  environment.NLTK_DATA = join(runtimeRoot, 'nltk_data')
   return environment
 }

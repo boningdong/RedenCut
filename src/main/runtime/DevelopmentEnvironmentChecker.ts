@@ -16,7 +16,9 @@ export class DevelopmentEnvironmentChecker {
     private probe: Probe = async (file, args, signal) => {
       await execute(file, args, {
         signal,
-        env: offlineEnvironment({ ...process.env, PYTHONPATH: '' }),
+        env: offlineEnvironment(
+          this.runtime.getSpeechEnvironment({ ...process.env, PYTHONPATH: '' }),
+        ),
         timeout: 60_000,
         killSignal: 'SIGKILL',
         maxBuffer: 512 * 1024,

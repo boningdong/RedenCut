@@ -126,3 +126,10 @@ it('describes the selected root without requiring an installed runtime', () => {
   })
   expect(overridden.getLocation().displayPath).toBe('/opt/custom-runtime')
 })
+
+it('uses bundled NLTK data even when the user supplies a different data directory', () => {
+  const f = fixture()
+  expect(f.locator().getSpeechEnvironment({ NLTK_DATA: '/user/cache' }).NLTK_DATA).toBe(
+    join(f.root, 'nltk_data'),
+  )
+})

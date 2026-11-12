@@ -16,11 +16,13 @@ test('managed Python environment disables user/global and loader-path fallback',
     LD_PRELOAD: '/external/injected.so',
     LD_AUDIT: '/external/audit.so',
     PATH: '/usr/bin',
+    NLTK_DATA: '/external/cached-data',
   })
 
   assert.equal(environment.PYTHONNOUSERSITE, '1')
   assert.equal(environment.PYTHONDONTWRITEBYTECODE, '1')
   assert.equal(environment.PATH, '/runtime/bin')
+  assert.equal(environment.NLTK_DATA, '/runtime/nltk_data')
   for (const key of [
     'PYTHONHOME',
     'PYTHONUSERBASE',
