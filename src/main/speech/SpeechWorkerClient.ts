@@ -1,6 +1,8 @@
 import { manageProcess, ProcessExecutionError } from '../processes/ManagedProcess'
 import { offlineEnvironment } from './inferenceEnvironment'
 import { spawn } from 'child_process'
+import { executeLogged } from '../processes/LoggedCommand'
+import { AlignmentResourceCheckResultSchema } from '../../shared/speechWorker.types'
 import type { EventEmitter } from 'events'
 import type { Readable, Writable } from 'stream'
 import {
@@ -64,6 +66,42 @@ export class SpeechWorkerClient {
       env: options.env,
       cwd: options.cwd,
       spawn: options.spawn ?? ((command, args, spawnOptions) => spawn(command, args, spawnOptions)),
+    }
+  }
+
+  async preflight(signal: AbortSignal): Promise<void> {
+    await this.checkNltkResources(signal)
+  }
+
+  private async checkNltkResources(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted()
+    const { stdout } = await executeLogged(
+      typeof this.command === 'function' ? this.command() : this.command,
+      ['-m', 'redencut_speech_worker.nltk_resources'],
+      {
+        signal,
+        cwd: this.options.cwd,
+        env: offlineEnvironment(
+          (typeof this.options.env === 'function' ? this.options.env() : this.options.env) ??
+            process.env,
+        ),
+        timeout: 60_000,
+        maxBuffer: 512 * 1024,
+      },
+    )
+    signal.throwIfAborted()
+    let result
+    try {
+      result = AlignmentResourceCheckResultSchema.parse(JSON.parse(stdout))
+    } catch {
+      throw new ProcessExecutionError('protocol', 'Invalid alignment resource-check result')
+    }
+    if (result.status === 'unavailable') {
+      throw new SpeechWorkerFailure(
+        result.code,
+        undefined,
+        'Alignment runtime data is missing or invalid. Repair or reinstall the application runtime, then retry.',
+      )
     }
   }
 

@@ -98,7 +98,11 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
         const imports = models.some((model) => model.capability === 'diarization')
           ? 'import torch, pyannote.audio'
           : 'import torch; from whisperx import load_align_model'
-        await execute(runtime.getSpeechPythonPath(), ['-c', imports], {
+        const resourceCheck = models.some((model) => model.capability === 'alignment')
+          ? '; from redencut_speech_worker.nltk_resources import require_alignment_resources; require_alignment_resources()'
+          : ''
+        env.PYTHONPATH = join(dirname(manifest), 'src')
+        await execute(runtime.getSpeechPythonPath(), ['-c', imports + resourceCheck], {
           env,
           signal,
           timeout: 60000,

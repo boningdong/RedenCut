@@ -1,4 +1,6 @@
 import { join } from 'path'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { EventEmitter } from 'events'
 import { PassThrough, Writable } from 'stream'
 import { describe, expect, it, vi } from 'vitest'
@@ -174,5 +176,75 @@ describe('SpeechWorkerClient', () => {
         },
       }),
     )
+  })
+})
+
+describe('speech preflight', () => {
+  async function withProbe(body: string, check: (client: SpeechWorkerClient) => Promise<void>) {
+    const directory = await mkdtemp(join(tmpdir(), 'speech-preflight-'))
+    try {
+      const command = join(directory, 'python-fixture')
+      await writeFile(command, `#!${process.execPath}\n${body}`, { mode: 0o755 })
+      await check(new SpeechWorkerClient(command, []))
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  }
+
+  it('allows analysis when the resource check reports ready', async () => {
+    await withProbe('console.log(JSON.stringify({status: "ready"}))', async (client) => {
+      await expect(client.preflight(new AbortController().signal)).resolves.toBeUndefined()
+    })
+  })
+
+  it('reports a resource failure only for an explicit unavailable result', async () => {
+    await withProbe(
+      'console.log(JSON.stringify({status: "unavailable", code: "alignment-resources-unavailable"}))',
+      async (client) => {
+        const error = await client
+          .preflight(new AbortController().signal)
+          .catch((error: unknown) => error)
+        expect(error).toBeInstanceOf(SpeechWorkerFailure)
+        expect(error).toMatchObject({ code: 'alignment-resources-unavailable' })
+        expect((error as Error).message).toContain('reinstall')
+      },
+    )
+  })
+
+  it('preserves an unrelated process failure instead of blaming NLTK data', async () => {
+    await withProbe('process.exit(1)', async (client) => {
+      const error = await client
+        .preflight(new AbortController().signal)
+        .catch((error: unknown) => error)
+      expect(error).not.toBeInstanceOf(SpeechWorkerFailure)
+      expect(error).toMatchObject({ code: 1 })
+    })
+  })
+
+  it.each(['not json', '{"status":"unavailable","code":"other-failure"}', ''])(
+    'rejects an invalid resource-check result: %s',
+    async (output) => {
+      await withProbe(`console.log(${JSON.stringify(output)})`, async (client) => {
+        await expect(client.preflight(new AbortController().signal)).rejects.toMatchObject({
+          kind: 'protocol',
+        })
+      })
+    },
+  )
+
+  it('preserves missing-executable failures', async () => {
+    await expect(
+      new SpeechWorkerClient('/definitely/missing/python', []).preflight(
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('preserves cancellation', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    await expect(
+      new SpeechWorkerClient(process.execPath, []).preflight(controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' })
   })
 })

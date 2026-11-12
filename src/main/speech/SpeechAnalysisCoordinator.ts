@@ -9,6 +9,7 @@ import { attributeSpeakers } from './SpeakerAttribution'
 import { TranscriberUnavailableError } from './transcriber/TranscriberUnavailableError'
 
 interface Worker {
+  preflight?(signal: AbortSignal): Promise<void>
   run(
     request: SpeechWorkerRequest,
     signal: AbortSignal,
@@ -110,6 +111,8 @@ export class SpeechAnalysisCoordinator {
       modelPaths: input.modelPaths ? { ...input.modelPaths } : undefined,
     }
     const speakerRecognitionEnabled = input.speakerRecognitionEnabled ?? true
+    signal.throwIfAborted()
+    await this.worker.preflight?.(signal)
     signal.throwIfAborted()
     onProgress({ stage: 'transcribing' })
     const transcription: TranscriptionResult = await this.transcriber.transcribe(

@@ -97,7 +97,8 @@ export class DevelopmentEnvironmentChecker {
       python &&
       (await check('libraries', () => this.runtime.getSpeechPythonPath(), [
         '-c',
-        'import av, torch, torchaudio, sys, platform; from whisperx import load_align_model; from pyannote.audio import Pipeline; ' +
+        'import av, torch, torchaudio, sys, platform, os, nltk; from whisperx import load_align_model; from pyannote.audio import Pipeline; ' +
+          "nltk.data.path[:] = [os.environ['NLTK_DATA']]; nltk.data.load('tokenizers/punkt_tab/english.pickle', cache=False); " +
           "exec('from torchcodec.decoders import AudioDecoder' if not (sys.platform == 'linux' and platform.machine() == 'aarch64') else '')",
       ]))
     // uv is a setup tool, not an inference dependency once Python is ready.
