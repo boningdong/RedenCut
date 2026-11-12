@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import numpy as np
 from redencut_speech_worker.alignment import normalize_alignment
 from redencut_speech_worker.alignment_quality import validate_audio_evidence
@@ -60,6 +61,12 @@ class RecoveryTest(unittest.TestCase):
         self.assertEqual(10.2, r['units'][1]['sourceStart'])
 
 class RetryTest(unittest.TestCase):
+    def setUp(self):
+        # These tests supply fake inference, not a provisioned runtime.
+        resources = patch("redencut_speech_worker.nltk_resources.require_alignment_resources")
+        resources.start()
+        self.addCleanup(resources.stop)
+
 
     def test_retry_budget_resets_per_window_and_preserves_original_evidence(self):
         from unittest.mock import Mock, patch

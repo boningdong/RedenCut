@@ -21,6 +21,12 @@ UNITS = [
 
 
 class AlignmentTest(unittest.TestCase):
+    def setUp(self):
+        # Inference is mocked here; bundled sentence-table loading has its own tests.
+        resources = patch("redencut_speech_worker.nltk_resources.require_alignment_resources")
+        resources.start()
+        self.addCleanup(resources.stop)
+
     def test_typed_alignment_input_failures(self):
         with self.assertRaises(AlignmentFailure) as mismatch:
             partition_units([{"id": "u", "text": "hello", "kind": "speech"}], ["hel", "lo"])

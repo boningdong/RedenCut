@@ -39,6 +39,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.config.unit.ts",
     "test:integration": "vitest run --config vitest.config.integration.ts",
+    "test:python": "node scripts/ci/RunPythonUnitTests.mjs",
     "test:watch": "vitest",
 
     "test:runtime": "node --test scripts/runtime/*.test.mjs",

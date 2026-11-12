@@ -1210,6 +1210,12 @@ dependencies = [
     { name = "whisperx" },
 ]
 
+[package.dev-dependencies]
+unit = [
+    { name = "nltk" },
+    { name = "numpy" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "av", specifier = "==14.4.0" },
@@ -1219,6 +1225,12 @@ requires-dist = [
     { name = "torchaudio", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", specifier = "==0.23.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "whisperx", specifier = "==3.8.6" },
+]
+
+[package.metadata.requires-dev]
+unit = [
+    { name = "nltk" },
+    { name = "numpy" },
 ]
 
 [[package]]
