@@ -190,6 +190,11 @@ test('actual release workflow prepares tools and the bundled model in one explic
     calls.map(({ token }) => token),
     [false, true, false, false, false],
   )
+  assert.deepEqual(calls.find(({ script }) => script === 'release:prepare').args, [
+    '--',
+    '--build-record',
+    'dist-electron/build-record.json',
+  ])
   assert.equal(await readFile(join(fixture.root, 'draft-ready'), 'utf8'), 'ready')
 })
 

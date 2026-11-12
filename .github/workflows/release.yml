@@ -13,7 +13,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  quality:
+    uses: ./.github/workflows/_code-quality.yml
+  build:
+    uses: ./.github/workflows/_build.yml
+  unit:
+    uses: ./.github/workflows/_unit-tests.yml
+  integration:
+    uses: ./.github/workflows/_integration-tests.yml
+  users:
+    uses: ./.github/workflows/_user-workflows.yml
   release:
+    needs: [quality, build, unit, integration, users]
     runs-on: macos-15
     timeout-minutes: 120
     env:
@@ -21,11 +32,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: package.json
           cache: npm
@@ -33,30 +44,25 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_COMMIT: ${{ github.sha }}
-        run: |
-          node --input-type=module <<'JS'
-          import { readReleaseState, assertReleaseTag } from './scripts/release/ReleaseState.mjs'
-          if (process.platform !== 'darwin' || process.arch !== 'arm64') throw new Error('macOS arm64 runner required')
-          const state = await readReleaseState(process.cwd())
-          assertReleaseTag(state, process.env.RELEASE_TAG, process.env.RELEASE_COMMIT)
-          console.log(`Building ${state.tag} from ${state.commit}`)
-          JS
+        run: node scripts/release/VerifyReleaseTag.mjs
+      - name: Download this execution's compiled application
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: .
+          merge-multiple: true
+      - name: Verify compiled application source and checksums
+        run: node scripts/ci/BuildArtifact.mjs verify
       - name: Check model credential
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          if [ -z "$HF_TOKEN" ]; then
-            echo '::error::Configure HF_TOKEN with access to pyannote/speaker-diarization-community-1 before releasing.'
-            exit 1
-          fi
+        run: node scripts/ci/CiEnvironment.mjs require-model-token
       - name: Install build prerequisites
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
-        run: |
-          for tool in cmake ninja pkg-config; do
-            command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
-          done
-          npm ci
+        run: node scripts/release/InstallMacPrerequisites.mjs
+      - name: Install packaging dependencies
+        run: npm ci
       - name: Build pinned runtime
         run: npm run setup:runtime
       - name: Prepare bundled diarization model
@@ -65,8 +71,8 @@ jobs:
         run: npm run setup:models -- --model diarization-default
       - name: Verify bundled diarization model
         run: npm run check:models -- --model diarization-default
-      - name: Test, package and verify release files
-        run: npm run release:prepare
+      - name: Package the verified build and verify release files
+        run: npm run release:prepare -- --build-record dist-electron/build-record.json
       - name: Create or refresh draft release
         env:
           GH_TOKEN: ${{ github.token }}

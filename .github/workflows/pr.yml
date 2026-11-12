@@ -1,0 +1,26 @@
+name: PR and main checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    uses: ./.github/workflows/_code-quality.yml
+  build:
+    uses: ./.github/workflows/_build.yml
+  unit:
+    uses: ./.github/workflows/_unit-tests.yml
+  integration:
+    uses: ./.github/workflows/_integration-tests.yml
+  users:
+    uses: ./.github/workflows/_user-workflows.yml
