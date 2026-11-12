@@ -43,6 +43,9 @@ vi.mock('../runtime/AppRuntimeLocator', () => ({
     getFfmpegPath() {
       return '/managed/bin/ffmpeg'
     }
+    getSpeechEnvironment() {
+      return { NLTK_DATA: '/managed/nltk_data' }
+    }
     getSpeechPythonPath() {
       return '/managed/python'
     }
@@ -233,7 +236,11 @@ function deferredPreferences() {
       })),
       models: [{ id: 'whisper', capability: 'transcription', files: [{ path: 'model.bin' }] }],
     },
-    runtime: { getSpeechPythonPath: () => '/python', getFfmpegPath: () => '/managed/bin/ffmpeg' },
+    runtime: {
+      getSpeechPythonPath: () => '/python',
+      getFfmpegPath: () => '/managed/bin/ffmpeg',
+      getSpeechEnvironment: () => ({ NLTK_DATA: '/managed/nltk_data' }),
+    },
     manifestPath: '/worker/models.json',
   } as unknown as NonNullable<Parameters<typeof registerSpeechAnalysisIpc>[3]>
   return {

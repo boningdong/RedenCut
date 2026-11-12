@@ -79,7 +79,7 @@ export function registerSpeechAnalysisIpc(
     join(workerRoot, 'models.json')
   const modelCache = services?.resources.registry.modelsRoot ?? resolveModelsPath()
   const workerEnvironment = () => ({
-    ...process.env,
+    ...runtime.getSpeechEnvironment(),
     PATH: dirname(runtime.getFfmpegPath()),
     PYTHONPATH: join(workerRoot, 'src'),
     REDENCUT_SPEECH_MANIFEST: manifest,

@@ -1,3 +1,4 @@
+import { assertLockedPythonDependencyHashes } from './RuntimeLock.mjs'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
@@ -7,12 +8,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { promisify } from 'node:util'
 
-import {
-  assertLockedPythonDependencyHashes,
-  bootstrapUv,
-  freshExtractSource,
-  requireEmptyOrMatchingBuild,
-} from './BuildRuntime.mjs'
+import { bootstrapUv, freshExtractSource, requireEmptyOrMatchingBuild } from './BuildRuntime.mjs'
 import { sha256File } from './RuntimeIntegrity.mjs'
 
 const execFileAsync = promisify(execFile)

@@ -14,7 +14,7 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
     signal: AbortSignal,
   ): Promise<void> => {
     const env = offlineEnvironment({
-      ...process.env,
+      ...runtime.getSpeechEnvironment(),
       HF_HUB_OFFLINE: '1',
       TRANSFORMERS_OFFLINE: '1',
       HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
@@ -88,7 +88,7 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
         models.some((model) => !['transcription', 'transcription-smoke'].includes(model.capability))
       ) {
         const env: NodeJS.ProcessEnv = offlineEnvironment({
-          ...process.env,
+          ...runtime.getSpeechEnvironment(),
           HF_HUB_OFFLINE: '1',
           TRANSFORMERS_OFFLINE: '1',
           PYTHONPATH: '',
@@ -98,7 +98,11 @@ export function createModelLoadValidator(runtime: AppRuntimeLocator, manifest: s
         const imports = models.some((model) => model.capability === 'diarization')
           ? 'import torch, pyannote.audio'
           : 'import torch; from whisperx import load_align_model'
-        await execute(runtime.getSpeechPythonPath(), ['-c', imports], {
+        const resourceCheck = models.some((model) => model.capability === 'alignment')
+          ? '; from redencut_speech_worker.nltk_resources import require_alignment_resources; require_alignment_resources()'
+          : ''
+        env.PYTHONPATH = join(dirname(manifest), 'src')
+        await execute(runtime.getSpeechPythonPath(), ['-c', imports + resourceCheck], {
           env,
           signal,
           timeout: 60000,

@@ -380,3 +380,27 @@ it('publishes text before speakers and enriches without changing text identities
   )
   expect(disabled).toMatchObject({ diarizationStatus: 'skipped-disabled', speakers: [] })
 })
+
+it('fails before transcription when alignment runtime data is unavailable', async () => {
+  const transcriber = { transcribe: vi.fn() }
+  const worker = {
+    preflight: async () => {
+      throw new Error('alignment-resources-unavailable')
+    },
+    run: vi.fn(),
+  }
+  const coordinator = new SpeechAnalysisCoordinator(transcriber, worker, () => crypto.randomUUID())
+  await expect(
+    coordinator.transcribeAndAlign(
+      {
+        jobId: 'job',
+        audioPath: 'audio.wav',
+        audioSource: source,
+        language: 'zh',
+        alignmentModel: 'auto',
+      },
+      new AbortController().signal,
+    ),
+  ).rejects.toThrow('alignment-resources-unavailable')
+  expect(transcriber.transcribe).not.toHaveBeenCalled()
+})

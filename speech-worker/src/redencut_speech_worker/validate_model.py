@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Sequence
 
 
 def load_alignment(language: str, path: Path) -> None:
+    from .nltk_resources import require_alignment_resources
+    require_alignment_resources()
     import whisperx
 
     whisperx.load_align_model(

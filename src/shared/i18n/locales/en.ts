@@ -718,6 +718,8 @@ export const englishResources = {
       'Preliminary speech recognition finished, but its words and time segments could not be matched. We cannot accurately place the words in the audio yet. Run recognition again; if this happens again, export a diagnostic report.',
     'speech-alignment-window':
       'One recognized section of the recording is too long to align. Export a diagnostic report.',
+    'speech-alignment-resources':
+      'Required alignment data is missing or invalid. Repair or reinstall RedenCut, then retry.',
     'speech-alignment-model':
       'The speech alignment model could not be used. Verify the model in Settings, then try again.',
     'speech-worker-exit':

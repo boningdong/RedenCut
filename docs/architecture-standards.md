@@ -115,6 +115,7 @@
 - New speech artifacts explicitly distinguish skipped-disabled diarization from completed results; existing v1 artifacts remain readable.
 - Skipped analysis uses source-track presentation without fabricated speaker results; settings changes preserve existing analysis and user overrides.
 - Analysis consumes provisioned resources and never implicitly downloads or authenticates.
+- The managed runtime bundles the English `punkt_tab` tables used by both supported alignment languages. Python jobs use the runtime-owned `NLTK_DATA` directory; alignment checks it before transcription and rejects missing/invalid data without falling back to user caches or downloading.
 
 The [transcript processing contract](transcript-processing.md) defines task selection, reruns, partial success, and transcript display behavior.
 

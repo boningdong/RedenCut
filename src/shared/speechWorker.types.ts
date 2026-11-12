@@ -78,10 +78,20 @@ export const SpeechWorkerFailureCodes = {
   AlignmentTimingInvalid: 'alignment-timing-invalid',
   AlignmentWindowTooLong: 'alignment-window-too-long',
   AlignmentModelUnavailable: 'alignment-model-unavailable',
+  AlignmentResourcesUnavailable: 'alignment-resources-unavailable',
   AlignmentInferenceFailed: 'alignment-inference-failed',
   InvalidRequest: 'invalid-request',
   WorkerFailed: 'worker-failed',
 } as const
+export const AlignmentResourceCheckResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('ready') }).strict(),
+  z
+    .object({
+      status: z.literal('unavailable'),
+      code: z.literal(SpeechWorkerFailureCodes.AlignmentResourcesUnavailable),
+    })
+    .strict(),
+])
 export const SpeechWorkerFailureCodeSchema = z.enum(SpeechWorkerFailureCodes)
 export type SpeechWorkerFailureCode = z.infer<typeof SpeechWorkerFailureCodeSchema>
 export const WorkerAlignmentUnitSchema = z

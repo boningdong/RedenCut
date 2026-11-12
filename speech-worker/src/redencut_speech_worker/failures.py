@@ -7,6 +7,7 @@ class WorkerFailureCode(StrEnum):
     ALIGNMENT_TIMING_INVALID = "alignment-timing-invalid"
     ALIGNMENT_WINDOW_TOO_LONG = "alignment-window-too-long"
     ALIGNMENT_MODEL_UNAVAILABLE = "alignment-model-unavailable"
+    ALIGNMENT_RESOURCES_UNAVAILABLE = "alignment-resources-unavailable"
     ALIGNMENT_INFERENCE_FAILED = "alignment-inference-failed"
     INVALID_REQUEST = "invalid-request"
     WORKER_FAILED = "worker-failed"

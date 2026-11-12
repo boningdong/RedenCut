@@ -9,6 +9,18 @@
 - Parallel logics should follow the same form.
 - Keep each function at a single level of abstraction.
 
+## Source of Truth
+- Reuse the same source of truths, (e.g. const values, paths, dependencies).
+- Avoid use more than one source of truths for different workflows share parallel logic.
+- If existing source of truth breaks clean code principle, discuss about it.
+
+## Embdded Scripts
+- Inline code is acceptable for a short, simple probe or expression.
+- Put substantial executable logic in a dedicated file in its own language. Keep Dockerfiles, shell commands and process-launching code focused on invoking those files and passing arguments.
+- Extract inline code when it contains branching, loops, multiple operations, or logic that needs independent testing.
+- Pass dynamic values through arguments or environment variables instead of inserting them into source-code strings.
+- When modifying existing embedded scripts, apply this rule within the affected scope; avoid unrelated cleanup.
+
 ## Naming
 
 - Use descriptive names that communicate domain intent.

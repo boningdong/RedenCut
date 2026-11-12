@@ -8,7 +8,6 @@ import {
   copyFile,
   cp,
   mkdir,
-  open,
   readFile,
   readdir,
   realpath,
@@ -22,12 +21,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 import { createDarwinArm64BuildPlan, requireSupportedBuildTarget } from './RuntimeBuildPlan.mjs'
+import { stageNltkData } from './NltkData.mjs'
+import { readRuntimeLock, verifyPythonDependencyInputs } from './RuntimeLock.mjs'
+import { downloadRuntimeSource } from './DownloadRuntimeSource.mjs'
 import { sha256File } from './RuntimeIntegrity.mjs'
 import { validateRuntimeDirectory } from './RuntimeVerifier.mjs'
 
 const execFileAsync = promisify(execFile)
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const lockPath = join(projectRoot, 'runtime', 'runtime-lock.json')
 
 async function exists(path) {
   try {
@@ -47,33 +48,14 @@ async function run(file, arguments_, options = {}) {
   return result.stdout
 }
 
-async function readLock() {
-  return JSON.parse(await readFile(lockPath, 'utf8'))
-}
-
 async function validatePythonDependencyInputs(lock) {
-  const pyprojectPath = join(projectRoot, 'speech-worker', 'pyproject.toml')
-  const uvLockPath = join(projectRoot, 'speech-worker', 'uv.lock')
-  const actual = {
-    pyprojectSha256: await sha256File(pyprojectPath),
-    uvLockSha256: await sha256File(uvLockPath),
-  }
-  assertLockedPythonDependencyHashes(lock.pythonDependencies, actual)
+  const actual = await verifyPythonDependencyInputs(lock, join(projectRoot, 'speech-worker'))
   return {
     ...actual,
     pythonDistributionSha256: lock.sources.pythonDistribution.sha256,
     pyavSourceSha256: lock.sources.pyav.sha256,
     uvToolSha256: lock.buildTools.uv.sha256,
     install: 'uv pip install --require-hashes --no-binary av',
-  }
-}
-
-export function assertLockedPythonDependencyHashes(expected, actual) {
-  if (
-    actual.pyprojectSha256 !== expected.pyprojectSha256 ||
-    actual.uvLockSha256 !== expected.uvLockSha256
-  ) {
-    throw new Error('speech-worker dependency files do not match runtime-lock.json')
   }
 }
 
@@ -135,50 +117,6 @@ async function writeBuildMarker(prefix, recipe) {
   )
 }
 
-async function downloadAndVerify(source, downloadsRoot, onProgress = () => {}) {
-  onProgress({ label: `Checking ${source.archive}` })
-  const archivePath = join(downloadsRoot, source.archive)
-  if (await exists(archivePath)) {
-    const actual = await sha256File(archivePath)
-    if (actual === source.sha256) return archivePath
-    throw new Error(`Cached source hash mismatch for ${source.archive}: ${actual}`)
-  }
-
-  await mkdir(downloadsRoot, { recursive: true })
-  const temporaryPath = `${archivePath}.download-${randomUUID()}`
-  try {
-    const response = await fetch(source.url)
-    if (!response.ok) throw new Error(`Download failed (${response.status}) for ${source.url}`)
-    const encoding = response.headers.get('content-encoding')
-    const total =
-      !encoding || encoding === 'identity'
-        ? Number(response.headers.get('content-length'))
-        : undefined
-    const handle = await open(temporaryPath, 'wx')
-    let completed = 0
-    try {
-      if (!response.body) throw new Error(`Empty download for ${source.archive}`)
-      onProgress({ label: `Downloading ${source.archive}`, completed, total })
-      for await (const chunk of response.body) {
-        await handle.writeFile(chunk)
-        completed += chunk.byteLength
-        onProgress({ label: `Downloading ${source.archive}`, completed, total })
-      }
-    } finally {
-      await handle.close()
-    }
-    onProgress({ label: `Verifying ${source.archive}` })
-    const actual = await sha256File(temporaryPath)
-    if (actual !== source.sha256) {
-      throw new Error(`Downloaded source hash mismatch for ${source.archive}: ${actual}`)
-    }
-    await rename(temporaryPath, archivePath)
-  } finally {
-    await rm(temporaryPath, { force: true })
-  }
-  return archivePath
-}
-
 async function extractSource(source, downloadsRoot, sourcesRoot) {
   if (!source.sourceDirectory) return
   const sourceRoot = join(sourcesRoot, source.sourceDirectory)
@@ -200,7 +138,7 @@ export async function freshExtractSource(source, downloadsRoot, sourcesRoot) {
 export async function bootstrapUv(lock, workRoot, onProgress = () => {}) {
   const source = lock.buildTools.uv
   const downloadsRoot = join(workRoot, 'downloads')
-  const archivePath = await downloadAndVerify(source, downloadsRoot, onProgress)
+  const archivePath = await downloadRuntimeSource(source, downloadsRoot, onProgress)
   const toolRoot = join(workRoot, 'tools', `uv-${source.version}`)
   const executable = join(toolRoot, source.executable)
   if ((await exists(executable)) && (await sha256File(executable)) !== source.executableSha256) {
@@ -603,7 +541,7 @@ async function listFiles(root) {
 }
 
 async function writeManifest(lock, bundleRoot) {
-  const components = Object.entries(lock.sources).map(([name, source]) => ({
+  const components = Object.entries({ ...lock.sources, ...lock.data }).map(([name, source]) => ({
     name,
     version: source.version,
     license: source.license,
@@ -647,7 +585,7 @@ async function validateExistingBundle(lock, bundleRoot, plan, pythonRecipe) {
     throw new Error(`Existing bundle at ${bundleRoot} does not match the locked runtime identity`)
   }
   const components = new Map(manifest.components.map((component) => [component.name, component]))
-  for (const [name, source] of Object.entries(lock.sources)) {
+  for (const [name, source] of Object.entries({ ...lock.sources, ...lock.data })) {
     const component = components.get(name)
     if (
       component?.version !== source.version ||
@@ -713,17 +651,18 @@ export async function buildRuntime({ workDirectory, bundleDirectory, onProgress 
   const bundleRoot = resolve(
     bundleDirectory ?? join(projectRoot, '.runtime', 'build', 'darwin-arm64-bundle'),
   )
-  const lock = await readLock()
+  const lock = await readRuntimeLock()
   const pythonRecipe = await validatePythonDependencyInputs(lock)
   const downloadsRoot = join(workRoot, 'downloads')
   const sourcesRoot = join(workRoot, 'sources')
   await mkdir(downloadsRoot, { recursive: true })
   await mkdir(sourcesRoot, { recursive: true })
   for (const source of Object.values(lock.sources)) {
-    await downloadAndVerify(source, downloadsRoot, onProgress)
+    await downloadRuntimeSource(source, downloadsRoot, onProgress)
     onProgress({ label: `Extracting ${source.archive}` })
     await extractSource(source, downloadsRoot, sourcesRoot)
   }
+  await downloadRuntimeSource(lock.data.punktTab, downloadsRoot, onProgress)
   const uvExecutable = await bootstrapUv(lock, workRoot, onProgress)
   const plan = await buildNativeSources(lock, workRoot, onProgress)
 
@@ -745,6 +684,12 @@ export async function buildRuntime({ workDirectory, bundleDirectory, onProgress 
     await copyNativeRuntime(stagingRoot, plan)
     onProgress({ label: 'Installing Python dependencies and building PyAV' })
     await installPythonEnvironment(lock, workRoot, stagingRoot, plan.ffmpeg.prefix, uvExecutable)
+    onProgress({ label: 'Staging bundled NLTK sentence data' })
+    await stageNltkData(
+      join(downloadsRoot, lock.data.punktTab.archive),
+      stagingRoot,
+      lock.data.punktTab,
+    )
     onProgress({ label: 'Packaging and verifying runtime files' })
     await completeBundle(lock, workRoot, stagingRoot, plan, pythonRecipe)
     await replaceBundle(stagingRoot, bundleRoot)

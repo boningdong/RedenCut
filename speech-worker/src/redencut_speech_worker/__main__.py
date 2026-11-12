@@ -2,15 +2,17 @@ from contextlib import redirect_stdout
 import json
 import logging
 import sys
-from typing import IO, Any, Dict
+from typing import IO, Any, Callable, Dict, Optional
 
 from .logging_setup import configure_logging
 from .alignment import align
 from .diarization import diarize
 from .protocol import ProtocolError, parse_request
 from .failures import AlignmentFailure, WorkerFailureCode
+from .nltk_resources import RESOURCE_MESSAGE
 
 MAX_JSONL_MESSAGE_BYTES = 32 * 1024 * 1024
+ProgressReporter = Callable[[str, Optional[float]], None]
 
 
 def emit(output: IO[str], value: Dict[str, Any]) -> None:
@@ -18,47 +20,75 @@ def emit(output: IO[str], value: Dict[str, Any]) -> None:
     output.flush()
 
 
+def read_request(input_stream: IO[str]) -> Dict[str, Any]:
+    line = input_stream.readline(MAX_JSONL_MESSAGE_BYTES + 1)
+    if not line or len(line.encode("utf-8")) > MAX_JSONL_MESSAGE_BYTES:
+        raise ProtocolError("request line is missing or too large")
+    return parse_request(json.loads(line))
+
+
+def execute_request(request: Dict[str, Any], report_progress: ProgressReporter) -> Dict[str, Any]:
+    phase = request.get("phase")
+    result = {"phase": phase} if phase else {}
+
+    if phase != "diarization":
+        report_progress("aligning", None)
+        result["alignment"] = align(
+            request,
+            on_progress=lambda percent: report_progress("aligning", percent),
+        )
+
+    if phase != "alignment":
+        if phase == "diarization" or request["config"].get("speakerRecognitionEnabled", True):
+            report_progress("diarizing", None)
+            result["diarization"] = {
+                "status": "completed",
+                **diarize(request, on_progress=lambda: report_progress("diarizing", None)),
+            }
+        else:
+            result["diarization"] = {"status": "skipped-disabled"}
+
+    return result
+
+
+def emit_progress(output: IO[str], envelope: Dict[str, Any], stage: str, percent: Optional[float]) -> None:
+    message = {**envelope, "type": "progress", "stage": stage}
+    if percent is not None:
+        message["percent"] = percent
+    emit(output, message)
+
+
+def describe_failure(error: Exception) -> Dict[str, Any]:
+    message = "The speech worker could not complete this request."
+    if isinstance(error, AlignmentFailure):
+        if error.code == WorkerFailureCode.ALIGNMENT_RESOURCES_UNAVAILABLE:
+            message = RESOURCE_MESSAGE
+        return {"code": error.code, "message": message, "details": error.details}
+
+    if isinstance(error, (ProtocolError, json.JSONDecodeError)):
+        return {"code": WorkerFailureCode.INVALID_REQUEST, "message": message}
+
+    return {"code": WorkerFailureCode.WORKER_FAILED, "message": message}
+
+
 def run(input_stream: IO[str], output: IO[str]) -> int:
     configure_logging()
-    job_id = "unknown"
+    envelope = {"protocolVersion": 1, "jobId": "unknown"}
     try:
-        line = input_stream.readline(MAX_JSONL_MESSAGE_BYTES + 1)
-        if not line or len(line.encode("utf-8")) > MAX_JSONL_MESSAGE_BYTES:
-            raise ProtocolError("request line is missing or too large")
-        request = parse_request(json.loads(line))
-        job_id = request["jobId"]
-        envelope = {"protocolVersion": 1, "jobId": job_id}
+        request = read_request(input_stream)
+        envelope["jobId"] = request["jobId"]
         emit(output, {**envelope, "type": "ready"})
-        phase = request.get("phase")
-        result = {"phase": phase} if phase else {}
         # Third-party libraries may print; stdout is reserved for our JSONL protocol.
-        if phase != "diarization":
-            emit(output, {**envelope, "type": "progress", "stage": "aligning"})
-            with redirect_stdout(sys.stderr):
-                result["alignment"] = align(request, on_progress=lambda percent: emit(output, {
-                    **envelope, "type": "progress", "stage": "aligning", "percent": percent,
-                }))
-        if phase != "alignment":
-            if phase == "diarization" or request["config"].get("speakerRecognitionEnabled", True):
-                emit(output, {**envelope, "type": "progress", "stage": "diarizing"})
-                with redirect_stdout(sys.stderr):
-                    result["diarization"] = {"status": "completed", **diarize(request, on_progress=lambda: emit(output, {
-                        **envelope, "type": "progress", "stage": "diarizing",
-                    }))}
-            else:
-                result["diarization"] = {"status": "skipped-disabled"}
+        with redirect_stdout(sys.stderr):
+            result = execute_request(
+                request,
+                lambda stage, percent: emit_progress(output, envelope, stage, percent),
+            )
         emit(output, {**envelope, "type": "result", "result": result})
         return 0
     except Exception as error:
         logging.getLogger("speech-worker").exception("Speech worker request failed")
-        code = (error.code if isinstance(error, AlignmentFailure) else
-                WorkerFailureCode.INVALID_REQUEST if isinstance(error, (ProtocolError, json.JSONDecodeError)) else WorkerFailureCode.WORKER_FAILED)
-        emit(output, {
-            "protocolVersion": 1, "jobId": job_id, "type": "error",
-            "code": code,
-            "message": "The speech worker could not complete this request.",
-            **({"details": error.details} if isinstance(error, AlignmentFailure) else {}),
-        })
+        emit(output, {**envelope, "type": "error", **describe_failure(error)})
         return 2
 
 

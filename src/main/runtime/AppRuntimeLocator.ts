@@ -46,6 +46,15 @@ export class AppRuntimeLocator {
   getUvPath(): string {
     return this.validator.resolve('uv')
   }
+  getSpeechEnvironment(input: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+    return {
+      ...input,
+      PATH: join(this.location.root, 'bin'),
+      NLTK_DATA: join(this.location.root, 'nltk_data'),
+      PYTHONNOUSERSITE: '1',
+      PYTHONDONTWRITEBYTECODE: '1',
+    }
+  }
   getSpeechPythonPath(): string {
     return this.validator.resolve('python')
   }

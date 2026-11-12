@@ -23,6 +23,17 @@ def request():
 
 
 class ProtocolTest(unittest.TestCase):
+    def test_missing_runtime_data_has_actionable_safe_error(self):
+        output = io.StringIO()
+        with patch("redencut_speech_worker.__main__.align", side_effect=AlignmentFailure(
+            "alignment-resources-unavailable", "/private/user token=secret")):
+            self.assertEqual(2, run(io.StringIO(json.dumps(request())), output))
+        terminal = json.loads(output.getvalue().splitlines()[-1])
+        self.assertEqual("alignment-resources-unavailable", terminal["code"])
+        self.assertIn("reinstall", terminal["message"])
+        self.assertNotIn("/private", json.dumps(terminal))
+        self.assertNotIn("token=", json.dumps(terminal))
+
     def test_alignment_failure_jsonl_uses_safe_code_and_details(self):
         output = io.StringIO()
         with patch("redencut_speech_worker.__main__.align", side_effect=AlignmentFailure(
@@ -32,6 +43,30 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual("alignment-segment-mismatch", terminal["code"])
         self.assertNotIn("/private", json.dumps(terminal))
         self.assertNotIn("token=", json.dumps(terminal))
+    def test_alignment_failure_preserves_safe_details_and_job_identity(self):
+        output = io.StringIO()
+        with patch("redencut_speech_worker.__main__.align", side_effect=AlignmentFailure(
+            "alignment-window-too-long", "private diagnostic", durationSeconds=60)):
+            self.assertEqual(2, run(io.StringIO(json.dumps(request())), output))
+        terminal = json.loads(output.getvalue().splitlines()[-1])
+        self.assertEqual({
+            "protocolVersion": 1, "jobId": "job-1", "type": "error",
+            "code": "alignment-window-too-long",
+            "message": "The speech worker could not complete this request.",
+            "details": {"durationSeconds": 60},
+        }, terminal)
+
+    def test_unexpected_failure_keeps_generic_error_and_no_private_details(self):
+        output = io.StringIO()
+        with patch("redencut_speech_worker.__main__.align", side_effect=RuntimeError("private diagnostic")):
+            self.assertEqual(2, run(io.StringIO(json.dumps(request())), output))
+        terminal = json.loads(output.getvalue().splitlines()[-1])
+        self.assertEqual({
+            "protocolVersion": 1, "jobId": "job-1", "type": "error",
+            "code": "worker-failed",
+            "message": "The speech worker could not complete this request.",
+        }, terminal)
+
     def test_accepts_segment_timing_and_rejects_invalid_ranges(self):
         candidate = request()
         candidate["alignmentSegments"] = [{"text": "hello", "sourceStart": 1, "sourceEnd": 2}]

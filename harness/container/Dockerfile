@@ -1,12 +1,21 @@
+ARG REDENCUT_RUNTIME_ROOT=/opt/redencut-runtime
 FROM node:24.14.0-bookworm-slim AS audio-runtime
+ARG REDENCUT_RUNTIME_ROOT
+ENV REDENCUT_RUNTIME_ROOT=${REDENCUT_RUNTIME_ROOT}
+WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl xz-utils build-essential pkg-config patchelf libpulse-dev \
     && rm -rf /var/lib/apt/lists/*
-COPY harness/container/build/audio/BuildAudioRuntime.sh /tmp/BuildAudioRuntime.sh
-RUN sh /tmp/BuildAudioRuntime.sh
-COPY harness/container/build/audio/WriteAudioManifest.mjs /tmp/WriteAudioManifest.mjs
-RUN node /tmp/WriteAudioManifest.mjs
+COPY runtime/runtime-lock.json ./runtime/runtime-lock.json
+COPY scripts/runtime/RuntimeLock.mjs scripts/runtime/DownloadRuntimeSource.mjs scripts/runtime/RuntimeIntegrity.mjs ./scripts/runtime/
+COPY harness/container/build/LinuxRuntimeBuild.mjs ./harness/container/build/LinuxRuntimeBuild.mjs
+COPY harness/container/build/audio/BuildAudioRuntime.mjs harness/container/build/audio/BuildAudioRuntime.sh ./harness/container/build/audio/
+RUN node harness/container/build/audio/BuildAudioRuntime.mjs
+COPY harness/container/build/audio/WriteAudioManifest.mjs ./harness/container/build/audio/WriteAudioManifest.mjs
+RUN node harness/container/build/audio/WriteAudioManifest.mjs
 
 FROM node:24.14.0-bookworm-slim
+ARG REDENCUT_RUNTIME_ROOT
+ENV REDENCUT_RUNTIME_ROOT=${REDENCUT_RUNTIME_ROOT}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git procps lsof unzip xvfb xauth tini \
@@ -21,9 +30,11 @@ RUN npm ci --no-audit --no-fund \
     && sha256sum package.json package-lock.json > /opt/redencut-dependencies.sha256 \
     && mkdir -p out .harness-runs \
     && chown -R node:node /workspace
-COPY --from=audio-runtime /opt/redencut-runtime /opt/redencut-runtime
-ENV REDENCUT_RUNTIME_ROOT=/opt/redencut-runtime
-ENV PATH="/opt/redencut-runtime/bin:${PATH}"
+COPY --from=audio-runtime ${REDENCUT_RUNTIME_ROOT} ${REDENCUT_RUNTIME_ROOT}
+COPY --from=audio-runtime --chown=node:node /workspace/runtime ./runtime
+COPY --from=audio-runtime --chown=node:node /workspace/scripts/runtime ./scripts/runtime
+COPY --from=audio-runtime --chown=node:node /workspace/harness/container/build ./harness/container/build
+ENV PATH="${REDENCUT_RUNTIME_ROOT}/bin:${PATH}"
 COPY harness/container/lifecycle/Entrypoint.sh /opt/redencut-entrypoint.sh
 COPY harness/container/lifecycle/SuperviseCommand.mjs /opt/redencut-supervise.mjs
 COPY harness/container/lifecycle/StartAudio.sh /opt/redencut-start-audio.sh

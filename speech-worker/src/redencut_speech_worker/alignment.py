@@ -117,6 +117,8 @@ def load_manifest_model(manifest_path: str, cache_root: str, model_id: str, mode
 def run_whisperx_alignment(*, audio_path: str, text: str, language: str, device: str,
                            model_path: str, segments: Optional[List[Dict[str, Any]]] = None,
                            on_progress: Optional[Callable[[float], None]] = None) -> Dict[str, Any]:
+    from .nltk_resources import require_alignment_resources
+    require_alignment_resources()
     import whisperx
 
     audio = whisperx.load_audio(audio_path)

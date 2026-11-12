@@ -33,6 +33,7 @@ export type PublicReason =
   | 'speech-alignment-input'
   | 'speech-alignment-window'
   | 'speech-alignment-model'
+  | 'speech-alignment-resources'
   | 'speech-worker-exit'
   | 'report-save-failed'
 export type SpeechFailureKind = 'startup' | 'process-exit' | 'protocol'
