@@ -201,7 +201,7 @@ html[data-theme='light'] .preferences-dialog {
 }
 .preferences-dialog .settings-layout {
   display: grid;
-  grid-template-columns: minmax(176px, max-content) minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 475px;
 }
 .preferences-dialog .settings-nav {
@@ -643,9 +643,6 @@ html[data-theme='light'] .preferences-dialog {
 }
 .preferences-dialog .resource-actions .primary {
   margin-left: auto;
-}
-.preferences-dialog.settings:has([data-value='resources'][aria-current='true']) {
-  width: 870px;
 }
 .preferences-dialog .settings-main {
   min-width: 0;
@@ -1345,9 +1342,6 @@ html[data-theme='light'] .preferences-dialog {
   flex-shrink: 0;
 }
 
-.preferences-dialog.settings:has([data-value='diagnostics'][aria-current='true']) {
-  height: 502px;
-}
 .preferences-dialog .settings-main:has(.diagnostic-collection) > .modal-heading {
   margin-bottom: 18px;
 }
