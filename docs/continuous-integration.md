@@ -24,6 +24,32 @@ Full command definitions live in [`package.json`](../package.json).
 `npm test` retains its original complete application/harness-helper scope, including real FFmpeg tests, and therefore needs the managed audio runtime.
 `npm run check` retains the existing developer verification scope; Docker workflows and the separately prepared Python unit environment are explicit additional commands.
 
+## Local Command Reference
+
+Run from the checkout root after `npm ci`, using the Node version pinned in `package.json`.
+The linked workflow files define the selected checks and their GitHub execution steps; this reference explains how to invoke those checks locally, not a second executable PR flow.
+No Task dependency, Taskfile, or additional local PR runner is required.
+
+| Group | Local commands |
+| --- | --- |
+| Code quality | `npm run format:check`, `npm run lint`, `npm run deadcode`, `npm run typecheck` |
+| Build | `npm run build` |
+| JavaScript/TypeScript unit and tooling tests | `npm run test:unit`, `npm run test:runtime`, `npm run test:models`, `npm run test:release`, `npm run test:tooling` |
+| Python unit tests | Prepare the [Python unit environment](#python-unit-environment), then run `npm run test:python` with its interpreter selected |
+| Integration tests | Run `test:integration` and normal `test:harness` through the Docker commands below |
+| User workflows | Run the Docker base E2E command below |
+
+To reproduce the additional maintenance regression with an inherited release model path:
+
+```sh
+REDENCUT_MODELS_PATH="$PWD/.runtime/release-models" npm run test:unit -- harness/tests/clear-app-data.test.ts
+```
+
+The ordinary build works with uncommitted changes.
+CI additionally runs `node scripts/ci/BuildArtifact.mjs write` from a clean macOS arm64 checkout to prepare the checked build record; local compilation alone does not need that record.
+For local release preparation and its installed-runtime/model requirements, follow [GitHub Releases](github-releases.md#local-diagnosis-and-verification).
+Draft publication is a separate explicit action, not part of running local checks.
+
 ## Python Unit Environment
 
 Use Python 3.11 and the uv version recorded in [`runtime/runtime-lock.json`](../runtime/runtime-lock.json).
@@ -44,6 +70,23 @@ Real speech inference is not covered by these unit tests.
 
 Build the base image explicitly, then run the required suites through the [container entrypoint](../harness/container/README.md#run-tests).
 CI passes an empty disposable model directory so pre-existing developer model files cannot affect the result.
+To use the same isolated model directory locally:
+
+```sh
+# Explicit preparation: creates test directories, then builds the image.
+node scripts/ci/CiEnvironment.mjs prepare-docker
+sh harness/container/docker-harness.sh build base
+
+# Application integrations and normal harness integrations.
+sh harness/container/docker-harness.sh run base --models-path .runtime/ci-models -- npm run test:integration
+sh harness/container/docker-harness.sh run base --models-path .runtime/ci-models -- npm run test:harness
+
+# User workflows, including actual virtual-audio playback and export checks.
+sh harness/container/docker-harness.sh test e2e-base --models-path .runtime/ci-models
+```
+
+Image preparation needs Docker Engine and network access; the test commands require the prepared image and do not build it implicitly.
+Direct `npm run test:integration` is also available with an installed managed audio runtime, but use Docker for harness and user-workflow tests to avoid opening host Electron windows or using host audio.
 The existing `test harness` shortcut includes deliberate-crash tests; CI uses `run base -- npm run test:harness` instead.
 Do not replace that command with `test:harness:all` or a fault mode.
 
