@@ -7,13 +7,13 @@
 Both call the same underscore-prefixed reusable workflow files; those files run only through `workflow_call`.
 The underscore is a repository naming convention, not a GitHub privacy setting.
 
-| Group | Shared workflow | Environment and requirements |
-| --- | --- | --- |
-| Code quality | [`_code-quality.yml`](../.github/workflows/_code-quality.yml) | Ubuntu, pinned Node, npm dependencies; formatting, lint, unused-code analysis, and TypeScript are separate steps in one job |
-| Build | [`_build.yml`](../.github/workflows/_build.yml) | macOS arm64, pinned Node, npm dependencies; compiles application code and uploads it with a build record |
-| Unit tests | [`_unit-tests.yml`](../.github/workflows/_unit-tests.yml) | Separate Ubuntu JavaScript/TypeScript and Python jobs; no installed audio runtime, running Electron, or speech models |
-| Integration tests | [`_integration-tests.yml`](../.github/workflows/_integration-tests.yml) | Ubuntu with Docker; base image supplies managed FFmpeg/FFprobe, Electron, virtual display and private virtual audio |
-| User workflows | [`_user-workflows.yml`](../.github/workflows/_user-workflows.yml) | Same Docker base image; runs the existing base product E2Es without speech models |
+| Group             | Shared workflow                                                         | Environment and requirements                                                                                                |
+| ----------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Code quality      | [`_code-quality.yml`](../.github/workflows/_code-quality.yml)           | Ubuntu, pinned Node, npm dependencies; formatting, lint, unused-code analysis, and TypeScript are separate steps in one job |
+| Build             | [`_build.yml`](../.github/workflows/_build.yml)                         | macOS arm64, pinned Node, npm dependencies; compiles application code and uploads it with a build record                    |
+| Unit tests        | [`_unit-tests.yml`](../.github/workflows/_unit-tests.yml)               | Separate Ubuntu JavaScript/TypeScript and Python jobs; no installed audio runtime, running Electron, or speech models       |
+| Integration tests | [`_integration-tests.yml`](../.github/workflows/_integration-tests.yml) | Ubuntu with Docker; base image supplies managed FFmpeg/FFprobe, Electron, virtual display and private virtual audio         |
+| User workflows    | [`_user-workflows.yml`](../.github/workflows/_user-workflows.yml)       | Same Docker base image; runs the existing base product E2Es without speech models                                           |
 
 Unit tests also run the existing runtime, model, release, maintenance, and workflow-tooling suites.
 Those suites use temporary fixtures and controlled command substitutes; they do not provision models or create real release packages.
@@ -30,14 +30,14 @@ Run from the checkout root after `npm ci`, using the Node version pinned in `pac
 The linked workflow files define the selected checks and their GitHub execution steps; this reference explains how to invoke those checks locally, not a second executable PR flow.
 No Task dependency, Taskfile, or additional local PR runner is required.
 
-| Group | Local commands |
-| --- | --- |
-| Code quality | `npm run format:check`, `npm run lint`, `npm run deadcode`, `npm run typecheck` |
-| Build | `npm run build` |
-| JavaScript/TypeScript unit and tooling tests | `npm run test:unit`, `npm run test:runtime`, `npm run test:models`, `npm run test:release`, `npm run test:tooling` |
-| Python unit tests | Prepare the [Python unit environment](#python-unit-environment), then run `npm run test:python` with its interpreter selected |
-| Integration tests | Run `test:integration` and normal `test:harness` through the Docker commands below |
-| User workflows | Run the Docker base E2E command below |
+| Group                                        | Local commands                                                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Code quality                                 | `npm run format:check`, `npm run lint`, `npm run deadcode`, `npm run typecheck`                                               |
+| Build                                        | `npm run build`                                                                                                               |
+| JavaScript/TypeScript unit and tooling tests | `npm run test:unit`, `npm run test:runtime`, `npm run test:models`, `npm run test:release`, `npm run test:tooling`            |
+| Python unit tests                            | Prepare the [Python unit environment](#python-unit-environment), then run `npm run test:python` with its interpreter selected |
+| Integration tests                            | Run `test:integration` and normal `test:harness` through the Docker commands below                                            |
+| User workflows                               | Run the Docker base E2E command below                                                                                         |
 
 To reproduce the additional maintenance regression with an inherited release model path:
 

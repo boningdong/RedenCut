@@ -24,15 +24,15 @@ These are implementation proposals, not claims that the environments or executio
 
 ## Target Jobs
 
-| File | Jobs and execution |
-| --- | --- |
-| `_code-quality.yml` | Ubuntu: `npm ci`, then separately named formatting, lint, unused-code, and TypeScript steps |
-| `_build.yml` | macOS arm64: `npm ci`, production build, build record, compiled-output upload |
-| `_unit-tests.yml` | Ubuntu JavaScript/TypeScript job for unit and existing script-tooling suites; separate Ubuntu Python 3.11 job for worker unit tests |
-| `_integration-tests.yml` | Ubuntu Docker base image: application integration tests and normal harness integrations |
-| `_user-workflows.yml` | Ubuntu Docker base image: existing base E2Es |
-| `pr.yml` | Call all five shared workflows on PRs targeting `main` and pushes to `main` |
-| `release.yml` | Call all five on `v*` tags; package only after all pass, using their macOS Build artifact |
+| File                     | Jobs and execution                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `_code-quality.yml`      | Ubuntu: `npm ci`, then separately named formatting, lint, unused-code, and TypeScript steps                                         |
+| `_build.yml`             | macOS arm64: `npm ci`, production build, build record, compiled-output upload                                                       |
+| `_unit-tests.yml`        | Ubuntu JavaScript/TypeScript job for unit and existing script-tooling suites; separate Ubuntu Python 3.11 job for worker unit tests |
+| `_integration-tests.yml` | Ubuntu Docker base image: application integration tests and normal harness integrations                                             |
+| `_user-workflows.yml`    | Ubuntu Docker base image: existing base E2Es                                                                                        |
+| `pr.yml`                 | Call all five shared workflows on PRs targeting `main` and pushes to `main`                                                         |
+| `release.yml`            | Call all five on `v*` tags; package only after all pass, using their macOS Build artifact                                           |
 
 Shared workflows use `workflow_call` only.
 Keep existing serial execution within the application workflow test suite.

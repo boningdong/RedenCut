@@ -26,14 +26,14 @@ Release-only packaging and draft publication remain in `release.yml`.
 
 ## Check Groups
 
-| Group | Responsibility |
-| --- | --- |
-| Code quality | One job with separate formatting, lint, unused-code, and TypeScript-check steps |
-| Build | Compile the production application and upload its compiled files as a GitHub Actions artifact |
-| Unit tests | Separate JavaScript/TypeScript and Python jobs, without running Electron or real audio/speech tools |
-| Integration tests | Exercise application code with actual tools such as FFmpeg; model-dependent speech tests are deferred |
-| User workflows | Run existing Docker-based Electron tests for import, editing, playback, export, saving, and reopening; speech workflows are deferred |
-| Release package checks | Preserve existing runtime preparation, bundled-model preparation, packaging, verification, and draft publication |
+| Group                  | Responsibility                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Code quality           | One job with separate formatting, lint, unused-code, and TypeScript-check steps                                                      |
+| Build                  | Compile the production application and upload its compiled files as a GitHub Actions artifact                                        |
+| Unit tests             | Separate JavaScript/TypeScript and Python jobs, without running Electron or real audio/speech tools                                  |
+| Integration tests      | Exercise application code with actual tools such as FFmpeg; model-dependent speech tests are deferred                                |
+| User workflows         | Run existing Docker-based Electron tests for import, editing, playback, export, saving, and reopening; speech workflows are deferred |
+| Release package checks | Preserve existing runtime preparation, bundled-model preparation, packaging, verification, and draft publication                     |
 
 Document required tools, runtime files, and models beside the test commands and in relevant test documentation rather than putting these requirements into group names.
 Existing tooling tests for runtime, models, maintenance, and releases must remain covered; model-tooling tests do not imply running actual speech inference.
