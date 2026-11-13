@@ -1,9 +1,20 @@
-import { configureAppRuntime, AppRuntimeLocator } from '../../runtime/AppRuntimeLocator'
+import {
+  configureAppRuntime,
+  AppRuntimeLocator,
+  getFfprobePath,
+} from '../../runtime/AppRuntimeLocator'
 import { toIpcResult } from '../../ipc/ipcResult'
 import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { probeAudio } from './probeAudio'
+import type * as RuntimeModule from '../../runtime/AppRuntimeLocator'
+
+// Fake process tests must not resolve an installed executable first.
+vi.mock('../../runtime/AppRuntimeLocator', async (original) => ({
+  ...(await original<typeof RuntimeModule>()),
+  getFfprobePath: vi.fn(() => '/test-runtime/ffprobe'),
+}))
 
 afterEach(() => vi.unstubAllEnvs())
 
@@ -58,6 +69,13 @@ describe('probeAudio cancellation', () => {
 })
 
 it('preserves actionable managed-runtime errors at the probe boundary', async () => {
+  vi.mocked(getFfprobePath).mockImplementationOnce(() =>
+    new AppRuntimeLocator({
+      packaged: true,
+      resourcesPath: '/missing-probe-test-runtime',
+      appPath: '',
+    }).getFfprobePath(),
+  )
   configureAppRuntime(
     new AppRuntimeLocator({
       packaged: true,

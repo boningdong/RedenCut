@@ -21,3 +21,14 @@ export function recordedRms(path: string): number[] {
   for (let i = 0; i < samples.length; i++) samples[i] = pcm.readFloatLE(i * 4)
   return rmsWindows(samples)
 }
+
+// Compare complete recordings of the same source. Added capture silence and the
+// alignment of fixed-size RMS windows must not change a gain measurement.
+export function recordedLevelChangeDb(reference: number[], candidate: number[]): number {
+  const energy = (windows: number[]) => windows.reduce((sum, value) => sum + value ** 2, 0)
+  const original = energy(reference)
+  const changed = energy(candidate)
+  if (!(original > 0) || !(changed > 0) || !Number.isFinite(original + changed))
+    throw new Error('LEVEL_COMPARISON_REQUIRES_AUDIBLE_RECORDINGS')
+  return 10 * Math.log10(changed / original)
+}

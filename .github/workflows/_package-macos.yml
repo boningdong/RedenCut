@@ -1,0 +1,88 @@
+name: Package macOS
+
+on:
+  workflow_call:
+    inputs:
+      build-artifact-id:
+        description: Exact compiled application artifact from the shared Build job
+        required: true
+        type: string
+      require-tag:
+        description: Require the triggering tag to match the package version
+        required: true
+        type: boolean
+    secrets:
+      HF_TOKEN:
+        required: true
+    outputs:
+      artifact-id:
+        description: Verified DMG, checksums, metadata and release notes
+        value: ${{ jobs.package.outputs.artifact-id }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 120
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    env:
+      REDENCUT_MODELS_PATH: ${{ github.workspace }}/.runtime/release-models
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: Verify release platform, version, source and tag
+        if: inputs.require-tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node scripts/release/VerifyReleaseTag.mjs
+      - name: Verify test platform, version and source without a release tag
+        if: ${{ !inputs.require-tag }}
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node scripts/release/VerifyReleaseTag.mjs --without-tag
+      - name: Download this execution's compiled application
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ inputs.build-artifact-id }}
+          path: .
+          merge-multiple: true
+      - name: Verify compiled application source and checksums
+        run: node scripts/ci/BuildArtifact.mjs verify
+      - name: Check model credential
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: node scripts/ci/CiEnvironment.mjs require-model-token
+      - name: Install build prerequisites
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: node scripts/release/InstallMacPrerequisites.mjs
+      - name: Install packaging dependencies
+        run: npm ci
+      - name: Build pinned runtime
+        run: npm run setup:runtime
+      - name: Prepare bundled diarization model
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: npm run setup:models -- --model diarization-default
+      - name: Verify bundled diarization model
+        run: npm run check:models -- --model diarization-default
+      - name: Package the verified build and verify release files
+        run: npm run release:prepare -- --build-record dist-electron/build-record.json
+      - name: Upload verified release files
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-macos-arm64-${{ github.run_attempt }}
+          path: dist-electron/releases/
+          if-no-files-found: error
+          retention-days: 7

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { parseArguments } from './PrepareRelease.mjs'
+import { writeBuildRecord, BUILD_RECORD_PATH } from '../ci/BuildArtifact.mjs'
 
 const entry = resolve(import.meta.dirname, 'PrepareRelease.mjs')
 
@@ -31,7 +32,7 @@ test('invalid model path arguments fail before preparation can run commands', ()
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'redencut-prepare-'))
   t.after(() => rm(root, { recursive: true, force: true }))
-  await writeFile(join(root, '.gitignore'), 'dist-electron/\n')
+  await writeFile(join(root, '.gitignore'), 'dist-electron/\nout/\n')
   await writeFile(join(root, 'package.json'), JSON.stringify({ version: '0.1.0-beta' }))
   await writeFile(
     join(root, 'package-lock.json'),
@@ -45,6 +46,64 @@ async function fixture(t) {
   git('commit', '-qm', 'fixture')
   return { root }
 }
+
+test('prebuilt release validates compiled files, skips repeated checks, and forwards the record', async (t) => {
+  const { prepareRelease } = await import('./PrepareRelease.mjs')
+  const { root } = await fixture(t)
+  for (const path of ['main/index.js', 'preload/index.js', 'renderer/index.html']) {
+    await mkdir(join(root, 'out', path, '..'), { recursive: true })
+    await writeFile(join(root, 'out', path), 'compiled')
+  }
+  await writeBuildRecord({ root, platform: 'darwin', arch: 'arm64' })
+  const calls = []
+  await prepareRelease({
+    root,
+    buildRecord: BUILD_RECORD_PATH,
+    platform: 'darwin',
+    arch: 'arm64',
+    run: async (command, args) => {
+      calls.push({ command, args })
+      if (command === 'npm' && args[1] === 'package:mac') {
+        assert.deepEqual(args.slice(-2), ['--build-record', BUILD_RECORD_PATH])
+        const packaged = join(root, 'dist-electron/package')
+        const runtime = join(packaged, 'mac-arm64/RedenCut.app/Contents/Resources/runtime')
+        await mkdir(runtime, { recursive: true })
+        await writeFile(join(runtime, 'manifest.json'), JSON.stringify({ runtimeId: 'fixture' }))
+        await writeFile(join(packaged, 'RedenCut-0.1.0-beta-arm64.dmg'), 'fixture')
+      }
+    },
+  })
+  assert.deepEqual(
+    calls.filter(({ command }) => command === 'npm').map(({ args }) => args[1]),
+    ['check:runtime', 'package:mac'],
+  )
+  await assert.rejects(
+    prepareRelease({
+      root,
+      buildRecord: BUILD_RECORD_PATH,
+      platform: 'darwin',
+      arch: 'arm64',
+      run: async (command) => {
+        if (command === 'hdiutil')
+          await writeFile(join(root, 'out/main/index.js'), 'changed during packaging')
+      },
+    }),
+    /checksums/,
+  )
+  await assert.rejects(
+    prepareRelease({
+      root,
+      buildRecord: BUILD_RECORD_PATH,
+      platform: 'darwin',
+      arch: 'arm64',
+      run: () => assert.fail('No commands for invalid build'),
+    }),
+    /checksums/,
+  )
+  await assert.rejects(readFile(join(root, 'dist-electron/releases/v0.1.0-beta/release.json')), {
+    code: 'ENOENT',
+  })
+})
 
 test('preparation forwards the explicit model path to packaging and produces verified release metadata', async (t) => {
   const { prepareRelease } = await import('./PrepareRelease.mjs')

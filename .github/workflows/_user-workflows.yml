@@ -1,0 +1,38 @@
+name: User workflows
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  users:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: Prepare isolated model and evidence directories
+        run: node scripts/ci/CiEnvironment.mjs prepare-docker
+      - name: Build managed audio test environment
+        run: sh harness/container/docker-harness.sh build base
+      - name: Editing, playback, export and project workflows
+        run: sh harness/container/docker-harness.sh test e2e-base --models-path .runtime/ci-models
+      - name: Collect container evidence
+        if: always()
+        run: node scripts/ci/CiEnvironment.mjs collect-docker
+      - name: Retain user-workflow evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: user-workflow-evidence-${{ github.run_attempt }}
+          path: .harness-runs/container/
+          include-hidden-files: true
+          retention-days: 7

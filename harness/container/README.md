@@ -48,6 +48,9 @@ sh harness/container/docker-harness.sh test e2e-all --models-path /absolute/path
 
 `test harness` runs the existing full normal/fault suite inside the base image's virtual display.
 Fault tests deliberately crash or terminate isolated processes; no host Electron is launched.
+For normal harness integrations only, use `sh harness/container/docker-harness.sh run base -- npm run test:harness`.
+For application integrations requiring the managed audio tools, use `sh harness/container/docker-harness.sh run base -- npm run test:integration`.
+PR/release CI runs these two groups and base E2Es, not the full normal/fault shortcut; see [continuous integration](../../docs/continuous-integration.md).
 The `node --test` command runs an MCP client on the host against the real container server, including screenshot delivery, rebuild/restart, and cleanup.
 It requires the host project's npm dependencies to be installed.
 `e2e-base` runs the [product E2Es](../../e2e/README.md) that need only the base image, including missing speech setup feedback. `e2e-speech` runs real speech and speech fault cases. `e2e-all` runs both sets in the speech image. The speech suites require an existing application model fixture and never download it.
@@ -74,11 +77,11 @@ See [speech models and dependencies](../../docs/speech-models-and-dependencies.m
 
 `run`, `mcp`, and `test` resolve host models in this order:
 
-| Priority | Model path source |
-| --- | --- |
-| 1 | Explicit `--models-path DIRECTORY` |
-| 2 | `REDENCUT_MODELS_PATH` |
-| 3 | Platform RedenCut application models directory; macOS: `~/Library/Application Support/RedenCut/models` |
+| Priority | Model path source                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------ |
+| 1        | Explicit `--models-path DIRECTORY`                                                                     |
+| 2        | `REDENCUT_MODELS_PATH`                                                                                 |
+| 3        | Platform RedenCut application models directory; macOS: `~/Library/Application Support/RedenCut/models` |
 
 An existing directory is mounted read-only at `/models`, with `REDENCUT_MODELS_PATH=/models` inside the container.
 There is no Docker model volume or model acquisition action.
@@ -106,15 +109,15 @@ AI-client configuration is a separate explicit step; successfully testing this e
 
 ## Files and lifetime
 
-| Host/image contents | Container path | Access/lifetime |
-| --- | --- | --- |
-| Current checkout, including uncommitted files | `/source` | Read-only bind mount; do not use an untrusted checkout |
-| Source snapshot copied at startup | `/workspace` | Writable private container layer; excludes dependencies, outputs, `.env*` and Git storage |
-| Checkout's Git common directory | Same absolute path as host | Read-only, for linked-worktree provenance |
-| Image's Linux dependencies | `/workspace/node_modules` | Private anonymous volume per container |
-| Build output | `/workspace/out` | Private anonymous volume per container |
-| Resolved host application model directory, when present | `/models` | Read-only shared bind mount; never downloaded or modified by tests |
-| Host `.harness-runs/container/` | `/workspace/.harness-runs` | Writable retained evidence |
+| Host/image contents                                     | Container path             | Access/lifetime                                                                           |
+| ------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
+| Current checkout, including uncommitted files           | `/source`                  | Read-only bind mount; do not use an untrusted checkout                                    |
+| Source snapshot copied at startup                       | `/workspace`               | Writable private container layer; excludes dependencies, outputs, `.env*` and Git storage |
+| Checkout's Git common directory                         | Same absolute path as host | Read-only, for linked-worktree provenance                                                 |
+| Image's Linux dependencies                              | `/workspace/node_modules`  | Private anonymous volume per container                                                    |
+| Build output                                            | `/workspace/out`           | Private anonymous volume per container                                                    |
+| Resolved host application model directory, when present | `/models`                  | Read-only shared bind mount; never downloaded or modified by tests                        |
+| Host `.harness-runs/container/`                         | `/workspace/.harness-runs` | Writable retained evidence                                                                |
 
 The launcher snapshots and builds current source at startup because electron-vite writes temporary config files beside its configuration.
 Host source edits require closing and recreating the container; `redencut_restart` with `rebuild: true` rebuilds the same container snapshot, not newer host files.

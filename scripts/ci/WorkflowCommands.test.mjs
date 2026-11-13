@@ -18,19 +18,22 @@ function npmScripts(shell) {
     if (/^\s*(?:#|$)/.test(line)) continue
     if (/^\s*echo\s+(?:'[^']*'|"[^"$`\\]*")\s*$/.test(line)) continue
     if (!/\bnpm\b/.test(line.split('#')[0])) continue
-    const tokens = line.trim().match(/[^\s]+/g)
-    assert.match(line.trim(), /^npm\s/, 'Workflow npm scripts must use standalone literal commands')
+    const command = line
+      .trim()
+      .replace(/^sh harness\/container\/docker-harness\.sh run base --models-path [\w./-]+ -- /, '')
+    const tokens = command.match(/[^\s]+/g)
+    assert.match(command, /^npm\s/, 'Workflow npm scripts must use standalone literal commands')
     if (['ci', 'install'].includes(tokens[1])) {
       assert.match(
-        line.trim(),
+        command,
         /^npm (?:ci|install)(?:\s+[\w./:@=-]+)*(?:\s+#.*)?$/,
         'Workflow npm scripts must use standalone literal commands',
       )
       continue
     }
     assert.match(
-      line.trim(),
-      /^npm (?:run|run-script) [\w:-]+(?:\s+[\w./:-]+)*(?:\s+#.*)?$/,
+      command,
+      /^npm (?:run|run-script) [\w:-]+(?:\s+[\w./:=-]+)*(?:\s+#.*)?$/,
       'Workflow npm scripts must use standalone literal commands',
     )
     scripts.push(tokens[2])
@@ -46,8 +49,10 @@ echo "npm run removed"
 npm run setup:runtime
 npm run setup:models -- --model diarization-default
 npm run-script check # verify resources
+sh harness/container/docker-harness.sh run base --models-path .runtime/ci-models -- npm run test:integration
+npm run test:unit -- --reporter=junit --outputFile=dist-electron/unit.xml
 `),
-    ['setup:runtime', 'setup:models', 'check'],
+    ['setup:runtime', 'setup:models', 'check', 'test:integration', 'test:unit'],
   )
   for (const command of [
     'npm run "$TASK"',
@@ -142,8 +147,10 @@ else if (script === 'setup:models') {
 `,
   )
   await chmod(executable, 0o755)
-  const { jobs } = parse(await readFile(join(repository, '.github/workflows/release.yml'), 'utf8'))
-  const job = jobs.release
+  const { jobs } = parse(
+    await readFile(join(repository, '.github/workflows/_package-macos.yml'), 'utf8'),
+  )
+  const job = jobs.package
   const environment = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH}`,
@@ -178,13 +185,21 @@ test('actual release workflow prepares tools and the bundled model in one explic
     .map(JSON.parse)
   assert.deepEqual(
     calls.map(({ script }) => script),
-    ['setup:runtime', 'setup:models', 'check:models', 'release:prepare', 'release:draft'],
+    ['setup:runtime', 'setup:models', 'check:models', 'release:prepare'],
   )
   assert.ok(calls.every(({ models }) => models === join(fixture.root, '.runtime/release-models')))
   assert.deepEqual(
     calls.map(({ token }) => token),
-    [false, true, false, false, false],
+    [false, true, false, false],
   )
+  assert.deepEqual(calls.find(({ script }) => script === 'release:prepare').args, [
+    '--',
+    '--build-record',
+    'dist-electron/build-record.json',
+  ])
+  assert.equal((await readdir(fixture.root)).includes('draft-ready'), false)
+  const { jobs } = parse(await readFile(join(repository, '.github/workflows/release.yml'), 'utf8'))
+  runReleaseSteps({ ...fixture, job: jobs.publish })
   assert.equal(await readFile(join(fixture.root, 'draft-ready'), 'utf8'), 'ready')
 })
 

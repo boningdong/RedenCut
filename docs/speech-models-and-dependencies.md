@@ -27,17 +27,18 @@ The application resolves verified paths and passes them to the Python worker; th
 
 ## Models and runtime tools
 
-| Capability | Model | Acquisition | Included in release |
-| --- | --- | --- | --- |
-| Recommended transcription | whisper.cpp multilingual small (`transcription-default`) | UI or CLI; public | No; user download |
-| Optional transcription | whisper.cpp medium and large-v3 | UI selection or CLI `--model`; public | No; user download |
-| Transcription smoke | whisper.cpp multilingual tiny | CLI `--set smoke`; public | No |
-| Chinese alignment | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn` | UI or CLI; public | No; user download |
-| English alignment | `facebook/wav2vec2-base-960h` | UI or CLI; public | No; user download |
-| Speaker separation | `pyannote/speaker-diarization-community-1` | Authorized developer/release CLI acquisition | Yes; pinned model in Resources |
+| Capability                | Model                                                    | Acquisition                                  | Included in release            |
+| ------------------------- | -------------------------------------------------------- | -------------------------------------------- | ------------------------------ |
+| Recommended transcription | whisper.cpp multilingual small (`transcription-default`) | UI or CLI; public                            | No; user download              |
+| Optional transcription    | whisper.cpp medium and large-v3                          | UI selection or CLI `--model`; public        | No; user download              |
+| Transcription smoke       | whisper.cpp multilingual tiny                            | CLI `--set smoke`; public                    | No                             |
+| Chinese alignment         | `jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn`    | UI or CLI; public                            | No; user download              |
+| English alignment         | `facebook/wav2vec2-base-960h`                            | UI or CLI; public                            | No; user download              |
+| Speaker separation        | `pyannote/speaker-diarization-community-1`               | Authorized developer/release CLI acquisition | Yes; pinned model in Resources |
 
 Model weights are separate from runtime tools.
 `setup:runtime` prepares FFmpeg, FFprobe, whisper-cli, pinned Python and its locked libraries; it does not install model weights or request Hugging Face access.
+Model-free worker unit tests use a separate Python 3.11 environment containing only the locked `unit` dependency group; see [Python unit environment](continuous-integration.md#python-unit-environment).
 Whisper is invoked as a native executable; alignment and diarization run in the managed Python worker with WhisperX, PyTorch and pyannote.audio.
 Prepared inference is offline and does not receive Hugging Face credentials.
 Linux Docker regression and native macOS release verification remain distinct lanes; successful Linux tests do not certify signed macOS distribution.
@@ -65,11 +66,11 @@ Path precedence is **`--models-path` > `REDENCUT_MODELS_PATH` > application defa
 Installing into a custom directory does not persist it as a new application default; pass it again to development, testing or packaging, or export the environment variable.
 The argument means the model root, not permission to overwrite unrelated models.
 
-| Platform | Default model directory |
-| --- | --- |
-| macOS | `~/Library/Application Support/RedenCut/models/` |
-| Windows | `%APPDATA%/RedenCut/models/` |
-| Linux | `$XDG_CONFIG_HOME/RedenCut/models/`, or `~/.config/RedenCut/models/` |
+| Platform | Default model directory                                              |
+| -------- | -------------------------------------------------------------------- |
+| macOS    | `~/Library/Application Support/RedenCut/models/`                     |
+| Windows  | `%APPDATA%/RedenCut/models/`                                         |
+| Linux    | `$XDG_CONFIG_HOME/RedenCut/models/`, or `~/.config/RedenCut/models/` |
 
 Development uses the platform RedenCut directory even when launched outside the dev wrapper; isolated harness sessions use their own `userData/models` when no override is provided.
 The developer CLI uses the platform RedenCut application directory; Docker resolves that host directory before starting a container.
@@ -92,10 +93,10 @@ Installer locks record local process ownership; a retry recovers locks left by a
 
 ## Three execution scenarios
 
-| Model | Local development | Local Docker application tests | Packaged application |
-| --- | --- | --- | --- |
-| Whisper | Shared root `transcription/<id>/<revision>` | Same host weights mounted at `/models/transcription/<id>/<revision>` | Writable `userData/models/transcription/<id>/<revision>` |
-| Alignment | Shared root `alignment/<id>/<revision>` | Same host weights mounted at `/models/alignment/<id>/<revision>` | Writable `userData/models/alignment/<id>/<revision>` |
+| Model       | Local development                                        | Local Docker application tests                                                    | Packaged application                                                    |
+| ----------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Whisper     | Shared root `transcription/<id>/<revision>`              | Same host weights mounted at `/models/transcription/<id>/<revision>`              | Writable `userData/models/transcription/<id>/<revision>`                |
+| Alignment   | Shared root `alignment/<id>/<revision>`                  | Same host weights mounted at `/models/alignment/<id>/<revision>`                  | Writable `userData/models/alignment/<id>/<revision>`                    |
 | Diarization | Shared root `diarization/diarization-default/<revision>` | Same host weights mounted at `/models/diarization/diarization-default/<revision>` | Read-only `Resources/models/diarization/diarization-default/<revision>` |
 
 Docker uses one read-only model mount; test settings, projects and output remain isolated in the run directory.
@@ -121,15 +122,15 @@ sh harness/container/docker-harness.sh build speech
 sh harness/container/docker-harness.sh test e2e-speech --models-path /absolute/path/models
 ```
 
-| Command or selection | Scope |
-| --- | --- |
-| `check:runtime` | Validate the prepared native runtime, executable loading and managed Python dependencies; no model downloads |
-| `setup:models` / `--set default` | Recommended Whisper small, both alignment models and diarization |
-| `setup:models -- --set text` | Recommended Whisper small and both alignment models; no gated diarization |
-| `setup:models -- --set smoke` | Whisper tiny only |
-| `setup:models -- --model <id>` | One manifest model, including optional medium or large-v3 |
-| `check:models` | Offline identity and file-integrity verification; no download or runtime load test |
-| `clear:models -- --models-path <directory>` | Explicit developer cleanup; exit the app first; never removes bundled Resources |
+| Command or selection                        | Scope                                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `check:runtime`                             | Validate the prepared native runtime, executable loading and managed Python dependencies; no model downloads |
+| `setup:models` / `--set default`            | Recommended Whisper small, both alignment models and diarization                                             |
+| `setup:models -- --set text`                | Recommended Whisper small and both alignment models; no gated diarization                                    |
+| `setup:models -- --set smoke`               | Whisper tiny only                                                                                            |
+| `setup:models -- --model <id>`              | One manifest model, including optional medium or large-v3                                                    |
+| `check:models`                              | Offline identity and file-integrity verification; no download or runtime load test                           |
+| `clear:models -- --models-path <directory>` | Explicit developer cleanup; exit the app first; never removes bundled Resources                              |
 
 Public model preparation continues independently if gated diarization fails; the command reports failures and exits nonzero so readiness cannot be mistaken for success.
 Application Text editing downloads prepare Whisper/alignment; development diarization guidance points to `setup:models`, followed by Validate.

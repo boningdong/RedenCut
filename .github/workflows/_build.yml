@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  workflow_call:
+    outputs:
+      artifact-id:
+        description: Verified macOS compiled application artifact
+        value: ${{ jobs.build.outputs.artifact-id }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: Build application
+        run: npm run build
+      - name: Record source, target and compiled-file checksums
+        run: node scripts/ci/BuildArtifact.mjs write
+      - id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compiled-macos-arm64-${{ github.run_attempt }}
+          path: |
+            out/
+            dist-electron/build-record.json
+          if-no-files-found: error
+          retention-days: 7

@@ -5,20 +5,28 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { require as tsRequire } from 'tsx/cjs/api'
 import { artifactDigest, readReleaseState } from './ReleaseState.mjs'
+import { verifyBuildRecord } from '../ci/BuildArtifact.mjs'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const { resolveModelsPath } = tsRequire('../../src/main/resources/ModelsPath.ts', import.meta.url)
 
 export function parseArguments(args) {
-  if (args.length === 0) return {}
-  if (args.length === 2 && args[0] === '--models-path' && args[1] && !args[1].startsWith('--'))
-    return { modelsPath: args[1] }
-  throw new Error('Usage: npm run release:prepare -- [--models-path MODELS_DIRECTORY]')
+  const options = {}
+  for (let index = 0; index < args.length; index += 2) {
+    const key = { '--models-path': 'modelsPath', '--build-record': 'buildRecord' }[args[index]]
+    if (!key || options[key] || !args[index + 1] || args[index + 1].startsWith('--'))
+      throw new Error(
+        'Usage: npm run release:prepare -- [--models-path MODELS_DIRECTORY] [--build-record PATH]',
+      )
+    options[key] = args[index + 1]
+  }
+  return options
 }
 
 export async function prepareRelease({
   root = repository,
   modelsPath,
+  buildRecord,
   environment = process.env,
   platform = process.platform,
   arch = process.arch,
@@ -37,9 +45,17 @@ export async function prepareRelease({
   await mkdir(destination, { recursive: true })
   // A failed new build must never leave an older record eligible for upload.
   await rm(join(destination, 'release.json'), { force: true })
+  if (buildRecord) await verifyBuildRecord({ root, recordPath: buildRecord, platform, arch })
   await execute('npm', ['run', 'check:runtime'])
-  await execute('npm', ['run', 'check'])
-  await execute('npm', ['run', 'package:mac', '--', '--models-path', modelDirectory])
+  if (!buildRecord) await execute('npm', ['run', 'check'])
+  await execute('npm', [
+    'run',
+    'package:mac',
+    '--',
+    '--models-path',
+    modelDirectory,
+    ...(buildRecord ? ['--build-record', buildRecord] : []),
+  ])
   const packaged = join(root, 'dist-electron/package')
   await execute('codesign', [
     '--verify',
@@ -48,6 +64,7 @@ export async function prepareRelease({
     join(packaged, 'mac-arm64/RedenCut.app'),
   ])
   await execute('hdiutil', ['verify', join(packaged, initial.filename)])
+  if (buildRecord) await verifyBuildRecord({ root, recordPath: buildRecord, platform, arch })
   const final = await readReleaseState(root)
   if (JSON.stringify(final) !== JSON.stringify(initial))
     throw new Error('Source changed during release preparation; rebuild from a stable checkout.')

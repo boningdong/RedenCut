@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { AudioCapture, requireContainerAudio } from '../harness/audio/AudioCapture'
-import { recordedRms } from './audioAnalysis'
+import { recordedRms, recordedLevelChangeDb } from './audioAnalysis'
 import { McpTestSession } from './support/McpTestSession'
 
 // These assertions observe device recordings and visible controls, never application stores.
@@ -34,7 +34,10 @@ test('track volume and gain change real preview output and Normalize remains pla
           { timeout: 20_000 },
         )
         .toBeGreaterThanOrEqual(4)
-      await ui.call('browser_click', { target: '[aria-label="Pause"]' })
+      // Capture the complete source, not an arbitrary four-second slice whose
+      // loudest windows vary with device latency. Allow the output buffer to drain.
+      await ui.page.getByRole('button', { name: 'Play', exact: true }).waitFor({ timeout: 40_000 })
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       observations[name] = recordedRms(await capture.stop())
       capture = undefined
       await ui.screenshot(name)
@@ -67,6 +70,7 @@ test('track volume and gain change real preview output and Normalize remains pla
     const baseline = await record('unity')
     expect(baseline).toBeGreaterThan(0.002)
     // Hold the pointer down: audition must change before the undoable gesture commits.
+    await ui.call('browser_click', { target: '[aria-label="Skip to start"]' })
     await ui.call('browser_click', { target: '[aria-label="Play"]' })
     await ui.call('browser_click', { target: 'button[aria-label="Track 1 volume"]' })
     const slider = await ui.page.getByRole('slider', { name: 'Track 1 volume' }).boundingBox()
@@ -94,8 +98,11 @@ test('track volume and gain change real preview output and Normalize remains pla
     expect(silent).toBeLessThan(0.0001)
     await volume('End')
     await gain('-12')
-    const attenuated = await record('gain-minus12')
-    expect(20 * Math.log10(attenuated / baseline)).toBeCloseTo(-12, 0)
+    await record('gain-minus12')
+    expect(recordedLevelChangeDb(observations.unity, observations['gain-minus12'])).toBeCloseTo(
+      -12,
+      0,
+    )
     await gain('0')
     await ui.call('browser_click', { target: 'button:has-text("Effects")' })
     await ui.call('browser_click', { target: '[role="menuitemcheckbox"]' })
@@ -103,13 +110,10 @@ test('track volume and gain change real preview output and Normalize remains pla
     expect(await record('normalized')).toBeGreaterThan(0.002)
     expect(await ui.page.getByRole('alert').count()).toBe(0)
     await gain('-12')
-    const normalizedLow = await record('normalized-minus12')
-    const normalized =
-      [...observations.normalized]
-        .sort((a, b) => b - a)
-        .slice(0, 5)
-        .reduce((a, b) => a + b, 0) / 5
-    expect(20 * Math.log10(normalizedLow / normalized)).toBeCloseTo(-12, 0)
+    await record('normalized-minus12')
+    expect(
+      recordedLevelChangeDb(observations.normalized, observations['normalized-minus12']),
+    ).toBeCloseTo(-12, 0)
     // Exercise concurrent normalization on four visible tracks, matching the reported layout.
     for (let index = 2; index <= 4; index++) {
       await ui.call('redencut_prepare_dialog', {
@@ -141,4 +145,4 @@ test('track volume and gain change real preview output and Normalize remains pla
       await ui.close()
     }
   }
-}, 180_000)
+}, 240_000)

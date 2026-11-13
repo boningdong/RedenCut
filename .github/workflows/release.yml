@@ -1,4 +1,4 @@
-name: macOS release
+name: Release
 
 on:
   push:
@@ -13,60 +13,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  quality:
+    uses: ./.github/workflows/_code-quality.yml
+  build:
+    uses: ./.github/workflows/_build.yml
+  unit:
+    uses: ./.github/workflows/_unit-tests.yml
+  integration:
+    uses: ./.github/workflows/_integration-tests.yml
+  users:
+    uses: ./.github/workflows/_user-workflows.yml
+  package:
+    needs: [quality, build, unit, integration, users]
+    uses: ./.github/workflows/_package-macos.yml
+    with:
+      build-artifact-id: ${{ needs.build.outputs.artifact-id }}
+      require-tag: true
+    secrets:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  publish:
+    needs: [package]
     runs-on: macos-15
-    timeout-minutes: 120
-    env:
-      REDENCUT_MODELS_PATH: ${{ github.workspace }}/.runtime/release-models
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: package.json
           cache: npm
-      - name: Verify platform, version and tag
+      - name: Verify platform, version and tag before publication
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_COMMIT: ${{ github.sha }}
-        run: |
-          node --input-type=module <<'JS'
-          import { readReleaseState, assertReleaseTag } from './scripts/release/ReleaseState.mjs'
-          if (process.platform !== 'darwin' || process.arch !== 'arm64') throw new Error('macOS arm64 runner required')
-          const state = await readReleaseState(process.cwd())
-          assertReleaseTag(state, process.env.RELEASE_TAG, process.env.RELEASE_COMMIT)
-          console.log(`Building ${state.tag} from ${state.commit}`)
-          JS
-      - name: Check model credential
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          if [ -z "$HF_TOKEN" ]; then
-            echo '::error::Configure HF_TOKEN with access to pyannote/speaker-diarization-community-1 before releasing.'
-            exit 1
-          fi
-      - name: Install build prerequisites
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-        run: |
-          for tool in cmake ninja pkg-config; do
-            command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
-          done
-          npm ci
-      - name: Build pinned runtime
-        run: npm run setup:runtime
-      - name: Prepare bundled diarization model
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: npm run setup:models -- --model diarization-default
-      - name: Verify bundled diarization model
-        run: npm run check:models -- --model diarization-default
-      - name: Test, package and verify release files
-        run: npm run release:prepare
+        run: node scripts/release/VerifyReleaseTag.mjs
+      - name: Download this execution's verified release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.package.outputs.artifact-id }}
+          path: dist-electron/releases
+          merge-multiple: true
       - name: Create or refresh draft release
         env:
           GH_TOKEN: ${{ github.token }}

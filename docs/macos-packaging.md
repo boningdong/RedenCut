@@ -14,6 +14,8 @@ The version comes from `package.json`; the app ID is `dev.redencut.app`.
 This first packaging target is macOS arm64 only; Intel, Windows, and automatic updating are not included.
 
 The script builds the Electron application, stages and checks the existing managed runtime and model, packages the application, adds the managed resources after Electron signing, re-signs the outer application bundle, and checks the runtime again at its final installed-bundle path.
+For CI, `--build-record dist-electron/build-record.json` instead validates and uses the existing compiled `out/` files without rebuilding; source identity, target and file checksums must match the record.
+The default command still builds first; runtime/model staging and package verification remain enabled in both modes.
 Temporary resource staging directories are removed on completion or failure; downloader caches remain under `.runtime/`.
 Packaging writes the standard build/output directories and must not run concurrently with another build of this checkout.
 
@@ -49,6 +51,7 @@ A local test package is not evidence that all public-release compatibility and t
 
 For tag-triggered builds and Release drafts, follow [GitHub Releases](github-releases.md).
 The Actions workflow reuses this packaging command after preparing the runtime on its ARM64 runner.
+Its compiled application comes from the same execution's shared Build job; see [release build transfer](continuous-integration.md#release-build-transfer).
 
 ## Project document packages
 

@@ -14,6 +14,8 @@ import type { WorkspaceToken } from '../../shared/session.types'
 import { ExportCoordinator, type ExportChild } from '../audio/export/ExportCoordinator'
 import { SessionJobRegistry } from '../project/SessionJobRegistry'
 
+vi.mock('../runtime/AppRuntimeLocator', () => ({ getFfmpegPath: () => '/test-runtime/ffmpeg' }))
+
 type IpcHandler = (...args: unknown[]) => unknown
 
 const mocks = vi.hoisted(() => ({

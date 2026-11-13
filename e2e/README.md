@@ -3,6 +3,7 @@
 ## Fixed Tests and Agent Acceptance
 
 The TypeScript E2Es below are deterministic product regressions driven through MCP.
+PR and release CI run the base suite as the User workflows group; automatic speech suites are deferred in [issue #8](https://github.com/boningdong/RedenCut/issues/8).
 [Agent scenarios](scenarios/README.md) complement them with fixed user goals, adaptive UI actions, visible feedback and change-focused exploration; they do not replace automated assertions.
 Use the repository's [agent-testing skill](../.agents/skills/agent-testing/SKILL.md), for example: "Use $agent-testing to verify the editing workflow and the approved behavior changed in this task."
 Agent reports and their supporting evidence stay in the runtime's artifact directory, not in the scenario source folder.
@@ -50,6 +51,7 @@ npm run test:e2e:base -- project-import-save-reopen
 Each run retains screenshots, `ui-actions.jsonl`, WAV recordings, capture logs and successful observation reports under `.harness-runs/container/<runId>/`.
 Recordings are bounded to 120 seconds of audio; startup and stop have explicit deadlines, and only the owned recorder process is signaled.
 Audio checks use 100 ms RMS windows: at least five windows above 0.002 full-scale RMS for audible output; paused output must remain below 0.0001 after a one-second buffer allowance.
+Track-level gain comparisons record the complete fixture and compare summed window energy, avoiding changes caused by capture-start silence or RMS-window alignment; the expected -12 dB change retains its 0.5 dB tolerance.
 Rendered clip-position tolerances are 0.1–0.15 seconds, derived from visible ruler spacing; the displayed transport time has centisecond precision, and seek assertions account for mouse-coordinate rounding.
 These checks do not certify sample-exact source-position matching, device latency, transcription or host audio hardware.
 

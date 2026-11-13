@@ -14,8 +14,8 @@
     }
   },
   "pythonDependencies": {
-    "pyprojectSha256": "869404373296dd4e83770411f0131f2ff938debe7e62acd9be51811c2122079b",
-    "uvLockSha256": "8676b6a92f0b1197aa4486e49cd9e9672359e7beecda2d0218dbb8872c2fba66"
+    "pyprojectSha256": "941ac0d7687493c4eab42165ad7230d2b59e5eec33dee28aab7089ad5edd4eb9",
+    "uvLockSha256": "adb64492bb3fb5bdd6774c8a84af28987b202d4a5eb24a26e9cac99a93ffeaf0"
   },
   "sources": {
     "ffmpeg": {

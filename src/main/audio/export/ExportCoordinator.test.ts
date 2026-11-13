@@ -14,6 +14,8 @@ import {
 import type { WorkspaceToken } from '../../../shared/session.types'
 import { ExportCoordinator, type ExportChild } from './ExportCoordinator'
 
+vi.mock('../../runtime/AppRuntimeLocator', () => ({ getFfmpegPath: () => '/test-runtime/ffmpeg' }))
+
 const TOKEN = 'workspace-a' as WorkspaceToken
 const SOURCE_ID = '00000000-0000-4000-8000-000000000001' as AudioSourceId
 const roots: string[] = []

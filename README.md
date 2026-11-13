@@ -40,10 +40,10 @@ It combines the audio editing tools you need with local AI that turns recordings
 
 ### Supported audio formats
 
-| Operation | Formats |
-| --- | --- |
-| Import | WAV, MP3, FLAC, AAC, M4A, OGG, AIFF |
-| Export | MP3, WAV, FLAC, AAC |
+| Operation | Formats                             |
+| --------- | ----------------------------------- |
+| Import    | WAV, MP3, FLAC, AAC, M4A, OGG, AIFF |
+| Export    | MP3, WAV, FLAC, AAC                 |
 
 ## Getting started
 
@@ -148,34 +148,36 @@ The complete command definitions live in [package.json](package.json).
 
 Scripts are ordered by the following responsibilities:
 
-| Group | Commands | Intended use |
-| --- | --- | --- |
-| Development | `dev`, `build`, `preview` | Everyday application development |
-| Setup | `setup:runtime`, `setup:models` | Prepare local tools and model files |
-| Validation | `check`, `check:runtime`, `check:models` | Check the codebase or installed resources |
-| Formatting and analysis | `format`, `format:check`, `lint`, `deadcode`, `typecheck` | Individual source-quality checks |
-| Maintenance | `clear:onboarding`, `clear:models` | Explicit local-data cleanup; exit the app first |
-| Distribution | `package:mac`, `release:prepare`, `release:draft` | Maintainer packaging and release entrypoints |
-| Runtime helpers | `runtime:build`, `runtime:stage` | Lower-level building and staging; normal setup and packaging entrypoints are preferred |
-| MCP server | `harness:mcp` | Direct server entry; use the Docker MCP launcher for container acceptance |
-| Performance | `profile:timeline`, `profile:waveform` | Developer benchmarks |
-| Default tests | `test`, `test:watch` | Run once or iterate in watch mode |
-| Tooling tests | `test:runtime`, `test:models`, `test:release`, `test:tooling` | Suites included in `check`, also callable for diagnosis |
-| Harness runners | `test:harness`, `test:harness:faults`, `test:harness:all` | Integration runners normally invoked through Docker |
-| Product E2E runners | `test:e2e:base`, `test:e2e:speech`, `test:e2e:all` | Product runners normally invoked through Docker |
+| Group                   | Commands                                                      | Intended use                                                                               |
+| ----------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Development             | `dev`, `build`, `preview`                                     | Everyday application development                                                           |
+| Setup                   | `setup:runtime`, `setup:models`                               | Prepare local tools and model files                                                        |
+| Validation              | `check`, `check:runtime`, `check:models`                      | Check the codebase or installed resources                                                  |
+| Formatting and analysis | `format`, `format:check`, `lint`, `deadcode`, `typecheck`     | Individual source-quality checks                                                           |
+| Maintenance             | `clear:onboarding`, `clear:models`                            | Explicit local-data cleanup; exit the app first                                            |
+| Distribution            | `package:mac`, `release:prepare`, `release:draft`             | Maintainer packaging and release entrypoints                                               |
+| Runtime helpers         | `runtime:build`, `runtime:stage`                              | Lower-level building and staging; normal setup and packaging entrypoints are preferred     |
+| MCP server              | `harness:mcp`                                                 | Direct server entry; use the Docker MCP launcher for container acceptance                  |
+| Performance             | `profile:timeline`, `profile:waveform`                        | Developer benchmarks                                                                       |
+| Default tests           | `test`, `test:watch`                                          | Run once or iterate in watch mode                                                          |
+| Selected test groups    | `test:unit`, `test:integration`, `test:python`                | Runtime-free JS/TS units, managed-audio integrations, and separately prepared Python units |
+| Tooling tests           | `test:runtime`, `test:models`, `test:release`, `test:tooling` | Suites included in `check`, also callable for diagnosis                                    |
+| Harness runners         | `test:harness`, `test:harness:faults`, `test:harness:all`     | Integration runners normally invoked through Docker                                        |
+| Product E2E runners     | `test:e2e:base`, `test:e2e:speech`, `test:e2e:all`            | Product runners normally invoked through Docker                                            |
 
 Use the Docker harness for integration and product E2E runners; see the references below for prerequisites and UI acceptance.
 The timeline benchmark measures history retention and edit comparison, not end-to-end UI latency; see the [CoW performance report](docs/superpowers/reports/2026-09-27-timeline-cow.md).
 
 ### Technical references
 
-| Topic | Documentation |
-| --- | --- |
-| Architecture and code standards | [Architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), [file organization](docs/file-organization-standards.md) |
-| Transcript tasks, reruns, and presentation | [Transcript processing](docs/transcript-processing.md) |
-| Speech runtimes, models, and credentials | [Speech models and dependencies](docs/speech-models-and-dependencies.md) |
-| Automated tests and UI acceptance | [Docker harness](harness/container/README.md), [product E2Es](e2e/README.md), [acceptance scenarios](e2e/scenarios/README.md) |
-| Build a macOS package or prepare a release | [macOS packaging](docs/macos-packaging.md), [GitHub Releases](docs/github-releases.md) |
+| Topic                                      | Documentation                                                                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Architecture and code standards            | [Architecture](docs/architecture-standards.md), [coding standards](docs/coding-standards.md), [file organization](docs/file-organization-standards.md) |
+| Transcript tasks, reruns, and presentation | [Transcript processing](docs/transcript-processing.md)                                                                                                 |
+| Speech runtimes, models, and credentials   | [Speech models and dependencies](docs/speech-models-and-dependencies.md)                                                                               |
+| Automated tests and UI acceptance          | [Docker harness](harness/container/README.md), [product E2Es](e2e/README.md), [acceptance scenarios](e2e/scenarios/README.md)                          |
+| PR and release checks                      | [Continuous integration](docs/continuous-integration.md)                                                                                               |
+| Build a macOS package or prepare a release | [macOS packaging](docs/macos-packaging.md), [GitHub Releases](docs/github-releases.md)                                                                 |
 
 ## Contributing
 

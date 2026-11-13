@@ -17,6 +17,10 @@ dependencies = [
   "whisperx==3.8.6",
 ]
 
+# Model-free tests use the same resolved packages as the inference environment.
+[dependency-groups]
+unit = ["numpy", "nltk"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/redencut_speech_worker"]
 
