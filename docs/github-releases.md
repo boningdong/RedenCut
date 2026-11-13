@@ -3,7 +3,8 @@
 ## Release pipeline
 
 Pushing a `v*` tag runs `.github/workflows/release.yml` and the same reusable checks used for PRs; see [continuous integration](continuous-integration.md).
-After every selected check passes, its release-only job on macOS 15 ARM64 checks the tag, downloads and validates that execution's compiled application, builds the pinned native runtime, prepares the bundled diarization model, packages and verifies the DMG, then creates a GitHub Release **draft**.
+After all five shared check groups pass, `_package-macos.yml` on macOS 15 ARM64 checks the tag, downloads and validates that execution's compiled application, builds the pinned native runtime, prepares the bundled diarization model, and packages and verifies the DMG.
+It uploads the verified release files as an Actions artifact; a separate publication job downloads that exact artifact, rechecks source identity and checksums, then creates a GitHub Release **draft**.
 Versions containing a prerelease suffix, including `0.1.0-alpha.2`, are marked as prereleases and are not marked Latest.
 There is no updater, Developer ID signing or Apple notarization in this pipeline.
 
@@ -18,6 +19,23 @@ Native source archives and Python packages are checked against the existing runt
 The initial workflow deliberately builds the runtime afresh on each run; it does not depend on a developer machine, a self-hosted runner, or a shared native build cache.
 It can take substantially longer than a local package using an already prepared runtime.
 The runtime source archives and license material remain inside the app resources.
+
+## Test a release before tagging
+
+1. Ensure `release-test.yml` has been merged into the default branch so GitHub offers its manual trigger.
+2. Open **Actions → Release (Test) → Run workflow**.
+3. Select the branch to test and start the run; only use trusted branches because packaging uses the repository's model-download credential.
+4. Wait for all five shared check groups and shared macOS packaging to pass.
+5. Open the run's **Artifacts** section and download `release-macos-arm64-<attempt>`.
+6. Extract the ZIP and open its `v<version>/` directory for the DMG, `SHA256SUMS.txt`, `release.json` and `release-notes.md`.
+
+**Release (Test)** runs only manually, not when opening a PR.
+It uses the same build transfer, runtime, model, signing, DMG and checksum checks as **Release**, but does not require a version tag or create a GitHub Release draft.
+Both paths validate the package/lockfile version, macOS arm64 platform and selected source commit.
+The test installer retains the package version; it does not reserve or bump a release version.
+Use `release.json` to distinguish candidates built from different commits with the same version.
+Actions artifacts are retained for seven days; download the candidate before expiry.
+The test needs the same `HF_TOKEN` setup as a formal release and builds the native runtime afresh.
 
 ## One-time repository setup
 
@@ -52,7 +70,7 @@ git tag -a "v$release_version" -m "RedenCut $release_version"
 git push origin "v$release_version"
 ```
 
-Open **Actions → macOS release** and wait for the tagged run to succeed.
+Open **Actions → Release** and wait for the tagged run to succeed.
 Open **Releases**, edit the generated draft's release notes, download the DMG and perform installation and core editing/speech checks.
 Publish through **Publish release** only when ready; leave the prerelease option enabled for alpha builds.
 The workflow does not publish the draft automatically.
@@ -87,8 +105,10 @@ Missing `HF_TOKEN`, denied model access, source download failures, failing tests
 After correcting a secret or resolving a transient download error, use **Re-run failed jobs** for the same tagged workflow run.
 If code must change, commit the fix and use a new version/tag rather than moving a published tag.
 
-If upload was interrupted, rerunning the release job reuses the matching compiled artifact, prepares the runtime/model again, repackages, and replaces only the existing draft's DMG, checksum and metadata assets; edited draft notes are preserved.
-Compiled artifacts have seven-day retention; after expiry, rerun all jobs to create a fresh Build artifact for the same tag rather than attempting to download an expired artifact.
+If draft upload was interrupted, rerunning the failed publication job reuses the verified package artifact without preparing the runtime/model or packaging again.
+It replaces only the existing draft's DMG, checksum and metadata assets; edited draft notes are preserved.
+Rerunning failed packaging reuses the matching compiled artifact, prepares the runtime/model again, and repackages.
+Compiled and packaged artifacts have seven-day retention; after expiry, rerun all jobs to create fresh artifacts for the same tag rather than attempting to download expired files.
 A published Release is never overwritten by the script, including when GitHub release immutability is disabled.
 The first successful build from that tag creates the draft; an existing published version requires a new version.
 Builds are tied to a source commit, but are not claimed to be byte-for-byte reproducible across runner or build-tool updates.

@@ -4,7 +4,8 @@
 
 [`pr.yml`](../.github/workflows/pr.yml) runs for PRs targeting `main` and pushes to `main`.
 [`release.yml`](../.github/workflows/release.yml) runs for `v*` tags.
-Both call the same underscore-prefixed reusable workflow files; those files run only through `workflow_call`.
+[`release-test.yml`](../.github/workflows/release-test.yml), displayed as **Release (Test)**, runs manually for a selected branch.
+All three call the same five underscore-prefixed reusable check workflows; those files run only through `workflow_call`.
 The underscore is a repository naming convention, not a GitHub privacy setting.
 
 | Group             | Shared workflow                                                         | Environment and requirements                                                                                                |
@@ -97,8 +98,8 @@ Uploads are limited to test-owned directories with seven-day retention; hosted-r
 
 ## Release Build Transfer
 
-Every release tag reruns the shared checks against that tag's commit.
-The release-only job waits for all selected groups, then downloads the exact artifact ID returned by the Build job in the same workflow execution.
+Every release tag and manual release test reruns the shared checks against its selected commit.
+Both entries call [`_package-macos.yml`](../.github/workflows/_package-macos.yml) after all five groups pass, passing the exact artifact ID returned by the Build job in the same workflow execution.
 It does not search for an earlier PR build.
 
 `dist-electron/build-record.json` records the source commit, package version, npm lockfile hash, macOS arm64 target, and complete compiled-file checksums.
@@ -108,6 +109,9 @@ The packaging job installs its own npm dependencies and prepares the existing na
 
 CI supplies `--build-record dist-electron/build-record.json` to release preparation so packaging validates and uses the compiled application without rebuilding it or repeating the completed shared checks.
 Default local packaging/release commands retain build-first behavior and their existing checks.
+Shared packaging uploads the verified DMG, checksums, source metadata and release notes as a seven-day Actions artifact.
+Only the formal release entry has a publication job, which downloads that exact package artifact and validates source identity and checksums again before creating or refreshing a release draft.
+Only that publication job has repository write permission; manual tests never create tags or GitHub Release drafts.
 This is a source/output consistency check, not a claim of reproducible builds or an independent signed provenance attestation.
 For credentials, package verification, retries, and draft publication, see [GitHub Releases](github-releases.md).
 
