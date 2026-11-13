@@ -147,8 +147,10 @@ else if (script === 'setup:models') {
 `,
   )
   await chmod(executable, 0o755)
-  const { jobs } = parse(await readFile(join(repository, '.github/workflows/release.yml'), 'utf8'))
-  const job = jobs.release
+  const { jobs } = parse(
+    await readFile(join(repository, '.github/workflows/_package-macos.yml'), 'utf8'),
+  )
+  const job = jobs.package
   const environment = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH}`,
@@ -183,18 +185,21 @@ test('actual release workflow prepares tools and the bundled model in one explic
     .map(JSON.parse)
   assert.deepEqual(
     calls.map(({ script }) => script),
-    ['setup:runtime', 'setup:models', 'check:models', 'release:prepare', 'release:draft'],
+    ['setup:runtime', 'setup:models', 'check:models', 'release:prepare'],
   )
   assert.ok(calls.every(({ models }) => models === join(fixture.root, '.runtime/release-models')))
   assert.deepEqual(
     calls.map(({ token }) => token),
-    [false, true, false, false, false],
+    [false, true, false, false],
   )
   assert.deepEqual(calls.find(({ script }) => script === 'release:prepare').args, [
     '--',
     '--build-record',
     'dist-electron/build-record.json',
   ])
+  assert.equal((await readdir(fixture.root)).includes('draft-ready'), false)
+  const { jobs } = parse(await readFile(join(repository, '.github/workflows/release.yml'), 'utf8'))
+  runReleaseSteps({ ...fixture, job: jobs.publish })
   assert.equal(await readFile(join(fixture.root, 'draft-ready'), 'utf8'), 'ready')
 })
 

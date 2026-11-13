@@ -1,0 +1,31 @@
+name: Release (Test)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    uses: ./.github/workflows/_code-quality.yml
+  build:
+    uses: ./.github/workflows/_build.yml
+  unit:
+    uses: ./.github/workflows/_unit-tests.yml
+  integration:
+    uses: ./.github/workflows/_integration-tests.yml
+  users:
+    uses: ./.github/workflows/_user-workflows.yml
+  package:
+    needs: [quality, build, unit, integration, users]
+    uses: ./.github/workflows/_package-macos.yml
+    with:
+      build-artifact-id: ${{ needs.build.outputs.artifact-id }}
+      require-tag: false
+    secrets:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}

@@ -1,4 +1,4 @@
-name: macOS release
+name: Release
 
 on:
   push:
@@ -23,12 +23,18 @@ jobs:
     uses: ./.github/workflows/_integration-tests.yml
   users:
     uses: ./.github/workflows/_user-workflows.yml
-  release:
+  package:
     needs: [quality, build, unit, integration, users]
+    uses: ./.github/workflows/_package-macos.yml
+    with:
+      build-artifact-id: ${{ needs.build.outputs.artifact-id }}
+      require-tag: true
+    secrets:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  publish:
+    needs: [package]
     runs-on: macos-15
-    timeout-minutes: 120
-    env:
-      REDENCUT_MODELS_PATH: ${{ github.workspace }}/.runtime/release-models
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -40,39 +46,17 @@ jobs:
         with:
           node-version-file: package.json
           cache: npm
-      - name: Verify platform, version and tag
+      - name: Verify platform, version and tag before publication
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_COMMIT: ${{ github.sha }}
         run: node scripts/release/VerifyReleaseTag.mjs
-      - name: Download this execution's compiled application
+      - name: Download this execution's verified release files
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          artifact-ids: ${{ needs.build.outputs.artifact-id }}
-          path: .
+          artifact-ids: ${{ needs.package.outputs.artifact-id }}
+          path: dist-electron/releases
           merge-multiple: true
-      - name: Verify compiled application source and checksums
-        run: node scripts/ci/BuildArtifact.mjs verify
-      - name: Check model credential
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: node scripts/ci/CiEnvironment.mjs require-model-token
-      - name: Install build prerequisites
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-        run: node scripts/release/InstallMacPrerequisites.mjs
-      - name: Install packaging dependencies
-        run: npm ci
-      - name: Build pinned runtime
-        run: npm run setup:runtime
-      - name: Prepare bundled diarization model
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: npm run setup:models -- --model diarization-default
-      - name: Verify bundled diarization model
-        run: npm run check:models -- --model diarization-default
-      - name: Package the verified build and verify release files
-        run: npm run release:prepare -- --build-record dist-electron/build-record.json
       - name: Create or refresh draft release
         env:
           GH_TOKEN: ${{ github.token }}
