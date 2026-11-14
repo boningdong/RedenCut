@@ -15,6 +15,7 @@
   <a href="#development">Development</a> ·
   <a href="#help-and-feedback">Bug Report</a>
 </p>
+
 > **Development preview:** RedenCut is under active development and currently focuses on macOS.
 
 ## What is RedenCut?
